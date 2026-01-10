@@ -44,9 +44,11 @@ const Header = () => {
 
           {/* CTA Button */}
           <div className="hidden lg:block">
-            <Button className="btn-primary">
-              Become a Member
-            </Button>
+            <a href="/auth">
+              <Button className="btn-primary">
+                Member Login
+              </Button>
+            </a>
           </div>
 
           {/* Mobile Menu Button */}
