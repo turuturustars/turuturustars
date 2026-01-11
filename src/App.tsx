@@ -12,6 +12,10 @@ import WelfarePage from "./pages/dashboard/WelfarePage";
 import ProfilePage from "./pages/dashboard/ProfilePage";
 import AnnouncementsPage from "./pages/dashboard/AnnouncementsPage";
 import MembersPage from "./pages/dashboard/MembersPage";
+import ApprovalsPage from "./pages/dashboard/ApprovalsPage";
+import AllContributionsPage from "./pages/dashboard/AllContributionsPage";
+import ReportsPage from "./pages/dashboard/ReportsPage";
+import TreasurerDashboard from "./pages/dashboard/TreasurerDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +36,10 @@ const App = () => (
             <Route path="profile" element={<ProfilePage />} />
             <Route path="announcements" element={<AnnouncementsPage />} />
             <Route path="members" element={<MembersPage />} />
+            <Route path="approvals" element={<ApprovalsPage />} />
+            <Route path="all-contributions" element={<AllContributionsPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="treasurer" element={<TreasurerDashboard />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

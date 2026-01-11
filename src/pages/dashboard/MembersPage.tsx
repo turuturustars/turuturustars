@@ -92,7 +92,7 @@ const MembersPage = () => {
     setFilteredMembers(filtered);
   };
 
-  const updateMemberStatus = async (memberId: string, newStatus: string) => {
+  const updateMemberStatus = async (memberId: string, newStatus: 'active' | 'dormant' | 'pending' | 'suspended') => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -287,7 +287,7 @@ const MembersPage = () => {
                       <TableCell>
                         <Select
                           value={member.status}
-                          onValueChange={(value) => updateMemberStatus(member.id, value)}
+                          onValueChange={(value: 'active' | 'dormant' | 'pending' | 'suspended') => updateMemberStatus(member.id, value)}
                         >
                           <SelectTrigger className="w-[120px]">
                             <SelectValue />
