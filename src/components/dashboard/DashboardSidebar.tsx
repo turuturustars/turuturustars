@@ -10,7 +10,8 @@ import {
   Star,
   FileText,
   UserCheck,
-  TrendingUp
+  TrendingUp,
+  PiggyBank,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +33,7 @@ const DashboardSidebar = () => {
     { label: 'Members', href: '/dashboard/members', icon: Users },
     { label: 'Pending Approvals', href: '/dashboard/approvals', icon: UserCheck },
     { label: 'All Contributions', href: '/dashboard/all-contributions', icon: TrendingUp },
+    { label: 'Treasurer', href: '/dashboard/treasurer', icon: PiggyBank },
     { label: 'Reports', href: '/dashboard/reports', icon: FileText },
   ];
 
