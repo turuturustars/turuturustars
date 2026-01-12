@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          action_description: string
+          action_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          performed_by: string
+          performed_by_name: string | null
+          performed_by_role: string | null
+        }
+        Insert: {
+          action_description: string
+          action_type: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          performed_by: string
+          performed_by_name?: string | null
+          performed_by_role?: string | null
+        }
+        Update: {
+          action_description?: string
+          action_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          performed_by?: string
+          performed_by_name?: string | null
+          performed_by_role?: string | null
+        }
+        Relationships: []
+      }
       contribution_tracking: {
         Row: {
           consecutive_missed: number | null
@@ -136,6 +178,119 @@ export type Database = {
           },
         ]
       }
+      documents: {
+        Row: {
+          cloudinary_public_id: string
+          cloudinary_url: string
+          created_at: string
+          description: string | null
+          document_type: string
+          file_name: string
+          file_size: number | null
+          id: string
+          is_public: boolean | null
+          mime_type: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          cloudinary_public_id: string
+          cloudinary_url: string
+          created_at?: string
+          description?: string | null
+          document_type: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          cloudinary_public_id?: string
+          cloudinary_url?: string
+          created_at?: string
+          description?: string | null
+          document_type?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      meeting_minutes: {
+        Row: {
+          action_items: Json | null
+          agenda: string | null
+          approved_at: string | null
+          approved_by: string | null
+          attendees: string[] | null
+          created_at: string
+          document_id: string | null
+          id: string
+          meeting_date: string
+          meeting_type: string
+          minutes_content: string | null
+          recorded_by: string
+          status: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          agenda?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          attendees?: string[] | null
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          meeting_date: string
+          meeting_type: string
+          minutes_content?: string | null
+          recorded_by: string
+          status?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          agenda?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          attendees?: string[] | null
+          created_at?: string
+          document_id?: string | null
+          id?: string
+          meeting_date?: string
+          meeting_type?: string
+          minutes_content?: string | null
+          recorded_by?: string
+          status?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_minutes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       members: {
         Row: {
           created_at: string
@@ -168,6 +323,140 @@ export type Database = {
           phone?: string
         }
         Relationships: []
+      }
+      mpesa_standing_orders: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          end_date: string | null
+          frequency: string
+          id: string
+          member_id: string
+          next_debit_date: string | null
+          phone_number: string
+          start_date: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          end_date?: string | null
+          frequency: string
+          id?: string
+          member_id: string
+          next_debit_date?: string | null
+          phone_number: string
+          start_date: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          member_id?: string
+          next_debit_date?: string | null
+          phone_number?: string
+          start_date?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_standing_orders_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mpesa_transactions: {
+        Row: {
+          amount: number
+          checkout_request_id: string | null
+          contribution_id: string | null
+          created_at: string
+          id: string
+          initiated_by: string
+          member_id: string | null
+          merchant_request_id: string | null
+          mpesa_receipt_number: string | null
+          phone_number: string
+          qr_code_data: string | null
+          result_code: number | null
+          result_desc: string | null
+          status: string | null
+          transaction_date: string | null
+          transaction_type: string
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          amount: number
+          checkout_request_id?: string | null
+          contribution_id?: string | null
+          created_at?: string
+          id?: string
+          initiated_by: string
+          member_id?: string | null
+          merchant_request_id?: string | null
+          mpesa_receipt_number?: string | null
+          phone_number: string
+          qr_code_data?: string | null
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string | null
+          transaction_date?: string | null
+          transaction_type: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          amount?: number
+          checkout_request_id?: string | null
+          contribution_id?: string | null
+          created_at?: string
+          id?: string
+          initiated_by?: string
+          member_id?: string | null
+          merchant_request_id?: string | null
+          mpesa_receipt_number?: string | null
+          phone_number?: string
+          qr_code_data?: string | null
+          result_code?: number | null
+          result_desc?: string | null
+          status?: string | null
+          transaction_date?: string | null
+          transaction_type?: string
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mpesa_transactions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_transactions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -338,6 +627,16 @@ export type Database = {
         Returns: boolean
       }
       is_official: { Args: { _user_id: string }; Returns: boolean }
+      log_audit_action: {
+        Args: {
+          p_action_description: string
+          p_action_type: string
+          p_entity_id?: string
+          p_entity_type: string
+          p_metadata?: Json
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role:
