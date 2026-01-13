@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, MapPin, Briefcase, Calendar, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2 } from 'lucide-react';
+import ProfilePhotoUpload from '@/components/dashboard/ProfilePhotoUpload';
 
 const ProfilePage = () => {
   const { profile, roles } = useAuth();
@@ -78,19 +79,23 @@ const ProfilePage = () => {
       {/* Profile Header Card */}
       <Card>
         <CardContent className="p-6">
-          <div className="flex items-start gap-6">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-3xl font-serif font-bold text-primary">
-                {profile?.full_name?.charAt(0) || 'M'}
-              </span>
-            </div>
-            <div className="flex-1">
-              <div className="flex items-start justify-between">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            <ProfilePhotoUpload
+              currentPhotoId={profile?.photo_url || null}
+              fullName={profile?.full_name || 'Member'}
+              userId={profile?.id || ''}
+              onPhotoUpdate={(photoUrl) => {
+                // Profile will be refreshed on next auth check
+                console.log('Photo updated:', photoUrl);
+              }}
+            />
+            <div className="flex-1 text-center md:text-left">
+              <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-2">
                 <div>
                   <h3 className="text-xl font-semibold text-foreground">{profile?.full_name}</h3>
                   <p className="text-muted-foreground font-mono">{profile?.membership_number}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap justify-center">
                   <Badge className={getStatusColor(profile?.status)}>
                     {profile?.status || 'Pending'}
                   </Badge>
@@ -101,7 +106,7 @@ const ProfilePage = () => {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center md:justify-start gap-4 mt-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   Joined {profile?.joined_at ? new Date(profile.joined_at).toLocaleDateString() : 'N/A'}
