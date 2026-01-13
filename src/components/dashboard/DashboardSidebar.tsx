@@ -12,6 +12,8 @@ import {
   UserCheck,
   TrendingUp,
   PiggyBank,
+  ClipboardList,
+  Smartphone,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,7 +21,7 @@ import { cn } from '@/lib/utils';
 
 const DashboardSidebar = () => {
   const location = useLocation();
-  const { profile, isOfficial, signOut } = useAuth();
+  const { profile, roles, isOfficial, hasRole, signOut } = useAuth();
 
   const memberLinks = [
     { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -33,9 +35,20 @@ const DashboardSidebar = () => {
     { label: 'Members', href: '/dashboard/members', icon: Users },
     { label: 'Pending Approvals', href: '/dashboard/approvals', icon: UserCheck },
     { label: 'All Contributions', href: '/dashboard/all-contributions', icon: TrendingUp },
-    { label: 'Treasurer', href: '/dashboard/treasurer', icon: PiggyBank },
     { label: 'Reports', href: '/dashboard/reports', icon: FileText },
   ];
+
+  const treasurerLinks = [
+    { label: 'Treasurer Dashboard', href: '/dashboard/treasurer', icon: PiggyBank },
+    { label: 'M-Pesa Management', href: '/dashboard/mpesa', icon: Smartphone },
+  ];
+
+  const secretaryLinks = [
+    { label: 'Secretary Dashboard', href: '/dashboard/secretary', icon: ClipboardList },
+  ];
+
+  const canAccessTreasurer = hasRole('treasurer') || hasRole('admin') || hasRole('chairperson');
+  const canAccessSecretary = hasRole('secretary') || hasRole('admin') || hasRole('chairperson');
 
   return (
     <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">
@@ -102,6 +115,60 @@ const DashboardSidebar = () => {
               Officials
             </p>
             {officialLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {canAccessTreasurer && (
+          <>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-6 mb-3">
+              Treasury
+            </p>
+            {treasurerLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = location.pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {canAccessSecretary && (
+          <>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-6 mb-3">
+              Secretary
+            </p>
+            {secretaryLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.href;
               return (

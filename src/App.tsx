@@ -16,6 +16,8 @@ import ApprovalsPage from "./pages/dashboard/ApprovalsPage";
 import AllContributionsPage from "./pages/dashboard/AllContributionsPage";
 import ReportsPage from "./pages/dashboard/ReportsPage";
 import TreasurerDashboard from "./pages/dashboard/TreasurerDashboard";
+import SecretaryDashboard from "./pages/dashboard/SecretaryDashboard";
+import MpesaManagement from "./pages/dashboard/MpesaManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => (
             <Route path="all-contributions" element={<AllContributionsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="treasurer" element={<TreasurerDashboard />} />
+            <Route path="secretary" element={<SecretaryDashboard />} />
+            <Route path="mpesa" element={<MpesaManagement />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
