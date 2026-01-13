@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
+import ContributionChart from '@/components/dashboard/ContributionChart';
+import WelfareParticipationChart from '@/components/dashboard/WelfareParticipationChart';
 import { 
   DollarSign, 
   HandHeart, 
@@ -33,13 +36,13 @@ interface Announcement {
 
 const DashboardHome = () => {
   const { profile, isOfficial } = useAuth();
+  const { announcements } = useRealtimeAnnouncements();
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
     pendingContributions: 0,
     activeWelfareCases: 0,
     unreadNotifications: 0,
   });
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -75,22 +78,12 @@ const DashboardHome = () => {
         .eq('user_id', profile.id)
         .eq('read', false);
 
-      // Fetch announcements
-      const { data: announcementData } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('published', true)
-        .order('published_at', { ascending: false })
-        .limit(3);
-
       setStats({
         totalContributions: totalPaid,
         pendingContributions: pendingCount,
         activeWelfareCases: welfareCases?.length || 0,
         unreadNotifications: notifications?.length || 0,
       });
-
-      setAnnouncements(announcementData || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -190,6 +183,12 @@ const DashboardHome = () => {
         })}
       </div>
 
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ContributionChart />
+        <WelfareParticipationChart />
+      </div>
+
       {/* Quick Actions & Announcements */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
@@ -240,7 +239,7 @@ const DashboardHome = () => {
               </p>
             ) : (
               <div className="space-y-4">
-                {announcements.map((announcement) => (
+                {announcements.slice(0, 3).map((announcement) => (
                   <div
                     key={announcement.id}
                     className="p-4 rounded-lg bg-accent/50 border border-border"
@@ -255,7 +254,7 @@ const DashboardHome = () => {
                       {announcement.content}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(announcement.published_at).toLocaleDateString()}
+                      {announcement.published_at ? new Date(announcement.published_at).toLocaleDateString() : 'Recently'}
                     </p>
                   </div>
                 ))}
