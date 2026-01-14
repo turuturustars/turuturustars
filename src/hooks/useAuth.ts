@@ -17,7 +17,7 @@ interface Profile {
 }
 
 interface UserRole {
-  role: 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'coordinator' | 'member';
+  role: 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'vice_chairperson' | 'vice_secretary' | 'organizing_secretary' | 'committee_member' | 'patron' | 'member';
 }
 
 export function useAuth() {
@@ -89,7 +89,7 @@ export function useAuth() {
 
   const isOfficial = () => {
     return roles.some((r) => 
-      ['admin', 'treasurer', 'secretary', 'chairperson', 'coordinator'].includes(r.role)
+      ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairperson', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron'].includes(r.role)
     );
   };
 

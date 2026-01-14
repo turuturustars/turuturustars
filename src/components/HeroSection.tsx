@@ -1,6 +1,6 @@
 import { ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import heroCommunity from '@/assets/hero-community.jpg';
+import heroCommunity from '@/assets/gallery-members.png';
 
 const HeroSection = () => {
   return (
