@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
+import { getPrimaryRole, hasRole } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
@@ -18,6 +20,7 @@ import {
   Clock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 
 interface DashboardStats {
   totalContributions: number;
@@ -35,7 +38,8 @@ interface Announcement {
 }
 
 const DashboardHome = () => {
-  const { profile, isOfficial } = useAuth();
+  const navigate = useNavigate();
+  const { profile, isOfficial, roles } = useAuth();
   const { announcements } = useRealtimeAnnouncements();
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
@@ -44,6 +48,31 @@ const DashboardHome = () => {
     unreadNotifications: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Redirect officials to their role-specific dashboards
+  useEffect(() => {
+    if (roles.length === 0) return; // Still loading
+    
+    const userRoles = roles.map(r => r.role);
+    const primaryRole = getPrimaryRole(userRoles);
+
+    // Map primary role to dashboard
+    const roleDashboards: Record<string, string> = {
+      'chairperson': '/dashboard/chairperson',
+      'vice_chairperson': '/dashboard/vice-chairperson',
+      'secretary': '/dashboard/secretary-role',
+      'vice_secretary': '/dashboard/vice-secretary',
+      'treasurer': '/dashboard/treasurer-role',
+      'organizing_secretary': '/dashboard/organizing-secretary',
+      'patron': '/dashboard/patron',
+      'admin': '/dashboard/admin',
+    };
+
+    const targetDashboard = roleDashboards[primaryRole];
+    if (targetDashboard && !window.location.pathname.includes('/dashboard/home')) {
+      navigate(targetDashboard, { replace: true });
+    }
+  }, [roles, navigate]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -203,6 +232,12 @@ const DashboardHome = () => {
                 Make a Contribution
               </Link>
             </Button>
+            <div className="w-full">
+              <PayWithMpesa
+                defaultAmount={100}
+                trigger={<Button className="w-full justify-start" variant="ghost"><DollarSign className="w-4 h-4 mr-2"/>Pay with M-Pesa</Button>}
+              />
+            </div>
             <Button asChild className="w-full justify-start" variant="outline">
               <Link to="/dashboard/welfare">
                 <HandHeart className="w-4 h-4 mr-2" />
