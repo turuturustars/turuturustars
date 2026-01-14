@@ -178,6 +178,57 @@ export type Database = {
           },
         ]
       }
+      discipline_records: {
+        Row: {
+          created_at: string | null
+          description: string
+          fine_amount: number | null
+          fine_paid: boolean | null
+          id: string
+          incident_date: string
+          incident_type: string
+          member_id: string
+          paid_at: string | null
+          recorded_by: string
+          resolution_notes: string | null
+          resolved_by: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          fine_amount?: number | null
+          fine_paid?: boolean | null
+          id?: string
+          incident_date: string
+          incident_type: string
+          member_id: string
+          paid_at?: string | null
+          recorded_by: string
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          fine_amount?: number | null
+          fine_paid?: boolean | null
+          id?: string
+          incident_date?: string
+          incident_type?: string
+          member_id?: string
+          paid_at?: string | null
+          recorded_by?: string
+          resolution_notes?: string | null
+          resolved_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           cloudinary_public_id: string
@@ -228,6 +279,47 @@ export type Database = {
           uploaded_by?: string
         }
         Relationships: []
+      }
+      meeting_attendance: {
+        Row: {
+          apology_reason: string | null
+          apology_sent: boolean | null
+          attended: boolean | null
+          id: string
+          marked_at: string | null
+          marked_by: string | null
+          meeting_id: string
+          member_id: string
+        }
+        Insert: {
+          apology_reason?: string | null
+          apology_sent?: boolean | null
+          attended?: boolean | null
+          id?: string
+          marked_at?: string | null
+          marked_by?: string | null
+          meeting_id: string
+          member_id: string
+        }
+        Update: {
+          apology_reason?: string | null
+          apology_sent?: boolean | null
+          attended?: boolean | null
+          id?: string
+          marked_at?: string | null
+          marked_by?: string | null
+          meeting_id?: string
+          member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_attendance_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       meeting_minutes: {
         Row: {
@@ -290,6 +382,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      meetings: {
+        Row: {
+          agenda: string | null
+          created_at: string | null
+          created_by: string
+          id: string
+          meeting_type: string
+          scheduled_date: string
+          status: string | null
+          title: string
+          updated_at: string | null
+          venue: string | null
+        }
+        Insert: {
+          agenda?: string | null
+          created_at?: string | null
+          created_by: string
+          id?: string
+          meeting_type: string
+          scheduled_date: string
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          venue?: string | null
+        }
+        Update: {
+          agenda?: string | null
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          meeting_type?: string
+          scheduled_date?: string
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          venue?: string | null
+        }
+        Relationships: []
       }
       members: {
         Row: {
@@ -493,6 +624,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          consecutive_absences: number | null
           created_at: string | null
           email: string | null
           full_name: string
@@ -508,6 +640,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          consecutive_absences?: number | null
           created_at?: string | null
           email?: string | null
           full_name: string
@@ -523,6 +656,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          consecutive_absences?: number | null
           created_at?: string | null
           email?: string | null
           full_name?: string
@@ -536,6 +670,45 @@ export type Database = {
           registration_fee_paid?: boolean | null
           status?: Database["public"]["Enums"]["member_status"] | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      role_handovers: {
+        Row: {
+          acting_user_id: string
+          created_at: string | null
+          created_by: string
+          end_date: string | null
+          id: string
+          original_user_id: string
+          reason: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          start_date: string
+          status: string | null
+        }
+        Insert: {
+          acting_user_id: string
+          created_at?: string | null
+          created_by: string
+          end_date?: string | null
+          id?: string
+          original_user_id: string
+          reason?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          start_date: string
+          status?: string | null
+        }
+        Update: {
+          acting_user_id?: string
+          created_at?: string | null
+          created_by?: string
+          end_date?: string | null
+          id?: string
+          original_user_id?: string
+          reason?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          start_date?: string
+          status?: string | null
         }
         Relationships: []
       }
@@ -562,6 +735,100 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      votes: {
+        Row: {
+          id: string
+          member_id: string
+          motion_id: string
+          vote: string
+          voted_at: string | null
+        }
+        Insert: {
+          id?: string
+          member_id: string
+          motion_id: string
+          vote: string
+          voted_at?: string | null
+        }
+        Update: {
+          id?: string
+          member_id?: string
+          motion_id?: string
+          vote?: string
+          voted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_motion_id_fkey"
+            columns: ["motion_id"]
+            isOneToOne: false
+            referencedRelation: "voting_motions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      voting_motions: {
+        Row: {
+          closed_at: string | null
+          created_at: string | null
+          created_by: string
+          description: string | null
+          id: string
+          meeting_id: string | null
+          motion_type: string | null
+          opened_at: string | null
+          status: string | null
+          tie_breaker_by: string | null
+          tie_breaker_vote: string | null
+          title: string
+          votes_abstain: number | null
+          votes_against: number | null
+          votes_for: number | null
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string | null
+          created_by: string
+          description?: string | null
+          id?: string
+          meeting_id?: string | null
+          motion_type?: string | null
+          opened_at?: string | null
+          status?: string | null
+          tie_breaker_by?: string | null
+          tie_breaker_vote?: string | null
+          title: string
+          votes_abstain?: number | null
+          votes_against?: number | null
+          votes_for?: number | null
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string | null
+          created_by?: string
+          description?: string | null
+          id?: string
+          meeting_id?: string | null
+          motion_type?: string | null
+          opened_at?: string | null
+          status?: string | null
+          tie_breaker_by?: string | null
+          tie_breaker_vote?: string | null
+          title?: string
+          votes_abstain?: number | null
+          votes_against?: number | null
+          votes_for?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voting_motions_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       welfare_cases: {
         Row: {
@@ -626,6 +893,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_management_committee: { Args: { _user_id: string }; Returns: boolean }
       is_official: { Args: { _user_id: string }; Returns: boolean }
       log_audit_action: {
         Args: {
@@ -646,6 +914,11 @@ export type Database = {
         | "chairperson"
         | "coordinator"
         | "member"
+        | "vice_chairman"
+        | "vice_secretary"
+        | "organizing_secretary"
+        | "committee_member"
+        | "patron"
       contribution_status: "paid" | "pending" | "missed"
       member_status: "active" | "dormant" | "pending" | "suspended"
     }
@@ -782,6 +1055,11 @@ export const Constants = {
         "chairperson",
         "coordinator",
         "member",
+        "vice_chairman",
+        "vice_secretary",
+        "organizing_secretary",
+        "committee_member",
+        "patron",
       ],
       contribution_status: ["paid", "pending", "missed"],
       member_status: ["active", "dormant", "pending", "suspended"],
