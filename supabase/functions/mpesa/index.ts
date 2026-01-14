@@ -81,8 +81,8 @@ serve(async (req) => {
 
     const { action, ...params } = await req.json();
 
-    // Some actions require financial roles
-    const financialActions = ["stk_push", "register_urls", "generate_qr", "create_standing_order"];
+    // Some actions require financial roles (members are allowed to initiate STK pushes)
+    const financialActions = ["register_urls", "generate_qr", "create_standing_order"];
     if (financialActions.includes(action) && !hasFinancialRole) {
       throw new Error("Insufficient permissions for financial operations");
     }
