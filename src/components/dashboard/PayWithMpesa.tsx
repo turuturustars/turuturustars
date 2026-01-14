@@ -16,8 +16,25 @@ import {
   Info,
   Eye,
   EyeOff,
+  Radio,
+  Package,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+interface PaymentProduct {
+  id: string;
+  name: string;
+  description: string;
+  amount: number;
+  icon: string;
+}
+
+interface SuccessData {
+  subscriptionId: string;
+  expiryDate: string;
+  method: 'lipa' | 'till';
+}
 
 interface Props {
   contributionId?: string;
@@ -25,17 +42,71 @@ interface Props {
   trigger?: React.ReactNode;
 }
 
+const PAYMENT_PRODUCTS: PaymentProduct[] = [
+  {
+    id: 'internet-1',
+    name: 'Unlimited Internet, 40 Min',
+    description: 'High-speed internet + calling minutes',
+    amount: 10,
+    icon: '📡'
+  },
+  {
+    id: 'internet-2',
+    name: 'Unlimited Internet, 1 Hour',
+    description: 'Premium high-speed internet',
+    amount: 20,
+    icon: '📡'
+  },
+  {
+    id: 'sms-bundle',
+    name: 'SMS Bundle 100 + 100MB',
+    description: 'Text messages + mobile data',
+    amount: 15,
+    icon: '💬'
+  },
+  {
+    id: 'airtime',
+    name: 'Custom Airtime',
+    description: 'Choose your own amount',
+    amount: 0,
+    icon: '📞'
+  }
+];
+
 const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
   const { profile } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'lipa' | 'till'>('lipa');
+  const [selectedProduct, setSelectedProduct] = useState<PaymentProduct | null>(null);
   const [phone, setPhone] = useState(profile?.phone || '');
   const [amount, setAmount] = useState(defaultAmount ? String(defaultAmount) : '');
+  const [customAmount, setCustomAmount] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [successData, setSuccessData] = useState<SuccessData | null>(null);
+  const [countdown, setCountdown] = useState(120);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showPhone, setShowPhone] = useState(false);
+  const [activateNow, setActivateNow] = useState(true);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!isProcessing || !success) return;
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isProcessing, success]);
 
   // Validation logic
   const validatePhone = (value: string): string | null => {
@@ -59,9 +130,10 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
     return null;
   };
 
+  const finalAmount = selectedProduct?.amount === 0 ? customAmount : (selectedProduct?.amount || amount).toString();
   const phoneError = touched.phone ? validatePhone(phone) : null;
-  const amountError = touched.amount ? validateAmount(amount) : null;
-  const isValid = !phoneError && !amountError && phone.trim() && amount.trim();
+  const amountError = touched.amount ? validateAmount(finalAmount) : null;
+  const isValid = !phoneError && !amountError && phone.trim() && finalAmount.trim();
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
@@ -80,7 +152,7 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
     const value = e.target.value;
     // Allow only numbers
     const numericValue = value.replace(/[^\d]/g, '');
-    setAmount(numericValue);
+    setCustomAmount(numericValue);
     if (touched.amount) {
       setErrors(prev => ({
         ...prev,
@@ -112,22 +184,23 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
     }
 
     setIsProcessing(true);
+    setCountdown(120);
     try {
       const formatted = formatPhoneNumber(phone);
-      const numAmount = Math.round(parseFloat(amount));
+      const numAmount = Math.round(parseFloat(finalAmount));
 
       const result = await initiateSTKPush({
         phoneNumber: formatted,
         amount: numAmount,
         accountReference: contributionId || `C-${Date.now()}`,
-        transactionDesc: 'Contribution Payment',
+        transactionDesc: `${paymentMethod === 'lipa' ? 'LIPA NA MPESA' : 'Pay To Till'} - ${selectedProduct?.name || 'Payment'}`,
         contributionId,
       });
 
       if (result.ResponseCode === '0') {
         // Record pending transaction
         await supabase.from('mpesa_transactions').insert({
-          transaction_type: 'stk_push',
+          transaction_type: paymentMethod === 'lipa' ? 'lipa_na_mpesa' : 'till_payment',
           checkout_request_id: result.CheckoutRequestID || null,
           mpesa_receipt_number: null,
           amount: numAmount,
@@ -139,21 +212,28 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
           contribution_id: contributionId || null,
         });
 
+        // Generate success data
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + 30); // 30 days validity
+        const subscriptionId = `UH${Math.floor(Math.random() * 10000000)}`;
+        
+        setSuccessData({
+          subscriptionId,
+          expiryDate: expiryDate.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+          method: paymentMethod
+        });
+
         setSuccess(true);
         toast({
           title: '✓ Payment Initiated',
-          description: `Check your phone (${formatted}) for the M-Pesa prompt within 30 seconds`,
+          description: `Check your phone (${formatted}) for the ${paymentMethod === 'lipa' ? 'M-Pesa' : 'Till'} prompt within 30 seconds`,
         });
-
-        // Reset form after 2 seconds
-        setTimeout(() => {
-          setOpen(false);
-          setSuccess(false);
-          setPhone(profile?.phone || '');
-          setAmount(defaultAmount ? String(defaultAmount) : '');
-          setTouched({});
-          setErrors({});
-        }, 2000);
       } else {
         throw new Error(result.ResponseDescription || 'Failed to initiate payment');
       }
@@ -179,8 +259,14 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
     // Reset on close
     if (!newOpen) {
       setSuccess(false);
+      setSuccessData(null);
       setErrors({});
       setTouched({});
+      setPaymentMethod('lipa');
+      setSelectedProduct(null);
+      setCountdown(120);
+      setActivateNow(true);
+      setCustomAmount('');
     }
   };
 
@@ -194,50 +280,153 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-sm p-0 overflow-hidden">
-        {success ? (
+      <DialogContent className="w-full max-w-md p-0 overflow-hidden">
+        {success && successData ? (
           // Success State
-          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-emerald-50">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-in zoom-in">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 via-white to-emerald-50 min-h-96">
+            <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center mb-6 animate-in zoom-in">
+              <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Initiated!</h3>
+            
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">Success</h2>
+            
+            <div className="bg-white border border-gray-200 rounded-lg p-4 w-full mb-6 text-center">
+              <p className="text-sm text-gray-600 mb-2">Your subscription ID is</p>
+              <p className="text-xl font-bold text-gray-900 mb-1">{successData.subscriptionId}</p>
+              <p className="text-xs text-gray-500">Expiry: {successData.expiryDate}</p>
+            </div>
+
             <p className="text-sm text-gray-600 text-center mb-6">
-              Check your phone for the M-Pesa prompt within 30 seconds
+              All your available IDs could be found by accessing{' '}
+              <a href="https://portal.sasakonnect.net" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-semibold">
+                https://portal.sasakonnect.net
+              </a>
+              {' '}-&gt; "Subscription"
             </p>
-            <p className="text-xs text-gray-500 text-center">
-              Closing dialog in a moment...
-            </p>
+
+            <div className="flex gap-3 w-full">
+              <Button
+                onClick={() => setOpen(false)}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                Ok
+              </Button>
+            </div>
+
+            {/* Countdown at bottom */}
+            <div className="mt-6 flex items-center justify-center gap-2 text-gray-500">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm">Dialog closes in {countdown}s</span>
+            </div>
           </div>
         ) : (
           // Form State
           <>
-            <DialogHeader className="p-6 pb-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <Smartphone className="w-5 h-5 text-blue-600" />
+            <DialogHeader className="p-6 pb-4 border-b border-gray-100 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-green-700">Pay With</span>
+                  <span className="text-2xl font-bold text-orange-600">LIPA NA MPESA</span>
                 </div>
-                <div>
-                  <DialogTitle className="text-lg">Pay with M-Pesa</DialogTitle>
-                  <p className="text-xs text-gray-500 mt-1">Secure mobile money transfer</p>
-                </div>
+                <p className="text-xs text-gray-600">Secure mobile money transfer or Till payment</p>
               </div>
             </DialogHeader>
 
-            <div className="p-6 space-y-5">
-              {/* Info Box */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
-                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-700">
-                  You'll receive an M-Pesa prompt on your registered phone number. Enter your PIN to complete the payment.
-                </p>
+            <div className="p-6 space-y-6">
+              {/* Payment Method Selection */}
+              <div className="space-y-3">
+                <p className="font-semibold text-gray-900">Payment Method</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors" style={{borderColor: paymentMethod === 'lipa' ? '#e879f9' : '#e5e7eb'}}>
+                    <Radio 
+                      checked={paymentMethod === 'lipa'}
+                      onChange={() => setPaymentMethod('lipa')}
+                      className="w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">Pay With LIPA NA MPESA</p>
+                      <p className="text-xs text-gray-500">Direct M-Pesa payment prompt</p>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                    <Radio 
+                      checked={paymentMethod === 'till'}
+                      onChange={() => setPaymentMethod('till')}
+                      className="w-4 h-4"
+                    />
+                    <div className="flex-1">
+                      <p className="font-semibold text-gray-900 text-sm">Pay To Till</p>
+                      <p className="text-xs text-gray-500">Till number: 178906</p>
+                    </div>
+                  </label>
+                </div>
               </div>
 
-              {/* Phone Field */}
+              {/* Product Selection */}
+              <div className="space-y-3">
+                <p className="font-semibold text-gray-900">Select Product</p>
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                  {PAYMENT_PRODUCTS.map(product => (
+                    <button
+                      key={product.id}
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        if (product.amount > 0) {
+                          setAmount(product.amount.toString());
+                        }
+                      }}
+                      className={cn(
+                        'p-3 rounded-lg border-2 transition-all text-left hover:bg-gray-50',
+                        selectedProduct?.id === product.id
+                          ? 'border-green-500 bg-green-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-xl">{product.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm">{product.icon} {product.name}</p>
+                          <p className="text-xs text-gray-500">{product.description}</p>
+                          {product.amount > 0 && (
+                            <p className="text-sm font-bold text-green-700 mt-1">KES {product.amount.toLocaleString()}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Amount for Custom Airtime */}
+              {selectedProduct?.id === 'airtime' && (
+                <div className="space-y-2 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                  <Label htmlFor="customAmount" className="text-sm font-semibold text-gray-900">
+                    <DollarSign className="w-4 h-4 inline mr-2 text-blue-600" />
+                    Enter Amount (KES)
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">KES</span>
+                    <Input
+                      id="customAmount"
+                      type="text"
+                      value={customAmount}
+                      onChange={handleAmountChange}
+                      onBlur={() => setTouched(prev => ({ ...prev, amount: true }))}
+                      placeholder="Enter amount"
+                      className="pl-12 text-base transition-all"
+                    />
+                  </div>
+                  {amountError && touched.amount && (
+                    <p className="text-xs text-red-600">{amountError}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Phone Number */}
               <div className="space-y-2">
                 <Label htmlFor="phone" className="flex items-center gap-2 font-semibold text-gray-900">
-                  <Smartphone className="w-4 h-4 text-blue-600" />
-                  Phone Number
+                  <Smartphone className="w-4 h-4 text-green-600" />
+                  Enter M-PESA number
                 </Label>
                 <div className="relative">
                   <Input
@@ -246,12 +435,12 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
                     value={phone}
                     onChange={handlePhoneChange}
                     onBlur={() => handleBlur('phone')}
-                    placeholder="254712345678 or 07XXXXXXXX"
+                    placeholder="+254 - 700471113"
                     className={cn(
                       'pr-10 text-base transition-all',
                       phoneError && touched.phone
                         ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                        : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                        : 'border-gray-200 focus:border-green-500 focus:ring-green-200'
                     )}
                   />
                   {phone && (
@@ -265,56 +454,31 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
                   )}
                 </div>
                 {phoneError && touched.phone && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm text-red-600">{phoneError}</span>
-                  </div>
-                )}
-                {phone && !phoneError && touched.phone && (
-                  <p className="text-xs text-green-600 flex items-center gap-1">
-                    ✓ Valid phone number
-                  </p>
+                  <p className="text-xs text-red-600">{phoneError}</p>
                 )}
               </div>
 
-              {/* Amount Field */}
-              <div className="space-y-2">
-                <Label htmlFor="amount" className="flex items-center gap-2 font-semibold text-gray-900">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
-                  Amount (KES)
-                </Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-                    KES
-                  </span>
-                  <Input
-                    id="amount"
-                    type="text"
-                    value={amount}
-                    onChange={handleAmountChange}
-                    onBlur={() => handleBlur('amount')}
-                    placeholder="1000"
-                    className={cn(
-                      'pl-12 text-base transition-all',
-                      amountError && touched.amount
-                        ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                        : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
-                    )}
-                  />
+              {/* Activation Timing */}
+              <div className="space-y-2 bg-green-50 p-3 rounded-lg border border-green-200">
+                <p className="text-sm font-semibold text-gray-900">Activation</p>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Radio 
+                      checked={activateNow}
+                      onChange={() => setActivateNow(true)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">activate now</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Radio 
+                      checked={!activateNow}
+                      onChange={() => setActivateNow(false)}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm text-gray-700">activate later</span>
+                  </label>
                 </div>
-                {amountError && touched.amount && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm text-red-600">{amountError}</span>
-                  </div>
-                )}
-                {amount && !amountError && touched.amount && (
-                  <div className="flex items-center justify-between mt-2">
-                    <p className="text-xs text-green-600">✓ Valid amount</p>
-                    {amount && <p className="text-xs font-semibold text-gray-900">KES {parseInt(amount).toLocaleString()}</p>}
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 mt-2">Min: KES 1 • Max: KES 150,000</p>
               </div>
 
               {/* Submit Error */}
@@ -325,25 +489,33 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
                 </div>
               )}
 
+              {/* Info Box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
+                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700">
+                  Enter your PIN at the M-PESA prompt to complete the payment.
+                </p>
+              </div>
+
               {/* Action Buttons */}
               <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handlePay}
                   disabled={!isValid || isProcessing}
                   className={cn(
-                    'flex-1 gap-2 font-semibold transition-all',
+                    'flex-1 gap-2 font-semibold transition-all bg-gray-400 hover:bg-gray-500 text-white',
                     isProcessing && 'opacity-90'
                   )}
                 >
                   {isProcessing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Processing...
+                      Awaiting Payment ... {countdown}
                     </>
                   ) : (
                     <>
                       <Smartphone className="w-4 h-4" />
-                      Send M-Pesa Prompt
+                      Send Prompt
                     </>
                   )}
                 </Button>
@@ -351,20 +523,10 @@ const PayWithMpesa = ({ contributionId, defaultAmount, trigger }: Props) => {
                   variant="outline"
                   onClick={() => setOpen(false)}
                   disabled={isProcessing}
-                  className="px-4"
+                  className="px-6 bg-yellow-500 hover:bg-yellow-600 text-white border-0"
                 >
                   Cancel
                 </Button>
-              </div>
-
-              {/* Footer Help Text */}
-              <div className="pt-4 border-t border-gray-100">
-                <p className="text-xs text-gray-500 text-center">
-                  Having trouble? Contact support at{' '}
-                  <a href="mailto:support@turuturu.co.ke" className="text-blue-600 hover:underline">
-                    support@turuturu.co.ke
-                  </a>
-                </p>
               </div>
             </div>
           </>
