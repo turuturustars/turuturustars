@@ -19,14 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { supabase } from '@/integrations/supabase/client';
+import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2 } from 'lucide-react';
@@ -51,6 +47,7 @@ const ContributionsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [newContribution, setNewContribution] = useState({
     amount: '',
     contribution_type: 'welfare',
@@ -124,6 +121,8 @@ const ContributionsPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -310,6 +309,7 @@ const ContributionsPage = () => {
                     <TableHead>Amount</TableHead>
                     <TableHead>Reference</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -328,6 +328,17 @@ const ContributionsPage = () => {
                         {contribution.reference_number || '-'}
                       </TableCell>
                       <TableCell>{getStatusBadge(contribution.status)}</TableCell>
+                      <TableCell>
+                        {contribution.status !== 'paid' ? (
+                          <PayWithMpesa
+                            contributionId={contribution.id}
+                            defaultAmount={contribution.amount}
+                            trigger={<Button size="sm" className="btn-outline">Pay with M-Pesa</Button>}
+                          />
+                        ) : (
+                          <span className="text-sm text-green-600">Paid</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -336,6 +347,8 @@ const ContributionsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Payment handled by PayWithMpesa component */}
     </div>
   );
 };
