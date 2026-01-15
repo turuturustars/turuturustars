@@ -2,9 +2,7 @@ import { useState } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import galleryLaunch from '@/assets/gallery-launch.jpg';
 import galleryMembers from '@/assets/gallery-members.jpg';
-import galleryEducation from '@/assets/gallery-education.jpg';
 import galleryMeeting from '@/assets/gallery-meeting.jpg';
-import galleryEnvironment from '@/assets/gallery-environment.jpg';
 import galleryWelfare from '@/assets/gallery-welfare.jpg';
 
 const GallerySection = () => {
@@ -22,19 +20,9 @@ const GallerySection = () => {
       description: "Our growing family of dedicated members"
     },
     {
-      src: galleryEducation,
-      title: "Education Support Program",
-      description: "Supporting students with educational materials"
-    },
-    {
       src: galleryMeeting,
       title: "Leadership Meeting",
       description: "Planning sessions for community development"
-    },
-    {
-      src: galleryEnvironment,
-      title: "Environmental Initiative",
-      description: "Tree planting and environmental conservation"
     },
     {
       src: galleryWelfare,

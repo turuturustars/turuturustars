@@ -1,4 +1,5 @@
 import { Quote } from 'lucide-react';
+import chairmanImage from '@/assets/chairmain-official-photo.png';
 
 const ChairmanSection = () => {
   return (
@@ -34,11 +35,13 @@ const ChairmanSection = () => {
               </div>
             </div>
 
-            {/* Signature */}
+            {/* Signature with Image */}
             <div className="mt-10 flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center text-primary-foreground font-serif text-xl font-bold shadow-soft">
-                FM
-              </div>
+              <img 
+                src={chairmanImage}
+                alt="Francis M. Mwangi, Chairman"
+                className="w-16 h-16 rounded-full object-cover shadow-elevated border-2 border-primary/30"
+              />
               <div>
                 <p className="font-serif text-lg font-semibold text-foreground">
                   Francis M. Mwangi
@@ -50,8 +53,26 @@ const ChairmanSection = () => {
             </div>
           </div>
 
-          {/* Stats Card */}
-          <div className="order-1 lg:order-2">
+          {/* Stats Card with Chairman Photo */}
+          <div className="order-1 lg:order-2 flex flex-col gap-8">
+            {/* Chairman Photo */}
+            <div className="rounded-2xl overflow-hidden shadow-elevated">
+              <img 
+                src={chairmanImage}
+                alt="Francis M. Mwangi, Chairman"
+                className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
+              />
+              <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-4 text-center">
+                <p className="font-serif text-lg font-semibold text-primary-foreground">
+                  Francis M. Mwangi
+                </p>
+                <p className="text-sm text-primary-foreground/90">
+                  Chairman – Turuturu Stars CBO
+                </p>
+              </div>
+            </div>
+
+            {/* Stats Card */}
             <div className="card-elevated p-8 lg:p-10 bg-gradient-to-br from-card to-section-light">
               <h3 className="font-serif text-2xl font-semibold text-foreground mb-8 text-center">
                 Our Journey in Numbers
