@@ -1,12 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
-import { supabase } from '@/integrations/supabase/client';
+import { MpesaTransactionService } from '@/lib/mpesaTransactionService';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -18,10 +16,6 @@ import {
   Info,
   Eye,
   EyeOff,
-  Clock,
-  TrendingUp,
-  ArrowRight,
-  PhoneCall,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,15 +46,18 @@ const PayWithMpesa = ({
   const [showPhone, setShowPhone] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
   const [referenceId, setReferenceId] = useState('');
-  const [estimatedTime, setEstimatedTime] = useState(30);
+  const [statusMessage, setStatusMessage] = useState('');
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Countdown timer for estimated time
+  // Cleanup polling on unmount
   useEffect(() => {
-    if (paymentStep === 'processing' && estimatedTime > 0) {
-      const timer = setTimeout(() => setEstimatedTime(estimatedTime - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [paymentStep, estimatedTime]);
+    const timeoutId = pollingRef.current;
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
 
   // Validation logic
   const validatePhone = (value: string): string | null => {
@@ -68,7 +65,7 @@ const PayWithMpesa = ({
     const cleaned = value.replace(/\D/g, '');
     if (cleaned.length < 10) return 'Phone number must be at least 10 digits';
     if (cleaned.length > 13) return 'Phone number is too long';
-    if (!cleaned.match(/^(254|0)?7\d{8}$/)) {
+    if (!/^(254|0)?7\d{8}$/.exec(cleaned)) {
       return 'Invalid Kenyan phone number format';
     }
     return null;
@@ -76,8 +73,8 @@ const PayWithMpesa = ({
 
   const validateAmount = (value: string): string | null => {
     if (!value.trim()) return 'Amount is required';
-    const numAmount = parseFloat(value);
-    if (isNaN(numAmount)) return 'Amount must be a number';
+    const numAmount = Number.parseFloat(value);
+    if (Number.isNaN(numAmount)) return 'Amount must be a number';
     if (numAmount < 1) return 'Minimum amount is KES 1';
     if (numAmount > 150000) return 'Maximum amount is KES 150,000';
     if (!Number.isInteger(numAmount)) return 'Amount must be a whole number';
@@ -89,20 +86,20 @@ const PayWithMpesa = ({
   const isValid = !phoneError && !amountError && phone.trim() && amount.trim();
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
+    const { value } = e.target;
     // Allow only numbers, +, and spaces
-    value = value.replace(/[^\d+\s]/g, '');
-    setPhone(value);
+    const cleanedValue = value.replace(/[^\d+\s]/g, '');
+    setPhone(cleanedValue);
     if (touched.phone) {
       setErrors(prev => ({
         ...prev,
-        phone: validatePhone(value) || ''
+        phone: validatePhone(cleanedValue) || ''
       }));
     }
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const { value } = e.target;
     // Allow only numbers
     const numericValue = value.replace(/[^\d]/g, '');
     setAmount(numericValue);
@@ -137,9 +134,12 @@ const PayWithMpesa = ({
     }
 
     setIsProcessing(true);
+    setPaymentStep('processing');
+    setStatusMessage('Initiating M-Pesa payment...');
+    
     try {
       const formatted = formatPhoneNumber(phone);
-      const numAmount = Math.round(parseFloat(amount));
+      const numAmount = Math.round(Number.parseFloat(amount));
 
       const result = await initiateSTKPush({
         phoneNumber: formatted,
@@ -149,42 +149,64 @@ const PayWithMpesa = ({
         contributionId,
       });
 
-      if (result.ResponseCode === '0') {
-        // Record pending transaction
-        await supabase.from('mpesa_transactions').insert({
-          transaction_type: 'stk_push',
-          checkout_request_id: result.CheckoutRequestID || null,
-          mpesa_receipt_number: null,
-          amount: numAmount,
-          phone_number: formatted,
-          status: 'pending',
-          result_desc: result.ResponseDescription || null,
-          initiated_by: profile?.id || null,
-          member_id: profile?.id || null,
-          contribution_id: contributionId || null,
-        });
-
-        setSuccess(true);
-        toast({
-          title: '✓ Payment Initiated',
-          description: `Check your phone (${formatted}) for the M-Pesa prompt within 30 seconds`,
-        });
-
-        // Reset form after 2 seconds
-        setTimeout(() => {
-          setOpen(false);
-          setSuccess(false);
-          setPhone(profile?.phone || '');
-          setAmount(defaultAmount ? String(defaultAmount) : '');
-          setTouched({});
-          setErrors({});
-        }, 2000);
-      } else {
+      if (result.ResponseCode !== '0') {
         throw new Error(result.ResponseDescription || 'Failed to initiate payment');
       }
-    } catch (err: any) {
+
+      const checkoutRequestId = result.CheckoutRequestID;
+      setReferenceId(checkoutRequestId);
+
+      toast({
+        title: '✓ Payment Initiated',
+        description: `Check your phone (${formatted}) for the M-Pesa prompt within 30 seconds`,
+      });
+
+      // Poll for transaction status with improved handling
+      setStatusMessage('Waiting for payment confirmation...');
+      
+      const completedTransaction = await MpesaTransactionService.pollTransactionStatus(
+        checkoutRequestId,
+        {
+          onStatusChange: (status) => setStatusMessage(status),
+          onSuccess: () => {
+            setSuccess(true);
+            setPaymentStep('success');
+            onPaymentSuccess?.(checkoutRequestId);
+          },
+          onError: (error) => {
+            throw error;
+          },
+        }
+      );
+
+      if (!completedTransaction) {
+        // Transaction may still complete via callback
+        setStatusMessage('Payment status pending - check your phone');
+        // Wait a bit more for callback
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        const finalStatus = await MpesaTransactionService.getTransactionStatus(checkoutRequestId);
+        if (finalStatus?.status === 'completed') {
+          setSuccess(true);
+          setPaymentStep('success');
+          onPaymentSuccess?.(checkoutRequestId);
+        }
+      }
+
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setOpen(false);
+        setSuccess(false);
+        setPhone(profile?.phone || '');
+        setAmount(defaultAmount ? String(defaultAmount) : '');
+        setTouched({});
+        setErrors({});
+        setPaymentStep('form');
+        setStatusMessage('');
+      }, 3000);
+    } catch (err) {
       console.error('Payment error:', err);
-      const errorMessage = err?.message || 'Payment initiation failed';
+      const errorMessage = err instanceof Error ? err.message : 'Payment initiation failed';
       setErrors(prev => ({
         ...prev,
         submit: errorMessage
@@ -194,6 +216,8 @@ const PayWithMpesa = ({
         description: errorMessage,
         variant: 'destructive',
       });
+      setPaymentStep('form');
+      setStatusMessage('');
     } finally {
       setIsProcessing(false);
     }
@@ -226,13 +250,42 @@ const PayWithMpesa = ({
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-in zoom-in">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Initiated!</h3>
-            <p className="text-sm text-gray-600 text-center mb-6">
-              Check your phone for the M-Pesa prompt within 30 seconds
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Successful!</h3>
+            <p className="text-sm text-gray-600 text-center mb-2">
+              Your payment has been processed
             </p>
-            <p className="text-xs text-gray-500 text-center">
-              Closing dialog in a moment...
+            {referenceId && (
+              <p className="text-xs text-gray-500 text-center font-mono bg-gray-100 px-3 py-2 rounded">
+                Ref: {referenceId}
+              </p>
+            )}
+          </div>
+        ) : paymentStep === 'processing' ? (
+          // Processing State
+          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-[300px]">
+            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4 animate-pulse">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing Payment</h3>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              {statusMessage || 'Waiting for M-Pesa confirmation...'}
             </p>
+            <div className="w-full max-w-xs">
+              <div className="bg-white rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Smartphone className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm text-gray-700">
+                    Phone: {phone.slice(-4).padStart(phone.length, '*')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <DollarSign className="w-5 h-5 text-blue-600" />
+                  <span className="text-sm text-gray-700">
+                    Amount: KES {Number.parseInt(amount).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           // Form State
@@ -336,7 +389,7 @@ const PayWithMpesa = ({
                 {amount && !amountError && touched.amount && (
                   <div className="flex items-center justify-between mt-2">
                     <p className="text-xs text-green-600">✓ Valid amount</p>
-                    {amount && <p className="text-xs font-semibold text-gray-900">KES {parseInt(amount).toLocaleString()}</p>}
+                    {amount && <p className="text-xs font-semibold text-gray-900">KES {Number.parseInt(amount).toLocaleString()}</p>}
                   </div>
                 )}
                 <p className="text-xs text-gray-500 mt-2">Min: KES 1 • Max: KES 150,000</p>

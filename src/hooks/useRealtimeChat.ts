@@ -24,13 +24,13 @@ export function useRealtimeChat(roomId = 'global') {
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from('messages')
-        .select('*, sender:profiles(id, full_name, photo_url)')
+        .select('id, room_id, sender_id, content, created_at, sender_profile:profiles(id, full_name, photo_url)')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
         .limit(200);
 
       if (mounted && !error && data) {
-        setMessages(data as ChatMessage[]);
+        setMessages((data as any) as ChatMessage[]);
       }
       setIsLoading(false);
     };
@@ -64,14 +64,14 @@ export function useRealtimeChat(roomId = 'global') {
     const trackPresence = async () => {
       if (!user) return;
       try {
-        await supabase.from('user_status').upsert({ user_id: user.id, status: 'online', last_seen: new Date().toISOString() });
+        await supabase.from('user_status').upsert({ user_id: user.id, status: 'online', last_seen: new Date().toISOString() } as any);
       } catch (e) {
         // ignore if table doesn't exist
       }
 
       const uChannel = supabase
         .channel(`public-user_status`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_status' }, (p) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'user_status' }, (p: any) => {
           // fetch current online users
           fetchOnlineUsers();
         })
@@ -80,7 +80,7 @@ export function useRealtimeChat(roomId = 'global') {
       // clean up presence on unload
       const cleanup = async () => {
         try {
-          await supabase.from('user_status').upsert({ user_id: user.id, status: 'offline', last_seen: new Date().toISOString() });
+          await supabase.from('user_status').upsert({ user_id: user.id, status: 'offline', last_seen: new Date().toISOString() } as any);
         } catch {}
         supabase.removeChannel(uChannel);
       };
@@ -94,7 +94,7 @@ export function useRealtimeChat(roomId = 'global') {
 
     const fetchOnlineUsers = async () => {
       try {
-        const { data } = await supabase.from('user_status').select('user_id').eq('status', 'online');
+        const { data } = await supabase.from('user_status').select('user_id' as any).eq('status', 'online');
         setOnlineUsers((data || []).map((r: any) => r.user_id));
       } catch (e) {
         // ignore

@@ -14,7 +14,7 @@ import {
   Bell,
   Trash2,
   Check,
-  CheckAll,
+  CheckCheck,
   Search,
   Filter,
   AlertCircle,
@@ -119,7 +119,7 @@ const NotificationsPage = () => {
 
         {unreadCount > 0 && (
           <Button onClick={() => markAllAsRead()} className="gap-2">
-            <CheckAll className="w-4 h-4" />
+            <CheckCheck className="w-4 h-4" />
             Mark all as read
           </Button>
         )}
