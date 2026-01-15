@@ -12,8 +12,9 @@ import { z } from 'zod';
 const authSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
-  fullName: z.string().min(2, 'Name must be at least 2 characters').optional(),
-  phone: z.string().min(10, 'Please enter a valid phone number').optional(),
+  fullName: z.string().min(2, 'Name must be at least 2 characters'),
+  phone: z.string().min(10, 'Please enter a valid phone number'),
+  idNumber: z.string().min(6, 'Please enter a valid ID number'),
 });
 
 const Auth = () => {
@@ -25,6 +26,7 @@ const Auth = () => {
     password: '',
     fullName: '',
     phone: '',
+    idNumber: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -52,7 +54,7 @@ const Auth = () => {
       if (isLogin) {
         authSchema.pick({ email: true, password: true }).parse(formData);
       } else {
-        authSchema.parse({ ...formData, fullName: formData.fullName, phone: formData.phone });
+        authSchema.parse(formData);
       }
       setErrors({});
       return true;
@@ -110,6 +112,7 @@ const Auth = () => {
             data: {
               full_name: formData.fullName,
               phone: formData.phone,
+              id_number: formData.idNumber,
             },
           },
         });
@@ -172,7 +175,7 @@ const Auth = () => {
             {!isLogin && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="fullName">Full Name *</Label>
                   <Input
                     id="fullName"
                     placeholder="Enter your full name"
@@ -185,7 +188,20 @@ const Auth = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="idNumber">ID Number *</Label>
+                  <Input
+                    id="idNumber"
+                    placeholder="e.g., 12345678"
+                    value={formData.idNumber}
+                    onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                    className={errors.idNumber ? 'border-destructive' : ''}
+                  />
+                  {errors.idNumber && (
+                    <p className="text-sm text-destructive">{errors.idNumber}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -201,7 +217,7 @@ const Auth = () => {
               </>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Email Address *</Label>
               <Input
                 id="email"
                 type="email"
@@ -215,7 +231,7 @@ const Auth = () => {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Password *</Label>
               <div className="relative">
                 <Input
                   id="password"

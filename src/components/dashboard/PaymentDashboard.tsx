@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   DollarSign,
@@ -23,7 +22,6 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Calendar,
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -33,9 +31,9 @@ interface PaymentObligation {
   member_id: string;
   amount: number;
   due_date: string;
-  payment_type: 'regular' | 'event' | 'penalty'; // Changed from contribution_type
-  status: 'pending' | 'initiated' | 'received' | 'confirmed' | 'rejected' | 'refunded';
-  contribution_type?: string; // e.g., welfare, monthly, registration
+  payment_type: 'regular' | 'event' | 'penalty';
+  status: 'pending' | 'paid';
+  contribution_type?: string;
   welfare_case_id?: string;
   created_at: string;
 }
@@ -104,7 +102,6 @@ const PaymentDashboard = () => {
 
   const fetchPaymentData = async () => {
     try {
-      // Fetch payment obligations (mock - in real app, these come from a payment_obligations table)
       const { data: contributions, error: contribError } = await supabase
         .from('contributions')
         .select('*')
@@ -113,40 +110,34 @@ const PaymentDashboard = () => {
 
       if (contribError) throw contribError;
 
-      // Mock obligations from contributions
+      // Map contributions to obligations
       const mockObligations: PaymentObligation[] = (contributions || [])
-        .filter((c) => c.status === 'pending' || c.status === 'initiated')
+        .filter((c) => c.status === 'pending' || c.status === 'missed')
         .map((c) => ({
           id: c.id,
           member_id: c.member_id,
           amount: c.amount,
           due_date: c.due_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          payment_type: c.welfare_case_id ? 'event' : 'regular' as const,
-          status: (c.status === 'pending' ? 'pending' : 'received') as const,
+          payment_type: c.welfare_case_id ? 'event' : 'regular',
+          status: 'pending',
           contribution_type: c.contribution_type,
           welfare_case_id: c.welfare_case_id,
-          created_at: c.created_at,
+          created_at: c.created_at || new Date().toISOString(),
         }));
 
       setObligations(mockObligations);
 
-      // Fetch transaction history (mock)
-      const { data: allContributions } = await supabase
-        .from('contributions')
-        .select('*')
-        .eq('member_id', profile?.id)
-        .order('created_at', { ascending: false });
-
-      const mockTransactions: PaymentTransaction[] = (allContributions || [])
+      // Fetch transaction history
+      const mockTransactions: PaymentTransaction[] = (contributions || [])
         .filter((c) => c.status === 'paid')
         .map((c) => ({
           id: c.id,
           obligation_id: c.id,
           reference_id: c.reference_number || `REF-${c.id.substring(0, 8)}`,
           amount: c.amount,
-          payment_method: 'mpesa' as const,
-          status: 'confirmed' as const,
-          timestamp: c.paid_at || c.created_at,
+          payment_method: 'mpesa',
+          status: 'confirmed',
+          timestamp: c.paid_at || c.created_at || new Date().toISOString(),
           confirmed_at: c.paid_at,
         }));
 
@@ -215,24 +206,7 @@ const PaymentDashboard = () => {
       // Generate unique reference ID
       const referenceId = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
-      // Create payment transaction record
-      const transactionData = {
-        obligation_id: selectedObligation.id,
-        reference_id: referenceId,
-        amount: selectedObligation.amount,
-        payment_method: paymentMethod,
-        status: paymentMethod === 'cash' ? 'pending' : 'initiated',
-        phone_number: paymentMethod === 'mpesa' ? mpesaPhone : null,
-        bank_name: paymentMethod === 'bank' ? bankName : null,
-        account_number: paymentMethod === 'bank' ? accountNumber : null,
-        account_holder: paymentMethod === 'bank' ? accountHolder : null,
-        notes: notes || null,
-        timestamp: new Date().toISOString(),
-        member_id: profile?.id,
-      };
-
-      // In a real app, this would be a separate payments table
-      // For now, we'll update the contribution status
+      // Update the contribution status
       const { error: updateError } = await supabase
         .from('contributions')
         .update({ status: 'paid', paid_at: new Date().toISOString(), reference_number: referenceId })
@@ -262,19 +236,19 @@ const PaymentDashboard = () => {
       // Add to transactions
       const newTransaction: PaymentTransaction = {
         id: selectedObligation.id,
-        ...transactionData,
+        obligation_id: selectedObligation.id,
+        reference_id: referenceId,
+        amount: selectedObligation.amount,
+        payment_method: paymentMethod,
         status: 'confirmed',
+        timestamp: new Date().toISOString(),
         confirmed_at: new Date().toISOString(),
       };
 
       setTransactions((prev) => [newTransaction, ...prev]);
 
-      // Update obligations
-      setObligations((prev) =>
-        prev.map((o) =>
-          o.id === selectedObligation.id ? { ...o, status: 'confirmed' } : o
-        )
-      );
+      // Remove from obligations
+      setObligations((prev) => prev.filter((o) => o.id !== selectedObligation.id));
 
       toast({
         title: '✓ Payment Recorded',
@@ -293,11 +267,12 @@ const PaymentDashboard = () => {
         setTouched({});
         setSelectedObligation(null);
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Payment error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to process payment';
       toast({
         title: 'Payment Failed',
-        description: err.message || 'Failed to process payment',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -340,7 +315,7 @@ For inquiries, contact the treasurer.
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { bg: string; text: string; icon: any }> = {
+    const variants: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
       pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: Clock },
       initiated: { bg: 'bg-blue-100', text: 'text-blue-800', icon: Loader2 },
       received: { bg: 'bg-purple-100', text: 'text-purple-800', icon: CheckCircle2 },
@@ -370,7 +345,7 @@ For inquiries, contact the treasurer.
 
   const totalDue = obligations.reduce((sum, o) => sum + o.amount, 0);
   const totalPaid = transactions.reduce((sum, t) => sum + t.amount, 0);
-  const pendingPayments = obligations.filter((o) => o.status === 'pending' || o.status === 'initiated').length;
+  const pendingPayments = obligations.filter((o) => o.status === 'pending').length;
 
   if (isLoading) {
     return (
@@ -383,12 +358,12 @@ For inquiries, contact the treasurer.
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Due</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-xl sm:text-2xl font-bold text-red-600">
                 KES {totalDue.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">{pendingPayments} pending</p>
@@ -400,7 +375,7 @@ For inquiries, contact the treasurer.
           <CardContent className="pt-6">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Total Paid</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xl sm:text-2xl font-bold text-green-600">
                 KES {totalPaid.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">{transactions.length} payments</p>
@@ -411,11 +386,9 @@ For inquiries, contact the treasurer.
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Pending Obligations</p>
-              <p className="text-2xl font-bold text-yellow-600">{pendingPayments}</p>
-              <p className="text-xs text-muted-foreground">
-                {obligations.filter((o) => o.status === 'initiated').length} initiated
-              </p>
+              <p className="text-sm text-muted-foreground">Pending</p>
+              <p className="text-xl sm:text-2xl font-bold text-yellow-600">{pendingPayments}</p>
+              <p className="text-xs text-muted-foreground">obligations</p>
             </div>
           </CardContent>
         </Card>
@@ -424,8 +397,8 @@ For inquiries, contact the treasurer.
           <CardContent className="pt-6">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Payment Rate</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {totalDue > 0 ? ((totalPaid / (totalPaid + totalDue)) * 100).toFixed(0) : 0}%
+              <p className="text-xl sm:text-2xl font-bold text-primary">
+                {totalDue + totalPaid > 0 ? ((totalPaid / (totalPaid + totalDue)) * 100).toFixed(0) : 0}%
               </p>
               <p className="text-xs text-muted-foreground">of obligations</p>
             </div>
@@ -435,83 +408,81 @@ For inquiries, contact the treasurer.
 
       {/* Tabs */}
       <Tabs defaultValue="obligations" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="obligations">Pending Obligations</TabsTrigger>
-          <TabsTrigger value="history">Payment History</TabsTrigger>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="obligations" className="flex-1 sm:flex-none">Pending</TabsTrigger>
+          <TabsTrigger value="history" className="flex-1 sm:flex-none">History</TabsTrigger>
         </TabsList>
 
         {/* Pending Obligations Tab */}
         <TabsContent value="obligations">
-          {obligations.filter((o) => o.status === 'pending' || o.status === 'initiated').length > 0 ? (
+          {obligations.length > 0 ? (
             <div className="grid gap-4">
-              {obligations
-                .filter((o) => o.status === 'pending' || o.status === 'initiated')
-                .map((obligation) => {
-                  const daysUntilDue = Math.ceil(
-                    (new Date(obligation.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-                  );
-                  const isOverdue = daysUntilDue < 0;
+              {obligations.map((obligation) => {
+                const daysUntilDue = Math.ceil(
+                  (new Date(obligation.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+                );
+                const isOverdue = daysUntilDue < 0;
 
-                  return (
-                    <Card key={obligation.id} className={cn('hover:shadow-lg transition-shadow', {
-                      'border-red-300 bg-red-50': isOverdue,
-                    })}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">
-                              {getPaymentTypeLabel(obligation.payment_type)}
+                return (
+                  <Card key={obligation.id} className={cn('hover:shadow-lg transition-shadow', {
+                    'border-red-300 bg-red-50': isOverdue,
+                  })}>
+                    <CardHeader className="pb-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            {getPaymentTypeLabel(obligation.payment_type)}
+                          </p>
+                          {obligation.contribution_type && (
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {obligation.contribution_type.replace('_', ' ')} Contribution
                             </p>
-                            {obligation.contribution_type && (
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {obligation.contribution_type.replace('_', ' ')} Contribution
-                              </p>
-                            )}
-                          </div>
-                          {getStatusBadge(obligation.status)}
+                          )}
                         </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Amount Due</p>
-                            <p className="text-xl font-bold text-gray-900">
-                              KES {obligation.amount.toLocaleString()}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Due Date</p>
-                            <p className="text-sm font-medium">
-                              {new Date(obligation.due_date).toLocaleDateString('en-KE')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Days Until Due</p>
-                            <p className={cn('text-sm font-medium', {
-                              'text-red-600': isOverdue,
-                              'text-yellow-600': !isOverdue && daysUntilDue <= 3,
-                              'text-green-600': !isOverdue && daysUntilDue > 3,
-                            })}>
-                              {isOverdue ? `${Math.abs(daysUntilDue)} days overdue` : `${daysUntilDue} days`}
-                            </p>
-                          </div>
-                          <div className="flex justify-end">
-                            <Button
-                              onClick={() => {
-                                setSelectedObligation(obligation);
-                                setShowPaymentDialog(true);
-                              }}
-                              className="gap-2"
-                            >
-                              <DollarSign className="w-4 h-4" />
-                              Pay Now
-                            </Button>
-                          </div>
+                        {getStatusBadge(obligation.status)}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Amount Due</p>
+                          <p className="text-lg sm:text-xl font-bold text-foreground">
+                            KES {obligation.amount.toLocaleString()}
+                          </p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Due Date</p>
+                          <p className="text-sm font-medium">
+                            {new Date(obligation.due_date).toLocaleDateString('en-KE')}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Days</p>
+                          <p className={cn('text-sm font-medium', {
+                            'text-red-600': isOverdue,
+                            'text-yellow-600': !isOverdue && daysUntilDue <= 3,
+                            'text-green-600': !isOverdue && daysUntilDue > 3,
+                          })}>
+                            {isOverdue ? `${Math.abs(daysUntilDue)} overdue` : `${daysUntilDue} left`}
+                          </p>
+                        </div>
+                        <div className="flex justify-start sm:justify-end col-span-2 sm:col-span-1">
+                          <Button
+                            onClick={() => {
+                              setSelectedObligation(obligation);
+                              setShowPaymentDialog(true);
+                            }}
+                            className="gap-2 w-full sm:w-auto"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                            Pay Now
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <Card>
@@ -533,7 +504,7 @@ For inquiries, contact the treasurer.
               {transactions.map((transaction) => (
                 <Card key={transaction.id}>
                   <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className={cn('p-3 rounded-lg', {
                           'bg-blue-100': transaction.payment_method === 'mpesa',
@@ -554,7 +525,7 @@ For inquiries, contact the treasurer.
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-left sm:text-right">
                         <p className="font-bold text-lg">KES {transaction.amount.toLocaleString()}</p>
                         {getStatusBadge(transaction.status)}
                       </div>
@@ -579,7 +550,7 @@ For inquiries, contact the treasurer.
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Initiate Payment</DialogTitle>
           </DialogHeader>
@@ -589,7 +560,7 @@ For inquiries, contact the treasurer.
               {/* Obligation Summary */}
               <Card className="bg-blue-50 border-blue-200">
                 <CardContent className="pt-6">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <p className="text-xs text-muted-foreground">Amount</p>
                       <p className="text-xl font-bold">KES {selectedObligation.amount.toLocaleString()}</p>
@@ -612,15 +583,15 @@ For inquiries, contact the treasurer.
               <div className="space-y-3">
                 <Label className="text-base font-semibold">Select Payment Method</Label>
                 <div className="grid grid-cols-3 gap-3">
-                  {['mpesa', 'bank', 'cash'].map((method) => (
+                  {(['mpesa', 'bank', 'cash'] as const).map((method) => (
                     <button
                       key={method}
-                      onClick={() => handlePaymentMethodChange(method as 'mpesa' | 'bank' | 'cash')}
+                      onClick={() => handlePaymentMethodChange(method)}
                       className={cn(
                         'p-4 rounded-lg border-2 transition-all text-center',
                         paymentMethod === method
                           ? 'border-primary bg-primary/5'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-border hover:border-muted-foreground'
                       )}
                     >
                       <div className="mb-2">
@@ -629,7 +600,7 @@ For inquiries, contact the treasurer.
                         {method === 'cash' && <Banknote className="w-6 h-6 mx-auto text-green-600" />}
                       </div>
                       <p className="font-medium text-sm capitalize">
-                        {method === 'mpesa' ? 'M-Pesa' : method === 'bank' ? 'Bank Transfer' : 'Cash'}
+                        {method === 'mpesa' ? 'M-Pesa' : method === 'bank' ? 'Bank' : 'Cash'}
                       </p>
                     </button>
                   ))}
@@ -714,15 +685,6 @@ For inquiries, contact the treasurer.
                       onChange={(e) => setAccountHolder(e.target.value)}
                     />
                   </div>
-                  <div className="bg-white p-3 rounded border border-purple-100 text-sm">
-                    <p className="font-medium mb-1">Instructions:</p>
-                    <ol className="text-xs space-y-1 list-decimal list-inside">
-                      <li>Make a bank transfer to: Turuturu Stars CBO</li>
-                      <li>Use this reference: <span className="font-mono text-primary">PAY-{Date.now().toString().slice(-8)}</span></li>
-                      <li>Upload proof of payment when prompted</li>
-                      <li>Admin will verify and confirm</li>
-                    </ol>
-                  </div>
                 </div>
               )}
 
@@ -735,11 +697,7 @@ For inquiries, contact the treasurer.
                       <li>Contact the treasurer to arrange pickup/delivery</li>
                       <li>Make payment in person</li>
                       <li>You'll receive a receipt immediately</li>
-                      <li>Transaction will be recorded in the system</li>
                     </ol>
-                    <p className="mt-3 text-xs font-medium text-gray-700">
-                      Treasurer Contact: treasurer@turuturustars.org
-                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="notes">Notes (Optional)</Label>
@@ -754,20 +712,6 @@ For inquiries, contact the treasurer.
                 </div>
               )}
 
-              {/* General Notes */}
-              {paymentMethod !== 'cash' && (
-                <div className="space-y-2">
-                  <Label htmlFor="general-notes">Notes (Optional)</Label>
-                  <Textarea
-                    id="general-notes"
-                    placeholder="Any additional information about this payment..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-              )}
-
               {/* Error Message */}
               {errors.submit && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex gap-2">
@@ -777,11 +721,12 @@ For inquiries, contact the treasurer.
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4">
                 <Button
                   variant="outline"
                   onClick={() => setShowPaymentDialog(false)}
                   disabled={isProcessing}
+                  className="w-full sm:w-auto"
                 >
                   Cancel
                 </Button>
@@ -798,7 +743,7 @@ For inquiries, contact the treasurer.
                   ) : (
                     <>
                       <DollarSign className="w-4 h-4" />
-                      Initiate Payment - KES {selectedObligation.amount.toLocaleString()}
+                      Pay KES {selectedObligation.amount.toLocaleString()}
                     </>
                   )}
                 </Button>
@@ -833,7 +778,7 @@ For inquiries, contact the treasurer.
               </div>
 
               {/* Receipt Card */}
-              <Card className="bg-gray-50">
+              <Card className="bg-muted/50">
                 <CardContent className="pt-4 text-sm space-y-3">
                   <div className="border-b pb-2">
                     <p className="text-xs text-muted-foreground">Receipt Number</p>
@@ -865,23 +810,11 @@ For inquiries, contact the treasurer.
                 </CardContent>
               </Card>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowReceipt(false)}
-                  className="flex-1"
-                >
-                  Close
-                </Button>
-                <Button
-                  onClick={downloadReceipt}
-                  className="gap-2 flex-1"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </Button>
-              </div>
+              {/* Download Button */}
+              <Button onClick={downloadReceipt} variant="outline" className="w-full gap-2">
+                <Download className="w-4 h-4" />
+                Download Receipt
+              </Button>
             </div>
           )}
         </DialogContent>

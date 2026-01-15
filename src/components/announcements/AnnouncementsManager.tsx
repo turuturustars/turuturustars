@@ -19,7 +19,6 @@ import {
   Plus,
   Calendar,
   AlertCircle,
-  CheckCircle,
   Loader2,
   Trash2,
   Edit2,
@@ -30,16 +29,17 @@ import { useToast } from '@/hooks/use-toast';
 import { hasRole } from '@/lib/rolePermissions';
 import { cn } from '@/lib/utils';
 
+type PriorityType = 'urgent' | 'high' | 'normal' | 'low';
+
 interface Announcement {
   id: string;
   title: string;
   content: string;
-  priority: 'urgent' | 'high' | 'normal' | 'low';
+  priority: string;
   published: boolean;
   published_at: string | null;
   created_by: string;
   created_at: string;
-  updated_at: string;
 }
 
 const AnnouncementsManager = () => {
@@ -51,7 +51,7 @@ const AnnouncementsManager = () => {
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    priority: 'normal' as const,
+    priority: 'normal' as PriorityType,
     published: false,
   });
 
@@ -88,7 +88,6 @@ const AnnouncementsManager = () => {
         priority: formData.priority,
         published: formData.published,
         published_at: formData.published ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
       };
 
       if (editingId) {
@@ -104,7 +103,6 @@ const AnnouncementsManager = () => {
           .insert({
             ...announcementData,
             created_by: profile?.id,
-            created_at: new Date().toISOString(),
           });
 
         if (error) throw error;
@@ -120,7 +118,7 @@ const AnnouncementsManager = () => {
       resetForm();
       setOpen(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: '✗ Error',
         description: error.message || 'Failed to save announcement',
@@ -147,7 +145,7 @@ const AnnouncementsManager = () => {
         description: 'Announcement removed successfully',
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: '✗ Error',
         description: error.message || 'Failed to delete announcement',
@@ -165,7 +163,7 @@ const AnnouncementsManager = () => {
     setFormData({
       title: announcement.title,
       content: announcement.content,
-      priority: announcement.priority,
+      priority: (announcement.priority as PriorityType) || 'normal',
       published: announcement.published,
     });
     setEditingId(announcement.id);
@@ -196,14 +194,14 @@ const AnnouncementsManager = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-lg bg-purple-100">
             <Megaphone className="w-6 h-6 text-purple-600" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Manage Announcements</h2>
-            <p className="text-sm text-gray-500">Create and manage organization announcements</p>
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground">Manage Announcements</h2>
+            <p className="text-sm text-muted-foreground">Create and manage organization announcements</p>
           </div>
         </div>
 
@@ -212,12 +210,12 @@ const AnnouncementsManager = () => {
           if (!newOpen) resetForm();
         }}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2 w-full sm:w-auto">
               <Plus className="w-4 h-4" />
               New Announcement
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingId ? 'Edit Announcement' : 'Create New Announcement'}
@@ -248,12 +246,12 @@ const AnnouncementsManager = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="priority">Priority</Label>
                   <Select
                     value={formData.priority}
-                    onValueChange={(value: any) =>
+                    onValueChange={(value: PriorityType) =>
                       setFormData({ ...formData, priority: value })
                     }
                   >
@@ -285,7 +283,7 @@ const AnnouncementsManager = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   onClick={handleSave}
                   disabled={saveMutation.isPending}
@@ -316,7 +314,7 @@ const AnnouncementsManager = () => {
       {/* Loading State */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       )}
 
@@ -326,19 +324,19 @@ const AnnouncementsManager = () => {
           {announcements?.length === 0 ? (
             <Card className="border-dashed border-2">
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Megaphone className="w-12 h-12 text-gray-300 mb-3" />
-                <p className="text-gray-500 font-medium">No announcements yet</p>
-                <p className="text-sm text-gray-400">Create your first announcement</p>
+                <Megaphone className="w-12 h-12 text-muted-foreground mb-3" />
+                <p className="text-muted-foreground font-medium">No announcements yet</p>
+                <p className="text-sm text-muted-foreground">Create your first announcement</p>
               </CardContent>
             </Card>
           ) : (
             announcements?.map((announcement) => (
               <Card key={announcement.id} className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <h3 className="font-semibold text-gray-900 text-base">
+                        <h3 className="font-semibold text-foreground text-base">
                           {announcement.title}
                         </h3>
                         <Badge variant={announcement.published ? 'default' : 'secondary'}>
@@ -354,10 +352,10 @@ const AnnouncementsManager = () => {
                           {announcement.priority}
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
                         {announcement.content}
                       </p>
-                      <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {new Date(announcement.created_at).toLocaleDateString()}
                       </p>

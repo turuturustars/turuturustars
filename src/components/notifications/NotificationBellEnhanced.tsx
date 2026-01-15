@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Trash2, Settings, Loader2, AlertCircle } from 'lucide-react';
+import { Bell, Check, Trash2, Settings, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -17,14 +16,13 @@ import { cn } from '@/lib/utils';
 
 interface Notification {
   id: string;
-  user_id: string;
+  user_id: string | null;
   title: string;
   message: string;
-  type: 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system';
-  read: boolean;
-  action_url?: string;
-  created_at: string;
-  updated_at: string;
+  type: string;
+  read: boolean | null;
+  sent_via: string[] | null;
+  created_at: string | null;
 }
 
 const NotificationBellEnhanced = () => {
@@ -51,7 +49,7 @@ const NotificationBellEnhanced = () => {
       return data as Notification[];
     },
     enabled: !!user?.id,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
   // Real-time subscription
@@ -70,7 +68,6 @@ const NotificationBellEnhanced = () => {
         },
         () => {
           queryClient.invalidateQueries({ queryKey: ['notifications', user.id] });
-          // Play notification sound
           playNotificationSound();
         }
       )
@@ -113,37 +110,6 @@ const NotificationBellEnhanced = () => {
     },
   });
 
-  // Delete notification mutation
-  const deleteNotificationMutation = useMutation({
-    mutationFn: async (notificationId: string) => {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notificationId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
-    },
-  });
-
-  // Delete all notifications mutation
-  const deleteAllMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user?.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
-      toast({ title: '✓ All notifications cleared' });
-    },
-  });
-
   const unreadCount = notifications?.filter(n => !n.read).length || 0;
 
   const getTypeColor = (type: string) => {
@@ -177,7 +143,8 @@ const NotificationBellEnhanced = () => {
     return icons[type] || '📌';
   };
 
-  const formatTime = (dateString: string) => {
+  const formatTime = (dateString: string | null) => {
+    if (!dateString) return 'Unknown';
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -193,21 +160,24 @@ const NotificationBellEnhanced = () => {
   };
 
   const playNotificationSound = () => {
-    // Create a simple beep sound
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
+    try {
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
 
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
 
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
 
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.3);
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (e) {
+      console.log('Could not play notification sound:', e);
+    }
   };
 
   return (
@@ -223,13 +193,13 @@ const NotificationBellEnhanced = () => {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-96 p-0" align="end">
+      <PopoverContent className="w-80 sm:w-96 p-0" align="end">
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div className="p-4 border-b border-border bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-gray-900">Notifications</h3>
+              <Bell className="w-5 h-5 text-primary" />
+              <h3 className="font-semibold text-foreground">Notifications</h3>
               {unreadCount > 0 && (
                 <Badge variant="destructive" className="ml-2">
                   {unreadCount} new
@@ -247,19 +217,19 @@ const NotificationBellEnhanced = () => {
         </div>
 
         {/* Notifications List */}
-        <ScrollArea className="h-96">
+        <ScrollArea className="h-80 sm:h-96">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : notifications && notifications.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-border">
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={cn(
-                    'p-4 hover:bg-gray-50 transition-colors cursor-pointer border-l-4',
-                    notification.read ? 'border-l-transparent' : 'border-l-blue-500 bg-blue-50/30'
+                    'p-4 hover:bg-accent transition-colors cursor-pointer border-l-4',
+                    notification.read ? 'border-l-transparent' : 'border-l-primary bg-primary/5'
                   )}
                 >
                   <div className="flex gap-3">
@@ -273,7 +243,7 @@ const NotificationBellEnhanced = () => {
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <h4 className={cn(
                           'text-sm font-semibold line-clamp-1',
-                          notification.read ? 'text-gray-600' : 'text-gray-900'
+                          notification.read ? 'text-muted-foreground' : 'text-foreground'
                         )}>
                           {notification.title}
                         </h4>
@@ -283,11 +253,11 @@ const NotificationBellEnhanced = () => {
                       </div>
                       <p className={cn(
                         'text-xs line-clamp-2',
-                        notification.read ? 'text-gray-500' : 'text-gray-700'
+                        notification.read ? 'text-muted-foreground' : 'text-foreground'
                       )}>
                         {notification.message}
                       </p>
-                      <p className="text-xs text-gray-400 mt-2">
+                      <p className="text-xs text-muted-foreground mt-2">
                         {formatTime(notification.created_at)}
                       </p>
                     </div>
@@ -305,15 +275,6 @@ const NotificationBellEnhanced = () => {
                           <Check className="w-4 h-4 text-green-600" />
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => deleteNotificationMutation.mutate(notification.id)}
-                        disabled={deleteNotificationMutation.isPending}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-600" />
-                      </Button>
                     </div>
                   </div>
                 </div>
@@ -321,34 +282,23 @@ const NotificationBellEnhanced = () => {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Bell className="w-8 h-8 text-gray-300 mb-2" />
-              <p className="text-sm text-gray-500">No notifications yet</p>
+              <Bell className="w-8 h-8 text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">No notifications yet</p>
             </div>
           )}
         </ScrollArea>
 
         {/* Footer */}
-        {notifications && notifications.length > 0 && (
-          <div className="p-3 border-t border-gray-200 flex gap-2">
-            {unreadCount > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => markAllAsReadMutation.mutate()}
-                disabled={markAllAsReadMutation.isPending}
-                className="flex-1 text-xs"
-              >
-                Mark all as read
-              </Button>
-            )}
+        {notifications && notifications.length > 0 && unreadCount > 0 && (
+          <div className="p-3 border-t border-border">
             <Button
               size="sm"
               variant="outline"
-              onClick={() => deleteAllMutation.mutate()}
-              disabled={deleteAllMutation.isPending}
-              className="flex-1 text-xs text-red-600 hover:bg-red-50"
+              onClick={() => markAllAsReadMutation.mutate()}
+              disabled={markAllAsReadMutation.isPending}
+              className="w-full text-xs"
             >
-              Clear all
+              Mark all as read
             </Button>
           </div>
         )}
