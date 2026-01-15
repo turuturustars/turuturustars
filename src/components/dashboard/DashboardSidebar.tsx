@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -14,6 +15,9 @@ import {
   PiggyBank,
   ClipboardList,
   Smartphone,
+  ChevronDown,
+  Menu,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,13 +30,31 @@ const DashboardSidebar = () => {
   const userRoles = roles.map(r => r.role);
   const primaryRole = getPrimaryRole(userRoles);
   const isUserOfficial = userRoles.some(r => ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairperson', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron'].includes(r));
+  
+  const [isOpen, setIsOpen] = useState(false);
+  const [expandedRole, setExpandedRole] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) setIsOpen(true);
+  }, [isMobile]);
+
+  const toggleRoleSection = () => {
+    setExpandedRole(expandedRole ? null : primaryRole);
+  };
 
   const memberLinks = [
-    { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard },
-    { label: 'My Contributions', href: '/dashboard/contributions', icon: DollarSign },
-    { label: 'Welfare Cases', href: '/dashboard/welfare', icon: HandHeart },
-    { label: 'Announcements', href: '/dashboard/announcements', icon: Bell },
-    { label: 'My Profile', href: '/dashboard/profile', icon: Settings },
+    { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
+    { label: 'My Contributions', href: '/dashboard/contributions', icon: DollarSign, badge: null },
+    { label: 'Welfare Cases', href: '/dashboard/welfare', icon: HandHeart, badge: null },
+    { label: 'Announcements', href: '/dashboard/announcements', icon: Bell, badge: 'new' },
+    { label: 'My Profile', href: '/dashboard/profile', icon: Settings, badge: null },
   ];
 
   // Role-specific navigation
@@ -97,104 +119,166 @@ const DashboardSidebar = () => {
   };
 
   return (
-    <aside className="w-64 bg-card border-r border-border min-h-screen flex flex-col">
-      {/* Logo */}
-      <div className="p-6 border-b border-border">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-            <Star className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <span className="font-serif font-semibold text-foreground">Turuturu Stars</span>
-            <span className="block text-xs text-muted-foreground">Member Portal</span>
-          </div>
-        </Link>
-      </div>
+    <>
+      {/* Mobile Toggle Button */}
+      {isMobile && (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-primary text-primary-foreground md:hidden hover:bg-primary/90 transition-colors"
+          aria-label="Toggle sidebar"
+        >
+          {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+      )}
 
-      {/* Member Info */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-            <span className="text-sm font-medium text-accent-foreground">
-              {profile?.full_name?.charAt(0) || 'M'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {profile?.full_name || 'Member'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {profile?.membership_number || 'Pending'}
-            </p>
+      {/* Backdrop for Mobile */}
+      {isMobile && isOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed md:relative z-40 h-screen w-64 bg-card border-r border-border flex flex-col transition-transform duration-300 ease-in-out',
+          isMobile && !isOpen && '-translate-x-full'
+        )}
+      >
+        {/* Logo Section */}
+        <div className="p-4 md:p-6 border-b border-border bg-gradient-to-br from-primary/5 to-transparent">
+          <Link
+            to="/"
+            className="flex items-center gap-3 group"
+            onClick={() => isMobile && setIsOpen(false)}
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
+              <Star className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="font-serif font-bold text-foreground text-base group-hover:text-primary transition-colors">Turuturu Stars</span>
+              <span className="block text-xs text-muted-foreground">Member Portal</span>
+            </div>
+          </Link>
+        </div>
+
+        {/* Member Info Card */}
+        <div className="p-4 border-b border-border mx-3 my-3 rounded-lg bg-gradient-to-br from-accent/50 to-accent/20 backdrop-blur-sm hover:bg-accent/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center flex-shrink-0 shadow-md">
+              <span className="text-sm font-bold text-primary-foreground">
+                {profile?.full_name?.charAt(0) || 'M'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate hover:text-clip">
+                {profile?.full_name || 'Member'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {profile?.membership_number || 'Pending'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-          Member
-        </p>
-        {memberLinks.map((link) => {
-          const Icon = link.icon;
-          const isActive = location.pathname === link.href;
-          return (
-            <Link
-              key={link.href}
-              to={link.href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {link.label}
-            </Link>
-          );
-        })}
-
-        {isUserOfficial && (
-          <>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-6 mb-3">
-              {primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1).replace('_', ' ')}
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-3 md:p-4 space-y-1 scrollbar-hide">
+          {/* Member Section */}
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-3">
+              Menu
             </p>
-            {roleSpecificLinks().map((link) => {
-              const Icon = link.icon;
-              const isActive = location.pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  to={link.href}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                  )}
-                >
-                  <Icon className="w-4 h-4" />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </>
-        )}
-      </nav>
+            <div className="space-y-1">
+              {memberLinks.map((link) => {
+                const Icon = link.icon;
+                const isActive = location.pathname === link.href;
+                return (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    onClick={() => isMobile && setIsOpen(false)}
+                    className={cn(
+                      'flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    )}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <span>{link.label}</span>
+                    </div>
+                    {link.badge && (
+                      <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full bg-destructive text-destructive-foreground">
+                        1
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-muted-foreground hover:text-destructive"
-          onClick={signOut}
-        >
-          <LogOut className="w-4 h-4 mr-3" />
-          Sign Out
-        </Button>
-      </div>
-    </aside>
+          {/* Role-Specific Section */}
+          {isUserOfficial && (
+            <div className="mt-6 pt-4 border-t border-border/50">
+              <button
+                onClick={toggleRoleSection}
+                className="w-full flex items-center justify-between px-3 py-2.5 mb-2 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground uppercase tracking-widest transition-colors hover:bg-accent/30"
+              >
+                <span>{primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1).replace('_', ' ')}</span>
+                <ChevronDown
+                  className={cn(
+                    'w-4 h-4 transition-transform duration-200',
+                    expandedRole && 'rotate-180'
+                  )}
+                />
+              </button>
+              {expandedRole && (
+                <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {roleSpecificLinks().map((link) => {
+                    const Icon = link.icon;
+                    const isActive = location.pathname === link.href;
+                    return (
+                      <Link
+                        key={link.href}
+                        to={link.href}
+                        onClick={() => isMobile && setIsOpen(false)}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-md'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                        )}
+                      >
+                        <Icon className="w-4 h-4 flex-shrink-0" />
+                        <span>{link.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </nav>
+
+        {/* Logout Section */}
+        <div className="p-3 md:p-4 border-t border-border bg-gradient-to-t from-background/50 to-transparent">
+          <Button
+            onClick={signOut}
+            disabled={isLoading}
+            className={cn(
+              'w-full justify-start gap-3 font-medium transition-all duration-200',
+              'bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive'
+            )}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {isMobile ? 'Sign Out' : 'Sign Out'}
+          </Button>
+        </div>
+      </aside>
+    </>
   );
 };
 
