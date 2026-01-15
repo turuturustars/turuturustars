@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { hasRole, isManagementCommittee } from '@/lib/rolePermissions';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -9,27 +8,27 @@ import {
   DollarSign,
   Calendar,
   FileText,
-  AlertTriangle,
   Bell,
-  Settings,
   BarChart3,
   Mail,
   Gavel,
   MessageSquare,
+  CreditCard,
 } from 'lucide-react';
+
+type AppRole = 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'vice_chairperson' | 'vice_secretary' | 'organizing_secretary' | 'committee_member' | 'patron' | 'member';
 
 interface NavItem {
   title: string;
   href: string;
   icon: React.ReactNode;
-  roles?: string[];
-  children?: NavItem[];
+  roles?: AppRole[];
 }
 
 const RoleBasedNav = () => {
   const { roles } = useAuth();
   const location = useLocation();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = roles.map(r => r.role) as AppRole[];
 
   // Define navigation items with role requirements
   const navItems: NavItem[] = [
@@ -83,7 +82,7 @@ const RoleBasedNav = () => {
     {
       title: 'Contributions',
       href: '/dashboard/contributions',
-      icon: <TrendingUp className="w-4 h-4" />,
+      icon: <CreditCard className="w-4 h-4" />,
     },
     {
       title: 'Community',
