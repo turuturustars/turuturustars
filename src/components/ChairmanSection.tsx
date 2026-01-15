@@ -1,112 +1,93 @@
 import { Quote } from 'lucide-react';
 import chairmanImage from '@/assets/chairmain-official-photo.png';
+import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 
 const ChairmanSection = () => {
-  return (
-    <section id="leadership" className="py-24 bg-gradient-to-b from-background to-section-accent relative">
-      <div className="section-container">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-          {/* Message Content */}
-          <div className="order-2 lg:order-1">
-            <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4">
-              From The Chairman
-            </span>
-            <h2 className="heading-display text-3xl sm:text-4xl font-bold text-foreground mb-8">
-              A Message of Unity & Hope
-            </h2>
+  const { ref, isVisible } = useScrollAnimation();
 
-            <div className="relative">
-              <Quote className="absolute -top-4 -left-4 w-12 h-12 text-primary/20" />
-              <div className="pl-8 border-l-4 border-primary/30">
-                <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                  Warm greetings to all members, friends, and sons and daughters of Turuturu. 
-                  With thanksgiving to God and pride in our shared heritage, I warmly welcome you 
+  return (
+    <section
+      id="leadership"
+      className="py-20 bg-section-accent"
+    >
+      <div className="section-container">
+        <div
+          ref={ref}
+          className={`grid gap-12 lg:grid-cols-2 items-center transition-all duration-700 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+          }`}
+        >
+          {/* LEFT: Chairman Profile */}
+          <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+            <img
+              src={chairmanImage}
+              alt="Francis M. Mwangi, Chairman"
+              className="w-40 h-40 rounded-full object-cover shadow-lg mb-6"
+            />
+
+            <h3 className="font-serif text-2xl font-semibold text-foreground">
+              Francis M. Mwangi
+            </h3>
+            <p className="text-sm text-muted-foreground mb-8">
+              Chairman – Turuturu Stars CBO
+            </p>
+
+            {/* Message */}
+            <div className="relative max-w-xl">
+              <Quote className="absolute -top-4 -left-4 w-10 h-10 text-primary/20" />
+
+              <div className="pl-6 border-l-4 border-primary/40 space-y-5">
+                <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+                  Warm greetings to all members, friends, and sons and daughters of Turuturu.
+                  With thanksgiving to God and pride in our shared heritage, I welcome you
                   to Turuturu Stars CBO.
                 </p>
-                <p className="text-lg text-muted-foreground leading-relaxed mb-6">
-                  This journey is a true testimony of unity, faith, and shared purpose. 
-                  I sincerely thank our founders, officials, members, leaders, partners, and supporters. 
-                  Your commitment has shaped who we are today.
-                </p>
-                <p className="text-lg text-foreground font-medium italic">
-                  "To all alumni and friends yet to join us—this is your home. Walk with us as we preserve 
-                  our identity, uplift one another, and build a lasting legacy for present and future generations."
-                </p>
-              </div>
-            </div>
 
-            {/* Signature with Image */}
-            <div className="mt-10 flex items-center gap-4">
-              <img 
-                src={chairmanImage}
-                alt="Francis M. Mwangi, Chairman"
-                className="w-16 h-16 rounded-full object-cover shadow-elevated border-2 border-primary/30"
-              />
-              <div>
-                <p className="font-serif text-lg font-semibold text-foreground">
-                  Francis M. Mwangi
+                <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+                  This journey is a true testimony of unity, faith, and shared purpose.
+                  I sincerely thank our founders, officials, members, partners, and supporters.
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Chairman – Turuturu Stars CBO
+
+                <p className="italic font-medium text-foreground">
+                  “This is your home. Walk with us as we preserve our identity,
+                  uplift one another, and build a lasting legacy.”
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Stats Card with Chairman Photo */}
-          <div className="order-1 lg:order-2 flex flex-col gap-8">
-            {/* Chairman Photo */}
-            <div className="rounded-2xl overflow-hidden shadow-elevated">
-              <img 
-                src={chairmanImage}
-                alt="Francis M. Mwangi, Chairman"
-                className="w-full h-auto object-cover hover:scale-105 transition-transform duration-300"
-              />
-              <div className="bg-gradient-to-r from-primary to-primary/80 px-6 py-4 text-center">
-                <p className="font-serif text-lg font-semibold text-primary-foreground">
-                  Francis M. Mwangi
+          {/* RIGHT: Stats */}
+          <div className="grid grid-cols-2 gap-6">
+            {[
+              { value: '200+', label: 'Active Members' },
+              { value: '2019', label: 'Year Founded' },
+              { value: '3', label: 'Core Pillars' },
+              { value: '1', label: 'United Community' },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="rounded-xl bg-card p-6 text-center shadow-sm hover:shadow-md transition"
+              >
+                <p className="text-3xl font-bold text-primary">
+                  {stat.value}
                 </p>
-                <p className="text-sm text-primary-foreground/90">
-                  Chairman – Turuturu Stars CBO
-                </p>
-              </div>
-            </div>
-
-            {/* Stats Card */}
-            <div className="card-elevated p-8 lg:p-10 bg-gradient-to-br from-card to-section-light">
-              <h3 className="font-serif text-2xl font-semibold text-foreground mb-8 text-center">
-                Our Journey in Numbers
-              </h3>
-
-              <div className="grid grid-cols-2 gap-6">
-                <div className="text-center p-6 rounded-2xl bg-primary/5 hover:bg-primary/10 transition-colors">
-                  <p className="heading-display text-4xl lg:text-5xl font-bold text-primary">200+</p>
-                  <p className="text-sm text-muted-foreground mt-2">Active Members</p>
-                </div>
-                <div className="text-center p-6 rounded-2xl bg-gold/10 hover:bg-gold/15 transition-colors">
-                  <p className="heading-display text-4xl lg:text-5xl font-bold text-gold">2019</p>
-                  <p className="text-sm text-muted-foreground mt-2">Year Founded</p>
-                </div>
-                <div className="text-center p-6 rounded-2xl bg-gold/10 hover:bg-gold/15 transition-colors">
-                  <p className="heading-display text-4xl lg:text-5xl font-bold text-gold">3</p>
-                  <p className="text-sm text-muted-foreground mt-2">Core Pillars</p>
-                </div>
-                <div className="text-center p-6 rounded-2xl bg-primary/5 hover:bg-primary/10 transition-colors">
-                  <p className="heading-display text-4xl lg:text-5xl font-bold text-primary">1</p>
-                  <p className="text-sm text-muted-foreground mt-2">United Family</p>
-                </div>
-              </div>
-
-              {/* Launch Event */}
-              <div className="mt-8 p-6 rounded-2xl border border-border bg-card/50">
-                <p className="text-sm text-muted-foreground mb-2">Official Launch</p>
-                <p className="font-serif text-lg font-semibold text-foreground">
-                  September 16, 2023
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Presided over by Hon. Senator Veronica Maina & Hon. Joseph Munyoro, MP Kigumo
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {stat.label}
                 </p>
               </div>
+            ))}
+
+            {/* Launch Info */}
+            <div className="col-span-2 rounded-xl bg-card p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground mb-1">
+                Official Launch
+              </p>
+              <p className="font-semibold text-foreground">
+                September 16, 2023
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Presided over by Hon. Sen. Veronica Maina & Hon. Joseph Munyoro, MP Kigumo
+              </p>
             </div>
           </div>
         </div>
