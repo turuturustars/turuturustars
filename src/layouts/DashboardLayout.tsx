@@ -34,30 +34,33 @@ const DashboardLayout = () => {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block w-64 flex-shrink-0">
         <DashboardSidebar />
       </div>
 
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
+          aria-label="Close menu"
         >
           <div 
-            className="fixed inset-y-0 left-0 w-64"
+            className="fixed inset-y-0 left-0 w-64 max-w-[85vw]"
             onClick={(e) => e.stopPropagation()}
           >
-            <DashboardSidebar />
+            <DashboardSidebar onClose={() => setIsMobileMenuOpen(false)} />
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         <DashboardHeader onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
-        <main className="flex-1 p-6 overflow-auto">
-          <Outlet />
+        <main className="flex-1 overflow-auto bg-background">
+          <div className="px-4 py-5 sm:px-6 md:px-8 lg:py-6">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

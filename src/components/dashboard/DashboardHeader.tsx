@@ -37,10 +37,13 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
   };
 
   const firstName = profile?.full_name?.split(' ')[0] || 'Member';
+  const displayName = window.innerWidth < 480 
+    ? firstName.slice(0, 8)
+    : firstName;
 
   return (
     <header className="sticky top-0 z-40 h-14 sm:h-16 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 border-b border-border flex items-center justify-between px-3 sm:px-4 md:px-6 transition-all duration-200">
-      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 min-w-0 flex-1">
         <Button
           variant="ghost"
           size="icon"
@@ -53,19 +56,18 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
         
         <div className="min-w-0 flex-1">
           <h1 className="font-serif text-base sm:text-lg md:text-xl font-semibold text-foreground truncate">
-            Welcome, <span className="hidden xs:inline">{firstName}</span>
-            <span className="xs:hidden">{firstName.slice(0, 10)}{firstName.length > 10 ? '...' : ''}</span>
+            Welcome, <span className="hidden xs:inline">{displayName}</span>
           </h1>
           
-          <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 mt-0.5 flex-wrap">
             <Badge 
               variant="outline" 
-              className="text-xs px-1.5 sm:px-2 py-0 h-5 whitespace-nowrap"
+              className="text-xs px-1.5 sm:px-2 py-0.5 h-5 whitespace-nowrap"
             >
               {getRoleBadge()}
             </Badge>
             <Badge 
-              className={`text-xs px-1.5 sm:px-2 py-0 h-5 whitespace-nowrap transition-colors ${getStatusColor(profile?.status)}`}
+              className={`text-xs px-1.5 sm:px-2 py-0.5 h-5 whitespace-nowrap transition-colors ${getStatusColor(profile?.status)}`}
             >
               {profile?.status || 'Pending'}
             </Badge>
@@ -73,8 +75,14 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-        <Button variant="ghost" size="icon" aria-label="Open chat" onClick={() => setShowChat(true)}>
+      <div className="flex items-center gap-1 sm:gap-2 md:gap-4 shrink-0">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-9 w-9 transition-colors hover:bg-accent"
+          aria-label="Open chat" 
+          onClick={() => setShowChat(true)}
+        >
           <MessageSquare className="w-5 h-5" />
         </Button>
         <NotificationBell />
