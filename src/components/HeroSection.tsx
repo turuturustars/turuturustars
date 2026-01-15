@@ -47,8 +47,8 @@ const HeroSection = () => {
           {/* LEFT: Text Content */}
           <div className="relative z-10 space-y-6 sm:space-y-8 lg:space-y-10 animate-fadeInUp">
             
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-primary/10 via-blue-500/10 to-primary/10 border border-primary/30 backdrop-blur-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 group cursor-default">
+            {/* Premium Badge */}
+            <div className="inline-flex items-center gap-2.5 px-4 sm:px-5 py-2.5 sm:py-3 rounded-full bg-gradient-to-r from-primary/15 via-blue-500/15 to-primary/15 border border-primary/40 backdrop-blur-xl shadow-lg hover:shadow-2xl hover:scale-105 hover:border-primary/60 transition-all duration-300 group cursor-default card-hover">
               <div className="relative">
                 <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 animate-pulse" />
                 <div className="absolute inset-0 blur-sm">
@@ -91,50 +91,54 @@ const HeroSection = () => {
               </span>
             </p>
 
-            {/* CTA Buttons */}
+            {/* CTA Buttons - Enhanced Design */}
             <div className="flex flex-col sm:flex-row gap-4 animate-fadeInUp" style={{ animationDelay: '0.4s' }}>
               <Button 
-                className="group relative px-8 py-6 sm:py-7 text-base sm:text-lg font-semibold bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 shadow-lg hover:shadow-xl hover:shadow-primary/30 transition-all duration-300 overflow-hidden"
+                className="group relative px-8 py-6 sm:py-7 text-base sm:text-lg font-semibold bg-gradient-to-r from-primary to-blue-600 hover:from-primary/95 hover:to-blue-700 text-white shadow-lg hover:shadow-2xl hover:shadow-primary/40 transition-all duration-300 overflow-hidden hover:scale-105 active:scale-95 card-hover"
                 onClick={() => document.getElementById('register')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 <span className="relative z-10 flex items-center">
                   Join Our Family
-                  <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
                 </span>
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                {/* Premium shimmer effect */}
+                <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
               </Button>
 
               <Button
                 variant="outline"
-                className="group px-8 py-6 sm:py-7 text-base sm:text-lg font-semibold border-2 border-gray-300 hover:border-primary hover:bg-primary/5 transition-all duration-300"
+                className="group relative px-8 py-6 sm:py-7 text-base sm:text-lg font-semibold border-2 border-gray-300 hover:border-primary hover:bg-primary/5 hover:scale-105 transition-all duration-300 active:scale-95 card-hover"
                 onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 <span className="flex items-center gap-2">
-                  <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <Play className="w-5 h-5 group-hover:scale-125 transition-transform duration-300" />
                   Learn More
                 </span>
               </Button>
             </div>
 
-            {/* Stats Cards */}
+            {/* Stats Cards - Enhanced with Better Hover Effects */}
             <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4 sm:pt-6 animate-fadeInUp" style={{ animationDelay: '0.5s' }}>
               {stats.map((stat, index) => {
                 const Icon = stat.icon;
                 return (
                   <div
                     key={index}
-                    className="group relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200/50 p-4 sm:p-5 lg:p-6 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default"
+                    className="group relative overflow-hidden rounded-2xl bg-white/60 backdrop-blur-md border border-gray-200/80 p-4 sm:p-5 lg:p-6 hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 cursor-default card-hover stagger-item"
+                    style={{ animationDelay: `${0.5 + index * 0.1}s` }}
                   >
-                    {/* Gradient overlay on hover */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}></div>
+                    {/* Enhanced gradient overlay */}
+                    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                    
+                    {/* Shine effect on hover */}
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
                     
                     <div className="relative">
-                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 mb-2 sm:mb-3 bg-gradient-to-br ${stat.gradient} bg-clip-text text-transparent group-hover:scale-110 transition-transform duration-300`} style={{ WebkitTextFillColor: 'transparent', WebkitBackgroundClip: 'text' }} />
+                      <Icon className={`w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 mb-2 sm:mb-3 bg-gradient-to-br ${stat.gradient} bg-clip-text text-transparent group-hover:scale-125 transition-transform duration-300`} style={{ WebkitTextFillColor: 'transparent', WebkitBackgroundClip: 'text' }} />
                       <p className={`text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-br ${stat.gradient} bg-clip-text text-transparent mb-1`}>
                         {stat.value}
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-600 font-medium">
+                      <p className="text-xs sm:text-sm text-gray-600 font-semibold group-hover:text-gray-900 transition-colors">
                         {stat.label}
                       </p>
                     </div>
@@ -143,20 +147,20 @@ const HeroSection = () => {
               })}
             </div>
 
-            {/* Milestones Timeline */}
-            <div className="border-t border-gray-200 pt-6 sm:pt-8 animate-fadeInUp" style={{ animationDelay: '0.6s' }}>
+            {/* Milestones Timeline - Enhanced */}
+            <div className="border-t border-gray-200/60 pt-6 sm:pt-8 animate-fadeInUp" style={{ animationDelay: '0.6s' }}>
               <div className="grid grid-cols-3 gap-4 sm:gap-6">
                 {milestones.map((milestone, index) => {
                   const Icon = milestone.icon;
                   return (
-                    <div key={index} className="group text-center sm:text-left">
-                      <div className="flex items-center justify-center sm:justify-start gap-2 mb-2">
-                        <Icon className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-                        <p className="text-xs sm:text-sm text-gray-600 font-medium">
+                    <div key={index} className="group text-center sm:text-left stagger-item" style={{ animationDelay: `${0.6 + index * 0.1}s` }}>
+                      <div className="flex items-center justify-center sm:justify-start gap-2 mb-2 group-hover:gap-3 transition-all duration-300">
+                        <Icon className="w-4 h-4 text-primary group-hover:scale-125 transition-transform duration-300" />
+                        <p className="text-xs sm:text-sm text-gray-600 font-semibold group-hover:text-primary transition-colors duration-300">
                           {milestone.label}
                         </p>
                       </div>
-                      <p className="font-serif text-sm sm:text-base lg:text-lg font-bold text-gray-900 group-hover:text-primary transition-colors">
+                      <p className="font-serif text-sm sm:text-base lg:text-lg font-bold text-gray-900 group-hover:text-primary transition-colors duration-300">
                         {milestone.date}
                       </p>
                     </div>
@@ -181,7 +185,7 @@ const HeroSection = () => {
             </div>
 
             {/* Image Container */}
-            <div className="relative z-10 w-full max-w-2xl">
+            <div className="relative z-10 w-full max-w-2xl bounce-in-top">
               {/* Image wrapper with effects */}
               <div className="relative group cursor-pointer">
                 {/* Gradient border effect */}
