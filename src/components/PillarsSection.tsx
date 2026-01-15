@@ -1,4 +1,5 @@
 import { GraduationCap, Users, Heart } from 'lucide-react';
+import { useStaggerAnimation } from '@/hooks/useScrollAnimation';
 
 const pillars = [
   {
@@ -22,41 +23,46 @@ const pillars = [
 ];
 
 const PillarsSection = () => {
+  const { containerRef, isVisible } = useStaggerAnimation();
+
   return (
     <section id="pillars" className="py-24 bg-section-light relative overflow-hidden">
-      {/* Decorative Background */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gold/5 rounded-full blur-3xl" />
+      {/* Animated Decorative Background */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse animation-delay-300" />
+      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gold/5 rounded-full blur-3xl animate-pulse animation-delay-500" />
+      <div className="absolute top-1/2 right-1/4 w-64 h-64 bg-secondary/5 rounded-full blur-3xl animate-float" />
 
       <div className="section-container relative z-10">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4">
+          <span className="inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4 animate-fade-up">
             Our Three-Fold Mandate
           </span>
-          <h2 className="heading-display text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-6">
+          <h2 className="heading-display text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-6 animate-fade-up animation-delay-100">
             Pillars of Our Vision
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-muted-foreground animate-fade-up animation-delay-200">
             Our work is firmly anchored in the spirit of Ubuntu, guiding every initiative we undertake.
           </p>
         </div>
 
         {/* Pillars Grid */}
-        <div className="grid md:grid-cols-3 gap-8">
+        <div ref={containerRef} className="grid md:grid-cols-3 gap-8">
           {pillars.map((pillar, index) => (
             <div
               key={pillar.title}
-              className="group card-elevated p-8 hover:shadow-elevated transition-all duration-500 hover:-translate-y-2"
+              className={`card-elevated p-8 hover:shadow-elevated transition-all duration-500 hover:-translate-y-2 group cursor-pointer ${
+                isVisible ? `animate-fade-up` : 'opacity-0'
+              }`}
               style={{ animationDelay: `${index * 100}ms` }}
             >
               {/* Icon */}
-              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-6 shadow-soft group-hover:scale-110 transition-transform duration-300`}>
+              <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${pillar.color} flex items-center justify-center mb-6 shadow-soft group-hover:scale-110 group-hover:shadow-glow transition-all duration-300`}>
                 <pillar.icon className="w-8 h-8 text-primary-foreground" />
               </div>
 
               {/* Content */}
-              <h3 className="font-serif text-xl font-semibold text-foreground mb-4 group-hover:text-primary transition-colors">
+              <h3 className="font-serif text-xl font-semibold text-foreground mb-4 group-hover:text-primary transition-colors duration-300">
                 {pillar.title}
               </h3>
               <p className="text-muted-foreground leading-relaxed">
@@ -71,14 +77,14 @@ const PillarsSection = () => {
 
         {/* Ubuntu Quote */}
         <div className="mt-20 text-center">
-          <blockquote className="relative inline-block">
+          <blockquote className="relative inline-block animate-fade-up animation-delay-300">
             <span className="absolute -top-6 -left-4 text-6xl text-primary/20 font-serif">"</span>
             <p className="heading-display text-2xl sm:text-3xl lg:text-4xl font-medium text-foreground italic">
               I am because we are
             </p>
             <span className="absolute -bottom-4 -right-4 text-6xl text-primary/20 font-serif rotate-180">"</span>
           </blockquote>
-          <p className="mt-8 text-muted-foreground font-medium">
+          <p className="mt-8 text-muted-foreground font-medium animate-fade-up animation-delay-400">
             — Ubuntu Philosophy
           </p>
         </div>
