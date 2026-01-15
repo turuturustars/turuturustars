@@ -48,57 +48,133 @@ serve(async (req) => {
       }
     }
     
-    // Update the transaction record
-    const { data: transaction, error: updateError } = await supabase
+    // Check if transaction already exists to ensure idempotency
+    const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
-      .update({
-        result_code: ResultCode,
-        result_desc: ResultDesc,
-        mpesa_receipt_number: mpesaReceiptNumber,
-        phone_number: phoneNumber || undefined,
-        transaction_date: transactionDate,
-        status: ResultCode === 0 ? "completed" : "failed",
-      })
+      .select("id, status")
       .eq("checkout_request_id", CheckoutRequestID)
-      .select()
       .single();
     
-    if (updateError) {
-      console.error("Error updating transaction:", updateError);
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Error checking existing transaction:", checkError);
     }
     
-    // If payment successful, update contribution status
-    if (ResultCode === 0 && transaction?.contribution_id) {
-      await supabase
-        .from("contributions")
+    let transaction = existingTransaction;
+    
+    // Only update if transaction exists and not already completed
+    if (transaction && transaction.status !== "completed" && transaction.status !== "failed") {
+      const { data: updatedTx, error: updateError } = await supabase
+        .from("mpesa_transactions")
         .update({
-          status: "paid",
-          paid_at: new Date().toISOString(),
-          reference_number: mpesaReceiptNumber,
+          result_code: ResultCode,
+          result_desc: ResultDesc,
+          mpesa_receipt_number: mpesaReceiptNumber || undefined,
+          phone_number: phoneNumber || undefined,
+          transaction_date: transactionDate,
+          status: ResultCode === 0 ? "completed" : "failed",
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", transaction.contribution_id);
+        .eq("checkout_request_id", CheckoutRequestID)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error("Error updating transaction:", updateError);
+        transaction = null;
+      } else {
+        transaction = updatedTx;
+      }
+    } else if (!transaction) {
+      console.warn(`Transaction not found for checkout request ${CheckoutRequestID}`);
+    } else {
+      console.log(`Transaction ${CheckoutRequestID} already processed with status: ${transaction.status}`);
+    }
+    
+    // If payment successful and transaction exists, update contribution status
+    if (ResultCode === 0 && transaction?.contribution_id) {
+      try {
+        // Get current contribution status
+        const { data: currentContribution } = await supabase
+          .from("contributions")
+          .select("status, paid_at")
+          .eq("id", transaction.contribution_id)
+          .single();
         
-      // Update contribution tracking
-      if (transaction.member_id) {
-        await supabase
-          .from("contribution_tracking")
-          .update({
-            last_contribution_date: new Date().toISOString(),
-            consecutive_missed: 0,
-          })
-          .eq("member_id", transaction.member_id);
+        // Only update if not already marked as paid
+        if (currentContribution?.status !== "paid") {
+          await supabase
+            .from("contributions")
+            .update({
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              reference_number: mpesaReceiptNumber,
+            })
+            .eq("id", transaction.contribution_id);
+          
+          console.log(`Updated contribution ${transaction.contribution_id} to paid status`);
+        }
+        
+        // Update contribution tracking if member exists
+        if (transaction.member_id) {
+          const { data: existingTracking } = await supabase
+            .from("contribution_tracking")
+            .select("id")
+            .eq("member_id", transaction.member_id)
+            .single();
+          
+          if (existingTracking) {
+            await supabase
+              .from("contribution_tracking")
+              .update({
+                last_contribution_date: new Date().toISOString(),
+                consecutive_missed: 0,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("member_id", transaction.member_id);
+            
+            console.log(`Updated contribution tracking for member ${transaction.member_id}`);
+          }
+        }
+      } catch (error) {
+        console.error("Error updating contribution:", error);
+        // Don't fail the callback response even if contribution update fails
       }
     }
     
+    // Log audit action
+    try {
+      await supabase.rpc("log_audit_action", {
+        p_action_type: "MPESA_CALLBACK_PROCESSED",
+        p_action_description: `M-Pesa callback processed for ${CheckoutRequestID} - ${ResultDesc}`,
+        p_entity_type: "mpesa_transaction",
+        p_metadata: {
+          checkoutRequestId: CheckoutRequestID,
+          resultCode: ResultCode,
+          amount: amount,
+          mpesaReceipt: mpesaReceiptNumber,
+        },
+      });
+    } catch (auditError) {
+      console.error("Error logging audit action:", auditError);
+      // Don't fail if audit logging fails
+    }
+    
+    // Always respond with success to M-Pesa to confirm receipt
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
       headers: { "Content-Type": "application/json" },
+      status: 200,
     });
   } catch (error: unknown) {
     console.error("Callback error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
+    
+    // Still return 200 to acknowledge receipt, but log the error
     return new Response(
-      JSON.stringify({ ResultCode: 1, ResultDesc: message }),
-      { headers: { "Content-Type": "application/json" } }
+      JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }),
+      {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      }
     );
   }
 });
