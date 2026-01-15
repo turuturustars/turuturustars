@@ -56,26 +56,28 @@ const Header = () => {
             </div>
           </a>
 
-          {/* Desktop Navigation - Enhanced */}
-          <nav className="hidden lg:flex items-center gap-2">
+          {/* Desktop Navigation - Enhanced with Premium Feel */}
+          <nav className="hidden lg:flex items-center gap-1">
             {mainNavLinks.map((link) => (
               <a
                 key={link.label}
                 href={link.href}
-                className="relative px-3 py-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors group"
+                className="relative px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors duration-300 group smooth-color"
               >
                 {link.label}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-primary to-primary/50 group-hover:w-full transition-all duration-300"></span>
+                <span className="absolute bottom-0 left-0 w-0 h-1 bg-gradient-to-r from-primary via-blue-500 to-primary group-hover:w-full transition-all duration-500 rounded-full"></span>
               </a>
             ))}
           </nav>
 
-          {/* CTA Button - Desktop */}
+          {/* CTA Button - Desktop with Enhanced Hover */}
           <div className="hidden lg:flex items-center gap-3">
             <a href="/auth">
-              <Button className="btn-primary relative overflow-hidden group">
-                <span className="relative z-10">Member Login</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-500"></div>
+              <Button className="btn-primary relative overflow-hidden group px-6 py-2.5 font-semibold hover:shadow-lg hover:shadow-primary/30 transition-all duration-300 card-hover">
+                <span className="relative z-10 flex items-center gap-2">
+                  Member Login
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
               </Button>
             </a>
           </div>
@@ -94,26 +96,27 @@ const Header = () => {
           </button>
         </div>
 
-        {/* Mobile Navigation - Enhanced with Better UX */}
+        {/* Mobile Navigation - Enhanced Premium UX */}
         {isMenuOpen && (
-          <div className="lg:hidden py-4 border-t border-border/50 animate-fade-up bg-card/50 backdrop-blur-sm">
-            <nav className="flex flex-col gap-1">
-              {mainNavLinks.map((link) => (
+          <div className="lg:hidden py-4 border-t border-border/50 animate-fade-up bg-card/80 backdrop-blur-xl shadow-lg">
+            <nav className="flex flex-col gap-1 px-2">
+              {mainNavLinks.map((link, index) => (
                 <a
                   key={link.label}
                   href={link.href}
                   onClick={closeMenus}
-                  className="px-4 py-3 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-accent rounded-lg transition-all duration-300 flex items-center justify-between group"
+                  className="px-4 py-3 text-sm font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-all duration-300 flex items-center justify-between group smooth-color stagger-item"
+                  style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <span>{link.label}</span>
-                  <ChevronDown className="w-4 h-4 opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300" />
+                  <ChevronDown className="w-4 h-4 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 text-primary" />
                 </a>
               ))}
               
-              {/* Mobile CTA */}
-              <div className="px-4 pt-4 border-t border-border/50 mt-2">
+              {/* Mobile CTA - Enhanced */}
+              <div className="px-2 pt-4 border-t border-border/50 mt-2">
                 <a href="/auth" className="block">
-                  <Button className="btn-primary w-full">
+                  <Button className="btn-primary w-full font-semibold hover:shadow-lg transition-all duration-300 card-hover">
                     Member Login
                   </Button>
                 </a>
