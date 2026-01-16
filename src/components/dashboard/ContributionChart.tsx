@@ -3,9 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, ArrowRight, Minus, DollarSign, Calendar, Activity } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 interface MonthlyData {
   month: string;
@@ -19,6 +20,7 @@ interface ContributionStats {
   averageMonthly: number;
   trend: 'up' | 'down' | 'stable';
   lastMonthAmount: number;
+  percentageChange: number;
 }
 
 interface CustomTooltipProps {
@@ -27,18 +29,27 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-// Move tooltip out of main component
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-card border border-border rounded-lg shadow-lg p-3">
-        <p className="font-semibold text-sm">{label}</p>
-        <p className="text-primary font-medium">
-          Amount: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(payload[0].value)}
-        </p>
-        <p className="text-muted-foreground text-sm">
-          Contributions: {payload[0].payload.count}
-        </p>
+      <div className="relative bg-gradient-to-br from-card via-card to-card/95 border-2 border-primary/20 rounded-2xl shadow-2xl p-4 backdrop-blur-xl">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-2xl" />
+        <div className="relative space-y-2">
+          <p className="font-bold text-sm text-foreground/90 flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-primary" />
+            {label}
+          </p>
+          <div className="space-y-1">
+            <p className="text-primary font-bold text-lg flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(payload[0].value)}
+            </p>
+            <p className="text-muted-foreground text-xs flex items-center gap-2">
+              <Activity className="w-3 h-3" />
+              {payload[0].payload.count} contribution{payload[0].payload.count !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -71,8 +82,13 @@ const ContributionChart = () => {
 
     const lastTwoMonths = validData.slice(-2);
     let trend: 'up' | 'down' | 'stable' = 'stable';
+    let percentageChange = 0;
+    
     if (lastTwoMonths.length === 2) {
       const [prevMonth, lastMonth] = lastTwoMonths;
+      if (prevMonth.amount > 0) {
+        percentageChange = ((lastMonth.amount - prevMonth.amount) / prevMonth.amount) * 100;
+      }
       trend = lastMonth.amount > prevMonth.amount ? 'up' : lastMonth.amount < prevMonth.amount ? 'down' : 'stable';
     }
 
@@ -81,6 +97,7 @@ const ContributionChart = () => {
       averageMonthly,
       trend,
       lastMonthAmount: validData.at(-1)?.amount ?? 0,
+      percentageChange,
     };
   }, []);
 
@@ -157,13 +174,16 @@ const ContributionChart = () => {
 
   if (error) {
     return (
-      <Card>
+      <Card className="border-destructive/50 bg-destructive/5">
         <CardHeader>
-          <CardTitle className="text-lg">Contribution History</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Contribution History
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="border-2">
+            <AlertDescription className="text-sm">{error}</AlertDescription>
           </Alert>
         </CardContent>
       </Card>
@@ -172,13 +192,23 @@ const ContributionChart = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader className="space-y-2">
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-64" />
+      <Card className="overflow-hidden">
+        <CardHeader className="space-y-3 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-7 w-52" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-10 w-32 rounded-full" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+            <Skeleton className="h-20 rounded-xl" />
+          </div>
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[250px] w-full" />
+          <Skeleton className="h-[300px] w-full rounded-xl" />
         </CardContent>
       </Card>
     );
@@ -187,104 +217,176 @@ const ContributionChart = () => {
   const hasData = data.some(item => item.amount > 0);
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl">Contribution History</CardTitle>
-            <CardDescription>Your contributions over the last 6 months</CardDescription>
+    <Card className="overflow-hidden border-border/50 bg-gradient-to-br from-card via-card to-card/95 shadow-lg hover:shadow-xl transition-all duration-300">
+      <CardHeader className="pb-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="space-y-1.5">
+            <CardTitle className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent flex items-center gap-2">
+              <Activity className="w-6 h-6 text-primary" />
+              Contribution History
+            </CardTitle>
+            <CardDescription className="text-sm sm:text-base">
+              Track your contributions over the last 6 months
+            </CardDescription>
           </div>
+          
           {stats && hasData && (
-            <div className="flex items-center space-x-2">
-              {stats.trend === 'up' && <TrendingUp className="w-5 h-5 text-green-500" />}
-              {stats.trend === 'down' && <TrendingDown className="w-5 h-5 text-red-500" />}
-              <span className="text-sm font-medium text-muted-foreground">
-                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.lastMonthAmount)} last month
-              </span>
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-full transition-all duration-300",
+              "border-2 backdrop-blur-sm",
+              stats.trend === 'up' && "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400",
+              stats.trend === 'down' && "bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-400",
+              stats.trend === 'stable' && "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+            )}>
+              {stats.trend === 'up' && <TrendingUp className="w-5 h-5" />}
+              {stats.trend === 'down' && <TrendingDown className="w-5 h-5" />}
+              {stats.trend === 'stable' && <Minus className="w-5 h-5" />}
+              <div className="flex flex-col items-end">
+                <span className="text-xs font-semibold whitespace-nowrap">
+                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.lastMonthAmount)}
+                </span>
+                {stats.percentageChange !== 0 && (
+                  <span className="text-[10px] font-medium opacity-80">
+                    {stats.percentageChange > 0 ? '+' : ''}{stats.percentageChange.toFixed(1)}%
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {stats && hasData && (
-          <div className="grid grid-cols-3 gap-4 pt-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total (6 months)</p>
-              <p className="text-xl font-semibold">
-                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.totalAmount)}
-              </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 pt-2">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-4 border border-primary/20 hover:border-primary/40 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-primary/5 rounded-full blur-2xl" />
+              <div className="relative space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <DollarSign className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm font-medium">Total (6 months)</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.totalAmount)}
+                </p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Average Monthly</p>
-              <p className="text-xl font-semibold">
-                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.averageMonthly)}
-              </p>
+
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent p-4 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/5 rounded-full blur-2xl" />
+              <div className="relative space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <TrendingUp className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm font-medium">Average Monthly</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(stats.averageMonthly)}
+                </p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Contributions</p>
-              <p className="text-xl font-semibold">{data.reduce((sum, item) => sum + item.count, 0)}</p>
+
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent p-4 border border-violet-500/20 hover:border-violet-500/40 transition-all duration-300 hover:shadow-lg hover:shadow-violet-500/10">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-violet-500/5 rounded-full blur-2xl" />
+              <div className="relative space-y-2">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Activity className="w-4 h-4" />
+                  <p className="text-xs sm:text-sm font-medium">Total Contributions</p>
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-foreground">
+                  {data.reduce((sum, item) => sum + item.count, 0)}
+                </p>
+              </div>
             </div>
           </div>
         )}
       </CardHeader>
 
-      <CardContent>
-        <div className="h-[300px]">
+      <CardContent className="pb-6">
+        <div className="h-[280px] sm:h-[320px] md:h-[350px] rounded-2xl overflow-hidden bg-gradient-to-br from-accent/30 to-transparent p-2 sm:p-4">
           {hasData ? (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 20 }}>
+              <AreaChart data={data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gradientAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
+                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.5} />
+                    <stop offset="50%" stopColor="hsl(var(--primary))" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
                   </linearGradient>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="hsl(var(--border))" 
+                  strokeOpacity={0.3}
+                  vertical={false} 
+                />
                 <XAxis
                   dataKey="month"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                  padding={{ left: 10, right: 10 }}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                  padding={{ left: 20, right: 20 }}
+                  height={40}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                   tickFormatter={value => (value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value.toString())}
-                  width={40}
+                  width={45}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 2, strokeDasharray: '5 5', strokeOpacity: 0.3 }} />
                 <Area
                   type="monotone"
                   dataKey="amount"
                   stroke="hsl(var(--primary))"
-                  strokeWidth={2}
+                  strokeWidth={3}
                   fill="url(#gradientAmount)"
-                  activeDot={{ r: 6, strokeWidth: 2, stroke: 'hsl(var(--background))', fill: 'hsl(var(--primary))' }}
+                  activeDot={{ 
+                    r: 8, 
+                    strokeWidth: 3, 
+                    stroke: 'hsl(var(--background))', 
+                    fill: 'hsl(var(--primary))',
+                    filter: 'url(#glow)'
+                  }}
+                  dot={{ 
+                    r: 4, 
+                    strokeWidth: 2, 
+                    stroke: 'hsl(var(--background))', 
+                    fill: 'hsl(var(--primary))' 
+                  }}
                   isAnimationActive
-                  animationDuration={800}
-                  animationEasing="ease-in-out"
+                  animationDuration={1000}
+                  animationEasing="ease-out"
                 />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                <TrendingUp className="w-8 h-8 text-muted-foreground" />
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 sm:p-8">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl" />
+                <div className="relative w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl flex items-center justify-center border-2 border-primary/20">
+                  <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10 text-primary/60" />
+                </div>
               </div>
-              <h3 className="font-semibold text-lg mb-2">No Contributions Yet</h3>
-              <p className="text-muted-foreground text-sm">
-                Your contribution history will appear here once you make your first payment.
+              <h3 className="font-bold text-base sm:text-lg mb-2 text-foreground">No Contributions Yet</h3>
+              <p className="text-muted-foreground text-xs sm:text-sm max-w-sm">
+                Your contribution history will appear here once you make your first payment. Start contributing to see your progress!
               </p>
             </div>
           )}
         </div>
 
         {hasData && (
-          <div className="mt-4 pt-4 border-t border-border text-center">
-            <p className="text-sm text-muted-foreground">
-              View detailed statements in your contribution history page
-            </p>
+          <div className="mt-6 pt-4 border-t border-border/50">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group cursor-pointer">
+              <p>View detailed statements in your contribution history</p>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </div>
           </div>
         )}
       </CardContent>
