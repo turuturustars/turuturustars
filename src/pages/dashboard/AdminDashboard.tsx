@@ -1,175 +1,354 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Users,
   Settings,
   BarChart3,
-  Sliders,
   Shield,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  ArrowUpRight,
+  Zap,
+  MessageSquare,
+  Calendar,
+  DollarSign,
+  Gavel,
+  Mail,
+  Bell,
+  Eye,
   Database,
+  Sparkles,
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    systemHealth: 100,
+    pendingTasks: 0,
+    activeSessions: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Simulate data loading
+  useEffect(() => {
+    setTimeout(() => {
+      setStats({
+        totalUsers: 156,
+        systemHealth: 98,
+        pendingTasks: 8,
+        activeSessions: 23,
+      });
+      setIsLoading(false);
+    }, 500);
+  }, []);
+
+  const statCards = [
+    {
+      title: 'Total Users',
+      value: stats.totalUsers,
+      change: '+12%',
+      trend: 'up',
+      icon: Users,
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-950/50',
+      description: 'Registered members',
+    },
+    {
+      title: 'System Health',
+      value: `${stats.systemHealth}%`,
+      change: 'Stable',
+      trend: 'neutral',
+      icon: Activity,
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-50 dark:bg-green-950/50',
+      description: 'All systems operational',
+    },
+    {
+      title: 'Pending Tasks',
+      value: stats.pendingTasks,
+      change: '3 urgent',
+      trend: 'down',
+      icon: Clock,
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-50 dark:bg-amber-950/50',
+      description: 'Awaiting your action',
+    },
+    {
+      title: 'Active Sessions',
+      value: stats.activeSessions,
+      change: '+5 today',
+      trend: 'up',
+      icon: Zap,
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-50 dark:bg-purple-950/50',
+      description: 'Users online now',
+    },
+  ];
 
   const sections = [
     {
       title: 'User Management',
-      description: 'Manage roles, permissions, and access',
-      icon: <Users className="w-5 h-5" />,
+      description: 'Manage roles, permissions, and member access',
+      icon: Users,
       items: [
-        { label: 'Members', path: '/dashboard/members' },
-        { label: 'Role Management', path: '/dashboard/roles' },
-        { label: 'Approvals', path: '/dashboard/approvals' },
+        { label: 'All Members', path: '/dashboard/members', icon: Users, badge: '156' },
+        { label: 'Role Management', path: '/dashboard/roles', icon: Shield, badge: null },
+        { label: 'Pending Approvals', path: '/dashboard/approvals', icon: CheckCircle2, badge: '3' },
       ],
-      color: 'bg-blue-100 dark:bg-blue-900/30',
+      gradient: 'from-blue-500 to-cyan-500',
+      bgGradient: 'from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50',
     },
     {
       title: 'Financial Management',
-      description: 'Oversee all payments and finances',
-      icon: <BarChart3 className="w-5 h-5" />,
+      description: 'Oversee all payments, transactions, and finances',
+      icon: DollarSign,
       items: [
-        { label: 'Payment Tracking', path: '/dashboard/mpesa-management' },
-        { label: 'Reports', path: '/dashboard/reports' },
-        { label: 'Contributions', path: '/dashboard/all-contributions' },
+        { label: 'Payment Tracking', path: '/dashboard/mpesa-management', icon: DollarSign, badge: null },
+        { label: 'Financial Reports', path: '/dashboard/reports', icon: BarChart3, badge: null },
+        { label: 'All Contributions', path: '/dashboard/all-contributions', icon: TrendingUp, badge: 'KES 2.4M' },
       ],
-      color: 'bg-green-100 dark:bg-green-900/30',
+      gradient: 'from-green-500 to-emerald-500',
+      bgGradient: 'from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50',
     },
     {
-      title: 'Operations',
-      description: 'Manage meetings, discipline, and records',
-      icon: <Settings className="w-5 h-5" />,
+      title: 'Operations & Records',
+      description: 'Manage meetings, discipline cases, and documentation',
+      icon: Settings,
       items: [
-        { label: 'Meetings', path: '/dashboard/meetings' },
-        { label: 'Discipline', path: '/dashboard/discipline' },
-        { label: 'Secretary Tasks', path: '/dashboard/secretary' },
+        { label: 'Meetings', path: '/dashboard/meetings', icon: Calendar, badge: '2 upcoming' },
+        { label: 'Discipline Cases', path: '/dashboard/discipline', icon: Gavel, badge: '1 active' },
+        { label: 'Secretary Tasks', path: '/dashboard/secretary', icon: Mail, badge: null },
       ],
-      color: 'bg-purple-100 dark:bg-purple-900/30',
+      gradient: 'from-purple-500 to-pink-500',
+      bgGradient: 'from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50',
     },
     {
-      title: 'Communications',
-      description: 'Send announcements and manage communications',
-      icon: <Shield className="w-5 h-5" />,
+      title: 'Communications Hub',
+      description: 'Send announcements and manage all communications',
+      icon: MessageSquare,
       items: [
-        { label: 'Announcements', path: '/dashboard/announcements' },
-        { label: 'Direct Messages', path: '/dashboard/chat' },
-        { label: 'Notifications', path: '/dashboard/notifications' },
+        { label: 'Announcements', path: '/dashboard/announcements', icon: Bell, badge: null },
+        { label: 'Direct Messages', path: '/dashboard/chat', icon: MessageSquare, badge: '12' },
+        { label: 'Notifications Center', path: '/dashboard/notifications', icon: Bell, badge: '45' },
       ],
-      color: 'bg-amber-100 dark:bg-amber-900/30',
+      gradient: 'from-amber-500 to-orange-500',
+      bgGradient: 'from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50',
     },
   ];
 
+  const permissions = [
+    { text: 'Full access to all association systems', icon: Database },
+    { text: 'Manage user roles and permissions', icon: Shield },
+    { text: 'View all financial and membership data', icon: Eye },
+    { text: 'System configuration and settings', icon: Settings },
+    { text: 'Audit logs and activity tracking', icon: Activity },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="border-b border-border pb-4">
-        <h1 className="text-3xl font-bold">Administrator Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Full system access and control
-        </p>
+    <div className="space-y-6 pb-8">
+      {/* Enhanced Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-pink-600 p-8 sm:p-10 shadow-2xl">
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl" />
+        
+        <div className="relative">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl border border-white/30">
+              <Shield className="w-7 h-7 text-white" />
+            </div>
+            <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30 px-3 py-1">
+              Administrator
+            </Badge>
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">
+            Admin Dashboard
+          </h1>
+          <p className="text-white/90 text-base sm:text-lg max-w-2xl">
+            Complete system oversight and control. Manage all aspects of the organization.
+          </p>
+        </div>
       </div>
 
-      {/* System Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Registered</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">System Health</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">100%</div>
-            <p className="text-xs text-muted-foreground mt-1">Operational</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Awaiting action</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Online users</p>
-          </CardContent>
-        </Card>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+        {statCards.map((stat, idx) => {
+          const Icon = stat.icon;
+          const isUp = stat.trend === 'up';
+          const isDown = stat.trend === 'down';
+          
+          return (
+            <Card key={idx} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <div className={`p-2.5 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform`}>
+                    <Icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="text-3xl font-bold text-foreground">
+                  {isLoading ? (
+                    <div className="h-9 w-20 bg-muted animate-pulse rounded" />
+                  ) : (
+                    stat.value
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    {stat.description}
+                  </p>
+                  {stat.change && (
+                    <div className={`flex items-center gap-1 text-xs font-medium ${
+                      isUp ? 'text-green-600 dark:text-green-400' : 
+                      isDown ? 'text-red-600 dark:text-red-400' : 
+                      'text-muted-foreground'
+                    }`}>
+                      {isUp && <TrendingUp className="w-3 h-3" />}
+                      {isDown && <TrendingDown className="w-3 h-3" />}
+                      {stat.change}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Management Sections */}
-      <div className="space-y-6">
-        {sections.map((section, idx) => (
-          <div key={idx}>
-            <div className="flex items-start gap-3 mb-4">
-              <div className={`w-12 h-12 rounded-lg ${section.color} flex items-center justify-center text-foreground`}>
-                {section.icon}
+      <div className="space-y-8">
+        {sections.map((section, idx) => {
+          const SectionIcon = section.icon;
+          
+          return (
+            <div key={idx} className="space-y-4">
+              {/* Section Header */}
+              <div className="flex items-start gap-4">
+                <div className={`relative p-4 rounded-2xl bg-gradient-to-br ${section.bgGradient} border-2 border-white dark:border-gray-800 shadow-lg`}>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${section.gradient} opacity-10 rounded-2xl`} />
+                  <SectionIcon className={`w-6 h-6 relative z-10 bg-gradient-to-br ${section.gradient} bg-clip-text text-transparent`} />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-1">
+                    {section.title}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    {section.description}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold">{section.title}</h2>
-                <p className="text-sm text-muted-foreground">{section.description}</p>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ml-15">
-              {section.items.map((item, itemIdx) => (
-                <button
-                  key={itemIdx}
-                  onClick={() => navigate(item.path)}
-                  className="p-4 border border-border rounded-lg hover:bg-accent hover:border-primary transition-colors text-left"
-                >
-                  <div className="font-medium text-sm">{item.label}</div>
-                </button>
-              ))}
+              {/* Section Items */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {section.items.map((item, itemIdx) => {
+                  const ItemIcon = item.icon;
+                  
+                  return (
+                    <Card
+                      key={itemIdx}
+                      onClick={() => navigate(item.path)}
+                      className="group cursor-pointer border-2 hover:border-primary transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
+                    >
+                      <CardContent className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className={`p-2.5 rounded-lg bg-gradient-to-br ${section.bgGradient} group-hover:scale-110 transition-transform`}>
+                            <ItemIcon className="w-4 h-4" />
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                        </div>
+                        <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
+                          {item.label}
+                        </h3>
+                        {item.badge && (
+                          <Badge variant="secondary" className="mt-2 text-xs">
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Permissions Info */}
-      <Card className="border-primary/50 bg-primary/5">
+      {/* Quick Actions */}
+      <Card className="border-2 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Administrator Permissions
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            Quick Actions
           </CardTitle>
+          <CardDescription>Frequently used administrative tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">✓</Badge>
-              <span>Full access to all association systems</span>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/members')}>
+              <Users className="w-4 h-4" />
+              Add Member
+            </Button>
+            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/announcements')}>
+              <Bell className="w-4 h-4" />
+              New Announcement
+            </Button>
+            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/reports')}>
+              <BarChart3 className="w-4 h-4" />
+              Generate Report
+            </Button>
+            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/settings')}>
+              <Settings className="w-4 h-4" />
+              System Settings
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Permissions Info */}
+      <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-purple-50/50 to-primary/5 dark:from-primary/10 dark:via-purple-950/50 dark:to-primary/10 shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <Shield className="w-5 h-5 text-primary" />
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">✓</Badge>
-              <span>Manage user roles and permissions</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">✓</Badge>
-              <span>View all financial and membership data</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">✓</Badge>
-              <span>System configuration and settings</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">✓</Badge>
-              <span>Audit logs and activity tracking</span>
-            </div>
+            Administrator Permissions & Access
+          </CardTitle>
+          <CardDescription>
+            You have unrestricted access to all system functions
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {permissions.map((permission, idx) => {
+              const PermIcon = permission.icon;
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-background/80 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-colors"
+                >
+                  <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                    <PermIcon className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium text-foreground">
+                    {permission.text}
+                   </span>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
