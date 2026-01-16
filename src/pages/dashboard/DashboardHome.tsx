@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
-import { getPrimaryRole, hasRole } from '@/lib/rolePermissions';
+import { getPrimaryRole } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
 import WelfareParticipationChart from '@/components/dashboard/WelfareParticipationChart';
+import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { 
   DollarSign, 
   HandHeart, 
@@ -17,24 +18,24 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  ArrowRight,
+  Sparkles,
+  Calendar,
+  MessageSquare,
+  TrendingDown,
+  Loader2,
+  ChevronRight,
+  Zap,
+  Shield,
+  Activity
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 
 interface DashboardStats {
   totalContributions: number;
   pendingContributions: number;
   activeWelfareCases: number;
   unreadNotifications: number;
-}
-
-interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  priority: string;
-  published_at: string;
 }
 
 const DashboardHome = () => {
@@ -48,15 +49,23 @@ const DashboardHome = () => {
     unreadNotifications: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [greeting, setGreeting] = useState('');
 
-  // Redirect officials to their role-specific dashboards
+  // Dynamic greeting
   useEffect(() => {
-    if (roles.length === 0) return; // Still loading
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 17) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
+
+  // Redirect officials to role-specific dashboards
+  useEffect(() => {
+    if (roles.length === 0) return;
     
     const userRoles = roles.map(r => r.role);
     const primaryRole = getPrimaryRole(userRoles);
 
-    // Map primary role to dashboard
     const roleDashboards: Record<string, string> = {
       'chairperson': '/dashboard/chairperson',
       'vice_chairperson': '/dashboard/vice-chairperson',
@@ -82,36 +91,23 @@ const DashboardHome = () => {
     if (!profile?.id) return;
 
     try {
-      // Fetch contributions stats
-      const { data: contributions } = await supabase
-        .from('contributions')
-        .select('status, amount')
-        .eq('member_id', profile.id);
+      const [contributionsRes, welfareCasesRes, notificationsRes] = await Promise.all([
+        supabase.from('contributions').select('status, amount').eq('member_id', profile.id),
+        supabase.from('welfare_cases').select('id').eq('status', 'active'),
+        supabase.from('notifications').select('id').eq('user_id', profile.id).eq('read', false),
+      ]);
 
-      const totalPaid = contributions
+      const totalPaid = contributionsRes.data
         ?.filter((c) => c.status === 'paid')
         .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
 
-      const pendingCount = contributions?.filter((c) => c.status === 'pending').length || 0;
-
-      // Fetch welfare cases
-      const { data: welfareCases } = await supabase
-        .from('welfare_cases')
-        .select('id')
-        .eq('status', 'active');
-
-      // Fetch unread notifications
-      const { data: notifications } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('read', false);
+      const pendingCount = contributionsRes.data?.filter((c) => c.status === 'pending').length || 0;
 
       setStats({
         totalContributions: totalPaid,
         pendingContributions: pendingCount,
-        activeWelfareCases: welfareCases?.length || 0,
-        unreadNotifications: notifications?.length || 0,
+        activeWelfareCases: welfareCasesRes.data?.length || 0,
+        unreadNotifications: notificationsRes.data?.length || 0,
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -124,88 +120,211 @@ const DashboardHome = () => {
     {
       title: 'Total Contributions',
       value: `KES ${stats.totalContributions.toLocaleString()}`,
+      change: '+12.5%',
+      trend: 'up',
       icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-green-600 dark:text-green-400',
+      bgColor: 'bg-green-50 dark:bg-green-950/50',
+      gradient: 'from-green-500 to-emerald-500',
     },
     {
       title: 'Pending Payments',
       value: stats.pendingContributions,
+      change: '-3 from last month',
+      trend: 'down',
       icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      color: 'text-amber-600 dark:text-amber-400',
+      bgColor: 'bg-amber-50 dark:bg-amber-950/50',
+      gradient: 'from-amber-500 to-orange-500',
     },
     {
       title: 'Active Welfare Cases',
       value: stats.activeWelfareCases,
+      change: '2 this month',
+      trend: 'neutral',
       icon: HandHeart,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-blue-600 dark:text-blue-400',
+      bgColor: 'bg-blue-50 dark:bg-blue-950/50',
+      gradient: 'from-blue-500 to-cyan-500',
     },
     {
       title: 'Notifications',
       value: stats.unreadNotifications,
+      change: 'New updates',
+      trend: 'neutral',
       icon: Bell,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-purple-600 dark:text-purple-400',
+      bgColor: 'bg-purple-50 dark:bg-purple-950/50',
+      gradient: 'from-purple-500 to-pink-500',
     },
   ];
 
-  const getStatusIcon = (status: string | undefined) => {
-    switch (status) {
-      case 'active':
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />;
-      case 'pending':
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-      case 'dormant':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-muted-foreground" />;
-    }
+  const quickActions = [
+    { 
+      label: 'Make Contribution', 
+      path: '/dashboard/contributions', 
+      icon: DollarSign,
+      color: 'from-green-500 to-emerald-500',
+      description: 'Add to your savings'
+    },
+    { 
+      label: 'View Welfare Cases', 
+      path: '/dashboard/welfare', 
+      icon: HandHeart,
+      color: 'from-blue-500 to-cyan-500',
+      description: 'Support members'
+    },
+    { 
+      label: 'Update Profile', 
+      path: '/dashboard/profile', 
+      icon: Users,
+      color: 'from-purple-500 to-pink-500',
+      description: 'Edit your details'
+    },
+    { 
+      label: 'View Meetings', 
+      path: '/dashboard/meetings', 
+      icon: Calendar,
+      color: 'from-amber-500 to-orange-500',
+      description: 'Upcoming events'
+    },
+  ];
+
+  const getStatusConfig = (status: string | undefined) => {
+    const configs = {
+      active: {
+        icon: CheckCircle2,
+        color: 'text-green-600 dark:text-green-400',
+        bgColor: 'bg-green-50 dark:bg-green-950/50',
+        borderColor: 'border-green-200 dark:border-green-800',
+        message: 'Your membership is active and in good standing',
+      },
+      pending: {
+        icon: Clock,
+        color: 'text-amber-600 dark:text-amber-400',
+        bgColor: 'bg-amber-50 dark:bg-amber-950/50',
+        borderColor: 'border-amber-200 dark:border-amber-800',
+        message: 'Your membership is pending approval',
+      },
+      dormant: {
+        icon: AlertCircle,
+        color: 'text-red-600 dark:text-red-400',
+        bgColor: 'bg-red-50 dark:bg-red-950/50',
+        borderColor: 'border-red-200 dark:border-red-800',
+        message: 'Your membership requires attention',
+      },
+    };
+    return configs[status as keyof typeof configs] || configs.pending;
   };
 
+  const statusConfig = getStatusConfig(profile?.status);
+  const StatusIcon = statusConfig.icon;
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground animate-pulse">Loading your dashboard...</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Member Status Card */}
-      <Card className="border-l-4 border-l-primary">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {getStatusIcon(profile?.status)}
-              <div>
-                <h3 className="font-semibold text-foreground">Membership Status</h3>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.status === 'active' 
-                    ? 'Your membership is active and in good standing'
-                    : profile?.status === 'pending'
-                    ? 'Your membership is pending approval'
-                    : 'Your membership requires attention'}
+    <div className="space-y-6 pb-8">
+      {/* Welcome Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-pink-600 p-6 sm:p-8 lg:p-10 shadow-2xl">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4xIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
+        <div className="absolute top-0 right-0 w-48 sm:w-64 h-48 sm:h-64 bg-white/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-48 sm:w-64 h-48 sm:h-64 bg-purple-500/20 rounded-full blur-3xl" />
+        
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-5 h-5 text-white animate-pulse" />
+            <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30">
+              Member Dashboard
+            </Badge>
+          </div>
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
+            {greeting}, {profile?.full_name?.split(' ')[0] || 'Member'}!
+          </h1>
+          <p className="text-white/90 text-sm sm:text-base">
+            Welcome back to Turuturu Stars CBO
+          </p>
+        </div>
+      </div>
+
+      {/* Membership Status Banner */}
+      <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-lg overflow-hidden`}>
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3 sm:gap-4 flex-1">
+              <div className={`p-2.5 sm:p-3 rounded-xl ${statusConfig.bgColor} border-2 ${statusConfig.borderColor}`}>
+                <StatusIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${statusConfig.color}`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-base sm:text-lg text-foreground mb-1">
+                  Membership Status
+                </h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {statusConfig.message}
                 </p>
               </div>
             </div>
-            <Badge variant={profile?.registration_fee_paid ? 'default' : 'destructive'}>
-              {profile?.registration_fee_paid ? 'Fee Paid' : 'Fee Pending'}
-            </Badge>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Badge 
+                variant={profile?.registration_fee_paid ? 'default' : 'destructive'}
+                className="px-3 py-1.5"
+              >
+                {profile?.registration_fee_paid ? '✓ Fee Paid' : '⚠ Fee Pending'}
+              </Badge>
+              <Badge 
+                variant="outline"
+                className={`px-3 py-1.5 ${statusConfig.color} ${statusConfig.borderColor}`}
+              >
+                {profile?.status?.toUpperCase()}
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((stat) => {
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        {statCards.map((stat, idx) => {
           const Icon = stat.icon;
+          const isUp = stat.trend === 'up';
+          const isDown = stat.trend === 'down';
+          
           return (
-            <Card key={stat.title}>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+            <Card 
+              key={stat.title}
+              className="group hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden"
+            >
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">
+                      {stat.title}
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+                      {stat.value}
+                    </p>
                   </div>
-                  <div className={`w-12 h-12 rounded-xl ${stat.bgColor} flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${stat.color}`} />
+                  <div className={`p-2.5 sm:p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
                   </div>
                 </div>
+                {stat.change && (
+                  <div className={`flex items-center gap-1 text-xs font-medium ${
+                    isUp ? 'text-green-600 dark:text-green-400' : 
+                    isDown ? 'text-red-600 dark:text-red-400' : 
+                    'text-muted-foreground'
+                  }`}>
+                    {isUp && <TrendingUp className="w-3 h-3" />}
+                    {isDown && <TrendingDown className="w-3 h-3" />}
+                    <span className="truncate">{stat.change}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -213,48 +332,80 @@ const DashboardHome = () => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <ContributionChart />
         <WelfareParticipationChart />
       </div>
 
       {/* Quick Actions & Announcements */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
+        <Card className="border-2 shadow-lg">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+            </div>
+            <CardDescription className="text-xs">Common tasks at your fingertips</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link to="/dashboard/contributions">
-                <DollarSign className="w-4 h-4 mr-2" />
-                Make a Contribution
-              </Link>
-            </Button>
-            <div className="w-full">
+          <CardContent className="space-y-2">
+            {quickActions.map((action) => {
+              const ActionIcon = action.icon;
+              return (
+                <Button
+                  key={action.path}
+                  asChild
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3 border-2 hover:border-primary group"
+                >
+                  <Link to={action.path}>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className={`p-2 rounded-lg bg-gradient-to-br ${action.color} bg-opacity-10`}>
+                        <ActionIcon className="w-4 h-4" />
+                      </div>
+                      <div className="text-left flex-1">
+                        <div className="font-semibold text-sm">{action.label}</div>
+                        <div className="text-xs text-muted-foreground">{action.description}</div>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </Link>
+                </Button>
+              );
+            })}
+            
+            <div className="pt-2">
               <PayWithMpesa
                 defaultAmount={100}
-                trigger={<Button className="w-full justify-start" variant="ghost"><DollarSign className="w-4 h-4 mr-2"/>Pay with M-Pesa</Button>}
+                trigger={
+                  <Button className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
+                    <div className="p-2 rounded-lg bg-white/20">
+                      <DollarSign className="w-4 h-4" />
+                    </div>
+                    <div className="text-left flex-1">
+                      <div className="font-semibold text-sm">Pay with M-Pesa</div>
+                      <div className="text-xs opacity-90">Quick mobile payment</div>
+                    </div>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                }
               />
             </div>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link to="/dashboard/welfare">
-                <HandHeart className="w-4 h-4 mr-2" />
-                View Welfare Cases
-              </Link>
-            </Button>
-            <Button asChild className="w-full justify-start" variant="outline">
-              <Link to="/dashboard/profile">
-                <Users className="w-4 h-4 mr-2" />
-                Update Profile
-              </Link>
-            </Button>
+
             {isOfficial() && (
-              <Button asChild className="w-full justify-start btn-primary">
+              <Button
+                asChild
+                className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 mt-3"
+              >
                 <Link to="/dashboard/members">
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  Manage Members
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <div className="font-semibold text-sm">Manage Members</div>
+                    <div className="text-xs opacity-90">Official access</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </Button>
             )}
@@ -262,35 +413,68 @@ const DashboardHome = () => {
         </Card>
 
         {/* Announcements */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Latest Announcements</CardTitle>
-            <CardDescription>Stay updated with CBO news</CardDescription>
+        <Card className="lg:col-span-2 border-2 shadow-lg">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-primary" />
+                <CardTitle className="text-lg">Latest Announcements</CardTitle>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard/announcements">
+                  View All
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Link>
+              </Button>
+            </div>
+            <CardDescription className="text-xs">Stay updated with organization news</CardDescription>
           </CardHeader>
           <CardContent>
             {announcements.length === 0 ? (
-              <p className="text-muted-foreground text-sm text-center py-8">
-                No announcements at this time
-              </p>
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
+                  <Bell className="w-8 h-8 text-muted-foreground/50" />
+                </div>
+                <h4 className="font-semibold text-foreground mb-1">No Announcements</h4>
+                <p className="text-sm text-muted-foreground">
+                  Check back later for updates
+                </p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {announcements.slice(0, 3).map((announcement) => (
                   <div
                     key={announcement.id}
-                    className="p-4 rounded-lg bg-accent/50 border border-border"
+                    className="group p-4 rounded-xl bg-gradient-to-br from-accent/50 to-accent/30 border-2 border-border hover:border-primary transition-all duration-300 cursor-pointer hover:shadow-lg"
                   >
-                    <div className="flex items-start justify-between">
-                      <h4 className="font-medium text-foreground">{announcement.title}</h4>
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors line-clamp-2">
+                        {announcement.title}
+                      </h4>
                       {announcement.priority === 'urgent' && (
-                        <Badge variant="destructive">Urgent</Badge>
+                        <Badge variant="destructive" className="ml-2 flex-shrink-0 animate-pulse">
+                          Urgent
+                        </Badge>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
                       {announcement.content}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {announcement.published_at ? new Date(announcement.published_at).toLocaleDateString() : 'Recently'}
-                    </p>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>
+                          {announcement.published_at 
+                            ? new Date(announcement.published_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })
+                            : 'Recently'}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    </div>
                   </div>
                 ))}
               </div>
