@@ -65,6 +65,7 @@ const MeetingsPage = lazy(() => import("./pages/dashboard/MeetingsPage"));
 const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
 const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
 const RoleHandoverPage = lazy(() => import("./pages/dashboard/RoleHandoverPage"));
+const PrivateMessagesPage = lazy(() => import("./pages/dashboard/PrivateMessagesPage"));
 
 // QueryClient configuration with better defaults
 const queryClient = new QueryClient({
@@ -150,6 +151,7 @@ const App = () => {
                   {/* Communication */}
                   <Route path="communication">
                     <Route path="announcements" element={<AnnouncementsPage />} />
+                    <Route path="messages" element={<PrivateMessagesPage />} />
                   </Route>
 
                   {/* Admin functions */}

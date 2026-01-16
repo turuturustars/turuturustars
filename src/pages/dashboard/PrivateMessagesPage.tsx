@@ -1,0 +1,379 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface MemberProfile {
+  id: string;
+  full_name: string;
+  photo_url: string | null;
+}
+
+export default function PrivateMessagesPage() {
+  const { user } = useAuth();
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newMessageText, setNewMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [members, setMembers] = useState<MemberProfile[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [showNewConversation, setShowNewConversation] = useState(false);
+
+  const { 
+    conversations, 
+    messages, 
+    isLoading, 
+    startConversation, 
+    sendPrivateMessage,
+    refreshMessages 
+  } = usePrivateMessages(selectedConversationId || undefined);
+
+  const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+
+  // Fetch members for new conversation
+  const fetchMembers = async () => {
+    if (!user) return;
+    setLoadingMembers(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, photo_url')
+        .neq('id', user.id)
+        .order('full_name');
+      
+      setMembers(data || []);
+    } catch (err) {
+      console.error('Error fetching members:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (showNewConversation) {
+      fetchMembers();
+    }
+  }, [showNewConversation]);
+
+  const handleStartConversation = async (memberId: string) => {
+    try {
+      const convId = await startConversation(memberId);
+      setSelectedConversationId(convId);
+      setShowNewConversation(false);
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessageText.trim() || sending) return;
+    
+    setSending(true);
+    const messageToSend = newMessageText.trim();
+    setNewMessageText('');
+
+    try {
+      await sendPrivateMessage(messageToSend);
+      refreshMessages();
+    } catch (err) {
+      console.error('Error sending message:', err);
+      setNewMessageText(messageToSend);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.other_participant?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredMembers = members.filter(m =>
+    m.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Mobile: Show either list or conversation
+  const showConversationView = selectedConversationId !== null;
+
+  return (
+    <div className="h-[calc(100vh-8rem)] flex flex-col md:flex-row gap-4">
+      {/* Conversations List */}
+      <Card className={`md:w-80 lg:w-96 flex flex-col ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
+        <CardHeader className="pb-3 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Messages
+            </CardTitle>
+            <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Plus className="h-4 w-4 mr-1" />
+                  New
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Start New Conversation
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search members..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <ScrollArea className="h-64">
+                    {loadingMembers ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        {filteredMembers.map((member) => (
+                          <button
+                            key={member.id}
+                            onClick={() => handleStartConversation(member.id)}
+                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage src={member.photo_url || undefined} />
+                              <AvatarFallback className="bg-primary/10 text-primary">
+                                {member.full_name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium">{member.full_name}</span>
+                          </button>
+                        ))}
+                        {filteredMembers.length === 0 && !loadingMembers && (
+                          <p className="text-center text-muted-foreground py-8">
+                            No members found
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 p-0 overflow-hidden">
+          <ScrollArea className="h-full">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="text-center py-8 px-4">
+                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">No conversations yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">
+                  Start a new conversation with a member
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-1 p-2">
+                {filteredConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isSelected={conv.id === selectedConversationId}
+                    onClick={() => setSelectedConversationId(conv.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      {/* Conversation View */}
+      <Card className={`flex-1 flex flex-col ${!showConversationView ? 'hidden md:flex' : 'flex'}`}>
+        {selectedConversation ? (
+          <>
+            {/* Header */}
+            <CardHeader className="pb-3 flex-shrink-0 border-b">
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="md:hidden"
+                  onClick={() => setSelectedConversationId(null)}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={selectedConversation.other_participant?.photo_url || undefined} />
+                  <AvatarFallback className="bg-primary/10 text-primary">
+                    {selectedConversation.other_participant?.full_name.charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold">
+                    {selectedConversation.other_participant?.full_name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Private conversation</p>
+                </div>
+              </div>
+            </CardHeader>
+
+            {/* Messages */}
+            <CardContent className="flex-1 p-0 overflow-hidden">
+              <ScrollArea className="h-full p-4">
+                <div className="space-y-4">
+                  {messages.map((msg) => {
+                    const isOwn = msg.sender_id === user?.id;
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`max-w-[80%] ${isOwn ? 'order-2' : ''}`}>
+                          <div
+                            className={`px-4 py-2.5 rounded-2xl ${
+                              isOwn
+                                ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                : 'bg-muted rounded-bl-sm'
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          </div>
+                          <p className={`text-[10px] text-muted-foreground mt-1 ${isOwn ? 'text-right' : ''}`}>
+                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {messages.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-muted-foreground">
+                        No messages yet. Start the conversation!
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+
+            {/* Input */}
+            <div className="p-4 border-t flex-shrink-0">
+              <div className="flex gap-2">
+                <Input
+                  value={newMessageText}
+                  onChange={(e) => setNewMessageText(e.target.value)}
+                  placeholder="Type a message..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  disabled={sending}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!newMessageText.trim() || sending}
+                  size="icon"
+                >
+                  {sending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <MessageCircle className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
+              <h3 className="font-semibold text-lg">Select a conversation</h3>
+              <p className="text-muted-foreground mt-1">
+                Choose a conversation from the list or start a new one
+              </p>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// Conversation List Item
+function ConversationItem({
+  conversation,
+  isSelected,
+  onClick,
+}: {
+  conversation: PrivateConversation;
+  isSelected: boolean;
+  onClick: () => void;
+}) {
+  const { other_participant, last_message, unread_count } = conversation;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+        isSelected
+          ? 'bg-primary/10 border border-primary/20'
+          : 'hover:bg-muted'
+      }`}
+    >
+      <Avatar className="h-12 w-12 flex-shrink-0">
+        <AvatarImage src={other_participant?.photo_url || undefined} />
+        <AvatarFallback className="bg-primary/10 text-primary">
+          {other_participant?.full_name.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between">
+          <span className="font-medium truncate">
+            {other_participant?.full_name}
+          </span>
+          {last_message && (
+            <span className="text-[10px] text-muted-foreground">
+              {formatDistanceToNow(new Date(last_message.created_at), { addSuffix: false })}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center justify-between mt-0.5">
+          <p className="text-sm text-muted-foreground truncate">
+            {last_message?.content || 'No messages yet'}
+          </p>
+          {(unread_count ?? 0) > 0 && (
+            <Badge variant="default" className="ml-2 h-5 min-w-5 flex items-center justify-center">
+              {unread_count}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
