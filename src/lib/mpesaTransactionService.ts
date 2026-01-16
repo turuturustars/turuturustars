@@ -17,9 +17,9 @@ export interface TransactionRecord {
  * Service for managing M-Pesa transaction lifecycle
  */
 export class MpesaTransactionService {
-  private static readonly POLL_INTERVAL_MS = 2000; // 2 seconds
-  private static readonly MAX_POLL_ATTEMPTS = 30; // 1 minute total
-  private static readonly CALLBACK_TIMEOUT_MS = 90000; // 90 seconds
+  private static readonly POLL_INTERVAL_MS = 2000;
+  private static readonly MAX_POLL_ATTEMPTS = 30;
+  private static readonly CALLBACK_TIMEOUT_MS = 90000;
 
   /**
    * Get transaction status from database
@@ -56,7 +56,6 @@ export class MpesaTransactionService {
     } = {}
   ): Promise<TransactionRecord | null> {
     let attempts = 0;
-    const startTime = Date.now();
 
     while (attempts < this.MAX_POLL_ATTEMPTS) {
       try {
@@ -69,7 +68,6 @@ export class MpesaTransactionService {
           continue;
         }
 
-        // Transaction found
         options.onStatusChange?.(`Payment status: ${transaction.status}`);
 
         if (transaction.status === "completed") {
@@ -81,7 +79,6 @@ export class MpesaTransactionService {
           return null;
         }
 
-        // Still pending, continue polling
         attempts++;
         if (attempts < this.MAX_POLL_ATTEMPTS) {
           options.onStatusChange?.(`Awaiting payment confirmation... (${attempts}/${this.MAX_POLL_ATTEMPTS})`);
@@ -94,7 +91,6 @@ export class MpesaTransactionService {
       }
     }
 
-    // Timeout - try query one more time
     try {
       const result = await queryTransactionStatus(checkoutRequestId);
       if (result?.ResultCode === 0) {
@@ -129,14 +125,12 @@ export class MpesaTransactionService {
       };
     }
 
-    // Verify amount
     if (transaction.amount !== expectedAmount) {
       issues.push(
         `Amount mismatch: expected ${expectedAmount}, got ${transaction.amount}`
       );
     }
 
-    // Verify receipt number for completed transactions
     if (transaction.status === "completed" && !transaction.mpesa_receipt_number) {
       issues.push("Completed transaction missing M-Pesa receipt number");
     }
@@ -159,7 +153,6 @@ export class MpesaTransactionService {
         return;
       }
 
-      // Mark as timed out
       await supabase
         .from("mpesa_transactions")
         .update({
@@ -169,14 +162,16 @@ export class MpesaTransactionService {
         .eq("id", transaction.id);
 
       // Log the timeout
-      await supabase.rpc("log_audit_action", {
-        p_action_type: "MPESA_TIMEOUT",
-        p_action_description: `Transaction ${checkoutRequestId} timed out`,
-        p_entity_type: "mpesa_transaction",
-        p_metadata: { checkoutRequestId, amount: transaction.amount },
-      }).catch(() => {
+      try {
+        await supabase.rpc("log_audit_action", {
+          p_action_type: "MPESA_TIMEOUT",
+          p_action_description: `Transaction ${checkoutRequestId} timed out`,
+          p_entity_type: "mpesa_transaction",
+          p_metadata: { checkoutRequestId, amount: transaction.amount },
+        });
+      } catch {
         // Ignore if audit log fails
-      });
+      }
     } catch (error) {
       console.error("Error handling transaction timeout:", error);
     }
@@ -187,17 +182,15 @@ export class MpesaTransactionService {
    */
   static async retryTransaction(
     previousCheckoutId: string,
-    newPaymentParams: any
+    newPaymentParams: Record<string, unknown>
   ): Promise<string | null> {
     try {
-      // Get the previous transaction for reference
       const previousTx = await this.getTransactionStatus(previousCheckoutId);
 
       if (!previousTx) {
         throw new Error("Previous transaction not found");
       }
 
-      // Verify enough time has passed (minimum 30 seconds between retries)
       const previousTime = new Date(previousTx.created_at).getTime();
       const now = Date.now();
       const timePassed = now - previousTime;
@@ -208,12 +201,13 @@ export class MpesaTransactionService {
         );
       }
 
-      // Create retry record
-      await supabase.from("mpesa_transactions").insert({
+      const insertData = {
         ...newPaymentParams,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      };
+
+      await (supabase.from("mpesa_transactions") as any).insert(insertData);
 
       return "Transaction retry initiated";
     } catch (error) {
@@ -325,7 +319,7 @@ export class MpesaTransactionService {
         averageAmount: 0,
       };
 
-      (data || []).forEach((tx: any) => {
+      (data || []).forEach((tx) => {
         if (tx.status === "completed") {
           stats.completed++;
           stats.completedAmount += tx.amount;

@@ -4,6 +4,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+interface MpesaTransaction {
+  id: string;
+  status: string;
+  contribution_id: string | null;
+  member_id: string | null;
+}
+
 serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -19,7 +26,7 @@ serve(async (req) => {
     let mpesaReceiptNumber = "";
     let amount = 0;
     let phoneNumber = "";
-    let transactionDate = null;
+    let transactionDate: Date | null = null;
     
     if (CallbackMetadata?.Item) {
       for (const item of CallbackMetadata.Item) {
@@ -51,7 +58,7 @@ serve(async (req) => {
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
-      .select("id, status")
+      .select("id, status, contribution_id, member_id")
       .eq("checkout_request_id", CheckoutRequestID)
       .single();
     
@@ -59,7 +66,7 @@ serve(async (req) => {
       console.error("Error checking existing transaction:", checkError);
     }
     
-    let transaction = existingTransaction;
+    let transaction: MpesaTransaction | null = existingTransaction as MpesaTransaction | null;
     
     // Only update if transaction exists and not already completed
     if (transaction && transaction.status !== "completed" && transaction.status !== "failed") {
@@ -75,14 +82,14 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("checkout_request_id", CheckoutRequestID)
-        .select()
+        .select("id, status, contribution_id, member_id")
         .single();
       
       if (updateError) {
         console.error("Error updating transaction:", updateError);
         transaction = null;
       } else {
-        transaction = updatedTx;
+        transaction = updatedTx as MpesaTransaction;
       }
     } else if (!transaction) {
       console.warn(`Transaction not found for checkout request ${CheckoutRequestID}`);
@@ -128,7 +135,7 @@ serve(async (req) => {
               .update({
                 last_contribution_date: new Date().toISOString(),
                 consecutive_missed: 0,
-                updated_at: new Date().toISOString(),
+                last_checked_at: new Date().toISOString(),
               })
               .eq("member_id", transaction.member_id);
             
@@ -166,7 +173,6 @@ serve(async (req) => {
     });
   } catch (error: unknown) {
     console.error("Callback error:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
     
     // Still return 200 to acknowledge receipt, but log the error
     return new Response(

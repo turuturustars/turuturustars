@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+type TransactionStatusType = 'pending' | 'completed' | 'failed' | 'timeout';
+
 export interface TransactionStatus {
   checkoutRequestId: string;
-  status: 'pending' | 'completed' | 'failed' | 'timeout';
+  status: TransactionStatusType;
   amount: number;
   phone: string;
   mpesaReceipt?: string;
@@ -37,21 +39,21 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
 
       if (queryError) {
         if (queryError.code !== 'PGRST116') {
-          // PGRST116 means no rows found, which is OK during initial state
           throw queryError;
         }
         setTransaction(null);
       } else if (data) {
+        const status = (data.status || 'pending') as TransactionStatusType;
         setTransaction({
-          checkoutRequestId: data.checkout_request_id,
-          status: data.status,
+          checkoutRequestId: data.checkout_request_id || '',
+          status,
           amount: data.amount,
           phone: data.phone_number,
-          mpesaReceipt: data.mpesa_receipt_number,
+          mpesaReceipt: data.mpesa_receipt_number || undefined,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
-          isComplete: data.status === 'completed',
-          isFailed: data.status === 'failed',
+          isComplete: status === 'completed',
+          isFailed: status === 'failed',
         });
       }
     } catch (err) {
@@ -73,7 +75,7 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
       return;
     }
 
-    const interval = setInterval(fetchTransaction, 2000); // Poll every 2 seconds
+    const interval = setInterval(fetchTransaction, 2000);
 
     return () => clearInterval(interval);
   }, [checkoutRequestId, transaction, fetchTransaction]);
@@ -82,27 +84,38 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
   useEffect(() => {
     if (!checkoutRequestId) return;
 
-    const subscription = supabase
-      .from('mpesa_transactions')
-      .on('*', { event: 'UPDATE', schema: 'public', filter: `checkout_request_id=eq.${checkoutRequestId}` }, (payload) => {
-        if (payload.new) {
-          setTransaction({
-            checkoutRequestId: payload.new.checkout_request_id,
-            status: payload.new.status,
-            amount: payload.new.amount,
-            phone: payload.new.phone_number,
-            mpesaReceipt: payload.new.mpesa_receipt_number,
-            createdAt: payload.new.created_at,
-            updatedAt: payload.new.updated_at,
-            isComplete: payload.new.status === 'completed',
-            isFailed: payload.new.status === 'failed',
-          });
+    const channel = supabase
+      .channel(`transaction-${checkoutRequestId}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'mpesa_transactions',
+          filter: `checkout_request_id=eq.${checkoutRequestId}`
+        },
+        (payload) => {
+          if (payload.new) {
+            const newData = payload.new as Record<string, unknown>;
+            const status = (newData.status as string || 'pending') as TransactionStatusType;
+            setTransaction({
+              checkoutRequestId: newData.checkout_request_id as string,
+              status,
+              amount: newData.amount as number,
+              phone: newData.phone_number as string,
+              mpesaReceipt: newData.mpesa_receipt_number as string | undefined,
+              createdAt: newData.created_at as string,
+              updatedAt: newData.updated_at as string,
+              isComplete: status === 'completed',
+              isFailed: status === 'failed',
+            });
+          }
         }
-      })
+      )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(subscription);
+      supabase.removeChannel(channel);
     };
   }, [checkoutRequestId]);
 
