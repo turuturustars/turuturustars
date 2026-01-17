@@ -175,17 +175,17 @@ const WelfarePage = () => {
 
   const fetchWelfareCases = async () => {
     try {
+      // Fetch ALL welfare cases regardless of status to ensure visibility
       const { data, error } = await supabase
         .from('welfare_cases')
         .select(`
           *,
           beneficiary:beneficiary_id (full_name, id)
         `)
-        .in('status', ['active', 'pending', 'open', null])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      console.log('Fetched welfare cases:', data);
+      console.log('Fetched all welfare cases:', data);
       setCases(data || []);
     } catch (error) {
       console.error('Error fetching welfare cases:', error);
