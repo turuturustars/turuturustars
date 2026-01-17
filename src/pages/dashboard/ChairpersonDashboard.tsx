@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { hasRole, isManagementCommittee } from '@/lib/rolePermissions';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,20 +21,72 @@ const ChairpersonDashboard = () => {
   const { roles, profile } = useAuth();
   const userRoles = roles.map(r => r.role);
   const isChair = hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairperson');
+  
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    upcomingMeetings: 0,
+    pendingApprovals: 0,
+    announcements: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch statistics
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      // Get total members
+      const { count: totalCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // Get upcoming meetings
+      const { data: upcomingData } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('status', 'scheduled')
+        .gt('scheduled_date', new Date().toISOString());
+
+      // Get pending approvals
+      const { count: approvalsCount } = await supabase
+        .from('member_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      // Get published announcements
+      const { count: announcementsCount } = await supabase
+        .from('announcements')
+        .select('*', { count: 'exact', head: true })
+        .eq('published', true);
+
+      setStats({
+        totalMembers: totalCount || 0,
+        upcomingMeetings: upcomingData?.length || 0,
+        pendingApprovals: approvalsCount || 0,
+        announcements: announcementsCount || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const quickActions = [
     {
       title: 'Create Meeting',
       description: 'Schedule a meeting or AGM',
       icon: <FileText className="w-5 h-5" />,
-      path: '/dashboard/meetings',
+      path: '/dashboard/governance/meetings',
       color: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       title: 'Send Announcement',
       description: 'Broadcast to all members',
       icon: <Bell className="w-5 h-5" />,
-      path: '/dashboard/announcements',
+      path: '/dashboard/communication/announcements',
       color: 'bg-purple-100 dark:bg-purple-900/30',
     },
     {
@@ -44,10 +97,10 @@ const ChairpersonDashboard = () => {
       color: 'bg-green-100 dark:bg-green-900/30',
     },
     {
-      title: 'Community',
-      description: 'Manage associations',
+      title: 'Reports',
+      description: 'View financial and member reports',
       icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/community',
+      path: '/dashboard/finance/reports',
       color: 'bg-amber-100 dark:bg-amber-900/30',
     },
   ];
@@ -69,8 +122,8 @@ const ChairpersonDashboard = () => {
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Active members</p>
+            <div className="text-2xl font-bold">{isLoading ? '--' : stats.totalMembers}</div>
+            <p className="text-xs text-muted-foreground mt-1">All registered members</p>
           </CardContent>
         </Card>
         <Card>
@@ -78,7 +131,7 @@ const ChairpersonDashboard = () => {
             <CardTitle className="text-sm font-medium">Upcoming Meetings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">--</div>
+            <div className="text-2xl font-bold">{isLoading ? '--' : stats.upcomingMeetings}</div>
             <p className="text-xs text-muted-foreground mt-1">Scheduled</p>
           </CardContent>
         </Card>
@@ -87,7 +140,7 @@ const ChairpersonDashboard = () => {
             <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">--</div>
+            <div className="text-2xl font-bold">{isLoading ? '--' : stats.pendingApprovals}</div>
             <p className="text-xs text-muted-foreground mt-1">Member applications</p>
           </CardContent>
         </Card>
@@ -96,7 +149,7 @@ const ChairpersonDashboard = () => {
             <CardTitle className="text-sm font-medium">Announcements</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">--</div>
+            <div className="text-2xl font-bold">{isLoading ? '--' : stats.announcements}</div>
             <p className="text-xs text-muted-foreground mt-1">Published</p>
           </CardContent>
         </Card>

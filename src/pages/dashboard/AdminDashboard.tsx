@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import {
   Users,
   Settings,
@@ -30,67 +32,117 @@ import {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [stats, setStats] = useState({
-    totalUsers: 0,
-    systemHealth: 100,
-    pendingTasks: 0,
-    activeSessions: 0,
+    totalMembers: 0,
+    activeMembers: 0,
+    upcomingMeetings: 0,
+    pendingApprovals: 0,
+    publishedAnnouncements: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate data loading
+  // Fetch dashboard statistics
   useEffect(() => {
-    setTimeout(() => {
-      setStats({
-        totalUsers: 156,
-        systemHealth: 98,
-        pendingTasks: 8,
-        activeSessions: 23,
-      });
-      setIsLoading(false);
-    }, 500);
+    fetchStats();
   }, []);
+
+  const fetchStats = async () => {
+    try {
+      // Get total members
+      const { count: totalCount } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+
+      // Get active members (status = 'active')
+      const { count: activeCount } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      // Get upcoming meetings (status = 'scheduled')
+      const { data: upcomingData } = await supabase
+        .from('meetings')
+        .select('*')
+        .eq('status', 'scheduled')
+        .gt('scheduled_date', new Date().toISOString());
+
+      // Get pending approvals
+      const { count: approvalsCount } = await supabase
+        .from('member_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      // Get published announcements
+      const { count: announcementsCount } = await supabase
+        .from('announcements')
+        .select('*', { count: 'exact', head: true })
+        .eq('published', true);
+
+      setStats({
+        totalMembers: totalCount || 0,
+        activeMembers: activeCount || 0,
+        upcomingMeetings: upcomingData?.length || 0,
+        pendingApprovals: approvalsCount || 0,
+        publishedAnnouncements: announcementsCount || 0,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const statCards = [
     {
-      title: 'Total Users',
-      value: stats.totalUsers,
-      change: '+12%',
-      trend: 'up',
+      title: 'Total Members',
+      value: stats.totalMembers,
+      change: '',
+      trend: 'neutral',
       icon: Users,
       color: 'text-blue-600 dark:text-blue-400',
       bgColor: 'bg-blue-50 dark:bg-blue-950/50',
-      description: 'Registered members',
+      description: 'All registered members',
     },
     {
-      title: 'System Health',
-      value: `${stats.systemHealth}%`,
-      change: 'Stable',
+      title: 'Active Members',
+      value: stats.activeMembers,
+      change: '',
       trend: 'neutral',
-      icon: Activity,
+      icon: CheckCircle2,
       color: 'text-green-600 dark:text-green-400',
       bgColor: 'bg-green-50 dark:bg-green-950/50',
-      description: 'All systems operational',
+      description: 'Members with active roles',
     },
     {
-      title: 'Pending Tasks',
-      value: stats.pendingTasks,
-      change: '3 urgent',
-      trend: 'down',
-      icon: Clock,
+      title: 'Upcoming Meetings',
+      value: stats.upcomingMeetings,
+      change: 'Scheduled',
+      trend: 'neutral',
+      icon: Calendar,
       color: 'text-amber-600 dark:text-amber-400',
       bgColor: 'bg-amber-50 dark:bg-amber-950/50',
-      description: 'Awaiting your action',
+      description: 'Future meetings',
     },
     {
-      title: 'Active Sessions',
-      value: stats.activeSessions,
-      change: '+5 today',
-      trend: 'up',
-      icon: Zap,
+      title: 'Pending Approvals',
+      value: stats.pendingApprovals,
+      change: 'Applications',
+      trend: 'neutral',
+      icon: Clock,
       color: 'text-purple-600 dark:text-purple-400',
       bgColor: 'bg-purple-50 dark:bg-purple-950/50',
-      description: 'Users online now',
+      description: 'Awaiting review',
+    },
+    {
+      title: 'Published Announcements',
+      value: stats.publishedAnnouncements,
+      change: '',
+      trend: 'neutral',
+      icon: Bell,
+      color: 'text-pink-600 dark:text-pink-400',
+      bgColor: 'bg-pink-50 dark:bg-pink-950/50',
+      description: 'Active announcements',
     },
   ];
 
@@ -180,7 +232,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           const isUp = stat.trend === 'up';
@@ -211,13 +263,7 @@ const AdminDashboard = () => {
                     {stat.description}
                   </p>
                   {stat.change && (
-                    <div className={`flex items-center gap-1 text-xs font-medium ${
-                      isUp ? 'text-green-600 dark:text-green-400' : 
-                      isDown ? 'text-red-600 dark:text-red-400' : 
-                      'text-muted-foreground'
-                    }`}>
-                      {isUp && <TrendingUp className="w-3 h-3" />}
-                      {isDown && <TrendingDown className="w-3 h-3" />}
+                    <div className={`text-xs font-medium text-muted-foreground`}>
                       {stat.change}
                     </div>
                   )}
