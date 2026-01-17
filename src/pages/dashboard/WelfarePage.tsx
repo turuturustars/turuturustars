@@ -50,6 +50,21 @@ const WelfarePage = () => {
   useEffect(() => {
     fetchWelfareCases();
     fetchBeneficiaries();
+
+    // Real-time subscription for new welfare cases
+    const channel = supabase
+      .channel('welfare_cases_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'welfare_cases' }, () => {
+        fetchWelfareCases();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'welfare_cases' }, () => {
+        fetchWelfareCases();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchBeneficiaries = async () => {

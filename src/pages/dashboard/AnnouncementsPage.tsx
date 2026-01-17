@@ -42,6 +42,21 @@ const AnnouncementsPage = () => {
 
   useEffect(() => {
     fetchAnnouncements();
+
+    // Real-time subscription for new announcements
+    const channel = supabase
+      .channel('announcements_updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => {
+        fetchAnnouncements();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' }, () => {
+        fetchAnnouncements();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchAnnouncements = async () => {

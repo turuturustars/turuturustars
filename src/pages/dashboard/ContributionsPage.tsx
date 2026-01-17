@@ -59,6 +59,21 @@ const ContributionsPage = () => {
   useEffect(() => {
     if (profile?.id) {
       fetchContributions();
+
+      // Real-time subscription for new contributions
+      const channel = supabase
+        .channel('contributions_updates')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'contributions', filter: `member_id=eq.${profile.id}` }, () => {
+          fetchContributions();
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'contributions', filter: `member_id=eq.${profile.id}` }, () => {
+          fetchContributions();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [profile?.id]);
 
