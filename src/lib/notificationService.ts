@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type NotificationType = 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system';
+export type NotificationType = 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system' | 'private_message';
 
 export interface SendNotificationParams {
   userId: string;
@@ -8,6 +8,19 @@ export interface SendNotificationParams {
   message: string;
   type: NotificationType;
   actionUrl?: string;
+}
+
+/**
+ * Browser Notification Options
+ */
+export interface BrowserNotificationOptions {
+  title: string;
+  body?: string;
+  icon?: string;
+  badge?: string;
+  tag?: string;
+  image?: string;
+  onClick?: () => void;
 }
 
 export interface SendBulkNotificationParams {
@@ -227,4 +240,194 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     console.error('Error marking all as read:', error);
     throw error;
   }
+};
+
+/**
+ * Browser Notification Service
+ * Handles Push Notifications using the Notifications API
+ */
+
+export const BrowserNotificationService = {
+  /**
+   * Check if browser supports notifications
+   */
+  isSupported(): boolean {
+    return 'Notification' in globalThis;
+  },
+
+  /**
+   * Check if notifications are currently enabled
+   */
+  isEnabled(): boolean {
+    return this.isSupported() && Notification.permission === 'granted';
+  },
+
+  /**
+   * Check if user has enabled notifications in localStorage
+   */
+  isEnabledInStorage(): boolean {
+    return localStorage.getItem('private_messages_notifications_enabled') === 'true';
+  },
+
+  /**
+   * Request permission for notifications
+   */
+  async requestPermission(): Promise<NotificationPermission> {
+    if (!this.isSupported()) {
+      console.warn('Browser does not support notifications');
+      return 'denied';
+    }
+
+    if (Notification.permission !== 'default') {
+      return Notification.permission;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        localStorage.setItem('private_messages_notifications_enabled', 'true');
+      }
+      return permission;
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
+      return 'denied';
+    }
+  },
+
+  /**
+   * Enable notifications with permission request
+   */
+  async enable(): Promise<boolean> {
+    const permission = await this.requestPermission();
+    if (permission === 'granted') {
+      localStorage.setItem('private_messages_notifications_enabled', 'true');
+      return true;
+    } else if (permission === 'denied') {
+      localStorage.setItem('private_messages_notifications_enabled', 'false');
+    }
+    return false;
+  },
+
+  /**
+   * Disable notifications
+   */
+  disable(): void {
+    localStorage.setItem('private_messages_notifications_enabled', 'false');
+  },
+
+  /**
+   * Show a private message notification
+   */
+  showPrivateMessageNotification(
+    senderName: string,
+    messagePreview: string,
+    options?: {
+      senderPhotoUrl?: string | null;
+      conversationId?: string;
+      onClick?: () => void;
+    }
+  ): Notification | null {
+    if (!this.isEnabled() || !this.isEnabledInStorage()) {
+      return null;
+    }
+
+    try {
+      const truncatedMessage = messagePreview.length > 100 
+        ? messagePreview.substring(0, 100) + '...' 
+        : messagePreview;
+
+      const notificationOptions: any = {
+        body: truncatedMessage,
+        icon: '/icon-192x192.png',
+        badge: '/icon-192x192.png',
+        tag: `private-message-${options?.conversationId || 'general'}`,
+        requireInteraction: false,
+        actions: [
+          { action: 'open', title: 'Open' },
+          { action: 'close', title: 'Close' },
+        ],
+      };
+
+      // Add sender photo as image if available
+      if (options?.senderPhotoUrl) {
+        notificationOptions.image = options.senderPhotoUrl;
+      }
+
+      const notification = new Notification(
+        `📨 Message from ${senderName}`,
+        notificationOptions
+      );
+
+      // Handle click on notification
+      notification.onclick = (event: Event) => {
+        event.preventDefault();
+        options?.onClick?.();
+        notification.close();
+        (globalThis as any).focus?.();
+      };
+
+      // Handle action buttons (using 'as any' to avoid TypeScript issues)
+      (notification as any).onaction = (event: any) => {
+        if (event.action === 'open') {
+          options?.onClick?.();
+          notification.close();
+          (globalThis as any).focus?.();
+        } else if (event.action === 'close') {
+          notification.close();
+        }
+      };
+
+      return notification;
+    } catch (error) {
+      console.error('Error showing private message notification:', error);
+      return null;
+    }
+  },
+
+  /**
+   * Show a generic notification
+   */
+  show(
+    title: string,
+    options?: {
+      body?: string;
+      icon?: string;
+      badge?: string;
+      tag?: string;
+      image?: string;
+      onClick?: () => void;
+    }
+  ): Notification | null {
+    if (!this.isEnabled()) {
+      return null;
+    }
+
+    try {
+      const notificationOptions: any = {
+        body: options?.body,
+        icon: options?.icon || '/icon-192x192.png',
+        badge: options?.badge || '/icon-192x192.png',
+        tag: options?.tag,
+        requireInteraction: false,
+      };
+
+      // Only add image if provided
+      if (options?.image) {
+        notificationOptions.image = options.image;
+      }
+
+      const notification = new Notification(title, notificationOptions);
+
+      notification.onclick = () => {
+        options?.onClick?.();
+        notification.close();
+        (globalThis as any).focus?.();
+      };
+
+      return notification;
+    } catch (error) {
+      console.error('Error showing notification:', error);
+      return null;
+    }
+  },
 };
