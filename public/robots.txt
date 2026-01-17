@@ -1,8 +1,27 @@
+# Allow all bots to crawl the site
+User-agent: *
+Allow: /
+
+# Disallow crawling of auth pages
+Disallow: /auth
+Disallow: /admin/login
+
+# Disallow crawling of private dashboard pages for anonymous users
+# (These are protected by authentication anyway)
+Disallow: /dashboard/private
+
+# Specific bot rules
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 0
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
+
+User-agent: Slurp
+Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -10,5 +29,11 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
+User-agent: LinkedInBot
 Allow: /
+
+User-agent: whatsapp
+Allow: /
+
+# Sitemap location
+Sitemap: https://turuturustars.co.ke/sitemap.xml

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Star, Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 const authSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -18,6 +19,20 @@ const authSchema = z.object({
 });
 
 const Auth = () => {
+  usePageMeta({
+    title: 'Login & Register - Turuturu Stars CBO',
+    description: 'Create your account or log in to Turuturu Stars Community Platform. Join us to manage contributions, welfare assistance, and community activities.',
+    keywords: [
+      'login',
+      'register',
+      'sign up',
+      'membership',
+      'Turuturu Stars'
+    ],
+    canonicalUrl: 'https://turuturustars.co.ke/auth',
+    robots: 'index,follow'
+  });
+
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
