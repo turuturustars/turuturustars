@@ -63,11 +63,14 @@ const MembershipForm = () => {
         return;
       }
 
+      // Note: Membership fee (KES 200) will be automatically created when member account is activated
+      // The fee is due immediately and renewal is set for 1 year from registration date
+      
       setIsSuccess(true);
       reset();
       toast({
         title: "Registration successful!",
-        description: "Welcome to the Turuturu Stars family. We'll be in touch soon!",
+        description: "Welcome to the Turuturu Stars family. A membership fee of KES 200 will be billed. We'll be in touch soon!",
       });
     } catch (error) {
       console.error('Registration error:', error);
