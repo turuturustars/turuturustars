@@ -4,23 +4,23 @@ import { supabase } from '@/integrations/supabase/client';
 export interface WelfareTransaction {
   id: string;
   welfare_case_id: string;
+  member_id: string;
   amount: number;
-  transaction_type: 'contribution' | 'refund';
-  mpesa_code: string | null;
-  recorded_by_id: string;
-  recorded_by: {
+  contribution_type: string;
+  status: 'pending' | 'paid' | 'missed';
+  reference_number: string | null;
+  notes: string | null;
+  created_at: string | null;
+  paid_at: string | null;
+  profiles?: {
     full_name: string;
   } | null;
-  notes: string | null;
-  created_at: string;
-  status: 'completed' | 'pending' | 'failed';
 }
 
 export interface WelfareTransactionFormData {
   amount: number;
   mpesa_code?: string;
   notes?: string;
-  transaction_type: 'contribution' | 'refund';
 }
 
 export const useWelfareTransactions = (caseId: string | null) => {
@@ -33,16 +33,16 @@ export const useWelfareTransactions = (caseId: string | null) => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('welfare_transactions')
+        .from('contributions')
         .select(`
           *,
-          recorded_by:recorded_by_id (full_name)
+          profiles:member_id (full_name)
         `)
         .eq('welfare_case_id', caseId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      setTransactions((data as WelfareTransaction[]) || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       throw error;
@@ -54,15 +54,16 @@ export const useWelfareTransactions = (caseId: string | null) => {
   const addTransaction = async (userId: string, formData: WelfareTransactionFormData) => {
     try {
       const { error } = await supabase
-        .from('welfare_transactions')
+        .from('contributions')
         .insert({
           welfare_case_id: caseId,
+          member_id: userId,
           amount: formData.amount,
-          transaction_type: formData.transaction_type,
-          mpesa_code: formData.mpesa_code || null,
-          recorded_by_id: userId,
+          contribution_type: 'welfare',
+          reference_number: formData.mpesa_code || null,
           notes: formData.notes || null,
-          status: 'completed',
+          status: 'paid',
+          paid_at: new Date().toISOString(),
         });
 
       if (error) throw error;
@@ -78,7 +79,7 @@ export const useWelfareTransactions = (caseId: string | null) => {
   const removeTransaction = async (transactionId: string) => {
     try {
       const { error } = await supabase
-        .from('welfare_transactions')
+        .from('contributions')
         .delete()
         .eq('id', transactionId);
 

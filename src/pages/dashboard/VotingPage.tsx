@@ -71,7 +71,7 @@ export default function VotingPage() {
   const canManage = hasPermission(userRoles, 'manage_voting') || hasPermission(userRoles, 'create_voting');
   const canVote = hasPermission(userRoles, 'cast_vote');
   const canViewResults = hasPermission(userRoles, 'view_voting_results');
-  const isChair = hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairperson');
+  const isChair = hasRole('chairperson') || hasRole('vice_chairman');
 
   useEffect(() => {
     fetchMotions();

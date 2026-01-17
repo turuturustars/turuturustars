@@ -49,9 +49,9 @@ const ChairpersonDashboard = () => {
         .eq('status', 'scheduled')
         .gt('scheduled_date', new Date().toISOString());
 
-      // Get pending approvals
+      // Get pending approvals (using profiles with pending status)
       const { count: approvalsCount } = await supabase
-        .from('member_applications')
+        .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 

@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useMembershipFees, getMembershipFeeStatus, getMembershipFeeColor } from '@/hooks/useMembershipFees';
 import { AlertCircle, CheckCircle, Clock, CreditCard, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -13,38 +12,26 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 
-interface MembershipFee {
+interface MemberContribution {
   id: string;
   member_id: string;
   amount: number;
-  fee_type: 'initial' | 'renewal';
-  due_date: string;
+  contribution_type: string;
+  due_date: string | null;
   paid_at: string | null;
-  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
-  payment_reference: string | null;
+  status: 'pending' | 'paid' | 'missed';
+  reference_number: string | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface MemberProfile {
-  id: string;
-  full_name: string;
-  email: string;
-  phone: string;
-  membership_fee_paid: boolean;
-  membership_fee_paid_at: string | null;
-  joined_at: string;
-  next_membership_renewal_date: string | null;
+  created_at: string | null;
 }
 
 const MembershipFeeManagement = () => {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const { toast } = useToast();
-  const { fees, loading } = useMembershipFees(profile?.id);
-  const [memberProfile, setMemberProfile] = useState<MemberProfile | null>(null);
+  const [contributions, setContributions] = useState<MemberContribution[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedFee, setSelectedFee] = useState<MembershipFee | null>(null);
+  const [selectedContribution, setSelectedContribution] = useState<MemberContribution | null>(null);
   const [paymentData, setPaymentData] = useState({
     paymentReference: '',
     notes: '',
@@ -54,26 +41,29 @@ const MembershipFeeManagement = () => {
   useEffect(() => {
     if (!profile?.id) return;
 
-    const fetchMemberProfile = async () => {
+    const fetchContributions = async () => {
       try {
         const { data, error } = await supabase
-          .from('profiles')
-          .select('id, full_name, email, phone, membership_fee_paid, membership_fee_paid_at, joined_at, next_membership_renewal_date')
-          .eq('id', profile.id)
-          .single();
+          .from('contributions')
+          .select('*')
+          .eq('member_id', profile.id)
+          .eq('contribution_type', 'membership_fee')
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setMemberProfile(data);
+        setContributions((data as MemberContribution[]) || []);
       } catch (err) {
-        console.error('Error fetching member profile:', err);
+        console.error('Error fetching contributions:', err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchMemberProfile();
+    fetchContributions();
   }, [profile?.id]);
 
   const handlePaymentSubmit = async () => {
-    if (!selectedFee || !paymentData.paymentReference) {
+    if (!selectedContribution || !paymentData.paymentReference) {
       toast({
         title: 'Required Field',
         description: 'Please provide a payment reference',
@@ -85,36 +75,34 @@ const MembershipFeeManagement = () => {
     setIsProcessing(true);
     try {
       const { error } = await supabase
-        .from('membership_fees')
+        .from('contributions')
         .update({
           status: 'paid',
           paid_at: new Date().toISOString(),
-          payment_reference: paymentData.paymentReference,
+          reference_number: paymentData.paymentReference,
           notes: paymentData.notes || null,
         })
-        .eq('id', selectedFee.id);
+        .eq('id', selectedContribution.id);
 
       if (error) throw error;
 
-      // Update profile if this is initial fee
-      if (selectedFee.fee_type === 'initial') {
-        await supabase
-          .from('profiles')
-          .update({
-            membership_fee_paid: true,
-            membership_fee_paid_at: new Date().toISOString(),
-          })
-          .eq('id', profile?.id);
-      }
-
       toast({
         title: 'Payment Recorded',
-        description: `Membership fee payment of KES ${selectedFee.amount} has been recorded successfully.`,
+        description: `Membership fee payment of KES ${selectedContribution.amount} has been recorded successfully.`,
       });
 
       setIsPaymentDialogOpen(false);
       setPaymentData({ paymentReference: '', notes: '' });
-      setSelectedFee(null);
+      setSelectedContribution(null);
+      
+      // Refresh contributions
+      const { data } = await supabase
+        .from('contributions')
+        .select('*')
+        .eq('member_id', profile?.id)
+        .eq('contribution_type', 'membership_fee')
+        .order('created_at', { ascending: false });
+      setContributions((data as MemberContribution[]) || []);
     } catch (err) {
       console.error('Error processing payment:', err);
       toast({
@@ -128,10 +116,10 @@ const MembershipFeeManagement = () => {
   };
 
   const getNextRenewalInfo = (): string => {
-    if (!memberProfile?.joined_at) return 'Not available';
+    if (!profile?.joined_at) return 'Not available';
 
     try {
-      const joinedDate = new Date(memberProfile.joined_at);
+      const joinedDate = new Date(profile.joined_at);
       const renewalDate = new Date(
         joinedDate.getFullYear() + 1,
         joinedDate.getMonth(),
@@ -145,8 +133,20 @@ const MembershipFeeManagement = () => {
 
       const daysUntilRenewal = Math.ceil((renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       return `In ${daysUntilRenewal} days (${format(renewalDate, 'dd MMM yyyy')})`;
-    } catch (err) {
+    } catch {
       return 'Error calculating renewal date';
+    }
+  };
+
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'paid':
+        return 'text-green-600 bg-green-50';
+      case 'missed':
+        return 'text-red-600 bg-red-50';
+      case 'pending':
+      default:
+        return 'text-yellow-600 bg-yellow-50';
     }
   };
 
@@ -158,10 +158,10 @@ const MembershipFeeManagement = () => {
     );
   }
 
-  const pendingFee = fees.find((f) => f.status === 'pending');
-  const totalPaid = fees
-    .filter((f) => f.status === 'paid')
-    .reduce((sum, f) => sum + f.amount, 0);
+  const pendingContribution = contributions.find((c) => c.status === 'pending');
+  const totalPaid = contributions
+    .filter((c) => c.status === 'paid')
+    .reduce((sum, c) => sum + c.amount, 0);
 
   return (
     <div className="space-y-6">
@@ -183,7 +183,7 @@ const MembershipFeeManagement = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {memberProfile?.joined_at ? format(new Date(memberProfile.joined_at), 'dd MMM yyyy') : 'N/A'}
+              {profile?.joined_at ? format(new Date(profile.joined_at), 'dd MMM yyyy') : 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Member since</p>
           </CardContent>
@@ -211,7 +211,7 @@ const MembershipFeeManagement = () => {
       </div>
 
       {/* Pending Payment Alert */}
-      {pendingFee && (
+      {pendingContribution && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -220,18 +220,20 @@ const MembershipFeeManagement = () => {
                 <CardTitle className="text-yellow-900">Payment Pending</CardTitle>
               </div>
               <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
-                {pendingFee.fee_type === 'initial' ? 'Initial Fee' : 'Renewal Fee'}
+                Membership Fee
               </Badge>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-yellow-800 mb-4">
-              You have a pending membership fee of <strong>KES {pendingFee.amount}</strong> due on{' '}
-              <strong>{format(new Date(pendingFee.due_date), 'dd MMM yyyy')}</strong>
+              You have a pending membership fee of <strong>KES {pendingContribution.amount}</strong>
+              {pendingContribution.due_date && (
+                <> due on <strong>{format(new Date(pendingContribution.due_date), 'dd MMM yyyy')}</strong></>
+              )}
             </p>
             <Button
               onClick={() => {
-                setSelectedFee(pendingFee);
+                setSelectedContribution(pendingContribution);
                 setIsPaymentDialogOpen(true);
               }}
               className="bg-yellow-600 hover:bg-yellow-700"
@@ -251,7 +253,7 @@ const MembershipFeeManagement = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {fees.length === 0 ? (
+            {contributions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>No membership fee records found</p>
@@ -270,32 +272,29 @@ const MembershipFeeManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {fees.map((fee) => {
-                      const status = getMembershipFeeStatus(fee);
-                      const statusColor = getMembershipFeeColor(status);
-
-                      return (
-                        <tr key={fee.id} className="border-b hover:bg-muted/50">
-                          <td className="py-3 px-2 capitalize">{fee.fee_type}</td>
-                          <td className="py-3 px-2 font-semibold">KES {fee.amount}</td>
-                          <td className="py-3 px-2">{format(new Date(fee.due_date), 'dd MMM yyyy')}</td>
-                          <td className="py-3 px-2">
-                            <Badge className={statusColor}>
-                              {status === 'Paid' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {status === 'Overdue' && <AlertCircle className="h-3 w-3 mr-1" />}
-                              {status === 'Pending' && <Clock className="h-3 w-3 mr-1" />}
-                              {status}
-                            </Badge>
-                          </td>
-                          <td className="py-3 px-2">
-                            {fee.paid_at ? format(new Date(fee.paid_at), 'dd MMM yyyy') : '-'}
-                          </td>
-                          <td className="py-3 px-2 text-xs text-muted-foreground">
-                            {fee.payment_reference || '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {contributions.map((contribution) => (
+                      <tr key={contribution.id} className="border-b hover:bg-muted/50">
+                        <td className="py-3 px-2 capitalize">{contribution.contribution_type.replace('_', ' ')}</td>
+                        <td className="py-3 px-2 font-semibold">KES {contribution.amount}</td>
+                        <td className="py-3 px-2">
+                          {contribution.due_date ? format(new Date(contribution.due_date), 'dd MMM yyyy') : '-'}
+                        </td>
+                        <td className="py-3 px-2">
+                          <Badge className={getStatusColor(contribution.status)}>
+                            {contribution.status === 'paid' && <CheckCircle className="h-3 w-3 mr-1" />}
+                            {contribution.status === 'missed' && <AlertCircle className="h-3 w-3 mr-1" />}
+                            {contribution.status === 'pending' && <Clock className="h-3 w-3 mr-1" />}
+                            {contribution.status.charAt(0).toUpperCase() + contribution.status.slice(1)}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-2">
+                          {contribution.paid_at ? format(new Date(contribution.paid_at), 'dd MMM yyyy') : '-'}
+                        </td>
+                        <td className="py-3 px-2 text-xs text-muted-foreground">
+                          {contribution.reference_number || '-'}
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -310,7 +309,7 @@ const MembershipFeeManagement = () => {
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>
-              Record the membership fee payment for KES {selectedFee?.amount}
+              Record the membership fee payment for KES {selectedContribution?.amount}
             </DialogDescription>
           </DialogHeader>
 

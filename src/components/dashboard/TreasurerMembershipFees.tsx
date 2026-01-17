@@ -24,46 +24,46 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertCircle, CheckCircle, Clock, DollarSign, Download, Filter } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, DollarSign, Download } from 'lucide-react';
 import { format } from 'date-fns';
 
-interface MembershipFee {
+interface MembershipContribution {
   id: string;
   member_id: string;
   amount: number;
-  fee_type: 'initial' | 'renewal';
-  due_date: string;
+  contribution_type: string;
+  due_date: string | null;
   paid_at: string | null;
-  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
-  payment_reference: string | null;
+  status: 'pending' | 'paid' | 'missed';
+  reference_number: string | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
   profiles?: {
     full_name: string;
-    email: string;
+    email: string | null;
     phone: string;
   };
 }
 
 const TreasurerMembershipFees = () => {
-  const { userRole } = useAuth();
+  const { roles, hasRole } = useAuth();
   const { toast } = useToast();
-  const [fees, setFees] = useState<MembershipFee[]>([]);
+  const [contributions, setContributions] = useState<MembershipContribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  const [selectedFee, setSelectedFee] = useState<MembershipFee | null>(null);
+  const [selectedContribution, setSelectedContribution] = useState<MembershipContribution | null>(null);
   const [paymentData, setPaymentData] = useState({
     paymentReference: '',
     notes: '',
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const userRoles = roles.map(r => r.role);
+  const canAccess = userRoles.includes('treasurer') || userRoles.includes('admin') || userRoles.includes('chairperson');
+
   useEffect(() => {
-    // Only allow treasurers and admins
-    if (!['treasurer', 'admin', 'chairperson'].includes(userRole || '')) {
+    if (!canAccess) {
       toast({
         title: 'Access Denied',
         description: 'Only treasurers can view membership fees.',
@@ -72,28 +72,29 @@ const TreasurerMembershipFees = () => {
       return;
     }
 
-    fetchMembershipFees();
-  }, [userRole]);
+    fetchMembershipContributions();
+  }, [canAccess]);
 
-  const fetchMembershipFees = async () => {
+  const fetchMembershipContributions = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('membership_fees')
+        .from('contributions')
         .select(`
           *,
-          profiles!membership_fees_member_id_fkey(
+          profiles:member_id (
             full_name,
             email,
             phone
           )
         `)
+        .eq('contribution_type', 'membership_fee')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setFees(data || []);
+      setContributions((data as MembershipContribution[]) || []);
     } catch (err) {
-      console.error('Error fetching membership fees:', err);
+      console.error('Error fetching membership contributions:', err);
       toast({
         title: 'Error',
         description: 'Failed to load membership fees.',
@@ -105,7 +106,7 @@ const TreasurerMembershipFees = () => {
   };
 
   const handlePaymentSubmit = async () => {
-    if (!selectedFee || !paymentData.paymentReference) {
+    if (!selectedContribution || !paymentData.paymentReference) {
       toast({
         title: 'Required Field',
         description: 'Please provide a payment reference',
@@ -117,29 +118,29 @@ const TreasurerMembershipFees = () => {
     setIsProcessing(true);
     try {
       const { error } = await supabase
-        .from('membership_fees')
+        .from('contributions')
         .update({
           status: 'paid',
           paid_at: new Date().toISOString(),
-          payment_reference: paymentData.paymentReference,
+          reference_number: paymentData.paymentReference,
           notes: paymentData.notes || null,
         })
-        .eq('id', selectedFee.id);
+        .eq('id', selectedContribution.id);
 
       if (error) throw error;
 
       // Update local state
-      setFees((prev) =>
-        prev.map((fee) =>
-          fee.id === selectedFee.id
+      setContributions((prev) =>
+        prev.map((c) =>
+          c.id === selectedContribution.id
             ? {
-                ...fee,
-                status: 'paid',
+                ...c,
+                status: 'paid' as const,
                 paid_at: new Date().toISOString(),
-                payment_reference: paymentData.paymentReference,
+                reference_number: paymentData.paymentReference,
                 notes: paymentData.notes || null,
               }
-            : fee
+            : c
         )
       );
 
@@ -150,7 +151,7 @@ const TreasurerMembershipFees = () => {
 
       setIsPaymentDialogOpen(false);
       setPaymentData({ paymentReference: '', notes: '' });
-      setSelectedFee(null);
+      setSelectedContribution(null);
     } catch (err) {
       console.error('Error processing payment:', err);
       toast({
@@ -163,24 +164,23 @@ const TreasurerMembershipFees = () => {
     }
   };
 
-  const filteredFees = fees.filter((fee) => {
-    if (statusFilter !== 'all' && fee.status !== statusFilter) return false;
-    if (typeFilter !== 'all' && fee.fee_type !== typeFilter) return false;
+  const filteredContributions = contributions.filter((c) => {
+    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
     return true;
   });
 
   const stats = {
-    total: fees.length,
-    paid: fees.filter((f) => f.status === 'paid').length,
-    pending: fees.filter((f) => f.status === 'pending').length,
-    overdue: fees.filter((f) => f.status === 'overdue').length,
-    totalAmount: fees.reduce((sum, f) => sum + f.amount, 0),
-    totalPaid: fees
-      .filter((f) => f.status === 'paid')
-      .reduce((sum, f) => sum + f.amount, 0),
-    totalPending: fees
-      .filter((f) => f.status === 'pending')
-      .reduce((sum, f) => sum + f.amount, 0),
+    total: contributions.length,
+    paid: contributions.filter((c) => c.status === 'paid').length,
+    pending: contributions.filter((c) => c.status === 'pending').length,
+    missed: contributions.filter((c) => c.status === 'missed').length,
+    totalAmount: contributions.reduce((sum, c) => sum + c.amount, 0),
+    totalPaid: contributions
+      .filter((c) => c.status === 'paid')
+      .reduce((sum, c) => sum + c.amount, 0),
+    totalPending: contributions
+      .filter((c) => c.status === 'pending')
+      .reduce((sum, c) => sum + c.amount, 0),
   };
 
   const getStatusIcon = (status: string) => {
@@ -189,7 +189,7 @@ const TreasurerMembershipFees = () => {
         return <CheckCircle className="h-4 w-4 text-green-600" />;
       case 'pending':
         return <Clock className="h-4 w-4 text-yellow-600" />;
-      case 'overdue':
+      case 'missed':
         return <AlertCircle className="h-4 w-4 text-red-600" />;
       default:
         return null;
@@ -202,27 +202,23 @@ const TreasurerMembershipFees = () => {
         return 'bg-green-50 text-green-700';
       case 'pending':
         return 'bg-yellow-50 text-yellow-700';
-      case 'overdue':
+      case 'missed':
         return 'bg-red-50 text-red-700';
-      case 'cancelled':
-        return 'bg-gray-50 text-gray-700';
       default:
         return 'bg-gray-50 text-gray-700';
     }
   };
 
   const handleExport = () => {
-    // Create CSV
-    const headers = ['Member Name', 'Email', 'Type', 'Amount', 'Due Date', 'Status', 'Paid Date', 'Reference'];
-    const rows = filteredFees.map((fee) => [
-      fee.profiles?.full_name || 'Unknown',
-      fee.profiles?.email || '',
-      fee.fee_type,
-      fee.amount,
-      format(new Date(fee.due_date), 'dd/MM/yyyy'),
-      fee.status,
-      fee.paid_at ? format(new Date(fee.paid_at), 'dd/MM/yyyy') : '-',
-      fee.payment_reference || '-',
+    const headers = ['Member Name', 'Email', 'Amount', 'Due Date', 'Status', 'Paid Date', 'Reference'];
+    const rows = filteredContributions.map((c) => [
+      c.profiles?.full_name || 'Unknown',
+      c.profiles?.email || '',
+      c.amount,
+      c.due_date ? format(new Date(c.due_date), 'dd/MM/yyyy') : '-',
+      c.status,
+      c.paid_at ? format(new Date(c.paid_at), 'dd/MM/yyyy') : '-',
+      c.reference_number || '-',
     ]);
 
     const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
@@ -269,17 +265,17 @@ const TreasurerMembershipFees = () => {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Overdue Fees</CardTitle>
+            <CardTitle className="text-sm font-medium">Missed Fees</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.overdue}</div>
+            <div className="text-2xl font-bold text-orange-600">{stats.missed}</div>
             <p className="text-xs text-muted-foreground mt-1">Requiring follow-up</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Records</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -294,7 +290,7 @@ const TreasurerMembershipFees = () => {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Filters</CardTitle>
-              <CardDescription>Filter membership fees by status and type</CardDescription>
+              <CardDescription>Filter membership fees by status</CardDescription>
             </div>
             <Button onClick={handleExport} variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
@@ -314,22 +310,7 @@ const TreasurerMembershipFees = () => {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex-1 space-y-2">
-              <Label>Type</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="initial">Initial Fee</SelectItem>
-                  <SelectItem value="renewal">Renewal Fee</SelectItem>
+                  <SelectItem value="missed">Missed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -341,10 +322,10 @@ const TreasurerMembershipFees = () => {
       <Card>
         <CardHeader>
           <CardTitle>Membership Fees</CardTitle>
-          <CardDescription>Showing {filteredFees.length} of {fees.length} fees</CardDescription>
+          <CardDescription>Showing {filteredContributions.length} of {contributions.length} fees</CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredFees.length === 0 ? (
+          {filteredContributions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p>No membership fees found</p>
@@ -356,7 +337,6 @@ const TreasurerMembershipFees = () => {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Type</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Due Date</TableHead>
                     <TableHead>Status</TableHead>
@@ -365,37 +345,38 @@ const TreasurerMembershipFees = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredFees.map((fee) => (
-                    <TableRow key={fee.id}>
+                  {filteredContributions.map((contribution) => (
+                    <TableRow key={contribution.id}>
                       <TableCell className="font-medium">
-                        {fee.profiles?.full_name || 'Unknown'}
+                        {contribution.profiles?.full_name || 'Unknown'}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {fee.profiles?.email}
+                        {contribution.profiles?.email}
                       </TableCell>
-                      <TableCell className="capitalize">{fee.fee_type}</TableCell>
                       <TableCell className="text-right font-semibold">
-                        KES {fee.amount}
+                        KES {contribution.amount}
                       </TableCell>
                       <TableCell>
-                        {format(new Date(fee.due_date), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(fee.status)}>
-                          {getStatusIcon(fee.status)}
-                          <span className="ml-1 capitalize">{fee.status}</span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {fee.paid_at
-                          ? format(new Date(fee.paid_at), 'dd MMM yyyy')
+                        {contribution.due_date
+                          ? format(new Date(contribution.due_date), 'dd MMM yyyy')
                           : '-'}
                       </TableCell>
                       <TableCell>
-                        {fee.status !== 'paid' && (
+                        <Badge className={getStatusColor(contribution.status)}>
+                          {getStatusIcon(contribution.status)}
+                          <span className="ml-1 capitalize">{contribution.status}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {contribution.paid_at
+                          ? format(new Date(contribution.paid_at), 'dd MMM yyyy')
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {contribution.status !== 'paid' && (
                           <Button
                             onClick={() => {
-                              setSelectedFee(fee);
+                              setSelectedContribution(contribution);
                               setIsPaymentDialogOpen(true);
                             }}
                             variant="outline"
@@ -421,8 +402,8 @@ const TreasurerMembershipFees = () => {
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>
               Record membership fee payment for{' '}
-              <strong>{selectedFee?.profiles?.full_name}</strong> - KES{' '}
-              {selectedFee?.amount}
+              <strong>{selectedContribution?.profiles?.full_name}</strong> - KES{' '}
+              {selectedContribution?.amount}
             </DialogDescription>
           </DialogHeader>
 
