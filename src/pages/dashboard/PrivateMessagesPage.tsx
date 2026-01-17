@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
+import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users } from 'lucide-react';
+import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users, Bell, BellOff, Edit2, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MemberProfile {
@@ -27,6 +28,10 @@ export default function PrivateMessagesPage() {
   const [members, setMembers] = useState<MemberProfile[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
   const { 
     conversations, 
@@ -37,7 +42,33 @@ export default function PrivateMessagesPage() {
     refreshMessages 
   } = usePrivateMessages(selectedConversationId || undefined);
 
+  // Setup notification hook for incoming messages
+  const {
+    isNotificationsEnabled: checkNotificationsEnabled,
+    enableNotifications,
+    disableNotifications,
+    requestPermission,
+    isNotificationsSupported,
+  } = usePrivateMessageNotifications(
+    messages,
+    user?.id,
+    selectedConversationId || undefined,
+    {
+      enabled: true,
+      onNotificationClick: (conversationId) => {
+        setSelectedConversationId(conversationId);
+      },
+    }
+  );
+
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+
+  // Initialize notification state
+  useEffect(() => {
+    if (isNotificationsSupported()) {
+      setNotificationsEnabled(checkNotificationsEnabled());
+    }
+  }, [isNotificationsSupported, checkNotificationsEnabled]);
 
   // Fetch members for new conversation
   const fetchMembers = async () => {
@@ -92,6 +123,67 @@ export default function PrivateMessagesPage() {
     }
   };
 
+  const handleToggleNotifications = async () => {
+    if (notificationsEnabled) {
+      disableNotifications();
+      setNotificationsEnabled(false);
+    } else {
+      try {
+        const granted = await requestPermission();
+        if (granted) {
+          enableNotifications();
+          setNotificationsEnabled(true);
+        }
+      } catch (err) {
+        console.error('Error enabling notifications:', err);
+      }
+    }
+  };
+
+  const handleEditMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditingContent(content);
+  };
+
+  const handleSaveEdit = async (messageId: string) => {
+    if (!editingContent.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('private_messages')
+        .update({ content: editingContent.trim() })
+        .eq('id', messageId);
+
+      if (error) throw error;
+      
+      setEditingMessageId(null);
+      setEditingContent('');
+      refreshMessages();
+    } catch (err) {
+      console.error('Error updating message:', err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!window.confirm('Delete this message?')) return;
+    
+    setDeletingMessageId(messageId);
+    try {
+      const { error } = await supabase
+        .from('private_messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw error;
+      
+      refreshMessages();
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    } finally {
+      setDeletingMessageId(null);
+    }
+  };
+
   const filteredConversations = conversations.filter(conv =>
     conv.other_participant?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -108,18 +200,34 @@ export default function PrivateMessagesPage() {
       {/* Conversations List */}
       <Card className={`md:w-80 lg:w-96 flex flex-col ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
         <CardHeader className="pb-3 flex-shrink-0">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" />
               Messages
             </CardTitle>
-            <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <Plus className="h-4 w-4 mr-1" />
-                  New
+            <div className="flex items-center gap-1">
+              {isNotificationsSupported() && (
+                <Button
+                  size="sm"
+                  variant={notificationsEnabled ? 'default' : 'outline'}
+                  onClick={handleToggleNotifications}
+                  title={notificationsEnabled ? 'Disable notifications' : 'Enable notifications'}
+                  className="h-8 w-8 p-0"
+                >
+                  {notificationsEnabled ? (
+                    <Bell className="h-4 w-4" />
+                  ) : (
+                    <BellOff className="h-4 w-4" />
+                  )}
                 </Button>
-              </DialogTrigger>
+              )}
+              <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
+                <DialogTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    <Plus className="h-4 w-4 mr-1" />
+                    New
+                  </Button>
+                </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle className="flex items-center gap-2">
@@ -170,6 +278,7 @@ export default function PrivateMessagesPage() {
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
           <div className="relative mt-2">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -247,21 +356,89 @@ export default function PrivateMessagesPage() {
                 <div className="space-y-4">
                   {messages.map((msg) => {
                     const isOwn = msg.sender_id === user?.id;
+                    const isEditing = editingMessageId === msg.id;
                     return (
                       <div
                         key={msg.id}
-                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                        className={`flex ${isOwn ? 'justify-end' : 'justify-start'} group`}
                       >
                         <div className={`max-w-[80%] ${isOwn ? 'order-2' : ''}`}>
-                          <div
-                            className={`px-4 py-2.5 rounded-2xl ${
-                              isOwn
-                                ? 'bg-primary text-primary-foreground rounded-br-sm'
-                                : 'bg-muted rounded-bl-sm'
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                          </div>
+                          {isEditing ? (
+                            <div className="flex gap-2 mb-2">
+                              <input
+                                type="text"
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="flex-1 px-3 py-2 rounded-lg border border-primary bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleSaveEdit(msg.id);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingMessageId(null);
+                                    setEditingContent('');
+                                  }
+                                }}
+                                autoFocus
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveEdit(msg.id)}
+                                className="h-9"
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingMessageId(null);
+                                  setEditingContent('');
+                                }}
+                                className="h-9"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              <div
+                                className={`px-4 py-2.5 rounded-2xl ${
+                                  isOwn
+                                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                    : 'bg-muted rounded-bl-sm'
+                                }`}
+                              >
+                                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                              </div>
+                              {isOwn && (
+                                <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleEditMessage(msg.id, msg.content)}
+                                    className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                    title="Edit message"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => handleDeleteMessage(msg.id)}
+                                    disabled={deletingMessageId === msg.id}
+                                    className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    title="Delete message"
+                                  >
+                                    {deletingMessageId === msg.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          )}
                           <p className={`text-[10px] text-muted-foreground mt-1 ${isOwn ? 'text-right' : ''}`}>
                             {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
                           </p>
