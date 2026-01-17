@@ -106,7 +106,7 @@ export default function VotingPage() {
     if (error) {
       toast.error('Failed to fetch motions');
     } else {
-      setMotions(data || []);
+      setMotions((data as VotingMotion[]) || []);
     }
     setIsLoading(false);
   };
@@ -123,9 +123,9 @@ export default function VotingPage() {
   const fetchUserVotes = async () => {
     const { data } = await supabase
       .from('votes')
-      .select('*')
+      .select('id, motion_id, member_id, vote, created_at')
       .eq('member_id', user?.id);
-    setUserVotes(data || []);
+    setUserVotes((data as UserVote[]) || []);
   };
 
   const createMotion = async () => {

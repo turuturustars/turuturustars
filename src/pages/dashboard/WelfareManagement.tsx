@@ -105,14 +105,14 @@ const WelfareManagement = () => {
       const { data, error } = await supabase
         .from('welfare_transactions')
         .select(`
-          *,
+          id, welfare_case_id, amount, transaction_type, mpesa_code, recorded_by_id, notes, created_at, status,
           recorded_by:recorded_by_id (full_name)
         `)
         .eq('welfare_case_id', caseId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+      setTransactions((data as WelfareTransaction[]) || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to load transactions');

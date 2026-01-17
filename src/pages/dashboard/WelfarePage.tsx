@@ -127,7 +127,7 @@ const WelfarePage = () => {
       description: welfareCase.description || '',
       case_type: welfareCase.case_type,
       target_amount: welfareCase.target_amount ? welfareCase.target_amount.toString() : '',
-      beneficiary_id: welfareCase.beneficiary ? welfareCase.beneficiary?.id || '' : '',
+      beneficiary_id: welfareCase.beneficiary?.id || '',
     });
     setIsEditingId(welfareCase.id);
     setIsDialogOpen(true);
