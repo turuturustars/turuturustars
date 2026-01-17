@@ -101,6 +101,7 @@ export default function VotingPage() {
     const { data, error } = await supabase
       .from('voting_motions')
       .select('*')
+      .in('status', ['pending', 'open', 'voting'])
       .order('created_at', { ascending: false });
 
     if (error) {

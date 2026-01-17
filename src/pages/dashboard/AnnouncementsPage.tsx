@@ -49,7 +49,6 @@ const AnnouncementsPage = () => {
       const announcementsTable = supabase.from('announcements' as 'announcements') as any;
       const { data, error } = await announcementsTable
         .select('id, title, content, priority, published_at, created_by')
-        .eq('published', true)
         .order('published_at', { ascending: false });
 
       if (error) throw error;

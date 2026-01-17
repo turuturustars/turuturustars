@@ -66,7 +66,10 @@ const ContributionsPage = () => {
     try {
       const { data, error } = await supabase
         .from('contributions')
-        .select('*')
+        .select(`
+          *,
+          member:member_id (full_name, id)
+        `)
         .eq('member_id', profile?.id)
         .order('created_at', { ascending: false });
 

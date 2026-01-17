@@ -164,8 +164,9 @@ const WelfarePage = () => {
         .from('welfare_cases')
         .select(`
           *,
-          beneficiary:beneficiary_id (full_name)
+          beneficiary:beneficiary_id (full_name, id)
         `)
+        .eq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
