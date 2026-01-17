@@ -106,7 +106,9 @@ export default function VotingPage() {
 
     if (error) {
       toast.error('Failed to fetch motions');
+      console.error('Error fetching voting motions:', error);
     } else {
+      console.log('Fetched voting motions:', data);
       setMotions((data as VotingMotion[]) || []);
     }
     setIsLoading(false);
