@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +13,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar, Plus, Users, Clock, MapPin, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { format, isFuture, isPast } from 'date-fns';
 import { toast } from 'sonner';
+import { 
+  sendMeetingNotifications, 
+  playNotificationSound,
+  getNotificationRecipients,
+  type MeetingNotificationType 
+} from '@/lib/meetingNotificationService';
 
 interface Meeting {
   id: string;
@@ -128,23 +133,45 @@ export default function MeetingsPage() {
       return;
     }
 
-    const { error } = await supabase.from('meetings').insert({
+    const { data, error } = await supabase.from('meetings').insert({
       title: newMeeting.title,
       meeting_type: newMeeting.meeting_type,
       scheduled_date: newMeeting.scheduled_date,
       venue: newMeeting.venue || null,
       agenda: newMeeting.agenda || null,
+      status: 'scheduled',
       created_by: user?.id
-    });
+    }).select().single();
 
     if (error) {
       toast.error('Failed to create meeting');
-    } else {
-      toast.success('Meeting scheduled successfully');
-      setShowCreateDialog(false);
-      setNewMeeting({ title: '', meeting_type: 'member', scheduled_date: '', venue: '', agenda: '' });
-      fetchMeetings();
+      return;
     }
+
+    // Get notification recipients based on meeting type
+    const recipients = await getNotificationRecipients(newMeeting.meeting_type);
+    
+    // Send notifications
+    await sendMeetingNotifications(
+      {
+        meetingId: data.id,
+        title: newMeeting.title,
+        scheduledDate: newMeeting.scheduled_date,
+        type: 'scheduled' as MeetingNotificationType,
+        venue: newMeeting.venue,
+        agenda: newMeeting.agenda,
+        createdBy: user?.id,
+      },
+      recipients
+    );
+
+    // Play notification sound
+    playNotificationSound(0.6);
+
+    toast.success('Meeting scheduled successfully and notifications sent');
+    setShowCreateDialog(false);
+    setNewMeeting({ title: '', meeting_type: 'member', scheduled_date: '', venue: '', agenda: '' });
+    fetchMeetings();
   };
 
   const initializeAttendance = async (meetingId: string) => {
@@ -182,6 +209,13 @@ export default function MeetingsPage() {
   };
 
   const updateMeetingStatus = async (meetingId: string, status: string) => {
+    // Find the meeting to get its details
+    const meeting = meetings.find(m => m.id === meetingId);
+    if (!meeting) {
+      toast.error('Meeting not found');
+      return;
+    }
+
     const { error } = await supabase
       .from('meetings')
       .update({ status })
@@ -189,10 +223,29 @@ export default function MeetingsPage() {
 
     if (error) {
       toast.error('Failed to update status');
-    } else {
-      toast.success('Status updated');
-      fetchMeetings();
+      return;
     }
+
+    // Send cancellation notifications if status is changed to cancelled
+    if (status === 'cancelled') {
+      const recipients = await getNotificationRecipients(meeting.meeting_type);
+      await sendMeetingNotifications(
+        {
+          meetingId: meeting.id,
+          title: meeting.title,
+          scheduledDate: meeting.scheduled_date,
+          type: 'cancelled' as MeetingNotificationType,
+          venue: meeting.venue,
+          agenda: meeting.agenda,
+          createdBy: meeting.created_by,
+        },
+        recipients
+      );
+      playNotificationSound(0.5);
+    }
+
+    toast.success('Status updated successfully');
+    fetchMeetings();
   };
 
   const openAttendanceDialog = (meeting: Meeting) => {
