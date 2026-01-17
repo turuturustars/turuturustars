@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2 } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X } from 'lucide-react';
 
 interface Contribution {
   id: string;
@@ -47,6 +47,7 @@ const ContributionsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPendingViewOpen, setIsPendingViewOpen] = useState(false);
   
   const [newContribution, setNewContribution] = useState({
     amount: '',
@@ -250,7 +251,7 @@ const ContributionsPage = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setIsPendingViewOpen(true)}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -347,6 +348,111 @@ const ContributionsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Pending Payments Modal Dialog */}
+      <Dialog open={isPendingViewOpen} onOpenChange={setIsPendingViewOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Pending Payments</DialogTitle>
+              <button
+                onClick={() => setIsPendingViewOpen(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-yellow-800">Total Pending Amount</p>
+                  <p className="text-3xl font-bold text-yellow-700">
+                    KES {stats.pending.toLocaleString()}
+                  </p>
+                </div>
+                <Clock className="w-12 h-12 text-yellow-500 opacity-30" />
+              </div>
+            </div>
+
+            {/* Pending Contributions List */}
+            {contributions.filter((c) => c.status === 'pending').length === 0 ? (
+              <div className="text-center py-8">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <p className="text-lg font-medium text-foreground">No Pending Payments!</p>
+                <p className="text-muted-foreground mt-1">You are all caught up</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {contributions
+                  .filter((c) => c.status === 'pending')
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((contribution) => (
+                    <div
+                      key={contribution.id}
+                      className="p-4 border border-yellow-200 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4 mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-foreground">
+                              {contribution.contribution_type.replace('_', ' ').toUpperCase()}
+                            </p>
+                            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-300">
+                              Pending
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(contribution.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-yellow-700">
+                            KES {contribution.amount.toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {contribution.notes && (
+                        <p className="text-xs text-muted-foreground mb-3 p-2 bg-white rounded border border-yellow-100">
+                          {contribution.notes}
+                        </p>
+                      )}
+
+                      {/* Pay Button */}
+                      <div className="flex justify-end">
+                        <PayWithMpesa
+                          contributionId={contribution.id}
+                          defaultAmount={contribution.amount}
+                          trigger={
+                            <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
+                              <DollarSign className="w-4 h-4 mr-2" />
+                              Pay Now
+                            </Button>
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Close Button */}
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={() => setIsPendingViewOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Payment handled by PayWithMpesa component */}
     </div>
