@@ -181,10 +181,11 @@ const WelfarePage = () => {
           *,
           beneficiary:beneficiary_id (full_name, id)
         `)
-        .eq('status', 'active')
+        .in('status', ['active', 'pending', 'open', null])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('Fetched welfare cases:', data);
       setCases(data || []);
     } catch (error) {
       console.error('Error fetching welfare cases:', error);
