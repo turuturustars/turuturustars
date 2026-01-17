@@ -18,6 +18,8 @@ import {
   ChevronDown,
   X,
   Menu,
+  MessageCircle,
+  Vote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -53,6 +55,8 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     { label: 'Contributions', href: '/dashboard/contributions', icon: DollarSign, badge: null },
     { label: 'Welfare Cases', href: '/dashboard/welfare', icon: HandHeart, badge: null },
     { label: 'Announcements', href: '/dashboard/announcements', icon: Bell, badge: 'new' },
+    { label: 'Voting', href: '/dashboard/voting', icon: Vote, badge: null },
+    { label: 'Private Messages', href: '/dashboard/communication/messages', icon: MessageCircle, badge: null },
     { label: 'Profile', href: '/dashboard/profile', icon: Settings, badge: null },
   ];
 
@@ -61,6 +65,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       return [
         { label: 'Chair Dashboard', href: `/dashboard/chairperson`, icon: Star },
         { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
         { label: 'Meetings', href: '/dashboard/meetings', icon: FileText },
         { label: 'Announcements', href: '/dashboard/announcements', icon: Bell },
       ];
@@ -85,6 +90,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     if (hasRole(userRoles, 'treasurer')) {
       return [
         { label: 'Treasury', href: `/dashboard/treasurer-role`, icon: PiggyBank },
+        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
         { label: 'Payments', href: '/dashboard/mpesa-management', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/reports', icon: TrendingUp },
       ];
@@ -108,6 +114,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       return [
         { label: 'Admin Dashboard', href: `/dashboard/admin`, icon: Settings },
         { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
         { label: 'Payments', href: '/dashboard/mpesa-management', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/reports', icon: FileText },
         { label: 'Approvals', href: '/dashboard/approvals', icon: UserCheck },
