@@ -42,7 +42,15 @@ export type PermissionKey =
   | 'send_payment'
   | 'handover_role'
   | 'approve_reports'
-  | 'manage_voting';
+  | 'manage_voting'
+  | 'create_voting'
+  | 'cast_vote'
+  | 'view_voting_results'
+  | 'create_welfare'
+  | 'manage_welfare'
+  | 'manage_welfare_transactions'
+  | 'refund_welfare'
+  | 'record_welfare_payment';
 
 // Role hierarchy for permission inheritance
 export const roleHierarchy: Record<UserRole, UserRole[]> = {
@@ -86,6 +94,14 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'handover_role',
     'approve_reports',
     'manage_voting',
+    'create_voting',
+    'cast_vote',
+    'view_voting_results',
+    'create_welfare',
+    'manage_welfare',
+    'manage_welfare_transactions',
+    'refund_welfare',
+    'record_welfare_payment',
   ],
   'chairperson': [
     'view_member_registry',
@@ -100,6 +116,15 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'send_chat_messages',
     'view_disciplines',
     'approve_reports',
+    'manage_voting',
+    'create_voting',
+    'cast_vote',
+    'view_voting_results',
+    'create_welfare',
+    'manage_welfare',
+    'manage_welfare_transactions',
+    'refund_welfare',
+    'record_welfare_payment',
   ],
   'vice_chairperson': [
     'view_member_registry',
@@ -115,21 +140,32 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'view_disciplines',
     'approve_reports',
     'manage_voting',
+    'create_voting',
+    'cast_vote',
+    'view_voting_results',
   ],
   'secretary': [
     'view_member_registry',
     'manage_secretary_tasks',
     'handle_correspondence',
     'record_minutes',
+    'send_announcements',
     'view_announcements',
     'view_chat',
     'send_chat_messages',
+    'manage_voting',
+    'create_voting',
+    'cast_vote',
+    'view_voting_results',
+    'create_welfare',
+    'manage_welfare',
   ],
   'vice_secretary': [
     'view_member_registry',
     'manage_secretary_tasks',
     'handle_correspondence',
     'record_minutes',
+    'send_announcements',
     'view_announcements',
     'view_chat',
     'send_chat_messages',
@@ -140,9 +176,15 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'manage_payments',
     'process_payments',
     'view_all_contributions',
+    'send_announcements',
     'view_announcements',
     'view_chat',
     'send_chat_messages',
+    'create_welfare',
+    'manage_welfare',
+    'manage_welfare_transactions',
+    'refund_welfare',
+    'record_welfare_payment',
   ],
   'organizing_secretary': [
     'view_member_registry',
@@ -152,9 +194,14 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'create_meetings',
     'manage_meetings',
     'view_all_contributions',
+    'send_announcements',
     'view_announcements',
     'view_chat',
     'send_chat_messages',
+    'manage_voting',
+    'create_voting',
+    'cast_vote',
+    'view_voting_results',
   ],
   'committee_member': [
     'raise_issues',
@@ -162,12 +209,16 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'view_chat',
     'send_chat_messages',
     'view_my_contributions',
+    'cast_vote',
+    'view_voting_results',
   ],
   'patron': [
     'view_patron_dashboard',
     'view_announcements',
     'view_chat',
     'send_chat_messages',
+    'create_welfare',
+    'manage_welfare',
   ],
   'member': [
     'view_announcements',
@@ -176,6 +227,8 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'raise_issues',
     'view_my_contributions',
     'send_payment',
+    'cast_vote',
+    'view_voting_results',
   ],
 };
 

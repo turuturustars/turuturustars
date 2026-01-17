@@ -52,6 +52,7 @@ const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
 // Feature pages
 const ContributionsPage = lazy(() => import("./pages/dashboard/ContributionsPage"));
 const WelfarePage = lazy(() => import("./pages/dashboard/WelfarePage"));
+const WelfareManagement = lazy(() => import("./pages/dashboard/WelfareManagement"));
 const ProfilePage = lazy(() => import("./pages/dashboard/ProfilePage"));
 const AnnouncementsPage = lazy(() => import("./pages/dashboard/AnnouncementsPage"));
 const MembersPage = lazy(() => import("./pages/dashboard/MembersPage"));
@@ -137,6 +138,7 @@ const App = () => {
                   <Route path="members">
                     <Route index element={<MembersPage />} />
                     <Route path="welfare" element={<WelfarePage />} />
+                    <Route path="welfare-management" element={<WelfareManagement />} />
                     <Route path="discipline" element={<DisciplinePage />} />
                   </Route>
 

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, MessageCircle, Users, ChevronDown, Circle, Sparkles } from 'lucide-react';
+import { X, MessageCircle, Users, ChevronDown, Circle, Sparkles, Send } from 'lucide-react';
+import ChatWindowEnhanced from './ChatWindowEnhanced';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { useAuth } from '@/hooks/useAuth';
 
 // Mock components - replace with your actual imports
 const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, title, disabled }: any) => (
@@ -79,9 +82,14 @@ const ChatInput = ({ onSend }: any) => {
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
     setIsSending(true);
-    await onSend(text);
-    setText('');
-    setIsSending(false);
+    try {
+      await onSend(text);
+      setText('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -105,7 +113,7 @@ const ChatInput = ({ onSend }: any) => {
           {isSending ? (
             <Circle className="w-4 h-4 animate-spin" />
           ) : (
-            <span className="font-semibold">Send</span>
+            <Send className="w-4 h-4" />
           )}
         </Button>
       </div>
@@ -115,20 +123,10 @@ const ChatInput = ({ onSend }: any) => {
 
 // Main Component
 export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
-  const [messages] = useState([
-    { userId: '1', userName: 'Alice Johnson', text: 'Hey everyone! How is everyone doing today?', timestamp: Date.now() - 300000 },
-    { userId: '2', userName: 'Bob Smith', text: 'Great! Just finished a new project. Feeling accomplished! 🎉', timestamp: Date.now() - 240000 },
-    { userId: '3', userName: 'You', text: 'That\'s awesome Bob! What was the project about?', timestamp: Date.now() - 180000 },
-  ]);
-  const [isLoading] = useState(false);
-  const [onlineUsers] = useState(['1', '2', '3', '4', '5', '6', '7', '8']);
-  const user = { id: '3' };
+  const { user } = useAuth();
+  const { messages, isLoading, typingUsers, onlineUsers, sendMessage, toggleReaction } = useRealtimeChat('global');
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
-
-  const sendMessage = async (text: string) => {
-    console.log('Sending:', text);
-  };
 
   return (
     <aside
@@ -257,7 +255,13 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
       {/* Chat Messages with Custom Scrollbar */}
       <div className="flex-1 overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-muted/20 pointer-events-none" />
-        <ChatWindow messages={messages} meId={user?.id ?? null} isLoading={isLoading} />
+        <ChatWindowEnhanced 
+          messages={messages} 
+          meId={user?.id ?? null} 
+          isLoading={isLoading}
+          typingUsers={typingUsers}
+          onToggleReaction={toggleReaction}
+        />
       </div>
 
       {/* Enhanced Chat Input */}
