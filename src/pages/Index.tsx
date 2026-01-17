@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import Header from '@/components/Header';
 import ScrollProgressIndicator from '@/components/ScrollProgressIndicator';
 import HeroSection from '@/components/HeroSection';
