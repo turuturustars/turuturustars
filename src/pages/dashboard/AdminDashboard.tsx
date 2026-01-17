@@ -56,9 +56,9 @@ const AdminDashboard = () => {
 
       // Get active members (status = 'active')
       const { count: activeCount } = await supabase
-        .from('user_roles')
+        .from('profiles')
         .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
+        .eq('status', 'active');
 
       // Get upcoming meetings (status = 'scheduled')
       const { data: upcomingData } = await supabase
@@ -67,9 +67,9 @@ const AdminDashboard = () => {
         .eq('status', 'scheduled')
         .gt('scheduled_date', new Date().toISOString());
 
-      // Get pending approvals
+      // Get pending approvals (using profiles with pending status)
       const { count: approvalsCount } = await supabase
-        .from('member_applications')
+        .from('profiles')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 

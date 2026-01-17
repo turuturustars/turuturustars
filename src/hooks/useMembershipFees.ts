@@ -5,14 +5,13 @@ export interface MembershipFee {
   id: string;
   member_id: string;
   amount: number;
-  fee_type: 'initial' | 'renewal';
-  due_date: string;
+  contribution_type: string;
+  due_date: string | null;
   paid_at: string | null;
-  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
-  payment_reference: string | null;
+  status: 'pending' | 'paid' | 'missed';
+  reference_number: string | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
 }
 
 export const useMembershipFees = (memberId?: string) => {
@@ -21,19 +20,23 @@ export const useMembershipFees = (memberId?: string) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!memberId) return;
+    if (!memberId) {
+      setLoading(false);
+      return;
+    }
 
     const fetchMembershipFees = async () => {
       try {
         setLoading(true);
         const { data, error } = await supabase
-          .from('membership_fees')
+          .from('contributions')
           .select('*')
           .eq('member_id', memberId)
+          .eq('contribution_type', 'membership_fee')
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setFees(data || []);
+        setFees((data as MembershipFee[]) || []);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to fetch membership fees';
         setError(message);
@@ -53,12 +56,15 @@ export const useMembershipFees = (memberId?: string) => {
         {
           event: '*',
           schema: 'public',
-          table: 'membership_fees',
+          table: 'contributions',
           filter: `member_id=eq.${memberId}`,
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            setFees((prev) => [payload.new as MembershipFee, ...prev]);
+            const newRecord = payload.new as MembershipFee;
+            if (newRecord.contribution_type === 'membership_fee') {
+              setFees((prev) => [newRecord, ...prev]);
+            }
           } else if (payload.eventType === 'UPDATE') {
             setFees((prev) =>
               prev.map((fee) => (fee.id === payload.new.id ? (payload.new as MembershipFee) : fee))
@@ -79,14 +85,15 @@ export const useMembershipFees = (memberId?: string) => {
 };
 
 export const getMembershipFeeStatus = (fee: MembershipFee): string => {
-  const dueDate = new Date(fee.due_date);
-  const today = new Date();
-  
   if (fee.status === 'paid') return 'Paid';
-  if (fee.status === 'cancelled') return 'Cancelled';
+  if (fee.status === 'missed') return 'Missed';
   
-  if (today > dueDate) {
-    return 'Overdue';
+  if (fee.due_date) {
+    const dueDate = new Date(fee.due_date);
+    const today = new Date();
+    if (today > dueDate) {
+      return 'Overdue';
+    }
   }
   
   return 'Pending';
@@ -97,11 +104,10 @@ export const getMembershipFeeColor = (status: string): string => {
     case 'Paid':
       return 'text-green-600 bg-green-50';
     case 'Overdue':
+    case 'Missed':
       return 'text-red-600 bg-red-50';
     case 'Pending':
       return 'text-yellow-600 bg-yellow-50';
-    case 'Cancelled':
-      return 'text-gray-600 bg-gray-50';
     default:
       return 'text-gray-600 bg-gray-50';
   }

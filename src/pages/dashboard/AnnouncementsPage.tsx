@@ -56,13 +56,13 @@ const AnnouncementsPage = () => {
       
       // Fetch creator information for each announcement
       if (data && data.length > 0) {
-        const creatorIds = [...new Set(data.map((a: any) => a.created_by))];
+        const creatorIds = [...new Set(data.map((a: any) => a.created_by).filter(Boolean))] as string[];
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name')
           .in('id', creatorIds);
 
-        const profileMap = new Map(profiles?.map((p: any) => [p.id, p]) || []);
+        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
         
         const announcementsWithCreators = data.map((a: any) => ({
           ...a,

@@ -128,7 +128,7 @@ export const getMeetingOfficials = async (): Promise<string[]> => {
       .in('role', [
         'admin',
         'chairperson',
-        'vice_chairperson',
+        'vice_chairman',
         'secretary',
         'vice_secretary',
         'treasurer',
