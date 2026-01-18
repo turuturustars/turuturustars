@@ -24,7 +24,7 @@ const Header = () => {
     { label: 'Pillars', href: '/pillars' },
     { label: 'Leadership', href: '/leadership' },
     { label: 'Careers', href: '/careers' },
-    { label: 'Register', href: '/auth' },
+    { label: 'Register', href: '/register' },
   ];
 
   const closeMenus = () => {

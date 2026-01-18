@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Star, Loader2, Eye, EyeOff, CheckCircle, Phone, MapPin, Briefcase } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import ForgotPassword from '@/components/ForgotPassword';
 
 // Location options
 const LOCATIONS = [
@@ -66,6 +67,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   
   // Phone verification states
   const [verificationStep, setVerificationStep] = useState<'form' | 'verify' | 'verified'>('form');
@@ -243,11 +245,11 @@ const Auth = () => {
           }
         }
       } else {
-        const redirectUrl = `${window.location.origin}/dashboard`;
+        const redirectUrl = `${globalThis.location.origin}/dashboard`;
         const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
         
         // Use phone as email if no email provided
-        const emailToUse = formData.email || `${formData.phone.replace(/\D/g, '')}@turuturustars.co.ke`;
+        const emailToUse = formData.email || `${formData.phone.replaceAll(/\D/g, '')}@turuturustars.co.ke`;
         
         const { error } = await supabase.auth.signUp({
           email: emailToUse,
@@ -287,9 +289,11 @@ const Auth = () => {
         }
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+      console.error('Authentication error:', error);
       toast({
         title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
+        description: errorMsg,
         variant: 'destructive',
       });
     } finally {
@@ -302,27 +306,34 @@ const Auth = () => {
     setVerificationCode('');
   };
 
+  const getButtonText = (): string => {
+    return isLogin ? 'Sign In' : 'Create Account';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-hero">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-elevated">
-              <Star className="w-8 h-8 text-primary-foreground" />
+      {isForgotPassword ? (
+        <ForgotPassword onBack={() => setIsForgotPassword(false)} />
+      ) : (
+        <Card className="w-full max-w-md shadow-hero">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-elevated">
+                <Star className="w-8 h-8 text-primary-foreground" />
+              </div>
             </div>
-          </div>
-          <div>
-            <CardTitle className="heading-display text-2xl">
-              {isLogin ? 'Welcome Back' : 'Join Turuturu Stars'}
-            </CardTitle>
-            <CardDescription className="mt-2">
-              {isLogin
-                ? 'Sign in to access your member dashboard'
-                : 'Create your account to become a member'}
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
+            <div>
+              <CardTitle className="heading-display text-2xl">
+                {isLogin ? 'Welcome Back' : 'Join Turuturu Stars'}
+              </CardTitle>
+              <CardDescription className="mt-2">
+                {isLogin
+                  ? 'Sign in to access your member dashboard'
+                  : 'Create your account to become a member'}
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <>
@@ -406,7 +417,7 @@ const Auth = () => {
                         id="verificationCode"
                         placeholder="Enter 6-digit code"
                         value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onChange={(e) => setVerificationCode(e.target.value.replaceAll(/\D/g, '').slice(0, 6))}
                         className="flex-1"
                         maxLength={6}
                       />
@@ -498,7 +509,10 @@ const Auth = () => {
                 <div className="space-y-2">
                   <Label htmlFor="email">
                     Email Address
-                    <span className="text-xs text-muted-foreground ml-2">(Optional)</span>
+                    {' '}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (Optional)
+                    </span>
                   </Label>
                   <Input
                     id="email"
@@ -558,6 +572,19 @@ const Auth = () => {
               )}
             </div>
 
+            {/* Forgot Password link (Login only) */}
+            {isLogin && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(true)}
+                  className="text-xs text-primary hover:underline transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
             {/* Confirm Password (Registration only) */}
             {!isLogin && (
               <div className="space-y-2">
@@ -596,7 +623,7 @@ const Auth = () => {
                   {isLogin ? 'Signing in...' : 'Creating account...'}
                 </>
               ) : (
-                isLogin ? 'Sign In' : 'Create Account'
+                getButtonText()
               )}
             </Button>
           </form>
@@ -617,6 +644,7 @@ const Auth = () => {
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 };

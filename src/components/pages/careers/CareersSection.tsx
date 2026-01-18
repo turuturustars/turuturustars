@@ -15,8 +15,8 @@ interface Job {
 }
 
 const CareersSection = () => {
-  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation();
-  const { ref: jobsRef, isVisible: jobsVisible } = useScrollAnimation();
+  const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation(),
+    { ref: jobsRef, isVisible: jobsVisible } = useScrollAnimation();
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
 
   const jobs: Job[] = [

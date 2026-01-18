@@ -9,7 +9,7 @@ const Footer = () => {
     { label: 'About Us', href: '/about' },
     { label: 'Our Pillars', href: '/pillars' },
     { label: 'Leadership', href: '/leadership' },
-    { label: 'Join Us', href: '/auth' },
+    { label: 'Join Us', href: '/register' },
   ];
 
   const socialLinks = [
