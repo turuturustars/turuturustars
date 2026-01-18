@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -22,7 +21,7 @@ interface VotingMotion {
   title: string;
   description: string | null;
   motion_type: string;
-  voting_type: string; // 'agenda', 'election', 'resolution', 'dispute'
+  voting_type: string;
   status: string;
   votes_for: number;
   votes_against: number;
@@ -41,7 +40,7 @@ interface UserVote {
   motion_id: string;
   member_id: string;
   vote: string;
-  created_at: string;
+  voted_at: string | null;
 }
 
 interface Meeting {
@@ -80,7 +79,6 @@ export default function VotingPage() {
       fetchUserVotes();
     }
 
-    // Real-time subscription for votes
     const channel = supabase
       .channel('voting_updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => {
@@ -108,7 +106,6 @@ export default function VotingPage() {
       toast.error('Failed to fetch motions');
       console.error('Error fetching voting motions:', error);
     } else {
-      console.log('Fetched voting motions:', data);
       setMotions((data as VotingMotion[]) || []);
     }
     setIsLoading(false);
@@ -126,7 +123,7 @@ export default function VotingPage() {
   const fetchUserVotes = async () => {
     const { data } = await supabase
       .from('votes')
-      .select('id, motion_id, member_id, vote, created_at')
+      .select('id, motion_id, member_id, vote, voted_at')
       .eq('member_id', user?.id);
     setUserVotes((data as UserVote[]) || []);
   };
@@ -180,7 +177,6 @@ export default function VotingPage() {
   };
 
   const closeVoting = async (motion: VotingMotion) => {
-    const totalVotes = motion.votes_for + motion.votes_against;
     let finalStatus: string;
 
     if (motion.votes_for > motion.votes_against) {
@@ -222,7 +218,6 @@ export default function VotingPage() {
       return;
     }
 
-    // Update the motion vote counts
     const motion = motions.find(m => m.id === motionId);
     if (motion) {
       const updateField = vote === 'for' ? 'votes_for' : vote === 'against' ? 'votes_against' : 'votes_abstain';
@@ -472,78 +467,99 @@ export default function VotingPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <CardTitle className="text-lg">{motion.title}</CardTitle>
                           {motion.is_confidential && (
-                            <Lock className="h-4 w-4 text-gray-500" title="Confidential Vote" />
+                            <Lock className="h-4 w-4 text-muted-foreground" aria-label="Confidential voting" />
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-wrap gap-2">
+                          {getStatusBadge(motion.status)}
                           {getVotingTypeBadge(motion.voting_type)}
                           {getMotionTypeBadge(motion.motion_type)}
-                          {getStatusBadge(motion.status)}
                         </div>
-                        {motion.description && <CardDescription>{motion.description}</CardDescription>}
                       </div>
-                      <div className="flex gap-2">
-                        {canManage && (
-                          <Button variant="outline" size="sm" onClick={() => closeVoting(motion)}>
-                            Close Voting
-                          </Button>
-                        )}
-                        {canViewResults && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => setShowVoteDetails(showDetails ? null : motion.id)}
-                          >
-                            {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                          </Button>
-                        )}
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowVoteDetails(showDetails ? null : motion.id)}
+                      >
+                        {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
                     </div>
+                    {motion.description && (
+                      <CardDescription className="mt-2">{motion.description}</CardDescription>
+                    )}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Vote Count Display */}
                     {showDetails && canViewResults && (
-                      <div className="space-y-2 p-4 bg-gray-50 rounded-lg">
-                        <div className="flex justify-between text-sm font-semibold">
-                          <span className="text-green-600">For: {motion.votes_for}</span>
-                          <span className="text-red-600">Against: {motion.votes_against}</span>
-                          <span className="text-gray-600">Abstain: {motion.votes_abstain}</span>
+                      <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>For</span>
+                          <span className="font-semibold text-green-600">{motion.votes_for}</span>
                         </div>
-                        <div className="flex gap-1 h-4">
-                          <div className="bg-green-500 rounded-l" style={{ width: `${forPercent}%` }} />
-                          <div className="bg-red-500" style={{ width: `${againstPercent}%` }} />
-                          <div className="bg-gray-300 rounded-r" style={{ width: `${100 - forPercent - againstPercent}%` }} />
+                        <Progress value={forPercent} className="h-2 bg-gray-200" />
+                        
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Against</span>
+                          <span className="font-semibold text-red-600">{motion.votes_against}</span>
                         </div>
-                        <p className="text-sm text-muted-foreground text-center">
+                        <Progress value={againstPercent} className="h-2 bg-gray-200" />
+                        
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Abstain</span>
+                          <span className="font-semibold text-gray-600">{motion.votes_abstain}</span>
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground text-center pt-2">
                           Total votes: {totalVotes}
                         </p>
                       </div>
                     )}
 
-                    {/* Voting Buttons */}
-                    {voted ? (
-                      <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-sm text-green-900">
-                          <CheckCircle className="h-4 w-4 inline mr-2" />
-                          Your vote has been recorded confidentially
-                        </p>
-                        <p className="text-xs text-green-800 mt-1">Votes cannot be changed to maintain confidentiality</p>
+                    {canVote && !voted && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          onClick={() => castVote(motion.id, 'for')}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                          Vote For
+                        </Button>
+                        <Button
+                          onClick={() => castVote(motion.id, 'against')}
+                          variant="destructive"
+                          className="flex-1"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Vote Against
+                        </Button>
+                        <Button
+                          onClick={() => castVote(motion.id, 'abstain')}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          <MinusCircle className="h-4 w-4 mr-2" />
+                          Abstain
+                        </Button>
                       </div>
-                    ) : canVote ? (
-                      <div className="flex gap-2 justify-center flex-wrap">
-                        <Button className="bg-green-600 hover:bg-green-700" onClick={() => castVote(motion.id, 'for')}>
-                          <CheckCircle className="h-4 w-4 mr-2" />For
-                        </Button>
-                        <Button variant="destructive" onClick={() => castVote(motion.id, 'against')}>
-                          <XCircle className="h-4 w-4 mr-2" />Against
-                        </Button>
-                        <Button variant="outline" onClick={() => castVote(motion.id, 'abstain')}>
-                          <MinusCircle className="h-4 w-4 mr-2" />Abstain
-                        </Button>
+                    )}
+
+                    {voted && (
+                      <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                        <CheckCircle className="h-5 w-5 text-green-600" />
+                        <span className="text-sm text-green-800">
+                          You voted: <span className="font-semibold capitalize">{myVote}</span>
+                        </span>
                       </div>
-                    ) : (
-                      <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                        <p className="text-sm text-yellow-900">You don't have permission to vote on this motion</p>
+                    )}
+
+                    {canManage && (
+                      <div className="flex gap-2 pt-2 border-t">
+                        <Button
+                          onClick={() => closeVoting(motion)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Close Voting
+                        </Button>
                       </div>
                     )}
                   </CardContent>
@@ -551,33 +567,6 @@ export default function VotingPage() {
               );
             })
           )}
-
-          {/* Tied Motions Section */}
-          {motions.filter(m => m.status === 'tied' && !m.tie_breaker_vote).map(motion => (
-            <Card key={motion.id} className="border-yellow-500 border-l-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {motion.title}
-                  {getStatusBadge('tied')}
-                </CardTitle>
-                <CardDescription>This motion is tied and requires a tie-breaker vote from the Chair</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isChair ? (
-                  <div className="flex gap-2 justify-center">
-                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => castTieBreaker(motion.id, 'for')}>
-                      <Gavel className="h-4 w-4 mr-2" />Break Tie - For
-                    </Button>
-                    <Button variant="destructive" onClick={() => castTieBreaker(motion.id, 'against')}>
-                      <Gavel className="h-4 w-4 mr-2" />Break Tie - Against
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground">Awaiting Chairman's tie-breaker vote...</p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
         </TabsContent>
 
         <TabsContent value="pending" className="space-y-4">
@@ -585,35 +574,26 @@ export default function VotingPage() {
             <Card><CardContent className="pt-6 text-center text-muted-foreground">No pending motions</CardContent></Card>
           ) : (
             pendingMotions.map(motion => (
-              <Card key={motion.id} className="border-l-4 border-l-gray-500">
+              <Card key={motion.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle className="flex items-center gap-2 mb-2">
-                        {motion.title}
-                        {motion.is_confidential && (
-                          <Lock className="h-4 w-4 text-gray-500" />
-                        )}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mb-2">
-                        {getVotingTypeBadge(motion.voting_type)}
-                        {getMotionTypeBadge(motion.motion_type)}
+                      <CardTitle className="text-lg">{motion.title}</CardTitle>
+                      <div className="flex flex-wrap gap-2 mt-2">
                         {getStatusBadge(motion.status)}
+                        {getVotingTypeBadge(motion.voting_type)}
                       </div>
-                      {motion.description && <CardDescription>{motion.description}</CardDescription>}
                     </div>
                     {canManage && (
-                      <Button onClick={() => openVoting(motion.id)} className="bg-blue-600 hover:bg-blue-700">
-                        <Vote className="h-4 w-4 mr-2" />Open Voting
+                      <Button onClick={() => openVoting(motion.id)} size="sm">
+                        Open Voting
                       </Button>
                     )}
                   </div>
+                  {motion.description && (
+                    <CardDescription>{motion.description}</CardDescription>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Created {format(new Date(motion.created_at), 'PPp')}
-                  </p>
-                </CardContent>
               </Card>
             ))
           )}
@@ -624,79 +604,58 @@ export default function VotingPage() {
             <Card><CardContent className="pt-6 text-center text-muted-foreground">No closed motions</CardContent></Card>
           ) : (
             closedMotions.map(motion => {
-              const totalVotes = motion.votes_for + motion.votes_against + motion.votes_abstain;
-              const forPercent = totalVotes > 0 ? (motion.votes_for / totalVotes) * 100 : 0;
-
+              const isTied = motion.status === 'tied';
+              
               return (
-                <Card key={motion.id} className="border-l-4 border-l-green-500">
+                <Card key={motion.id} className={motion.status === 'passed' ? 'border-l-4 border-l-green-500' : motion.status === 'failed' ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-yellow-500'}>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      {motion.title}
-                      {motion.is_confidential && (
-                        <Lock className="h-4 w-4 text-gray-500" />
-                      )}
-                      {getVotingTypeBadge(motion.voting_type)}
-                      {getMotionTypeBadge(motion.motion_type)}
-                      {getStatusBadge(motion.status)}
-                    </CardTitle>
-                    {motion.description && <CardDescription>{motion.description}</CardDescription>}
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-2xl font-bold text-green-600">{motion.votes_for}</p>
-                        <p className="text-sm text-muted-foreground">For</p>
+                        <CardTitle className="text-lg">{motion.title}</CardTitle>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {getStatusBadge(motion.status)}
+                          {getVotingTypeBadge(motion.voting_type)}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-2xl font-bold text-red-600">{motion.votes_against}</p>
-                        <p className="text-sm text-muted-foreground">Against</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-gray-600">{motion.votes_abstain}</p>
-                        <p className="text-sm text-muted-foreground">Abstain</p>
+                      <div className="text-right text-sm text-muted-foreground">
+                        <p>For: {motion.votes_for}</p>
+                        <p>Against: {motion.votes_against}</p>
+                        <p>Abstain: {motion.votes_abstain}</p>
                       </div>
                     </div>
-
-                    {motion.tie_breaker_vote && (
+                  </CardHeader>
+                  {isTied && isChair && !motion.tie_breaker_vote && (
+                    <CardContent>
                       <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <p className="text-sm text-center text-yellow-900">
-                          <Gavel className="h-4 w-4 inline mr-2" />
-                          Tie broken by Chairman: <strong className="capitalize">{motion.tie_breaker_vote}</strong>
+                        <p className="text-sm text-yellow-800 mb-3">
+                          <Gavel className="inline h-4 w-4 mr-1" />
+                          As chairperson, you may cast the tie-breaking vote.
                         </p>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => castTieBreaker(motion.id, 'for')}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            Break Tie: For
+                          </Button>
+                          <Button
+                            onClick={() => castTieBreaker(motion.id, 'against')}
+                            size="sm"
+                            variant="destructive"
+                          >
+                            Break Tie: Against
+                          </Button>
+                        </div>
                       </div>
-                    )}
-
-                    {motion.closed_at && (
-                      <p className="text-sm text-center text-muted-foreground">
-                        Closed {format(new Date(motion.closed_at), 'PPp')}
-                      </p>
-                    )}
-                  </CardContent>
+                    </CardContent>
+                  )}
                 </Card>
               );
             })
           )}
         </TabsContent>
       </Tabs>
-
-      {/* Confidentiality Notice */}
-      <Card className="bg-blue-50 border-blue-200">
-        <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <Lock className="h-6 w-6 text-blue-600 flex-shrink-0 mt-1" />
-            <div>
-              <h3 className="font-semibold text-blue-900 mb-2">Voting Confidentiality Policy</h3>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>✓ All votes are strictly confidential and recorded anonymously</li>
-                <li>✓ Individual vote details are never disclosed publicly</li>
-                <li>✓ Once a vote is cast, it cannot be changed or withdrawn</li>
-                <li>✓ Vote tallies are shown only after voting is closed or by authorized officials</li>
-                <li>✓ No individual vote tracking - only aggregated results are available</li>
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

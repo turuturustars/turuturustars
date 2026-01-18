@@ -29,7 +29,6 @@ const Header = () => {
 
   const closeMenus = () => {
     setIsMenuOpen(false);
-    setOpenDropdown(null);
   };
 
   return (

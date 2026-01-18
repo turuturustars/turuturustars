@@ -1,1 +1,19 @@
 project_id = "oxfkntgntgsebxbpfeyh"
+
+[functions.mpesa]
+verify_jwt = false
+
+[functions.mpesa-callback]
+verify_jwt = false
+
+[functions.mpesa-confirmation]
+verify_jwt = false
+
+[functions.mpesa-validation]
+verify_jwt = false
+
+[functions.cloudinary-upload]
+verify_jwt = false
+
+[functions.twilio-verify]
+verify_jwt = false

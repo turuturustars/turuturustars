@@ -19,6 +19,7 @@ interface WelfareCase {
   collected_amount: number;
   status: string;
   created_at: string;
+  beneficiary_id: string | null;
   beneficiary: {
     full_name: string;
   } | null;
@@ -142,7 +143,7 @@ const WelfarePage = () => {
       description: welfareCase.description || '',
       case_type: welfareCase.case_type,
       target_amount: welfareCase.target_amount ? welfareCase.target_amount.toString() : '',
-      beneficiary_id: welfareCase.beneficiary?.id || '',
+      beneficiary_id: welfareCase.beneficiary_id || '',
     });
     setIsEditingId(welfareCase.id);
     setIsDialogOpen(true);
@@ -180,7 +181,7 @@ const WelfarePage = () => {
         .from('welfare_cases')
         .select(`
           *,
-          beneficiary:beneficiary_id (full_name, id)
+          beneficiary:beneficiary_id (full_name)
         `)
         .order('created_at', { ascending: false });
 
@@ -302,11 +303,11 @@ const WelfarePage = () => {
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Progress</span>
                         <span className="font-medium">
-                          KES {welfareCase.collected_amount.toLocaleString()} / {welfareCase.target_amount!.toLocaleString()}
+                          KES {(welfareCase.collected_amount || 0).toLocaleString()} / {welfareCase.target_amount!.toLocaleString()}
                         </span>
                       </div>
                       <Progress
-                        value={(welfareCase.collected_amount / welfareCase.target_amount!) * 100}
+                        value={((welfareCase.collected_amount || 0) / welfareCase.target_amount!) * 100}
                         className="h-2"
                       />
                     </div>
@@ -335,7 +336,7 @@ const WelfarePage = () => {
                       <div>
                         <p className="font-medium">{welfareCase.title}</p>
                         <p className="text-sm text-muted-foreground">
-                          Collected: KES {welfareCase.collected_amount.toLocaleString()}
+                          Collected: KES {(welfareCase.collected_amount || 0).toLocaleString()}
                         </p>
                       </div>
                     </div>
@@ -443,34 +444,20 @@ const WelfarePage = () => {
                       className="mt-1"
                     />
                   </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={handleSaveWelfareCase}
-                      disabled={isSaving}
-                      className="flex-1"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          {isEditingId ? 'Updating...' : 'Creating...'}
-                        </>
-                      ) : (
-                        isEditingId ? 'Update Case' : 'Create Case'
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsDialogOpen(false);
-                        setIsEditingId(null);
-                        setFormData({ title: '', description: '', case_type: 'medical', target_amount: '', beneficiary_id: '' });
-                        setError(null);
-                        setSuccess(null);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={handleSaveWelfareCase}
+                    disabled={isSaving}
+                    className="w-full"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      isEditingId ? 'Update Case' : 'Create Case'
+                    )}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -478,58 +465,15 @@ const WelfarePage = () => {
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <HandHeart className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{activeCases.length}</p>
-                <p className="text-sm text-muted-foreground">Active Cases</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  KES {activeCases.reduce((sum, c) => sum + (c.collected_amount || 0), 0).toLocaleString()}
-                </p>
-                <p className="text-sm text-muted-foreground">Total Collected</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{closedCases.length}</p>
-                <p className="text-sm text-muted-foreground">Cases Closed</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
+      ) : cases.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        renderCasesList()
       )}
-      {!isLoading && cases.length === 0 && renderEmptyState()}
-      {!isLoading && cases.length > 0 && renderCasesList()}
     </div>
   );
 };
