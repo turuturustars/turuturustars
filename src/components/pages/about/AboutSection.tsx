@@ -156,18 +156,14 @@ const AboutSection = () => {
                   The seed of Turuturu Stars CBO was planted on{' '}
                   <span className="inline-flex items-center gap-1.5 font-bold text-gray-900 bg-blue-50 px-2 py-0.5 rounded">
                     <Calendar className="w-4 h-4 text-blue-600" />
-                    29th December 2019
-                  </span>
-                  , born from a shared vision of unity and community transformation.
+                    29th December 2019</span>, born from a shared vision of unity and community transformation.
                 </p>
 
                 <p>
                   After years of careful planning and dedication, we were officially registered on{' '}
                   <span className="inline-flex items-center gap-1.5 font-bold text-gray-900 bg-blue-50 px-2 py-0.5 rounded">
                     <Award className="w-4 h-4 text-blue-600" />
-                    11th September 2023
-                  </span>
-                  , marking a defining milestone in our collective journey.
+                    11th September 2023</span>, marking a defining milestone in our collective journey.
                 </p>
 
                 <p>
@@ -201,7 +197,7 @@ const AboutSection = () => {
                   {timeline.map((item, i) => {
                     const Icon = item.icon;
                     return (
-                      <div key={i} className="relative flex gap-4 group">
+                      <div key={`timeline-${i}-${item.title}`} className="relative flex gap-4 group">
                         {i < timeline.length - 1 && (
                           <div className="absolute left-5 top-12 w-0.5 h-full bg-gray-200"></div>
                         )}
@@ -295,7 +291,7 @@ const AboutSection = () => {
           <div className="grid gap-4 sm:gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-5">
             {coreValues.map((value, index) => (
               <div
-                key={index}
+                key={`core-value-${value.title}`}
                 className={`group rounded-xl lg:rounded-2xl bg-white border border-gray-200 p-5 sm:p-6 text-center hover:shadow-lg hover:border-gray-300 transition-all duration-300 hover:-translate-y-1 ${
                   isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
                 }`}

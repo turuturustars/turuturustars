@@ -1,4 +1,4 @@
-import { Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Share2, Mail, Send, Video } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import logoImage from '@/assets/turuturustarslogo.png';
 
@@ -6,17 +6,17 @@ const Footer = () => {
   const { ref: contentRef, isVisible: contentVisible } = useScrollAnimation();
 
   const quickLinks = [
-    { label: 'About Us', href: '#about' },
-    { label: 'Our Pillars', href: '#pillars' },
-    { label: 'Leadership', href: '#leadership' },
-    { label: 'Join Us', href: '#join' },
+    { label: 'About Us', href: '/about' },
+    { label: 'Our Pillars', href: '/pillars' },
+    { label: 'Leadership', href: '/leadership' },
+    { label: 'Join Us', href: '/auth' },
   ];
 
   const socialLinks = [
-    { icon: Facebook, href: '#', label: 'Facebook' },
-    { icon: Twitter, href: '#', label: 'Twitter' },
-    { icon: Instagram, href: '#', label: 'Instagram' },
-    { icon: Youtube, href: '#', label: 'YouTube' },
+    { icon: Share2, href: '#', label: 'Facebook' },
+    { icon: Send, href: '#', label: 'Twitter' },
+    { icon: Mail, href: '#', label: 'Instagram' },
+    { icon: Video, href: '#', label: 'YouTube' },
   ];
 
   return (

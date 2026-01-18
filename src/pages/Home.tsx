@@ -1,15 +1,11 @@
 import Header from '@/components/Header';
 import ScrollProgressIndicator from '@/components/ScrollProgressIndicator';
 import HeroSection from '@/components/HeroSection';
-import AboutSection from '@/components/pages/about/AboutSection';
-import PillarsSection from '@/components/pages/pillars/PillarsSection';
-import ChairmanSection from '@/components/pages/leadership/ChairmanSection';
-import CareersSection from '@/components/pages/careers/CareersSection';
 import Footer from '@/components/Footer';
 import { StructuredData } from '@/components/StructuredData';
 import { usePageMeta } from '@/hooks/usePageMeta';
 
-const Index = () => {
+const Home = () => {
   usePageMeta({
     title: 'Turuturu Stars CBO - Community Based Organization Kenya',
     description: 'Join Turuturu Stars, a vibrant community organization dedicated to mutual help and growth. Manage contributions, welfare assistance, and community events.',
@@ -49,15 +45,10 @@ const Index = () => {
       <Header />
       <main role="main">
         <HeroSection />
-        <AboutSection />
-        <PillarsSection />
-        <ChairmanSection />
-        <CareersSection />
       </main>
       <Footer />
     </div>
   );
 };
 
-export default Index;
-
+export default Home;

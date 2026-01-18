@@ -35,6 +35,12 @@ const ErrorFallback = ({ error, resetErrorBoundary }: any) => (
 
 // Lazy-loaded components
 const Index = lazy(() => import("./pages/Index"));
+const Home = lazy(() => import("./pages/Home"));
+const About = lazy(() => import("./pages/About"));
+const Pillars = lazy(() => import("./pages/Pillars"));
+const Careers = lazy(() => import("./pages/Careers"));
+const Leadership = lazy(() => import("./pages/Leadership"));
+const Register = lazy(() => import("./pages/Register"));
 const Auth = lazy(() => import("./pages/Auth"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
@@ -85,16 +91,22 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => window.location.href = "/"}>
+    <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => globalThis.location.href = "/"}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<Index />} />
+                <Route path="/home" element={<Home />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/pillars" element={<Pillars />} />
+                <Route path="/careers" element={<Careers />} />
+                <Route path="/leadership" element={<Leadership />} />
+                <Route path="/register" element={<Register />} />
                 <Route path="/auth" element={<Auth />} />
 
                 {/* Dashboard routes */}

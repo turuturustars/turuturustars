@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
@@ -6,7 +7,7 @@ import turuturuLogo from '@/assets/turuturustarslogo.png';
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const location = useLocation();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,13 +17,14 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Updated to use proper routes for independent pages
   const mainNavLinks = [
-    { label: 'Home', href: '#home' },
-    { label: 'About', href: '#about' },
-    { label: 'Pillars', href: '#pillars' },
-    { label: 'Leadership', href: '#leadership' },
-    { label: 'Careers', href: '#careers' },
-    { label: 'Register', href: '#register' },
+    { label: 'Home', href: '/' },
+    { label: 'About', href: '/about' },
+    { label: 'Pillars', href: '/pillars' },
+    { label: 'Leadership', href: '/leadership' },
+    { label: 'Careers', href: '/careers' },
+    { label: 'Register', href: '/auth' },
   ];
 
   const closeMenus = () => {
@@ -39,7 +41,7 @@ const Header = () => {
       <div className="section-container">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo - Enhanced with Animation */}
-          <a href="#home" className="flex items-center gap-2 group flex-shrink-0">
+          <a href="/" className="flex items-center gap-2 group flex-shrink-0">
             <div className="relative">
               <img 
                 src={turuturuLogo} 
@@ -58,16 +60,25 @@ const Header = () => {
 
           {/* Desktop Navigation - Enhanced with Premium Feel */}
           <nav className="hidden lg:flex items-center gap-1">
-            {mainNavLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="relative px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-primary transition-colors duration-300 group smooth-color"
-              >
-                {link.label}
-                <span className="absolute bottom-0 left-0 w-0 h-1 bg-gradient-to-r from-primary via-blue-500 to-primary group-hover:w-full transition-all duration-500 rounded-full"></span>
-              </a>
-            ))}
+            {mainNavLinks.map((link) => {
+              const isActive = location.pathname === link.href || (link.href === '#register' && location.pathname === '/');
+              return (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className={`relative px-4 py-2 text-sm font-semibold transition-colors duration-300 group smooth-color ${
+                    isActive 
+                      ? 'text-primary' 
+                      : 'text-muted-foreground hover:text-primary'
+                  }`}
+                >
+                  {link.label}
+                  <span className={`absolute bottom-0 left-0 h-1 bg-gradient-to-r from-primary via-blue-500 to-primary rounded-full transition-all duration-500 ${
+                    isActive ? 'w-full' : 'w-0 group-hover:w-full'
+                  }`}></span>
+                </a>
+              );
+            })}
           </nav>
 
           {/* CTA Button - Desktop with Enhanced Hover */}

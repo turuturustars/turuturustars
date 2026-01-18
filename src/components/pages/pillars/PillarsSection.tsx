@@ -123,9 +123,9 @@ const PillarsSection = () => {
 
                 {/* Features List */}
                 <div className="space-y-2 mb-6">
-                  {pillar.features.map((feature, idx) => (
+                  {pillar.features.map((feature) => (
                     <div 
-                      key={idx}
+                      key={`feature-${pillar.title}-${feature.substring(0, 8)}`}
                       className="flex items-center gap-2 text-xs sm:text-sm text-gray-500 group-hover:text-gray-700 transition-colors duration-300"
                     >
                       <div className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${pillar.accent}`}></div>

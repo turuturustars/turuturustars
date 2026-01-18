@@ -149,7 +149,7 @@ const CareersSection = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
           {benefits.map((benefit, index) => (
             <div
-              key={index}
+              key={`benefit-${index}-${benefit.title}`}
               className={`p-6 rounded-2xl bg-card border border-border/50 hover:border-primary/30 hover:shadow-glow transition-all duration-300 animation-delay-${(index + 1) * 100} ${
                 headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
               }`}
@@ -224,7 +224,7 @@ const CareersSection = () => {
                       <h5 className="font-semibold text-foreground mb-3">Requirements</h5>
                       <ul className="space-y-2">
                         {job.requirements.map((req, i) => (
-                          <li key={i} className="flex gap-2 text-sm text-muted-foreground">
+                          <li key={`req-${job.id}-${i}-${req.substring(0, 10)}`} className="flex gap-2 text-sm text-muted-foreground">
                             <span className="text-primary font-bold">•</span>
                             {req}
                           </li>
