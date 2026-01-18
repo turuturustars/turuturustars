@@ -62,7 +62,7 @@ const PayWithMpesa = ({
   // Validation logic
   const validatePhone = (value: string): string | null => {
     if (!value.trim()) return 'Phone number is required';
-    const cleaned = value.replaceAll(/\D/g, '');
+    const cleaned = value.replace(/\D/g, '');
     if (cleaned.length < 10) return 'Phone number must be at least 10 digits';
     if (cleaned.length > 13) return 'Phone number is too long';
     const phoneRegex = /^(254|0)?7\d{8}$/;
@@ -89,7 +89,7 @@ const PayWithMpesa = ({
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
     // Allow only numbers, +, and spaces
-    value = value.replaceAll(/[^\d+\s]/g, '');
+    value = value.replace(/[^\d+\s]/g, '');
     setPhone(value);
     if (touched.phone) {
       setErrors(prev => ({
@@ -102,7 +102,7 @@ const PayWithMpesa = ({
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Allow only numbers
-    const numericValue = value.replaceAll(/[^\d]/g, '');
+    const numericValue = value.replace(/[^\d]/g, '');
     setAmount(numericValue);
     if (touched.amount) {
       setErrors(prev => ({

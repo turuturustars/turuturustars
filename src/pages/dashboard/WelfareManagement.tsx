@@ -10,8 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { hasPermission } from '@/lib/rolePermissions';
 import { 
-  HandHeart, Loader2, Heart, Users, DollarSign, Plus, Edit2, Trash2, AlertCircle, 
-  TrendingUp, ArrowRight, RotateCcw, Eye, EyeOff, Send, X, Check
+  HandHeart, Loader2, Heart, Users, DollarSign, Plus, Trash2, 
+  TrendingUp, RotateCcw, Eye, EyeOff
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -32,40 +32,37 @@ interface WelfareCase {
   created_by: string;
 }
 
-interface WelfareTransaction {
+interface WelfareContribution {
   id: string;
   welfare_case_id: string;
   amount: number;
-  transaction_type: 'contribution' | 'refund';
-  mpesa_code: string | null;
-  recorded_by_id: string;
-  recorded_by: {
-    full_name: string;
-  } | null;
+  member_id: string;
   notes: string | null;
   created_at: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: string;
+  member: {
+    full_name: string;
+  } | null;
 }
 
 const WelfareManagement = () => {
   const { user, roles } = useAuth();
   const [cases, setCases] = useState<WelfareCase[]>([]);
-  const [transactions, setTransactions] = useState<WelfareTransaction[]>([]);
+  const [contributions, setContributions] = useState<WelfareContribution[]>([]);
   const [selectedCase, setSelectedCase] = useState<WelfareCase | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
-  const [showTransactionDetails, setShowTransactionDetails] = useState<string | null>(null);
+  const [isContributionDialogOpen, setIsContributionDialogOpen] = useState(false);
+  const [showContributionDetails, setShowContributionDetails] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [transactionForm, setTransactionForm] = useState({
+  const [contributionForm, setContributionForm] = useState({
     amount: '',
-    mpesa_code: '',
     notes: '',
-    transaction_type: 'contribution' as 'contribution' | 'refund',
+    contribution_type: 'welfare' as const,
   });
 
   const userRoles = roles.map(r => r.role);
-  const canManageTransactions = hasPermission(userRoles, 'manage_welfare_transactions');
+  const canManageContributions = hasPermission(userRoles, 'manage_welfare_transactions');
   const canRefund = hasPermission(userRoles, 'refund_welfare');
   const canRecordPayment = hasPermission(userRoles, 'record_welfare_payment');
 
@@ -75,7 +72,7 @@ const WelfareManagement = () => {
 
   useEffect(() => {
     if (selectedCase) {
-      fetchTransactions(selectedCase.id);
+      fetchContributions(selectedCase.id);
     }
   }, [selectedCase]);
 
@@ -100,61 +97,55 @@ const WelfareManagement = () => {
     }
   };
 
-  const fetchTransactions = async (caseId: string) => {
+  const fetchContributions = async (caseId: string) => {
     try {
       const { data, error } = await supabase
-        .from('welfare_transactions')
+        .from('contributions')
         .select(`
-          id, welfare_case_id, amount, transaction_type, mpesa_code, recorded_by_id, notes, created_at, status,
-          recorded_by:recorded_by_id (full_name)
+          id, welfare_case_id, amount, member_id, notes, created_at, status,
+          member:member_id (full_name)
         `)
         .eq('welfare_case_id', caseId)
+        .eq('contribution_type', 'welfare')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTransactions((data as WelfareTransaction[]) || []);
+      setContributions((data as unknown as WelfareContribution[]) || []);
     } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast.error('Failed to load transactions');
+      console.error('Error fetching contributions:', error);
+      toast.error('Failed to load contributions');
     }
   };
 
-  const handleAddTransaction = async () => {
+  const handleAddContribution = async () => {
     if (!selectedCase) {
       toast.error('Please select a welfare case');
       return;
     }
 
-    if (!transactionForm.amount || parseFloat(transactionForm.amount) <= 0) {
+    if (!contributionForm.amount || parseFloat(contributionForm.amount) <= 0) {
       toast.error('Please enter a valid amount');
       return;
     }
 
     setIsSaving(true);
     try {
-      const amount = parseFloat(transactionForm.amount);
-      let newCollected = selectedCase.collected_amount;
+      const amount = parseFloat(contributionForm.amount);
+      const newCollected = (selectedCase.collected_amount || 0) + amount;
 
-      if (transactionForm.transaction_type === 'contribution') {
-        newCollected += amount;
-      } else if (transactionForm.transaction_type === 'refund' && canRefund) {
-        newCollected = Math.max(0, newCollected - amount);
-      }
-
-      // Insert transaction
-      const { error: transactionError } = await supabase
-        .from('welfare_transactions')
+      // Insert contribution
+      const { error: contributionError } = await supabase
+        .from('contributions')
         .insert({
           welfare_case_id: selectedCase.id,
           amount: amount,
-          transaction_type: transactionForm.transaction_type,
-          mpesa_code: transactionForm.mpesa_code || null,
-          recorded_by_id: user?.id,
-          notes: transactionForm.notes || null,
-          status: 'completed',
+          member_id: user?.id,
+          contribution_type: 'welfare',
+          notes: contributionForm.notes || null,
+          status: 'paid',
         });
 
-      if (transactionError) throw transactionError;
+      if (contributionError) throw contributionError;
 
       // Update case collected amount
       const { error: updateError } = await supabase
@@ -164,41 +155,35 @@ const WelfareManagement = () => {
 
       if (updateError) throw updateError;
 
-      toast.success(`${transactionForm.transaction_type === 'contribution' ? 'Contribution' : 'Refund'} recorded successfully!`);
-      setTransactionForm({ amount: '', mpesa_code: '', notes: '', transaction_type: 'contribution' });
-      setIsTransactionDialogOpen(false);
+      toast.success('Contribution recorded successfully!');
+      setContributionForm({ amount: '', notes: '', contribution_type: 'welfare' });
+      setIsContributionDialogOpen(false);
       await fetchWelfareCases();
-      await fetchTransactions(selectedCase.id);
+      await fetchContributions(selectedCase.id);
     } catch (error) {
-      console.error('Error adding transaction:', error);
-      toast.error('Failed to record transaction');
+      console.error('Error adding contribution:', error);
+      toast.error('Failed to record contribution');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleRemoveTransaction = async (transactionId: string) => {
-    if (!selectedCase || !window.confirm('Are you sure you want to remove this transaction?')) {
+  const handleRemoveContribution = async (contributionId: string) => {
+    if (!selectedCase || !window.confirm('Are you sure you want to remove this contribution?')) {
       return;
     }
 
     try {
-      const transaction = transactions.find(t => t.id === transactionId);
-      if (!transaction) return;
+      const contribution = contributions.find(t => t.id === contributionId);
+      if (!contribution) return;
 
-      // Calculate new collected amount
-      let newCollected = selectedCase.collected_amount;
-      if (transaction.transaction_type === 'contribution') {
-        newCollected = Math.max(0, newCollected - transaction.amount);
-      } else if (transaction.transaction_type === 'refund') {
-        newCollected += transaction.amount;
-      }
+      const newCollected = Math.max(0, (selectedCase.collected_amount || 0) - contribution.amount);
 
-      // Delete transaction
+      // Delete contribution
       const { error: deleteError } = await supabase
-        .from('welfare_transactions')
+        .from('contributions')
         .delete()
-        .eq('id', transactionId);
+        .eq('id', contributionId);
 
       if (deleteError) throw deleteError;
 
@@ -210,19 +195,13 @@ const WelfareManagement = () => {
 
       if (updateError) throw updateError;
 
-      toast.success('Transaction removed successfully');
+      toast.success('Contribution removed successfully');
       await fetchWelfareCases();
-      await fetchTransactions(selectedCase.id);
+      await fetchContributions(selectedCase.id);
     } catch (error) {
-      console.error('Error removing transaction:', error);
-      toast.error('Failed to remove transaction');
+      console.error('Error removing contribution:', error);
+      toast.error('Failed to remove contribution');
     }
-  };
-
-  const getTransactionIcon = (type: string) => {
-    return type === 'contribution' ? 
-      <TrendingUp className="w-4 h-4 text-green-500" /> : 
-      <RotateCcw className="w-4 h-4 text-orange-500" />;
   };
 
   const getCaseTypeIcon = (type: string) => {
@@ -243,9 +222,8 @@ const WelfareManagement = () => {
       active: 'bg-green-100 text-green-800',
       closed: 'bg-gray-100 text-gray-800',
       cancelled: 'bg-red-100 text-red-800',
-      completed: 'bg-green-100 text-green-800',
+      paid: 'bg-green-100 text-green-800',
       pending: 'bg-yellow-100 text-yellow-800',
-      failed: 'bg-red-100 text-red-800',
     };
     return (
       <Badge className={colors[status] || colors.active}>
@@ -269,7 +247,7 @@ const WelfareManagement = () => {
           <h1 className="text-3xl font-serif font-bold text-foreground">Welfare Management</h1>
           <p className="text-muted-foreground">Manage welfare cases and track contributions</p>
         </div>
-        {(canManageTransactions || canRecordPayment) && (
+        {(canManageContributions || canRecordPayment) && (
           <Button className="gap-2" onClick={() => window.location.href = '/dashboard/members/welfare'}>
             <Plus className="w-4 h-4" />
             Create Welfare Case
@@ -301,11 +279,11 @@ const WelfareManagement = () => {
                   {welfareCase.target_amount && (
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>KES {welfareCase.collected_amount.toLocaleString()}</span>
+                        <span>KES {(welfareCase.collected_amount || 0).toLocaleString()}</span>
                         <span>KES {welfareCase.target_amount.toLocaleString()}</span>
                       </div>
                       <Progress 
-                        value={(welfareCase.collected_amount / welfareCase.target_amount) * 100}
+                        value={((welfareCase.collected_amount || 0) / welfareCase.target_amount) * 100}
                         className="h-1.5"
                       />
                     </div>
@@ -316,7 +294,7 @@ const WelfareManagement = () => {
           </div>
         </div>
 
-        {/* Transaction Details */}
+        {/* Contribution Details */}
         <div className="lg:col-span-2 space-y-4">
           {selectedCase ? (
             <>
@@ -347,7 +325,7 @@ const WelfareManagement = () => {
                         <div>
                           <p className="text-xs text-muted-foreground">Collected</p>
                           <p className="text-xl font-bold text-green-600">
-                            KES {selectedCase.collected_amount.toLocaleString()}
+                            KES {(selectedCase.collected_amount || 0).toLocaleString()}
                           </p>
                         </div>
                         <div>
@@ -359,76 +337,42 @@ const WelfareManagement = () => {
                         <div>
                           <p className="text-xs text-muted-foreground">Remaining</p>
                           <p className="text-xl font-bold text-orange-600">
-                            KES {Math.max(0, selectedCase.target_amount - selectedCase.collected_amount).toLocaleString()}
+                            KES {Math.max(0, selectedCase.target_amount - (selectedCase.collected_amount || 0)).toLocaleString()}
                           </p>
                         </div>
                       </div>
                       <Progress 
-                        value={(selectedCase.collected_amount / selectedCase.target_amount) * 100}
+                        value={((selectedCase.collected_amount || 0) / selectedCase.target_amount) * 100}
                         className="h-2"
                       />
                       <p className="text-xs text-center text-muted-foreground">
-                        {((selectedCase.collected_amount / selectedCase.target_amount) * 100).toFixed(1)}% funded
+                        {(((selectedCase.collected_amount || 0) / selectedCase.target_amount) * 100).toFixed(1)}% funded
                       </p>
                     </div>
                   )}
 
-                  {/* Add Transaction Button */}
-                  {(canManageTransactions || canRecordPayment) && (
-                    <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+                  {/* Add Contribution Button */}
+                  {(canManageContributions || canRecordPayment) && (
+                    <Dialog open={isContributionDialogOpen} onOpenChange={setIsContributionDialogOpen}>
                       <DialogTrigger asChild>
                         <Button className="w-full gap-2">
                           <Plus className="w-4 h-4" />
-                          Record Transaction
+                          Record Contribution
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Record Welfare Transaction</DialogTitle>
+                          <DialogTitle>Record Welfare Contribution</DialogTitle>
                         </DialogHeader>
                         <div className="space-y-4">
-                          <div>
-                            <label className="text-sm font-medium">Transaction Type</label>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <Button
-                                variant={transactionForm.transaction_type === 'contribution' ? 'default' : 'outline'}
-                                onClick={() => setTransactionForm({ ...transactionForm, transaction_type: 'contribution' })}
-                                className="gap-2"
-                              >
-                                <TrendingUp className="w-4 h-4" />
-                                Contribution
-                              </Button>
-                              <Button
-                                variant={transactionForm.transaction_type === 'refund' ? 'default' : 'outline'}
-                                onClick={() => setTransactionForm({ ...transactionForm, transaction_type: 'refund' })}
-                                disabled={!canRefund}
-                                className="gap-2"
-                              >
-                                <RotateCcw className="w-4 h-4" />
-                                Refund
-                              </Button>
-                            </div>
-                          </div>
-
                           <div>
                             <label htmlFor="amount" className="text-sm font-medium">Amount (KES) *</label>
                             <Input
                               id="amount"
                               type="number"
                               placeholder="0"
-                              value={transactionForm.amount}
-                              onChange={(e) => setTransactionForm({ ...transactionForm, amount: e.target.value })}
-                              className="mt-1"
-                            />
-                          </div>
-
-                          <div>
-                            <label htmlFor="mpesa_code" className="text-sm font-medium">M-Pesa Code (Transaction ID)</label>
-                            <Input
-                              id="mpesa_code"
-                              placeholder="e.g., LIL51IRF52"
-                              value={transactionForm.mpesa_code}
-                              onChange={(e) => setTransactionForm({ ...transactionForm, mpesa_code: e.target.value })}
+                              value={contributionForm.amount}
+                              onChange={(e) => setContributionForm({ ...contributionForm, amount: e.target.value })}
                               className="mt-1"
                             />
                           </div>
@@ -437,41 +381,30 @@ const WelfareManagement = () => {
                             <label htmlFor="notes" className="text-sm font-medium">Notes</label>
                             <textarea
                               id="notes"
-                              placeholder="Add any notes about this transaction..."
-                              value={transactionForm.notes}
-                              onChange={(e) => setTransactionForm({ ...transactionForm, notes: e.target.value })}
-                              className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary mt-1 min-h-20"
+                              placeholder="Add any notes about this contribution..."
+                              value={contributionForm.notes}
+                              onChange={(e) => setContributionForm({ ...contributionForm, notes: e.target.value })}
+                              className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-20 mt-1"
                             />
                           </div>
 
-                          <div className="flex gap-2 pt-2">
-                            <Button
-                              onClick={handleAddTransaction}
-                              disabled={isSaving}
-                              className="flex-1"
-                            >
-                              {isSaving ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Recording...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="w-4 h-4 mr-2" />
-                                  Record Transaction
-                                </>
-                              )}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => {
-                                setIsTransactionDialogOpen(false);
-                                setTransactionForm({ amount: '', mpesa_code: '', notes: '', transaction_type: 'contribution' });
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
+                          <Button
+                            onClick={handleAddContribution}
+                            className="w-full gap-2"
+                            disabled={isSaving}
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Recording...
+                              </>
+                            ) : (
+                              <>
+                                <TrendingUp className="w-4 h-4" />
+                                Record Contribution
+                              </>
+                            )}
+                          </Button>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -479,82 +412,46 @@ const WelfareManagement = () => {
                 </CardContent>
               </Card>
 
-              {/* Transactions History */}
+              {/* Contributions List */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    Transaction History
-                  </CardTitle>
+                  <CardTitle className="text-lg">Contributions</CardTitle>
+                  <CardDescription>{contributions.length} contributions recorded</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  {transactions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-6">No transactions yet</p>
+                <CardContent>
+                  {contributions.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No contributions yet</p>
                   ) : (
                     <div className="space-y-2">
-                      {transactions.map(transaction => (
-                        <div key={transaction.id}>
-                          <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <div className="flex-shrink-0">
-                                {getTransactionIcon(transaction.transaction_type)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium text-sm">
-                                    {transaction.transaction_type === 'contribution' ? 'Contribution' : 'Refund'}
-                                  </p>
-                                  {transaction.mpesa_code && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {transaction.mpesa_code}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {transaction.recorded_by?.full_name} • {format(new Date(transaction.created_at), 'MMM dd, yyyy HH:mm')}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <p className={`font-bold text-sm ${transaction.transaction_type === 'contribution' ? 'text-green-600' : 'text-orange-600'}`}>
-                                {transaction.transaction_type === 'contribution' ? '+' : '-'}KES {transaction.amount.toLocaleString()}
+                      {contributions.map(contribution => (
+                        <div
+                          key={contribution.id}
+                          className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <TrendingUp className="w-4 h-4 text-green-500" />
+                            <div>
+                              <p className="font-medium text-sm">
+                                KES {contribution.amount.toLocaleString()}
                               </p>
-                              {getStatusBadge(transaction.status)}
+                              <p className="text-xs text-muted-foreground">
+                                {contribution.member?.full_name || 'Unknown'} • {format(new Date(contribution.created_at), 'MMM d, yyyy')}
+                              </p>
                             </div>
                           </div>
-
-                          {/* Transaction Details */}
-                          {(transaction.notes || transaction.mpesa_code) && (
-                            <button
-                              onClick={() => setShowTransactionDetails(showTransactionDetails === transaction.id ? null : transaction.id)}
-                              className="text-xs text-primary hover:underline ml-11 mt-1"
-                            >
-                              {showTransactionDetails === transaction.id ? 'Hide' : 'Show'} Details
-                            </button>
-                          )}
-
-                          {showTransactionDetails === transaction.id && (
-                            <div className="ml-11 mt-2 p-3 bg-muted rounded-lg space-y-2 text-sm">
-                              {transaction.mpesa_code && (
-                                <p><span className="text-muted-foreground">M-Pesa Code:</span> {transaction.mpesa_code}</p>
-                              )}
-                              {transaction.notes && (
-                                <p><span className="text-muted-foreground">Notes:</span> {transaction.notes}</p>
-                              )}
-                              {canManageTransactions && (
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => handleRemoveTransaction(transaction.id)}
-                                  className="mt-2 w-full gap-2"
-                                >
-                                  <X className="w-4 h-4" />
-                                  Remove Transaction
-                                </Button>
-                              )}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(contribution.status)}
+                            {canManageContributions && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveContribution(contribution.id)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -563,10 +460,13 @@ const WelfareManagement = () => {
               </Card>
             </>
           ) : (
-            <Card className="h-full flex items-center justify-center">
-              <CardContent className="text-center py-12">
+            <Card>
+              <CardContent className="py-12 text-center">
                 <HandHeart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Select a welfare case to view details</p>
+                <h3 className="text-lg font-medium text-foreground">Select a Welfare Case</h3>
+                <p className="text-muted-foreground mt-1">
+                  Click on a case from the list to view and manage contributions
+                </p>
               </CardContent>
             </Card>
           )}
