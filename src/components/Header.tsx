@@ -39,20 +39,17 @@ const Header = () => {
     }`}>
       <div className="section-container">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo - Enhanced with Animation */}
+          {/* Logo */}
           <a href="/" className="flex items-center gap-2 group flex-shrink-0">
-            <div className="relative">
-              <img 
-                src={turuturuLogo} 
-                alt="Turuturu Stars Logo" 
-                className="h-10 w-auto lg:h-12 object-contain shadow-soft group-hover:shadow-elevated transition-all duration-300 group-hover:scale-110"
-                loading="eager"
-                width="48"
-                height="48"
-                decoding="async"
-              />
-              <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 rounded-full transition-all duration-300 blur-lg"></div>
-            </div>
+            <img 
+              src={turuturuLogo} 
+              alt="Turuturu Stars Logo" 
+              className="h-10 w-auto lg:h-12 object-contain group-hover:scale-110 transition-all duration-300"
+              loading="eager"
+              width="48"
+              height="48"
+              decoding="async"
+            />
             <div className="hidden sm:block">
               <span className="font-serif text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
                 Turuturu Stars

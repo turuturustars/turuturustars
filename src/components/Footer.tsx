@@ -36,7 +36,7 @@ const Footer = () => {
               <img 
                 src={logoImage}
                 alt="Turuturu Stars Logo"
-                className="w-12 h-12 rounded-full object-cover group hover:shadow-glow transition-all duration-300 hover:scale-110"
+                className="w-12 h-12 object-contain hover:scale-110 transition-all duration-300"
                 loading="lazy"
                 width="48"
                 height="48"

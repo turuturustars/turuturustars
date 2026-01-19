@@ -288,7 +288,7 @@ const Register = () => {
             <img 
               src={turuturuLogo}
               alt="Turuturu Stars Logo"
-              className="h-16 w-auto rounded-full shadow-elevated object-contain"
+              className="h-16 w-auto object-contain"
               loading="eager"
               width="64"
               height="64"
