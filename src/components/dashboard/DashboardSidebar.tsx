@@ -138,23 +138,21 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       )}
     >
       {/* Mobile Header */}
-      <div className="lg:hidden sticky top-0 z-10 bg-card/95 backdrop-blur-md border-b border-border/50">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
+      <div className="lg:hidden sticky top-0 z-10 bg-gradient-to-r from-card via-card to-card/95 backdrop-blur-md border-b border-border/40 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <img 
               src={turuturuLogo}
               alt="Turuturu Stars Logo"
-              className="w-8 h-8 object-contain"
+              className="w-7 h-7 object-contain"
               loading="eager"
             />
-            <span className="font-bold text-base bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-              Turuturu Stars
-            </span>
+            <span className="font-serif font-bold text-sm text-foreground">TS</span>
           </div>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-2 hover:bg-accent/80 rounded-xl transition-all duration-200 active:scale-95 hover:shadow-md"
+              className="p-1.5 hover:bg-accent/80 rounded-lg transition-all duration-200 active:scale-95"
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
@@ -163,53 +161,50 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         </div>
       </div>
 
-      {/* Desktop Logo */}
-      <div className="hidden lg:block p-6 border-b border-border/30">
+      {/* Desktop Logo - Enhanced */}
+      <div className="hidden lg:flex items-center gap-3 px-5 py-5 border-b border-border/30">
         <Link
           to="/"
-          className="flex items-center gap-3 group"
+          className="flex items-center gap-2.5 group flex-1 min-w-0"
           onClick={handleNavClick}
         >
-          <img 
-            src={turuturuLogo}
-            alt="Turuturu Stars Logo"
-            className="w-12 h-12 object-contain hover:scale-110 transition-transform duration-300"
-            loading="eager"
-            width="48"
-            height="48"
-            decoding="async"
-          />
+          <div className="relative flex-shrink-0">
+            <div className="absolute inset-0 bg-primary/20 rounded-lg blur group-hover:blur-md transition-all duration-300" />
+            <img 
+              src={turuturuLogo}
+              alt="Turuturu Stars Logo"
+              className="w-10 h-10 object-contain relative hover:scale-110 transition-transform duration-300"
+              loading="eager"
+            />
+          </div>
           <div className="flex-1 min-w-0">
-            <span className="font-serif font-bold text-lg bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent group-hover:from-primary group-hover:to-primary/70 transition-all duration-300">
+            <span className="text-sm font-bold text-foreground block">
               Turuturu Stars
             </span>
-            <span className="block text-xs text-muted-foreground font-medium">Member Portal</span>
+            <span className="text-xs text-muted-foreground/80">Member Portal</span>
           </div>
         </Link>
       </div>
 
-      {/* Member Info Card */}
-      <div className="p-4 mx-4 my-4">
-        <div className="relative group overflow-hidden rounded-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent group-hover:from-primary/15 group-hover:via-primary/10 transition-all duration-300" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/5 to-transparent" />
+      {/* Member Info Card - Compact & Beautiful */}
+      <div className="px-4 py-3 lg:px-5 lg:py-4 border-b border-border/20">
+        <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/8 via-primary/4 to-transparent border border-primary/10 p-3.5 hover:border-primary/20 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-t from-white/3 to-transparent" />
           
-          <div className="relative p-4 flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/30 rounded-2xl blur-md" />
-              <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center shadow-lg ring-2 ring-background/50">
-                <span className="text-base font-bold text-primary-foreground">
-                  {profile?.full_name?.charAt(0) || 'M'}
-                </span>
+          <div className="relative flex items-center gap-2.5">
+            <div className="relative flex-shrink-0">
+              <div className="absolute inset-0 bg-primary/25 rounded-lg blur group-hover:blur-md transition-all duration-300" />
+              <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center text-sm font-bold text-primary-foreground shadow-sm">
+                {profile?.full_name?.charAt(0) || 'M'}
               </div>
             </div>
             
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate mb-0.5">
-                {profile?.full_name || 'Member'}
+              <p className="text-xs sm:text-sm font-semibold text-foreground truncate leading-tight">
+                {profile?.full_name?.split(' ')[0] || 'Member'}
               </p>
-              <p className="text-xs text-muted-foreground truncate font-medium">
-                {profile?.membership_number || 'Pending'}
+              <p className="text-xs text-muted-foreground/70 truncate">
+                {profile?.membership_number ? `ID: ${profile.membership_number}` : 'Pending'}
               </p>
             </div>
           </div>
@@ -217,16 +212,16 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto px-3 pb-4 space-y-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+      <nav className="flex-1 overflow-y-auto px-2.5 py-3 lg:px-3 lg:py-4 space-y-0.5 scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
         {/* Member Section */}
         <div>
-          <div className="px-4 py-2 mb-2">
-            <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-wider">
-              Navigation
+          <div className="px-3 py-2 mb-2">
+            <p className="text-xs font-bold text-muted-foreground/60 uppercase tracking-wider">
+              Menu
             </p>
           </div>
           
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             {memberLinks.map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.href;
@@ -236,29 +231,24 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
                   to={link.href}
                   onClick={handleNavClick}
                   className={cn(
-                    'group relative flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
-                    'hover:translate-x-1 active:scale-[0.98]',
+                    'group relative flex items-center justify-between gap-2 px-3 py-2.5 lg:px-3.5 lg:py-3 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200',
+                    'active:scale-95',
                     isActive
-                      ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                      ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground shadow-md shadow-primary/20'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 lg:hover:bg-accent/40'
                   )}
                 >
-                  {isActive && (
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent rounded-xl" />
-                  )}
-                  
-                  <div className="relative flex items-center gap-3 flex-1 min-w-0">
+                  <div className="relative flex items-center gap-2 flex-1 min-w-0">
                     <Icon className={cn(
-                      "w-[18px] h-[18px] flex-shrink-0 transition-transform duration-200",
-                      isActive ? "scale-110" : "group-hover:scale-110"
+                      "w-4 h-4 sm:w-[18px] sm:h-[18px] flex-shrink-0 transition-transform duration-200",
+                      isActive ? "text-primary-foreground" : "group-hover:scale-110"
                     )} />
-                    <span className="truncate">{link.label}</span>
+                    <span className="truncate text-xs sm:text-sm">{link.label}</span>
                   </div>
                   
                   {link.badge && (
-                    <span className="relative flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] font-bold rounded-full bg-destructive text-destructive-foreground shadow-md">
+                    <span className="relative flex items-center justify-center min-w-[18px] h-4 px-1 text-[9px] font-bold rounded-full bg-red-500/90 text-white shadow-sm ml-1 flex-shrink-0">
                       1
-                      <span className="absolute inset-0 rounded-full bg-destructive animate-ping opacity-75" />
                     </span>
                   )}
                 </Link>
@@ -269,28 +259,28 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
 
         {/* Role-Specific Section */}
         {isUserOfficial && (
-          <div className="mt-6 pt-4 border-t border-border/30">
+          <div className="mt-4 pt-3 border-t border-border/20">
             <button
               onClick={toggleRoleSection}
               className={cn(
-                'w-full flex items-center justify-between px-4 py-3 mb-2 rounded-xl',
+                'w-full flex items-center justify-between px-3 py-2.5 mb-1.5 rounded-lg',
                 'text-xs font-bold uppercase tracking-wider transition-all duration-200',
-                'hover:bg-accent/60 active:scale-[0.98]',
+                'hover:bg-accent/50 lg:hover:bg-accent/40 active:scale-95',
                 expandedRole 
-                  ? 'text-primary bg-primary/10' 
+                  ? 'text-primary bg-primary/8' 
                   : 'text-muted-foreground/70 hover:text-foreground'
               )}
             >
-              <span className="truncate flex items-center gap-2">
+              <span className="truncate flex items-center gap-1.5">
                 <div className={cn(
-                  "w-1.5 h-1.5 rounded-full transition-colors",
-                  expandedRole ? "bg-primary" : "bg-muted-foreground/50"
+                  "w-1.5 h-1.5 rounded-full transition-colors flex-shrink-0",
+                  expandedRole ? "bg-primary" : "bg-muted-foreground/40"
                 )} />
-                {primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1).replace('_', ' ')}
+                <span className="text-xs">{primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1).replace('_', ' ')}</span>
               </span>
               <ChevronDown
                 className={cn(
-                  'w-4 h-4 transition-transform duration-300 flex-shrink-0',
+                  'w-3.5 h-3.5 transition-transform duration-300 flex-shrink-0',
                   expandedRole && 'rotate-180'
                 )}
               />
@@ -301,7 +291,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
               expandedRole ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
             )}>
               <div className="overflow-hidden">
-                <div className="space-y-1 pt-1">
+                <div className="space-y-0.5 pt-1">
                   {roleSpecificLinks().map((link) => {
                     const Icon = link.icon;
                     const isActive = location.pathname === link.href;
@@ -311,22 +301,18 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
                         to={link.href}
                         onClick={handleNavClick}
                         className={cn(
-                          'group relative flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200',
-                          'hover:translate-x-1 active:scale-[0.98]',
+                          'group relative flex items-center gap-2 px-3 py-2.5 lg:px-3.5 lg:py-3 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200',
+                          'active:scale-95',
                           isActive
-                            ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/25'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                            ? 'bg-gradient-to-r from-primary/90 to-primary text-primary-foreground shadow-md shadow-primary/20'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 lg:hover:bg-accent/40'
                         )}
                       >
-                        {isActive && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent rounded-xl" />
-                        )}
-                        
                         <Icon className={cn(
-                          "w-[18px] h-[18px] flex-shrink-0 relative transition-transform duration-200",
-                          isActive ? "scale-110" : "group-hover:scale-110"
+                          "w-4 h-4 sm:w-[18px] sm:h-[18px] flex-shrink-0 transition-transform duration-200",
+                          isActive ? "text-primary-foreground" : "group-hover:scale-110"
                         )} />
-                        <span className="truncate relative">{link.label}</span>
+                        <span className="truncate text-xs sm:text-sm">{link.label}</span>
                       </Link>
                     );
                   })}
@@ -337,12 +323,18 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         )}
       </nav>
 
-      {/* Logout Section */}
-      <div className="p-4 border-t border-border/30 bg-gradient-to-t from-background/80 via-background/40 to-transparent backdrop-blur-sm">
+      {/* Logout Section - Bottom Fixed */}
+      <div className="px-2.5 py-3 lg:px-3 lg:py-3.5 border-t border-border/20 bg-gradient-to-t from-primary/5 via-primary/2 to-transparent">
         <Button
           onClick={signOut}
           disabled={isLoading}
           variant="ghost"
+          className="w-full justify-start gap-2 text-xs sm:text-sm text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all duration-200"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          <span>Sign Out</span>
+        </Button>
+      </div>
           className={cn(
             'w-full justify-start gap-3 font-medium transition-all duration-200 h-11 text-sm rounded-xl',
             'hover:bg-destructive/10 text-destructive hover:text-destructive',
