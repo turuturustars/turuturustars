@@ -50,13 +50,31 @@ const DashboardHome = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [greeting, setGreeting] = useState('');
+  const [dayOfWeek, setDayOfWeek] = useState('');
+  const [currentTime, setCurrentTime] = useState('');
 
-  // Dynamic greeting
+  // Dynamic greeting with day, time, and name
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good Morning');
-    else if (hour < 17) setGreeting('Good Afternoon');
-    else setGreeting('Good Evening');
+    const updateGreeting = () => {
+      const now = new Date();
+      const hour = now.getHours();
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const day = days[now.getDay()];
+      const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      
+      let greeting = '';
+      if (hour < 12) greeting = 'Good Morning';
+      else if (hour < 17) greeting = 'Good Afternoon';
+      else greeting = 'Good Evening';
+      
+      setGreeting(greeting);
+      setDayOfWeek(day);
+      setCurrentTime(time);
+    };
+    
+    updateGreeting();
+    const interval = setInterval(updateGreeting, 60000); // Update every minute
+    return () => clearInterval(interval);
   }, []);
 
   // Redirect officials to role-specific dashboards
@@ -244,12 +262,20 @@ const DashboardHome = () => {
               Member Dashboard
             </Badge>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-            {greeting}, {profile?.full_name?.split(' ')[0] || 'Member'}!
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1">
+            Happy {dayOfWeek}!
           </h1>
-          <p className="text-white/90 text-sm sm:text-base">
-            Welcome back to Turuturu Stars CBO
+          <p className="text-white/90 text-xs sm:text-sm mb-3 flex items-center gap-2">
+            <span>{currentTime}</span>
           </p>
+          <div className="space-y-1">
+            <p className="text-lg sm:text-xl font-semibold text-white">
+              Welcome back, {profile?.full_name?.split(' ')[0] || 'Member'}
+            </p>
+            <p className="text-white/85 text-sm sm:text-base">
+              You're an active member of Turuturu Stars CBO
+            </p>
+          </div>
         </div>
       </div>
 
