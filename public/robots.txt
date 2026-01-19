@@ -1,52 +1,115 @@
 # Turuturu Stars CBO - robots.txt
 # Last Updated: 2026-01-19
 # Website: https://turuturustars.co.ke
+# This robots.txt helps search engines crawl important content while protecting private areas
 
 # ====================
-# GENERAL RULES
+# GENERAL RULES FOR ALL BOTS
 # ====================
 
-# Allow all bots to crawl the site
 User-agent: *
 Allow: /
 
-# Disallow crawling of auth pages
+# Disallow authentication pages (users can access via direct links)
 Disallow: /auth
-Disallow: /admin/login
+Disallow: /login
+Disallow: /register
 Disallow: /forgot-password
+Disallow: /reset-password
 
-# Disallow crawling of private dashboard pages for anonymous users
-# (These are protected by authentication anyway)
-Disallow: /dashboard/private
+# Disallow private dashboard pages
+Disallow: /dashboard/
+Disallow: /dashboard/roles/
+Disallow: /dashboard/finance/
+Disallow: /dashboard/members/
+Disallow: /dashboard/governance/
+Disallow: /dashboard/communication/
+Disallow: /dashboard/admin-panel/
+Disallow: /dashboard/profile
 
-# Disallow specific admin and internal paths
-Disallow: /*.json$
-Disallow: /*.js$
+# Disallow internal system paths
 Disallow: /admin/
 Disallow: /api/
-Disallow: /_next/
+Disallow: /backend/
 Disallow: /node_modules/
+Disallow: /src/
+Disallow: /_redirects
+
+# Disallow specific file types to save crawl budget
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /*.map$
+Disallow: /dist/
+Disallow: /build/
 
 # ====================
 # SPECIFIC BOT RULES
 # ====================
 
-# Google Bot - Standard crawl delay
+# Google Bot - Aggressive crawling allowed
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 0
-Request-rate: 100/1h
 
-# Bing Bot - Standard crawl delay
+# Prioritize important pages
+# Crawl delay: 0 means no delay
+Crawl-delay: 0
+Request-rate: 200/1h
+
+# Bing/MSN Bot
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
-Request-rate: 30/1h
+Request-rate: 50/1h
 
 # Yandex Bot
 User-agent: YandexBot
 Allow: /
 Crawl-delay: 1
+Request-rate: 40/1h
+
+# DuckDuckGo Bot
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 0
+
+# Baidu Bot (Chinese search engine)
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 1
+
+# ====================
+# SITEMAP LOCATIONS
+# ====================
+
+Sitemap: https://turuturustars.co.ke/sitemap.xml
+Sitemap: https://turuturustars.co.ke/sitemap-locations.xml
+Sitemap: https://turuturustars.co.ke/sitemap-landmarks.xml
+
+# ====================
+# ADDITIONAL DIRECTIVES
+# ====================
+
+# Uncomment to set crawl delay globally
+# Crawl-delay: 1
+
+# Set visit timeout (optional)
+# Visit-time: 06:00-23:00
+
+# Allow specific paths for important bots if needed
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: MJ12bot
+Allow: /
+Crawl-delay: 1
+
+User-agent: SemrushBot
+Allow: /
+Crawl-delay: 10
+
+User-agent: AhrefsBot
+Allow: /
+Crawl-delay: 10
 
 # DuckDuckGo
 User-agent: DuckDuckBot
