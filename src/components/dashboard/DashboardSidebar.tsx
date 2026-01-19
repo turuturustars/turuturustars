@@ -8,6 +8,7 @@ import {
   Bell, 
   Settings,
   LogOut,
+  Star,
   FileText,
   UserCheck,
   TrendingUp,
@@ -140,9 +141,12 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       <div className="lg:hidden sticky top-0 z-10 bg-card/95 backdrop-blur-md border-b border-border/50">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <Star className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img 
+              src={turuturuLogo}
+              alt="Turuturu Stars Logo"
+              className="w-8 h-8 object-contain"
+              loading="eager"
+            />
             <span className="font-bold text-base bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Turuturu Stars
             </span>
