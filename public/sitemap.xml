@@ -42,7 +42,7 @@
   <url>
     <loc>https://turuturustars.co.ke/about</loc>
     <lastmod>2026-01-18</lastmod>
-    <changefreq>monthly</changefreq>
+    <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
 
@@ -82,11 +82,7 @@
     <priority>0.4</priority>
   </url>
 
-  <!-- ========================================
-       MEMBER DASHBOARD (Auth Required - Lower Priority)
-       ======================================== -->
-  
-  <!-- Main Dashboard -->
+ 
   <url>
     <loc>https://turuturustars.co.ke/dashboard</loc>
     <lastmod>2026-01-18</lastmod>
@@ -258,10 +254,7 @@
     <priority>0.5</priority>
   </url>
 
-  <!-- ========================================
-       HELP & SUPPORT
-       ======================================== -->
-
+ 
   <url>
     <loc>https://turuturustars.co.ke/help</loc>
     <lastmod>2026-01-18</lastmod>
@@ -284,28 +277,79 @@
   </url>
 
   <!-- ========================================
-       ADDITIONAL RESOURCES
+       ADDITIONAL RESOURCES & MISSING PAGES
        ======================================== -->
 
+  <!-- Leadership Page -->
   <url>
-    <loc>https://turuturustars.co.ke/news</loc>
-    <lastmod>2026-01-18</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://turuturustars.co.ke/leadership</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
+  <!-- Careers Page -->
   <url>
-    <loc>https://turuturustars.co.ke/gallery</loc>
-    <lastmod>2026-01-18</lastmod>
-    <changefreq>weekly</changefreq>
+    <loc>https://turuturustars.co.ke/careers</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
+  <!-- Pillars/Values Page -->
   <url>
-    <loc>https://turuturustars.co.ke/testimonials</loc>
-    <lastmod>2026-01-18</lastmod>
-    <changefreq>monthly</changefreq>
+    <loc>https://turuturustars.co.ke/pillars</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>quarterly</changefreq>
     <priority>0.6</priority>
+  </url>
+
+  <!-- Forgot Password -->
+  <url>
+    <loc>https://turuturustars.co.ke/forgot-password</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+
+  <!-- Not Found Page -->
+  <url>
+    <loc>https://turuturustars.co.ke/not-found</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.1</priority>
+  </url>
+
+  <!-- Dashboard Chats -->
+  <url>
+    <loc>https://turuturustars.co.ke/dashboard/chats</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Dashboard Private Messages -->
+  <url>
+    <loc>https://turuturustars.co.ke/dashboard/private-messages</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Dashboard Loans (if applicable) -->
+  <url>
+    <loc>https://turuturustars.co.ke/dashboard/loans</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Dashboard Transactions -->
+  <url>
+    <loc>https://turuturustars.co.ke/dashboard/transactions</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.5</priority>
   </url>
 
 </urlset>

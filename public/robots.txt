@@ -1,3 +1,11 @@
+# Turuturu Stars CBO - robots.txt
+# Last Updated: 2026-01-19
+# Website: https://turuturustars.co.ke
+
+# ====================
+# GENERAL RULES
+# ====================
+
 # Allow all bots to crawl the site
 User-agent: *
 Allow: /
@@ -5,35 +13,96 @@ Allow: /
 # Disallow crawling of auth pages
 Disallow: /auth
 Disallow: /admin/login
+Disallow: /forgot-password
 
 # Disallow crawling of private dashboard pages for anonymous users
 # (These are protected by authentication anyway)
 Disallow: /dashboard/private
 
-# Specific bot rules
+# Disallow specific admin and internal paths
+Disallow: /*.json$
+Disallow: /*.js$
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /node_modules/
+
+# ====================
+# SPECIFIC BOT RULES
+# ====================
+
+# Google Bot - Standard crawl delay
 User-agent: Googlebot
 Allow: /
 Crawl-delay: 0
+Request-rate: 100/1h
 
+# Bing Bot - Standard crawl delay
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
+Request-rate: 30/1h
 
-User-agent: Slurp
+# Yandex Bot
+User-agent: YandexBot
 Allow: /
 Crawl-delay: 1
 
+# DuckDuckGo
+User-agent: DuckDuckBot
+Allow: /
+Crawl-delay: 1
+
+# Baidu Bot
+User-agent: Baiduspider
+Allow: /
+Crawl-delay: 2
+
+# Twitter/X Bot
 User-agent: Twitterbot
 Allow: /
+Crawl-delay: 0
 
+# Facebook Bot
 User-agent: facebookexternalhit
 Allow: /
 
+# LinkedIn Bot
 User-agent: LinkedInBot
 Allow: /
 
+# WhatsApp Bot
 User-agent: whatsapp
 Allow: /
 
-# Sitemap location
+# Slack Bot
+User-agent: Slackbot
+Allow: /
+
+# ====================
+# SITEMAP LOCATIONS
+# ====================
+
+# Main sitemap
 Sitemap: https://turuturustars.co.ke/sitemap.xml
+
+# Location-specific sitemap
+Sitemap: https://turuturustars.co.ke/sitemap-locations.xml
+
+# Landmark-specific sitemap
+Sitemap: https://turuturustars.co.ke/sitemap-landmarks.xml
+
+# ====================
+# OTHER CRAWLERS
+# ====================
+
+# Archive crawlers
+User-agent: archive.org_bot
+Allow: /
+
+# Duplicate content detection
+User-agent: MJ12bot
+Allow: /
+Crawl-delay: 1
+
+
