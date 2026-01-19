@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -26,7 +27,7 @@ interface NavItem {
 }
 
 const RoleBasedNav = () => {
-  const { roles } = useAuth();
+  const { roles, profile } = useAuth();
   const location = useLocation();
   const userRoles = roles.map(r => r.role) as AppRole[];
 
@@ -105,23 +106,38 @@ const RoleBasedNav = () => {
   });
 
   return (
-    <nav className="space-y-1">
-      {filteredItems.map((item) => (
-        <Link
-          key={item.href}
-          to={item.href}
-          className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-            location.pathname === item.href
-              ? 'bg-primary text-primary-foreground'
-              : 'text-foreground hover:bg-accent'
-          )}
-        >
-          {item.icon}
-          <span>{item.title}</span>
-        </Link>
-      ))}
-    </nav>
+    <>
+      {/* User Profile Avatar at the top */}
+      {profile && (
+        <div className="flex flex-col items-center gap-2 py-6">
+          <Avatar className="h-14 w-14 shadow-lg">
+            <AvatarImage src={profile.photo_url || undefined} alt={profile.full_name || 'Profile'} />
+            <AvatarFallback>{profile.full_name ? profile.full_name[0].toUpperCase() : 'U'}</AvatarFallback>
+          </Avatar>
+          <div className="text-center">
+            <div className="font-semibold text-base truncate max-w-[120px]">{profile.full_name}</div>
+            <div className="text-xs text-muted-foreground">{profile.membership_number}</div>
+          </div>
+        </div>
+      )}
+      <nav className="space-y-1">
+        {filteredItems.map((item) => (
+          <Link
+            key={item.href}
+            to={item.href}
+            className={cn(
+              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+              location.pathname === item.href
+                ? 'bg-primary text-primary-foreground'
+                : 'text-foreground hover:bg-accent'
+            )}
+          >
+            {item.icon}
+            <span>{item.title}</span>
+          </Link>
+        ))}
+      </nav>
+    </>
   );
 };
 
