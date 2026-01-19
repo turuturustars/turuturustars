@@ -70,14 +70,24 @@
   <!-- Legal Pages -->
   <url>
     <loc>https://turuturustars.co.ke/privacy-policy</loc>
-    <lastmod>2026-01-18</lastmod>
+    <lastmod>2026-01-19</lastmod>
     <changefreq>quarterly</changefreq>
     <priority>0.4</priority>
   </url>
 
   <url>
     <loc>https://turuturustars.co.ke/terms-of-service</loc>
-    <lastmod>2026-01-18</lastmod>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>quarterly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <url>
+    <loc>https://turuturustars.co.ke/constitution</loc>
+    <lastmod>2026-01-19</lastmod>
+    <changefreq>quarterly</changefreq>
+    <priority>0.5</priority>
+  </url>
     <changefreq>quarterly</changefreq>
     <priority>0.4</priority>
   </url>

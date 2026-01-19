@@ -47,6 +47,7 @@ const Benefits = lazy(() => import("./pages/Benefits"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const Constitution = lazy(() => import("./pages/Constitution"));
 const Help = lazy(() => import("./pages/Help"));
 const FAQPage = lazy(() => import("./pages/FAQ"));
 const Support = lazy(() => import("./pages/Support"));
@@ -119,6 +120,7 @@ const App = () => {
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/constitution" element={<Constitution />} />
                 <Route path="/help" element={<Help />} />
                 <Route path="/faq" element={<FAQPage />} />
                 <Route path="/support" element={<Support />} />
