@@ -70,10 +70,11 @@ const Auth = () => {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   
   // Phone verification states
-  const [verificationStep, setVerificationStep] = useState<'form' | 'verify' | 'verified'>('form');
+  const [verificationStep, setVerificationStep] = useState<'form' | 'verify' | 'verified' | 'skipped'>('form');
   const [verificationCode, setVerificationCode] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationFailed, setVerificationFailed] = useState(false);
   
   const [formData, setFormData] = useState({
     email: '',
@@ -138,6 +139,7 @@ const Auth = () => {
     }
 
     setIsSendingCode(true);
+    setVerificationFailed(false);
     try {
       const { data, error } = await supabase.functions.invoke('twilio-verify', {
         body: { action: 'send', phone: formData.phone }
@@ -156,14 +158,23 @@ const Auth = () => {
       }
     } catch (error) {
       console.error('Send verification error:', error);
+      setVerificationFailed(true);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send verification code',
-        variant: 'destructive',
+        title: 'SMS Verification Unavailable',
+        description: 'You can still register - we\'ll verify your phone later.',
+        variant: 'default',
       });
     } finally {
       setIsSendingCode(false);
     }
+  };
+
+  const skipVerification = () => {
+    setVerificationStep('skipped');
+    toast({
+      title: 'Verification Skipped',
+      description: 'You can proceed with registration. Phone verification will be done later.',
+    });
   };
 
   const verifyCode = async () => {
@@ -239,11 +250,11 @@ const Auth = () => {
     
     if (!validateForm()) return;
 
-    // For registration, require phone verification
-    if (!isLogin && verificationStep !== 'verified') {
+    // For registration, allow verified OR skipped verification
+    if (!isLogin && verificationStep !== 'verified' && verificationStep !== 'skipped') {
       toast({
         title: 'Phone Verification Required',
-        description: 'Please verify your phone number before registering',
+        description: 'Please verify your phone number or skip verification to continue',
         variant: 'destructive',
       });
       return;
@@ -474,7 +485,38 @@ const Auth = () => {
                       >
                         Change number
                       </button>
+                      <button
+                        type="button"
+                        onClick={skipVerification}
+                        className="text-xs text-orange-600 hover:underline font-medium"
+                      >
+                        Skip verification
+                      </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Skip Verification Option if SMS fails */}
+                {verificationFailed && verificationStep === 'form' && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <p className="text-sm text-orange-800 mb-2">SMS verification is currently unavailable.</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={skipVerification}
+                      className="w-full border-orange-300 text-orange-700 hover:bg-orange-100"
+                    >
+                      Continue without phone verification
+                    </Button>
+                  </div>
+                )}
+
+                {/* Verification Skipped Notice */}
+                {verificationStep === 'skipped' && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <p className="text-sm text-green-800">You can proceed with registration</p>
                   </div>
                 )}
 

@@ -14,6 +14,8 @@ interface Profile {
   photo_url: string | null;
   id_number: string | null;
   joined_at: string;
+  location: string | null;
+  occupation: string | null;
 }
 
 interface UserRole {
@@ -67,7 +69,24 @@ export function useAuth() {
       .maybeSingle();
 
     if (!error && data) {
-      setProfile(data as Profile);
+      // Cast to any to access new columns that may not be in generated types yet
+      const rawData = data as Record<string, unknown>;
+      const profileData: Profile = {
+        id: rawData.id as string,
+        full_name: rawData.full_name as string,
+        phone: rawData.phone as string,
+        email: rawData.email as string | null,
+        membership_number: rawData.membership_number as string | null,
+        status: (rawData.status as Profile['status']) || 'pending',
+        is_student: (rawData.is_student as boolean) || false,
+        registration_fee_paid: (rawData.registration_fee_paid as boolean) || false,
+        photo_url: rawData.photo_url as string | null,
+        id_number: rawData.id_number as string | null,
+        joined_at: (rawData.joined_at as string) || (rawData.created_at as string),
+        location: (rawData.location as string | null) || null,
+        occupation: (rawData.occupation as string | null) || null,
+      };
+      setProfile(profileData);
     }
     setIsLoading(false);
   };
