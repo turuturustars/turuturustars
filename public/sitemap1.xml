@@ -1,103 +1,70 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <!-- Homepage -->
+
   <url>
     <loc>https://turuturustars.co.ke/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
-  <!-- Main Pages -->
+
   <url>
     <loc>https://turuturustars.co.ke/about</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
+
   <url>
     <loc>https://turuturustars.co.ke/pillars</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+
   <url>
     <loc>https://turuturustars.co.ke/leadership</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
+
   <url>
     <loc>https://turuturustars.co.ke/how-it-works</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
-  <url>
-    <loc>https://turuturustars.co.ke/register</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/auth</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/privacy-policy</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/terms-of-service</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/constitution</loc>
-    <changefreq>yearly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <!-- Dashboard & Community -->
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard/profile</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard/settings</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard/announcements</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard/members</loc>
-    <changefreq>weekly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://turuturustars.co.ke/dashboard/notifications</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <!-- Careers & Help -->
+
   <url>
     <loc>https://turuturustars.co.ke/careers</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
+
   <url>
     <loc>https://turuturustars.co.ke/help</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
+
   <url>
     <loc>https://turuturustars.co.ke/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
-  <!-- Only include valid, existing routes below -->
+
+  <url>
+    <loc>https://turuturustars.co.ke/privacy-policy</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://turuturustars.co.ke/terms-of-service</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://turuturustars.co.ke/constitution</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
 </urlset>
