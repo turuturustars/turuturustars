@@ -328,13 +328,6 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         <Button
           onClick={signOut}
           disabled={isLoading}
-          variant="ghost"
-          className="w-full justify-start gap-2 text-xs sm:text-sm text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all duration-200"
-        >
-          <LogOut className="w-4 h-4 flex-shrink-0" />
-          <span>Sign Out</span>
-        </Button>
-      </div>
           className={cn(
             'w-full justify-start gap-3 font-medium transition-all duration-200 h-11 text-sm rounded-xl',
             'hover:bg-destructive/10 text-destructive hover:text-destructive',
