@@ -1,4 +1,4 @@
-import { Share2, Mail, Send, Video } from 'lucide-react';
+import { Share2, Mail, MessageCircle } from 'lucide-react';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import logoImage from '@/assets/turuturustarslogo.png';
 
@@ -9,14 +9,15 @@ const Footer = () => {
     { label: 'About Us', href: '/about' },
     { label: 'Our Pillars', href: '/pillars' },
     { label: 'Leadership', href: '/leadership' },
+    { label: 'How It Works', href: '/how-it-works' },
     { label: 'Join Us', href: '/register' },
+    { label: 'Help & Support', href: '/help' },
   ];
 
   const socialLinks = [
-    { icon: Share2, href: '#', label: 'Facebook' },
-    { icon: Send, href: '#', label: 'Twitter' },
-    { icon: Mail, href: '#', label: 'Instagram' },
-    { icon: Video, href: '#', label: 'YouTube' },
+    { icon: Share2, href: 'https://www.facebook.com/profile.php?id=61586034996115', label: 'Facebook' },
+    { icon: MessageCircle, href: 'https://chat.whatsapp.com/GGTZMqkT2akLenI23wWrN7', label: 'WhatsApp' },
+    { icon: Mail, href: 'mailto:support@turuturustars.co.ke', label: 'Email' },
   ];
 
   return (

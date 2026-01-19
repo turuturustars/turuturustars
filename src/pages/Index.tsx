@@ -6,20 +6,42 @@ import PillarsSection from '@/components/pages/pillars/PillarsSection';
 import ChairmanSection from '@/components/pages/leadership/ChairmanSection';
 import CareersSection from '@/components/pages/careers/CareersSection';
 import Footer from '@/components/Footer';
-import { StructuredData } from '@/components/StructuredData';
+import { StructuredData, LocalOrganizationSchema } from '@/components/StructuredData';
 import { usePageMeta } from '@/hooks/usePageMeta';
 
 const Index = () => {
   usePageMeta({
-    title: 'Turuturu Stars CBO - Community Based Organization Kenya',
-    description: 'Join Turuturu Stars, a vibrant community organization dedicated to mutual help and growth. Manage contributions, welfare assistance, and community events.',
+    title: 'Turuturu Stars CBO - Community Organization in Muranga, Kenya | Turuturu, Githima, Kigumo',
+    description: 'Turuturu Stars Community Based Organization serving Turuturu, Muranga County. Manage contributions, welfare assistance, and community events. Join our united family in Turuturu, Githima, Kigumo, and surrounding areas.',
     keywords: [
+      'Turuturu Stars',
       'CBO Kenya',
+      'community based organization',
       'community organization',
-      'contributions',
-      'welfare',
-      'membership',
-      'Turuturu Stars'
+      'Turuturu community',
+      'Muranga CBO',
+      'Turuturu Muranga',
+      'Githima community',
+      'Kigumo community',
+      'welfare assistance Kenya',
+      'community contributions',
+      'mutual help Kenya',
+      'Turuturu projects',
+      'Turuturu support',
+      'Turuturu good will community',
+      'Francis Mwangi chairman',
+      'Peter Muraya Turuturu',
+      'Turuturu Baptist Church',
+      'Turuturu KAG Church',
+      'Turuturu PEFA Church',
+      'Akorino church Turuturu',
+      'Bishop Kinyua',
+      'Turuturu primary school',
+      'Turuturu secondary school',
+      'Kigumo secondary school',
+      'Kigumo bendera high school',
+      'Turuturu well wishers',
+      'turuturu community welfare',
     ],
     ogImage: 'https://img.icons8.com/nolan/256/star.png',
     ogType: 'website',
@@ -29,22 +51,23 @@ const Index = () => {
   const organizationData = {
     name: 'Turuturu Stars CBO',
     url: 'https://turuturustars.co.ke',
-    description: 'Community Based Organization managing contributions, welfare, and member engagement',
+    description: 'Community Based Organization managing contributions, welfare, and member engagement in Muranga County',
     foundingDate: '2024',
     location: {
       '@type': 'Place',
-      name: 'Kenya'
+      name: 'Turuturu, Muranga County, Kenya'
     },
     logo: 'https://img.icons8.com/nolan/256/star.png',
     sameAs: [
-      'https://twitter.com/TuruturuStars',
-      'https://facebook.com/TuruturuStars'
+      'https://www.facebook.com/profile.php?id=61586034996115',
+      'https://chat.whatsapp.com/GGTZMqkT2akLenI23wWrN7'
     ]
   };
 
   return (
     <div className="min-h-screen scroll-smooth">
       <StructuredData data={organizationData} type="Organization" />
+      <LocalOrganizationSchema />
       <ScrollProgressIndicator />
       <Header />
       <main role="main">

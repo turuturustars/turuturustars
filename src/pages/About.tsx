@@ -7,15 +7,25 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 
 const About = () => {
   usePageMeta({
-    title: 'About Turuturu Stars CBO - Our Mission & Values',
-    description: 'Learn about Turuturu Stars, our mission, core values, and commitment to community development based on Ubuntu philosophy.',
+    title: 'About Turuturu Stars CBO - Community Organization in Muranga | Mission & Values',
+    description: 'Learn about Turuturu Stars Community Organization serving Turuturu, Muranga County. Our mission, Ubuntu values, and commitment to community welfare in Githima, Kigumo, and surrounding areas.',
     keywords: [
-      'about us',
-      'mission',
-      'values',
-      'Ubuntu',
-      'community development',
-      'Turuturu Stars'
+      'about Turuturu Stars',
+      'about CBO',
+      'Turuturu community mission',
+      'Ubuntu philosophy',
+      'community development Kenya',
+      'Turuturu values',
+      'Muranga community organization',
+      'Turuturu welfare',
+      'community values Kenya',
+      'Francis Mwangi Turuturu',
+      'Turuturu leaders',
+      'community support Muranga',
+      'Turuturu projects',
+      'Turuturu initiatives',
+      'Kigumo Turuturu community',
+      'Githima Turuturu'
     ],
     ogImage: 'https://img.icons8.com/nolan/256/star.png',
     ogType: 'website',

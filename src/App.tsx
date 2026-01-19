@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "react-error-boundary";
+import { LocalOrganizationSchema } from "@/components/StructuredData";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -42,6 +43,13 @@ const Careers = lazy(() => import("./pages/Careers"));
 const Leadership = lazy(() => import("./pages/Leadership"));
 const Register = lazy(() => import("./pages/Register"));
 const Auth = lazy(() => import("./pages/Auth"));
+const Benefits = lazy(() => import("./pages/Benefits"));
+const HowItWorks = lazy(() => import("./pages/HowItWorks"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const Help = lazy(() => import("./pages/Help"));
+const FAQPage = lazy(() => import("./pages/FAQ"));
+const Support = lazy(() => import("./pages/Support"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -94,6 +102,7 @@ const App = () => {
     <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => globalThis.location.href = "/"}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
+          <LocalOrganizationSchema />
           <Toaster />
           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -106,6 +115,13 @@ const App = () => {
                 <Route path="/pillars" element={<Pillars />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/leadership" element={<Leadership />} />
+                <Route path="/benefits" element={<Benefits />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+                <Route path="/terms-of-service" element={<TermsOfService />} />
+                <Route path="/help" element={<Help />} />
+                <Route path="/faq" element={<FAQPage />} />
+                <Route path="/support" element={<Support />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/auth" element={<Auth />} />
 
