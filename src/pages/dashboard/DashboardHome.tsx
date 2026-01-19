@@ -279,40 +279,44 @@ const DashboardHome = () => {
         </div>
       </div>
 
-      {/* Membership Status Banner */}
-      <Card className={`border-2 ${statusConfig.borderColor} ${statusConfig.bgColor} shadow-lg overflow-hidden`}>
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex items-start gap-3 sm:gap-4 flex-1">
-              <div className={`p-2.5 sm:p-3 rounded-xl ${statusConfig.bgColor} border-2 ${statusConfig.borderColor}`}>
-                <StatusIcon className={`w-5 h-5 sm:w-6 sm:h-6 ${statusConfig.color}`} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-base sm:text-lg text-foreground mb-1">
-                  Membership Status
-                </h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {statusConfig.message}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Badge 
-                variant={profile?.registration_fee_paid ? 'default' : 'destructive'}
-                className="px-3 py-1.5"
-              >
-                {profile?.registration_fee_paid ? '✓ Fee Paid' : '⚠ Fee Pending'}
-              </Badge>
-              <Badge 
-                variant="outline"
-                className={`px-3 py-1.5 ${statusConfig.color} ${statusConfig.borderColor}`}
-              >
-                {profile?.status?.toUpperCase()}
-              </Badge>
+      {/* Membership Status - Compact Badge */}
+      <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 xs:gap-3">
+        <div className="flex items-center gap-2 xs:gap-3 group">
+          {/* Status Icon */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-emerald-400/30 rounded-full blur-lg group-hover:blur-xl group-hover:bg-emerald-400/40 transition-all duration-300" />
+            <div className={`relative p-2 rounded-full ${statusConfig.bgColor} border-2 ${statusConfig.borderColor} group-hover:scale-110 transition-transform duration-300`}>
+              <StatusIcon className={`w-4 h-4 xs:w-5 xs:h-5 ${statusConfig.color}`} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+          
+          {/* Status Text */}
+          <div className="min-w-0">
+            <h3 className="font-bold text-sm xs:text-base text-foreground leading-tight">
+              Membership Status
+            </h3>
+            <p className="text-xs xs:text-sm text-muted-foreground truncate">
+              {statusConfig.message}
+            </p>
+          </div>
+        </div>
+        
+        {/* Status Badges - Compact */}
+        <div className="flex items-center gap-1.5 xs:gap-2">
+          <div className={`inline-flex items-center gap-1.5 px-2.5 xs:px-3 py-1.5 rounded-full text-xs xs:text-sm font-semibold transition-all duration-300 ${
+            profile?.registration_fee_paid 
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200/50' 
+              : 'bg-red-100 text-red-700 border border-red-200/50'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${profile?.registration_fee_paid ? 'bg-emerald-600 animate-pulse' : 'bg-red-600'}`} />
+            <span className="whitespace-nowrap">{profile?.registration_fee_paid ? 'Fee Paid' : 'Fee Pending'}</span>
+          </div>
+          
+          <div className="px-2.5 xs:px-3 py-1.5 rounded-full text-xs xs:text-sm font-semibold bg-blue-100 text-blue-700 border border-blue-200/50">
+            {profile?.status?.charAt(0).toUpperCase()}{profile?.status?.slice(1)}
+          </div>
+        </div>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
