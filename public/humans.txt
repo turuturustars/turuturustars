@@ -1,0 +1,32 @@
+/* TEAM */
+  Name: Francis Mwangi
+  Title: Chairman
+  Location: Kigumo, Muranga County, Kenya
+  Contact: support@turuturustars.co.ke
+
+  Name: Peter Muraya
+  Title: Board Member
+  Location: Muranga County, Kenya
+
+  Name: Bishop Kinyua
+  Title: Board Member / Patron
+  Location: Muranga County, Kenya
+
+/* SITE */
+  Last Updated: 2026-01-19
+  Language: English
+  Charset: UTF-8
+  Doctype: HTML5
+  Standards: HTML5, CSS3, ECMAScript 2020+
+  Components: React 18, TypeScript, TailwindCSS, Vite
+  
+/* THANKS */
+  Designed and developed by Turuturu Stars CBO
+  Serving Turuturu, Githima, Kigumo, Nguku, Kahariro, Gatune, Githeru, Duka Moja
+  
+/* CONTACT */
+  Email: support@turuturustars.co.ke
+  Phone: +254 700 000 000
+  Address: 65 Sabasaba Road, Kigumo 10208, Muranga County, Kenya
+  Facebook: https://www.facebook.com/profile.php?id=61586034996115
+  WhatsApp: https://chat.whatsapp.com/GGTZMqkT2akLenI23wWrN7

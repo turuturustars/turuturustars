@@ -1,0 +1,8 @@
+# ads.txt file for turuturustars.co.ke
+# Authorized Direct Sellers for Turuturu Stars CBO
+
+# Contact: admin@turuturustars.co.ke
+# Last Updated: 2026-01-19
+
+# Direct seller declaration
+turuturustars.co.ke, direct, all
