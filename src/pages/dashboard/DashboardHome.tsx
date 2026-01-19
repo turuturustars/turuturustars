@@ -248,34 +248,43 @@ const DashboardHome = () => {
   }
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Welcome Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-pink-600 p-6 sm:p-8 lg:p-10 shadow-2xl">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4xIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
-        <div className="absolute top-0 right-0 w-48 sm:w-64 h-48 sm:h-64 bg-white/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-48 sm:w-64 h-48 sm:h-64 bg-purple-500/20 rounded-full blur-3xl" />
+    <div className="space-y-4 pb-8">
+      {/* Welcome Header - Compact & Responsive */}
+      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8 lg:py-5 shadow-lg hover:shadow-xl transition-shadow duration-300">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 right-0 w-32 sm:w-48 h-32 sm:h-48 bg-white/10 rounded-full blur-2xl" />
+          <div className="absolute bottom-0 left-0 w-24 sm:w-40 h-24 sm:h-40 bg-purple-300/10 rounded-full blur-2xl" />
+        </div>
         
         <div className="relative">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-5 h-5 text-white animate-pulse" />
-            <Badge className="bg-white/20 backdrop-blur-sm text-white border-white/30">
-              Member Dashboard
-            </Badge>
+          {/* Top row: Badge + Time */}
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white/90 animate-pulse" />
+              <Badge className="bg-white/25 backdrop-blur-sm text-white border-white/40 text-xs sm:text-sm px-2.5 sm:px-3 py-0.5">
+                Dashboard
+              </Badge>
+            </div>
+            <span className="text-xs sm:text-sm text-white/85 font-medium">
+              {currentTime}
+            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-1">
-            Happy {dayOfWeek}!
-          </h1>
-          <p className="text-white/90 text-xs sm:text-sm mb-3 flex items-center gap-2">
-            <span>{currentTime}</span>
+          
+          {/* Main greeting - Inline layout */}
+          <div className="flex flex-col xs:flex-row xs:items-baseline xs:gap-2">
+            <h1 className="text-xl xs:text-2xl sm:text-3xl font-bold text-white leading-tight">
+              Happy {dayOfWeek}!
+            </h1>
+            <p className="text-xs xs:text-sm text-white/80 mt-0.5 xs:mt-0">
+              Welcome back, <span className="font-semibold text-white">{profile?.full_name?.split(' ')[0] || 'Member'}</span>
+            </p>
+          </div>
+          
+          {/* Subtitle */}
+          <p className="text-xs xs:text-sm text-white/75 mt-1 sm:mt-1.5">
+            Active member of Turuturu Stars CBO
           </p>
-          <div className="space-y-1">
-            <p className="text-lg sm:text-xl font-semibold text-white">
-              Welcome back, {profile?.full_name?.split(' ')[0] || 'Member'}
-            </p>
-            <p className="text-white/85 text-sm sm:text-base">
-              You're an active member of Turuturu Stars CBO
-            </p>
-          </div>
         </div>
       </div>
 
