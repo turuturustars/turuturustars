@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useLocation } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +10,7 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const { profile } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,24 +42,35 @@ const Header = () => {
     }`}>
       <div className="section-container">
         <div className="flex items-center justify-between h-16 lg:h-20">
-          {/* Logo */}
-          <a href="/" className="flex items-center gap-2 group flex-shrink-0">
-            <img 
-              src={turuturuLogo} 
-              alt="Turuturu Stars Logo" 
-              className="h-10 w-auto lg:h-12 object-contain group-hover:scale-110 transition-all duration-300"
-              loading="eager"
-              width="48"
-              height="48"
-              decoding="async"
-            />
-            <div className="hidden sm:block">
-              <span className="font-serif text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                Turuturu Stars
-              </span>
-              <span className="block text-xs text-muted-foreground -mt-1 group-hover:text-primary/70 transition-colors">CBO</span>
-            </div>
-          </a>
+          {/* Logo & Profile Avatar */}
+          <div className="flex items-center gap-4 flex-shrink-0">
+            <a href="/" className="flex items-center gap-2 group flex-shrink-0">
+              <img 
+                src={turuturuLogo} 
+                alt="Turuturu Stars Logo" 
+                className="h-10 w-auto lg:h-12 object-contain group-hover:scale-110 transition-all duration-300"
+                loading="eager"
+                width="48"
+                height="48"
+                decoding="async"
+              />
+              <div className="hidden sm:block">
+                <span className="font-serif text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
+                  Turuturu Stars
+                </span>
+                <span className="block text-xs text-muted-foreground -mt-1 group-hover:text-primary/70 transition-colors">CBO</span>
+              </div>
+            </a>
+            {/* Profile Avatar (right of logo) */}
+            {profile && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-10 w-10 shadow-md">
+                  <AvatarImage src={profile.photo_url || undefined} alt={profile.full_name || 'Profile'} />
+                  <AvatarFallback>{profile.full_name ? profile.full_name[0].toUpperCase() : 'U'}</AvatarFallback>
+                </Avatar>
+              </div>
+            )}
+          </div>
 
           {/* Desktop Navigation - Enhanced with Premium Feel */}
           <nav className="hidden lg:flex items-center gap-1">
