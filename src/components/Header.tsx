@@ -46,6 +46,10 @@ const Header = () => {
                 src={turuturuLogo} 
                 alt="Turuturu Stars Logo" 
                 className="h-10 w-auto lg:h-12 object-contain shadow-soft group-hover:shadow-elevated transition-all duration-300 group-hover:scale-110"
+                loading="eager"
+                width="48"
+                height="48"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 rounded-full transition-all duration-300 blur-lg"></div>
             </div>

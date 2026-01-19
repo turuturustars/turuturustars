@@ -8,7 +8,6 @@ import {
   Bell, 
   Settings,
   LogOut,
-  Star,
   FileText,
   UserCheck,
   TrendingUp,
@@ -25,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { getPrimaryRole, hasRole } from '@/lib/rolePermissions';
+import turuturuLogo from '@/assets/turuturustarslogo.png';
 
 interface DashboardSidebarProps {
   onClose?: () => void;
@@ -168,8 +168,16 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         >
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300" />
-            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-              <Star className="w-6 h-6 text-primary-foreground" />
+            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-primary via-primary to-primary/80 flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300 overflow-hidden">
+              <img 
+                src={turuturuLogo}
+                alt="Turuturu Stars Logo"
+                className="w-10 h-10 object-contain"
+                loading="eager"
+                width="40"
+                height="40"
+                decoding="async"
+              />
             </div>
           </div>
           <div className="flex-1 min-w-0">

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import NotificationBell from './NotificationBell';
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import turuturuLogo from '@/assets/turuturustarslogo.png';
 
 const ChatSidebar = lazy(() => import('@/components/chat/ChatSidebar'));
 
@@ -98,19 +99,33 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
         <div className="h-16 sm:h-18 md:h-20 px-4 sm:px-6 md:px-8 flex items-center justify-between">
           {/* Left Section */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                'lg:hidden shrink-0 h-10 w-10 rounded-xl transition-all duration-200',
-                'hover:bg-primary/10 hover:text-primary active:scale-95',
-                'hover:shadow-md hover:shadow-primary/10'
-              )}
-              onClick={onMenuToggle}
-              aria-label="Toggle menu"
-            >
-              <Menu className="w-5 h-5" />
-            </Button>
+            {/* Logo and Menu */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'lg:hidden shrink-0 h-10 w-10 rounded-xl transition-all duration-200',
+                  'hover:bg-primary/10 hover:text-primary active:scale-95',
+                  'hover:shadow-md hover:shadow-primary/10'
+                )}
+                onClick={onMenuToggle}
+                aria-label="Toggle menu"
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+              
+              {/* Logo */}
+              <img 
+                src={turuturuLogo}
+                alt="Turuturu Stars Logo"
+                className="h-10 w-auto hidden sm:block object-contain transition-transform duration-300 hover:scale-110"
+                loading="eager"
+                width="40"
+                height="40"
+                decoding="async"
+              />
+            </div>
             
             <div className="min-w-0 flex-1 max-w-2xl">
               {/* Greeting */}

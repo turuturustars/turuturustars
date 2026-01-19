@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Star, Loader2, Eye, EyeOff, CheckCircle, Phone, MapPin, Briefcase } from 'lucide-react';
+import { Loader2, Eye, EyeOff, CheckCircle, Phone, MapPin, Briefcase } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import turuturuLogo from '@/assets/turuturustarslogo.png';
 
 const LOCATIONS = [
   'Nairobi',
@@ -284,9 +285,14 @@ const Register = () => {
       <Card className="w-full max-w-md shadow-hero">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-elevated">
-              <Star className="w-8 h-8 text-primary-foreground" />
-            </div>
+            <img 
+              src={turuturuLogo}
+              alt="Turuturu Stars Logo"
+              className="h-16 w-auto rounded-full shadow-elevated object-contain"
+              loading="eager"
+              width="64"
+              height="64"
+            />
           </div>
           <div>
             <CardTitle className="heading-display text-2xl">Join Turuturu Stars</CardTitle>
