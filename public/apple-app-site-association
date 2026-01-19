@@ -1,0 +1,14 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "com.turuturustars.app",
+        "paths": ["/*"]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["com.turuturustars.app"]
+  }
+}
