@@ -1,14 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin } from 'lucide-react';
 import ProfilePhotoUpload from '@/components/dashboard/ProfilePhotoUpload';
+
+// Location options
+const LOCATIONS = [
+  'Turuturu',
+  'Gatune',
+  'Mutoho',
+  'Githeru',
+  'Kahariro',
+  'Kiangige',
+  'Daboo',
+  'Githima',
+  'Nguku',
+  'Ngaru',
+  'Kiugu',
+  'Kairi',
+  'Other'
+] as const;
 
 const ProfilePage = () => {
   const { profile, roles } = useAuth();
@@ -16,10 +34,28 @@ const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
-    full_name: profile?.full_name || '',
-    phone: profile?.phone || '',
-    id_number: profile?.id_number || '',
+    full_name: '',
+    phone: '',
+    id_number: '',
+    location: '',
+    otherLocation: '',
+    occupation: '',
   });
+
+  // Initialize form data when profile loads
+  useEffect(() => {
+    if (profile) {
+      const isOtherLocation = profile.location && !LOCATIONS.slice(0, -1).includes(profile.location as any);
+      setFormData({
+        full_name: profile.full_name || '',
+        phone: profile.phone || '',
+        id_number: profile.id_number || '',
+        location: isOtherLocation ? 'Other' : (profile.location || ''),
+        otherLocation: isOtherLocation ? (profile.location || '') : '',
+        occupation: profile.occupation || '',
+      });
+    }
+  }, [profile]);
 
   const handleSave = async () => {
     if (!profile?.id) return;
@@ -27,12 +63,16 @@ const ProfilePage = () => {
     setIsSaving(true);
 
     try {
+      const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
+      
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: formData.full_name,
           phone: formData.phone,
           id_number: formData.id_number,
+          location: finalLocation || null,
+          occupation: formData.occupation || null,
         })
         .eq('id', profile.id);
 
@@ -85,7 +125,6 @@ const ProfilePage = () => {
               fullName={profile?.full_name || 'Member'}
               userId={profile?.id || ''}
               onPhotoUpdate={(photoUrl) => {
-                // Profile will be refreshed on next auth check
                 console.log('Photo updated:', photoUrl);
               }}
             />
@@ -101,16 +140,22 @@ const ProfilePage = () => {
                   </Badge>
                   {roles.filter((r) => r.role !== 'member').map((r) => (
                     <Badge key={r.role} variant="outline" className="capitalize">
-                      {r.role}
+                      {r.role.replace('_', ' ')}
                     </Badge>
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-center md:justify-start gap-4 mt-4 text-sm text-muted-foreground">
+              <div className="flex items-center justify-center md:justify-start gap-4 mt-4 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   Joined {profile?.joined_at ? new Date(profile.joined_at).toLocaleDateString() : 'N/A'}
                 </span>
+                {profile?.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    {profile.location}
+                  </span>
+                )}
                 {profile?.is_student && (
                   <Badge variant="secondary">Student Member</Badge>
                 )}
@@ -175,7 +220,6 @@ const ProfilePage = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="id_number" className="flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
                 ID Number
               </Label>
               {isEditing ? (
@@ -186,6 +230,56 @@ const ProfilePage = () => {
                 />
               ) : (
                 <p className="text-foreground py-2">{profile?.id_number || 'Not provided'}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="location" className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Location
+              </Label>
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Select
+                    value={formData.location}
+                    onValueChange={(value) => setFormData({ ...formData, location: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your location" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOCATIONS.map((loc) => (
+                        <SelectItem key={loc} value={loc}>
+                          {loc}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.location === 'Other' && (
+                    <Input
+                      placeholder="Specify your location"
+                      value={formData.otherLocation}
+                      onChange={(e) => setFormData({ ...formData, otherLocation: e.target.value })}
+                    />
+                  )}
+                </div>
+              ) : (
+                <p className="text-foreground py-2">{profile?.location || 'Not specified'}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="occupation" className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                Occupation
+              </Label>
+              {isEditing ? (
+                <Input
+                  id="occupation"
+                  placeholder="e.g., Teacher, Farmer, Business Owner"
+                  value={formData.occupation}
+                  onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                />
+              ) : (
+                <p className="text-foreground py-2">{profile?.occupation || 'Not specified'}</p>
               )}
             </div>
           </div>

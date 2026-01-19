@@ -222,20 +222,28 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
             </div>
             
             <div className="grid grid-cols-2 gap-2">
-              {onlineUsers.slice(0, 8).map((userId, i) => (
+              {onlineUsers.slice(0, 8).map((onlineUser, i) => (
                 <div
-                  key={userId}
+                  key={onlineUser.user_id}
                   className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-card/80 hover:bg-card border border-border/30 hover:border-primary/30 transition-all duration-200 hover:shadow-md cursor-pointer"
                   style={{ animationDelay: `${i * 50}ms` }}
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
-                      M{i + 1}
-                    </div>
+                    {onlineUser.photo_url ? (
+                      <img 
+                        src={onlineUser.photo_url} 
+                        alt={onlineUser.full_name}
+                        className="w-7 h-7 rounded-full object-cover shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+                        {onlineUser.full_name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                     <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-card" />
                   </div>
                   <span className="text-xs font-medium truncate group-hover:text-primary transition-colors">
-                    Member {i + 1}
+                    {onlineUser.full_name}
                   </span>
                 </div>
               ))}

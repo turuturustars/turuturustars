@@ -29,11 +29,17 @@ export interface TypingUser {
   full_name: string;
 }
 
+export interface OnlineUser {
+  user_id: string;
+  full_name: string;
+  photo_url: string | null;
+}
+
 export function useRealtimeChat(roomId = 'global') {
   const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -92,11 +98,27 @@ export function useRealtimeChat(roomId = 'global') {
 
   const fetchOnlineUsers = useCallback(async () => {
     try {
-      const { data } = await (supabase.from('user_status' as 'announcements') as any)
+      const { data: statusData } = await (supabase.from('user_status' as 'announcements') as any)
         .select('user_id')
         .eq('status', 'online');
       
-      setOnlineUsers((data || []).map((r: any) => r.user_id));
+      if (statusData && statusData.length > 0) {
+        const userIds = statusData.map((r: any) => r.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, photo_url')
+          .in('id', userIds);
+
+        setOnlineUsers(
+          (profiles || []).map(p => ({
+            user_id: p.id,
+            full_name: p.full_name,
+            photo_url: p.photo_url
+          }))
+        );
+      } else {
+        setOnlineUsers([]);
+      }
     } catch (e) {
       console.error('Error fetching online users:', e);
     }
