@@ -1,37 +1,160 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Character Encoding and Viewport -->
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    
+    <!-- Preconnect for Performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    
+    <!-- Favicon and Links -->
     <link rel="icon" type="image/png" href="https://img.icons8.com/nolan/64/star.png" />
+    <link rel="apple-touch-icon" href="https://img.icons8.com/nolan/256/star.png" />
     <link rel="canonical" href="https://turuturustars.co.ke" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
     
-    <title>Turuturu Stars CBO - Community Based Organization</title>
-    <meta name="description" content="Turuturu Stars Community Based Organization. Manage member contributions, welfare assistance, announcements, and community activities efficiently." />
-    <meta name="keywords" content="CBO, community, Kenya, contributions, welfare, membership, organization" />
+    <!-- Core Title and Description -->
+    <title>Turuturu Stars CBO - Community Based Organization in Muranga, Kenya</title>
+    <meta name="description" content="Turuturu Stars Community Based Organization in Muranga County. Manage member contributions, welfare assistance, announcements, and community activities. Serving Turuturu, Githima, Kigumo, Nguku, Kahariro, Gatune, Githeru, Duka Moja." />
+    
+    <!-- Enhanced Keywords with Local Focus -->
+    <meta name="keywords" content="Turuturu Stars, CBO, community based organization, welfare, contributions, Muranga County, Turuturu, Githima, Kigumo, Nguku, Kahariro, Gatune, Githeru, Duka Moja, Kenya, membership, community organization, mutual assistance, welfare fund, savings group, community development" />
+    
+    <!-- Standard Meta Tags -->
     <meta name="author" content="Turuturu Stars CBO" />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
-    <meta name="google-site-verification" content="GCQYqq0aVHJ-QmYI8QBo20a4S5DSNG1_1ZnyYy8k8xQ" />
     <meta name="language" content="English" />
     <meta name="revisit-after" content="7 days" />
-
+    <meta name="theme-color" content="#3b82f6" />
+    
+    <!-- Verification Tags -->
+    <meta name="google-site-verification" content="GCQYqq0aVHJ-QmYI8QBo20a4S5DSNG1_1ZnyYy8k8xQ" />
+    <meta name="msvalidate.01" content="BingSiteAuth" />
+    
+    <!-- Geographic Meta Tags -->
+    <meta name="geo.region" content="KE-MG" />
+    <meta name="geo.placename" content="Turuturu, Muranga County, Kenya" />
+    <meta name="geo.position" content="-0.7247;36.4969" />
+    <meta name="ICBM" content="-0.7247, 36.4969" />
+    
     <!-- Open Graph Tags for Social Sharing -->
-    <meta property="og:title" content="Turuturu Stars CBO - Community Organization" />
-    <meta property="og:description" content="Manage contributions, welfare, and announcements for your community organization" />
+    <meta property="og:title" content="Turuturu Stars CBO - Community Organization in Muranga" />
+    <meta property="og:description" content="Community Based Organization managing contributions, welfare, and announcements for members in Muranga County. Transparent, trustworthy, and community-focused." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://turuturustars.co.ke" />
-    <meta property="og:image" content="https://img.icons8.com/nolan/256/star.png" />
-    <meta property="og:image:alt" content="Turuturu Stars Logo" />
+    <meta property="og:image" content="https://img.icons8.com/nolan/512/star.png" />
+    <meta property="og:image:secure_url" content="https://img.icons8.com/nolan/512/star.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Turuturu Stars CBO Logo" />
     <meta property="og:locale" content="en_KE" />
+    <meta property="og:site_name" content="Turuturu Stars CBO" />
 
     <!-- Twitter Card Tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@TuruturuStars" />
-    <meta name="twitter:title" content="Turuturu Stars CBO" />
-    <meta name="twitter:description" content="Community Based Organization - Managing Contributions, Welfare & Announcements" />
-    <meta name="twitter:image" content="https://img.icons8.com/nolan/256/star.png" />
+    <meta name="twitter:title" content="Turuturu Stars CBO - Community Organization" />
+    <meta name="twitter:description" content="Community Based Organization - Welfare, Contributions & Announcements in Muranga County" />
+    <meta name="twitter:image" content="https://img.icons8.com/nolan/512/star.png" />
+    <meta name="twitter:image:alt" content="Turuturu Stars CBO Logo" />
     <meta name="twitter:creator" content="@TuruturuStars" />
+
+    <!-- Additional SEO Meta Tags -->
+    <meta name="copyright" content="Turuturu Stars CBO" />
+    <meta name="distribution" content="global" />
+    <meta name="rating" content="general" />
+    <meta name="audience" content="Community Members, Organizations" />
+    
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "Turuturu Stars CBO",
+      "alternateName": "Turuturu Stars Community Based Organization",
+      "url": "https://turuturustars.co.ke",
+      "logo": "https://img.icons8.com/nolan/512/star.png",
+      "description": "Community Based Organization providing welfare assistance, managing member contributions, and facilitating community development initiatives in Muranga County.",
+      "telephone": "+254 700 000 000",
+      "email": "support@turuturustars.co.ke",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "65 Sabasaba Road",
+        "addressLocality": "Kigumo",
+        "addressRegion": "Muranga County",
+        "postalCode": "10208",
+        "addressCountry": "Kenya"
+      },
+      "areaServed": [
+        {
+          "@type": "Place",
+          "name": "Turuturu"
+        },
+        {
+          "@type": "Place",
+          "name": "Githima"
+        },
+        {
+          "@type": "Place",
+          "name": "Kigumo"
+        },
+        {
+          "@type": "Place",
+          "name": "Nguku"
+        },
+        {
+          "@type": "Place",
+          "name": "Kahariro"
+        },
+        {
+          "@type": "Place",
+          "name": "Gatune"
+        },
+        {
+          "@type": "Place",
+          "name": "Githeru"
+        },
+        {
+          "@type": "Place",
+          "name": "Duka Moja"
+        }
+      ],
+      "founder": {
+        "@type": "Person",
+        "name": "Francis Mwangi",
+        "jobTitle": "Chairman"
+      },
+      "sameAs": [
+        "https://www.facebook.com/profile.php?id=61586034996115",
+        "https://chat.whatsapp.com/GGTZMqkT2akLenI23wWrN7"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "telephone": "+254 700 000 000",
+        "contactType": "Customer Support",
+        "email": "support@turuturustars.co.ke",
+        "areaServed": "KE"
+      },
+      "knowsAbout": [
+        "Community Development",
+        "Welfare Assistance",
+        "Member Contributions",
+        "Savings Groups",
+        "Mutual Assistance",
+        "Community Activities"
+      ],
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-0.7247",
+        "longitude": "36.4969"
+      }
+    }
+    </script>
   </head>
 
   <body>
