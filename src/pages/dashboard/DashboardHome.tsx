@@ -85,14 +85,14 @@ const DashboardHome = () => {
     const primaryRole = getPrimaryRole(userRoles);
 
     const roleDashboards: Record<string, string> = {
-      'chairperson': '/dashboard/chairperson',
-      'vice_chairperson': '/dashboard/vice-chairperson',
-      'secretary': '/dashboard/secretary-role',
-      'vice_secretary': '/dashboard/vice-secretary',
-      'treasurer': '/dashboard/treasurer-role',
-      'organizing_secretary': '/dashboard/organizing-secretary',
-      'patron': '/dashboard/patron',
-      'admin': '/dashboard/admin',
+      'chairperson': '/dashboard/roles/chairperson',
+      'vice_chairperson': '/dashboard/roles/vice-chairperson',
+      'secretary': '/dashboard/roles/secretary',
+      'vice_secretary': '/dashboard/roles/vice-secretary',
+      'treasurer': '/dashboard/roles/treasurer',
+      'organizing_secretary': '/dashboard/roles/organizing-secretary',
+      'patron': '/dashboard/roles/patron',
+      'admin': '/dashboard/roles/admin',
     };
 
     const targetDashboard = roleDashboards[primaryRole];
