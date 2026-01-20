@@ -53,10 +53,10 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
 
   const memberLinks = [
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
-    { label: 'Contributions', href: '/dashboard/contributions', icon: DollarSign, badge: null },
-    { label: 'Welfare Cases', href: '/dashboard/welfare', icon: HandHeart, badge: null },
-    { label: 'Announcements', href: '/dashboard/announcements', icon: Bell, badge: 'new' },
-    { label: 'Voting', href: '/dashboard/voting', icon: Vote, badge: null },
+    { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
+    { label: 'Welfare Cases', href: '/dashboard/members/welfare', icon: HandHeart, badge: null },
+    { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell, badge: 'new' },
+    { label: 'Voting', href: '/dashboard/governance/voting', icon: Vote, badge: null },
     { label: 'Private Messages', href: '/dashboard/communication/messages', icon: MessageCircle, badge: null },
     { label: 'Profile', href: '/dashboard/profile', icon: Settings, badge: null },
   ];
@@ -64,61 +64,61 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const roleSpecificLinks = () => {
     if (hasRole(userRoles, 'chairperson')) {
       return [
-        { label: 'Chair Dashboard', href: `/dashboard/chairperson`, icon: Star },
+        { label: 'Chair Dashboard', href: `/dashboard/roles/chairperson`, icon: Star },
         { label: 'Members', href: '/dashboard/members', icon: Users },
         { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Meetings', href: '/dashboard/meetings', icon: FileText },
-        { label: 'Announcements', href: '/dashboard/announcements', icon: Bell },
+        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
+        { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell },
       ];
     }
     if (hasRole(userRoles, 'vice_chairperson')) {
       return [
-        { label: 'Vice Chairman', href: `/dashboard/vice-chairperson`, icon: Star },
+        { label: 'Vice Chairman', href: `/dashboard/roles/vice-chairperson`, icon: Star },
         { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Meetings', href: '/dashboard/meetings', icon: FileText },
-        { label: 'Announcements', href: '/dashboard/announcements', icon: Bell },
-        { label: 'Community', href: '/dashboard/community', icon: HandHeart },
-        { label: 'Reports', href: '/dashboard/reports', icon: TrendingUp },
-        { label: 'Discipline', href: '/dashboard/discipline', icon: FileText },
+        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
+        { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell },
+        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
+        { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
+        { label: 'Discipline', href: '/dashboard/members/discipline', icon: FileText },
       ];
     }
     if (hasRole(userRoles, 'secretary') || hasRole(userRoles, 'vice_secretary')) {
       return [
-        { label: 'Secretary', href: `/dashboard/secretary-role`, icon: FileText },
-        { label: 'Records', href: '/dashboard/secretary', icon: ClipboardList },
+        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
+        { label: 'Records', href: '/dashboard/governance/secretary-dashboard', icon: ClipboardList },
       ];
     }
     if (hasRole(userRoles, 'treasurer')) {
       return [
-        { label: 'Treasury', href: `/dashboard/treasurer-role`, icon: PiggyBank },
+        { label: 'Treasury', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
         { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Payments', href: '/dashboard/mpesa-management', icon: Smartphone },
-        { label: 'Reports', href: '/dashboard/reports', icon: TrendingUp },
+        { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
+        { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
       ];
     }
     if (hasRole(userRoles, 'organizing_secretary')) {
       return [
-        { label: 'Org Secretary', href: `/dashboard/organizing-secretary`, icon: ClipboardList },
-        { label: 'Meetings', href: '/dashboard/meetings', icon: FileText },
-        { label: 'Discipline & Fines', href: '/dashboard/discipline', icon: FileText },
+        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
+        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
+        { label: 'Discipline & Fines', href: '/dashboard/members/discipline', icon: FileText },
         { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Reports', href: '/dashboard/reports', icon: TrendingUp },
+        { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
       ];
     }
     if (hasRole(userRoles, 'patron')) {
       return [
-        { label: 'Patron Dashboard', href: `/dashboard/patron`, icon: Star },
-        { label: 'Reports', href: '/dashboard/reports', icon: FileText },
+        { label: 'Patron Dashboard', href: `/dashboard/roles/patron`, icon: Star },
+        { label: 'Reports', href: '/dashboard/finance/reports', icon: FileText },
       ];
     }
     if (hasRole(userRoles, 'admin')) {
       return [
-        { label: 'Admin Dashboard', href: `/dashboard/admin`, icon: Settings },
+        { label: 'Admin Dashboard', href: `/dashboard/roles/admin`, icon: Settings },
         { label: 'Members', href: '/dashboard/members', icon: Users },
         { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Payments', href: '/dashboard/mpesa-management', icon: Smartphone },
-        { label: 'Reports', href: '/dashboard/reports', icon: FileText },
-        { label: 'Approvals', href: '/dashboard/approvals', icon: UserCheck },
+        { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
+        { label: 'Reports', href: '/dashboard/finance/reports', icon: FileText },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
       ];
     }
     return [];
