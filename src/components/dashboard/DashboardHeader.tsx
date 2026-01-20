@@ -96,7 +96,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
             : 'border-border/30'
         )}
       >
-        <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between"
+        <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between">
           {/* Left Section */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
             {/* Logo and Menu */}
