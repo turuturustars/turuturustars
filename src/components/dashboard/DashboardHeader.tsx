@@ -96,7 +96,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
             : 'border-border/30'
         )}
       >
-        <div className="h-16 sm:h-18 md:h-20 px-4 sm:px-6 md:px-8 flex items-center justify-between">
+        <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between"
           {/* Left Section */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
             {/* Logo and Menu */}
@@ -130,7 +130,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
             <div className="min-w-0 flex-1 max-w-2xl">
               {/* Greeting */}
               <div className="flex items-baseline gap-2 mb-1">
-                <h1 className="font-serif text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent truncate">
+                <h1 className="font-serif text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent truncate">
                   Good {timeOfDay}
                   <span className="hidden xs:inline">, {firstName}</span>
                 </h1>

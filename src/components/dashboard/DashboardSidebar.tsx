@@ -131,7 +131,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   return (
     <aside
       className={cn(
-        'h-screen w-72 max-w-[85vw] bg-gradient-to-b from-card via-card to-card/95',
+        'h-screen w-64 md:w-72 max-w-[90vw] bg-gradient-to-b from-card via-card to-card/95',
         'border-r border-border/40 backdrop-blur-xl',
         'flex flex-col overflow-hidden',
         'shadow-xl lg:shadow-none'

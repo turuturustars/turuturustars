@@ -133,7 +133,7 @@ const DashboardLayout = () => {
 
           {/* Sidebar Drawer */}
           <aside
-            className="absolute inset-y-0 left-0 w-72 max-w-[85vw] bg-background shadow-2xl animate-in slide-in-from-left duration-300 border-r border-border"
+            className="absolute inset-y-0 left-0 w-64 md:w-72 max-w-[90vw] bg-background shadow-2xl animate-in slide-in-from-left duration-300 border-r border-border"
           >
             <Sidebar onClose={() => setMobileOpen(false)} />
           </aside>
@@ -149,7 +149,7 @@ const DashboardLayout = () => {
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-6 lg:px-8 lg:py-8">
             {/* Content wrapper with subtle animations */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <Outlet />
@@ -162,7 +162,7 @@ const DashboardLayout = () => {
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>© 2024 Turuturu Stars</span>
+                <span>© {new Date().getFullYear()} Turuturu Stars</span>
                 <span className="hidden sm:inline">•</span>
                 <span className="hidden sm:inline">All rights reserved</span>
               </div>

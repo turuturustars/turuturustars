@@ -144,6 +144,7 @@ const DashboardHome = () => {
       color: 'text-green-600 dark:text-green-400',
       bgColor: 'bg-green-50 dark:bg-green-950/50',
       gradient: 'from-green-500 to-emerald-500',
+      action: { label: 'Add Contribution', path: '/dashboard/finance/contributions' }
     },
     {
       title: 'Pending Payments',
@@ -154,6 +155,7 @@ const DashboardHome = () => {
       color: 'text-amber-600 dark:text-amber-400',
       bgColor: 'bg-amber-50 dark:bg-amber-950/50',
       gradient: 'from-amber-500 to-orange-500',
+      action: { label: 'Pay Now', path: '/dashboard/finance/mpesa' }
     },
     {
       title: 'Active Welfare Cases',
@@ -164,6 +166,7 @@ const DashboardHome = () => {
       color: 'text-blue-600 dark:text-blue-400',
       bgColor: 'bg-blue-50 dark:bg-blue-950/50',
       gradient: 'from-blue-500 to-cyan-500',
+      action: { label: 'View Cases', path: '/dashboard/members/welfare' }
     },
     {
       title: 'Notifications',
@@ -174,6 +177,7 @@ const DashboardHome = () => {
       color: 'text-purple-600 dark:text-purple-400',
       bgColor: 'bg-purple-50 dark:bg-purple-950/50',
       gradient: 'from-purple-500 to-pink-500',
+      action: { label: 'View All', path: '/dashboard/communication/messages' }
     },
   ];
 
@@ -328,7 +332,7 @@ const DashboardHome = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           const isUp = stat.trend === 'up';
@@ -339,22 +343,22 @@ const DashboardHome = () => {
               key={stat.title}
               className="group hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden"
             >
-              <CardContent className="p-4 sm:p-6">
+              <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6">
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm md:text-sm text-muted-foreground mb-2 truncate">
                       {stat.title}
                     </p>
-                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+                    <p className="text-2xl sm:text-2xl md:text-3xl lg:text-3xl font-bold text-foreground">
                       {stat.value}
                     </p>
                   </div>
-                  <div className={`p-2.5 sm:p-3 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform`}>
-                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${stat.color}`} />
+                  <div className={`p-2 sm:p-2.5 md:p-3 rounded-lg sm:rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform flex-shrink-0`}>
+                    <Icon className={`w-4 h-4 sm:w-5 sm:h-5 md:w-5 md:h-5 ${stat.color}`} />
                   </div>
                 </div>
                 {stat.change && (
-                  <div className={`flex items-center gap-1 text-xs font-medium ${
+                  <div className={`flex items-center gap-1 text-xs font-medium mb-3 ${
                     isUp ? 'text-green-600 dark:text-green-400' : 
                     isDown ? 'text-red-600 dark:text-red-400' : 
                     'text-muted-foreground'
@@ -364,6 +368,18 @@ const DashboardHome = () => {
                     <span className="truncate">{stat.change}</span>
                   </div>
                 )}
+                {stat.action && (
+                  <Button 
+                    asChild 
+                    variant="outline" 
+                    className="w-full text-xs group-hover:border-primary group-hover:text-primary transition-all"
+                  >
+                    <Link to={stat.action.path} className="flex items-center gap-1">
+                      {stat.action.label}
+                      <ArrowRight className="w-3 h-3 ml-1" />
+                    </Link>
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
@@ -371,13 +387,13 @@ const DashboardHome = () => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
         <ContributionChart />
         <WelfareParticipationChart />
       </div>
 
       {/* Quick Actions & Announcements */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
         {/* Quick Actions */}
         <Card className="border-2 shadow-lg">
           <CardHeader className="pb-4">

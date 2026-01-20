@@ -232,7 +232,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
           const isUp = stat.trend === 'up';
@@ -240,20 +240,20 @@ const AdminDashboard = () => {
           
           return (
             <Card key={idx} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardHeader className="pb-2 sm:pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-2.5 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform`}>
+                  <div className={`p-2 sm:p-2.5 rounded-lg ${stat.bgColor} group-hover:scale-110 transition-transform flex-shrink-0`}>
                     <Icon className={`w-4 h-4 ${stat.color}`} />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="text-3xl font-bold text-foreground">
+              <CardContent className="p-3 sm:p-4 space-y-2">
+                <div className="text-2xl sm:text-2xl md:text-3xl font-bold text-foreground">
                   {isLoading ? (
-                    <div className="h-9 w-20 bg-muted animate-pulse rounded" />
+                    <div className="h-8 w-16 bg-muted animate-pulse rounded" />
                   ) : (
                     stat.value
                   )}
@@ -298,7 +298,7 @@ const AdminDashboard = () => {
               </div>
 
               {/* Section Items */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5">
                 {section.items.map((item, itemIdx) => {
                   const ItemIcon = item.icon;
                   
@@ -308,14 +308,14 @@ const AdminDashboard = () => {
                       onClick={() => navigate(item.path)}
                       className="group cursor-pointer border-2 hover:border-primary transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
                     >
-                      <CardContent className="p-5">
+                      <CardContent className="p-4 sm:p-5">
                         <div className="flex items-center justify-between mb-3">
-                          <div className={`p-2.5 rounded-lg bg-gradient-to-br ${section.bgGradient} group-hover:scale-110 transition-transform`}>
+                          <div className={`p-2 sm:p-2.5 rounded-lg bg-gradient-to-br ${section.bgGradient} group-hover:scale-110 transition-transform flex-shrink-0`}>
                             <ItemIcon className="w-4 h-4" />
                           </div>
                           <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                         </div>
-                        <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
+                        <h3 className="font-semibold text-sm sm:text-base text-foreground mb-1 group-hover:text-primary transition-colors truncate">
                           {item.label}
                         </h3>
                         {item.badge && (

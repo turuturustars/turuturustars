@@ -14,6 +14,7 @@ import {
   Bell,
   TrendingUp,
   ArrowRight,
+  CheckCircle2,
 } from 'lucide-react';
 
 const ChairpersonDashboard = () => {
@@ -116,41 +117,65 @@ const ChairpersonDashboard = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <Card className="border-2 hover:shadow-lg transition-all hover:border-blue-500/50">
+          <CardHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Members</CardTitle>
+              <Users className="w-4 h-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '--' : stats.totalMembers}</div>
-            <p className="text-xs text-muted-foreground mt-1">All registered members</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.totalMembers}</div>
+            <p className="text-xs sm:text-xs text-muted-foreground mt-2">Active & registered members</p>
+            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+              <a href="/dashboard/members">View All</a>
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Upcoming Meetings</CardTitle>
+        <Card className="border-2 hover:shadow-lg transition-all hover:border-amber-500/50">
+          <CardHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Upcoming Meetings</CardTitle>
+              <FileText className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '--' : stats.upcomingMeetings}</div>
-            <p className="text-xs text-muted-foreground mt-1">Scheduled</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.upcomingMeetings}</div>
+            <p className="text-xs sm:text-xs text-muted-foreground mt-2">Scheduled events</p>
+            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+              <a href="/dashboard/governance/meetings">Schedule</a>
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+        <Card className="border-2 hover:shadow-lg transition-all hover:border-purple-500/50">
+          <CardHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Pending Approvals</CardTitle>
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-purple-600 dark:text-purple-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '--' : stats.pendingApprovals}</div>
-            <p className="text-xs text-muted-foreground mt-1">Member applications</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.pendingApprovals}</div>
+            <p className="text-xs sm:text-xs text-muted-foreground mt-2">Awaiting review</p>
+            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+              <a href="/dashboard/admin-panel/approvals">Review</a>
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Announcements</CardTitle>
+        <Card className="border-2 hover:shadow-lg transition-all hover:border-pink-500/50">
+          <CardHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Announcements</CardTitle>
+              <Bell className="w-4 h-4 flex-shrink-0 text-pink-600 dark:text-pink-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isLoading ? '--' : stats.announcements}</div>
-            <p className="text-xs text-muted-foreground mt-1">Published</p>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.announcements}</div>
+            <p className="text-xs sm:text-xs text-muted-foreground mt-2">Published announcements</p>
+            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+              <a href="/dashboard/communication/announcements">Create</a>
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -158,7 +183,7 @@ const ChairpersonDashboard = () => {
       {/* Quick Actions */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {quickActions.map((action, idx) => (
             <button
               key={idx}
