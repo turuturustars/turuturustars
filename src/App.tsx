@@ -42,7 +42,7 @@ const Pillars = lazy(() => import("./pages/Pillars"));
 const Careers = lazy(() => import("./pages/Careers"));
 const Leadership = lazy(() => import("./pages/Leadership"));
 const Register = lazy(() => import("./pages/Register"));
-const Auth = lazy(() => import("./pages/Auth"));
+const AuthFlow = lazy(() => import("./components/auth/AuthFlow"));
 const Benefits = lazy(() => import("./pages/Benefits"));
 const HowItWorks = lazy(() => import("./pages/HowItWorks"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
@@ -125,7 +125,7 @@ const App = () => {
                 <Route path="/faq" element={<FAQPage />} />
                 <Route path="/support" element={<Support />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/auth" element={<Auth />} />
+                <Route path="/auth" element={<AuthFlow />} />
 
                 {/* Dashboard routes */}
                 <Route path="/dashboard" element={<DashboardLayout />}>
