@@ -10,7 +10,7 @@ export const SEO_CONFIG = {
     description: 'Turuturu Stars is a Community Based Organization in Turuturu, Muranga County, Kenya providing Turuturu welfare, community contributions, and community support services for the Turuturu area',
     url: 'https://turuturustars.co.ke',
     email: 'support@turuturustars.co.ke',
-    phone: '+254',
+    phone: '+254700471113',
   },
 
   // Leadership
