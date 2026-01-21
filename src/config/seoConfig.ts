@@ -4,10 +4,10 @@
  */
 
 export const SEO_CONFIG = {
-  // Organization Info
+  // Organization Info - Turuturu Priority
   organization: {
     name: 'Turuturu Stars CBO',
-    description: 'Community Based Organization providing welfare, contributions, and community support',
+    description: 'Turuturu Stars is a Community Based Organization in Turuturu, Muranga County, Kenya providing Turuturu welfare, community contributions, and community support services for the Turuturu area',
     url: 'https://turuturustars.co.ke',
     email: 'support@turuturustars.co.ke',
     phone: '+254',
@@ -73,6 +73,12 @@ export const SEO_CONFIG = {
       'Turuturu Muranga',
       'Turuturu Kenya',
       'Turuturu location',
+      'Turuturu area',
+      'Turuturu region',
+      'Turuturu community',
+      'Turuturu organization',
+      'Turuturu Stars CBO',
+      'in Turuturu',
     ],
     community: [
       'Turuturu community',
@@ -84,6 +90,8 @@ export const SEO_CONFIG = {
       'Turuturu members',
       'Turuturu organization',
       'Turuturu group',
+      'Turuturu people',
+      'Turuturu residents',
     ],
     services: [
       'Turuturu welfare',
@@ -95,6 +103,8 @@ export const SEO_CONFIG = {
       'emergency assistance Turuturu',
       'welfare fund Turuturu',
       'contributions Turuturu',
+      'Turuturu services',
+      'Turuturu aid',
     ],
     organization: [
       'Turuturu community based organization',
