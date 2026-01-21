@@ -32,6 +32,7 @@ export const StructuredData: FC<StructuredDataProps> = ({ data, type = 'Organiza
 
 /**
  * Local Organization Schema with service areas and contact info
+ * Emphasizes Turuturu as primary location and place
  */
 export const LocalOrganizationSchema: FC = () => {
   useEffect(() => {
@@ -39,14 +40,28 @@ export const LocalOrganizationSchema: FC = () => {
       '@context': 'https://schema.org',
       '@type': 'LocalBusiness',
       name: 'Turuturu Stars CBO',
-      description: 'Community Based Organization providing welfare, contributions, and community support in Muranga County, Kenya',
+      alternateName: ['Turuturu Stars', 'Turuturu Community Organization', 'Turuturu CBO'],
+      description: 'Turuturu Stars Community Based Organization in Turuturu, Muranga County. Turuturu welfare services, community contributions, and mutual assistance for the Turuturu place community.',
       url: 'https://turuturustars.co.ke',
       telephone: '+254',
       email: 'support@turuturustars.co.ke',
+      foundingDate: '2020',
+      location: {
+        '@type': 'Place',
+        name: 'Turuturu',
+        address: {
+          '@type': 'PostalAddress',
+          addressLocality: 'Turuturu',
+          addressRegion: 'Muranga County',
+          postalCode: '10208',
+          addressCountry: 'KE',
+        },
+      },
       areaServed: [
         {
           '@type': 'Place',
           name: 'Turuturu',
+          description: 'Primary service area for Turuturu Stars CBO',
           address: {
             '@type': 'PostalAddress',
             addressLocality: 'Turuturu',
@@ -129,17 +144,43 @@ export const LocalOrganizationSchema: FC = () => {
         'https://www.facebook.com/profile.php?id=61586034996115',
         'https://chat.whatsapp.com/GGTZMqkT2akLenI23wWrN7',
       ],
-      founder: {
-        '@type': 'Person',
-        name: 'Francis Mwangi',
-        jobTitle: 'Chairman',
-      },
-      contactPoint: {
-        '@type': 'ContactPoint',
-        contactType: 'Customer Service',
-        telephone: '+254',
-        email: 'support@turuturustars.co.ke',
-      },
+      founder: [
+        {
+          '@type': 'Person',
+          name: 'Francis Mwangi',
+          jobTitle: 'Chairman',
+          description: 'Chairman of Turuturu Stars CBO',
+        },
+        {
+          '@type': 'Person',
+          name: 'Peter Muraya',
+          description: 'Co-founder of Turuturu Stars CBO',
+        },
+        {
+          '@type': 'Person',
+          name: 'Bishop Kinyua',
+          description: 'Co-founder of Turuturu Stars CBO',
+        },
+      ],
+      contactPoint: [
+        {
+          '@type': 'ContactPoint',
+          contactType: 'Customer Service',
+          telephone: '+254',
+          email: 'support@turuturustars.co.ke',
+          areaServed: 'Turuturu, Muranga County, Kenya',
+        },
+      ],
+      knowsAbout: [
+        'Turuturu Community',
+        'Community Development',
+        'Welfare Assistance',
+        'Member Contributions',
+        'Savings Groups',
+        'Mutual Assistance',
+        'Community Activities',
+        'Emergency Relief',
+      ],
     };
 
     const script = document.createElement('script');

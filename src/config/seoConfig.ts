@@ -62,8 +62,18 @@ export const SEO_CONFIG = {
     ],
   },
 
-  // Local Keywords
+  // Local Keywords - Prioritized for Turuturu
   keywords: {
+    turuturu_primary: [
+      'Turuturu',
+      'Turuturu Stars',
+      'Turuturu CBO',
+      'Turuturu community based organization',
+      'Turuturu place',
+      'Turuturu Muranga',
+      'Turuturu Kenya',
+      'Turuturu location',
+    ],
     community: [
       'Turuturu community',
       'Turuturu Stars',
@@ -71,27 +81,50 @@ export const SEO_CONFIG = {
       'Turuturu well wishers',
       'Turuturu parents',
       'Turuturu support',
+      'Turuturu members',
+      'Turuturu organization',
+      'Turuturu group',
     ],
     services: [
       'Turuturu welfare',
       'Turuturu projects',
-      'community welfare',
-      'community support',
-      'mutual help',
-      'emergency assistance',
+      'Turuturu assistance',
+      'community welfare Turuturu',
+      'community support Turuturu',
+      'mutual help Turuturu',
+      'emergency assistance Turuturu',
+      'welfare fund Turuturu',
+      'contributions Turuturu',
     ],
     organization: [
-      'community based organization',
+      'Turuturu community based organization',
       'CBO Kenya',
       'Muranga CBO',
-      'community organization',
+      'community organization Kenya',
+      'CBO Muranga County',
+      'registered CBO',
+      'NGO Turuturu',
+    ],
+    location_keywords: [
+      'Turuturu location',
+      'Turuturu place',
+      'Turuturu area',
+      'Turuturu region',
+      'Turuturu town',
+      'Turuturu village',
+      'in Turuturu',
+      'Turuturu Muranga County',
+      'Kigumo Division',
+      'Muranga Central',
     ],
     local_leaders: [
-      'Francis Mwangi Chairman',
-      'Peter Muraya',
-      'Ndungu Peter Muraya',
-      'Bishop Kinyua',
-      'Akorino Bishop',
+      'Francis Mwangi Turuturu Chairman',
+      'Peter Muraya Turuturu',
+      'Ndungu Peter Muraya Turuturu',
+      'Bishop Kinyua Turuturu',
+      'Akorino Bishop Turuturu',
+      'Turuturu leadership',
+      'Turuturu officials',
     ],
   },
 
@@ -102,9 +135,11 @@ export const SEO_CONFIG = {
     email: 'support@turuturustars.co.ke',
   },
 
-  // Combined keywords for all pages
+  // Combined keywords for all pages - Turuturu prioritized
   getAllKeywords: () => {
     return [
+      ...SEO_CONFIG.keywords.turuturu_primary,
+      ...SEO_CONFIG.keywords.location_keywords,
       ...SEO_CONFIG.keywords.community,
       ...SEO_CONFIG.keywords.services,
       ...SEO_CONFIG.keywords.organization,
