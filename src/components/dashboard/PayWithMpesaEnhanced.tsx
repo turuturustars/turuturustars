@@ -152,6 +152,8 @@ const PayWithMpesa = ({
         contributionId,
       });
 
+      console.log("STK Push result:", result);
+
       if (result.ResponseCode === '0') {
         // Record transaction
         await supabase.from('mpesa_transactions').insert({
@@ -186,7 +188,10 @@ const PayWithMpesa = ({
       }
     } catch (err: any) {
       console.error('Payment error:', err);
+      // Use the actual error message from backend
       const errorMessage = err?.message || 'Payment initiation failed';
+      console.log('Displaying error to user:', errorMessage);
+      
       setErrors(prev => ({
         ...prev,
         submit: errorMessage
@@ -222,7 +227,10 @@ const PayWithMpesa = ({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-md p-0 overflow-hidden">
+      <DialogContent className="w-full max-w-md p-0 overflow-hidden" aria-describedby="mpesa-payment-description">
+        <div id="mpesa-payment-description" className="sr-only">
+          M-Pesa payment dialog for Turuturu Stars contributions
+        </div>
         {paymentStep === 'success' ? (
           // Success State
           <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 min-h-[400px]">

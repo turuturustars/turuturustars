@@ -31,10 +31,19 @@ export async function initiateSTKPush(params: STKPushParams): Promise<STKPushRes
     },
   });
 
+  // Handle error response from Supabase function
   if (error) {
+    console.error("Supabase function error:", error);
     throw new Error(error.message);
   }
 
+  // Handle error response from M-Pesa API
+  if (data?.error) {
+    console.error("M-Pesa API error:", data.error);
+    throw new Error(data.error);
+  }
+
+  console.log("STK Push response:", data);
   return data;
 }
 

@@ -22,6 +22,9 @@ serve(async (req) => {
     const { stkCallback } = Body;
     const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
     
+    // Log callback result details
+    console.log(`Callback ResultCode: ${ResultCode}, ResultDesc: ${ResultDesc}`);
+    
     // Extract callback metadata
     let mpesaReceiptNumber = "";
     let amount = 0;
@@ -55,6 +58,8 @@ serve(async (req) => {
       }
     }
     
+    console.log(`Parsed Callback: Receipt=${mpesaReceiptNumber}, Amount=${amount}, Phone=${phoneNumber}`);
+    
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
@@ -68,7 +73,7 @@ serve(async (req) => {
     
     let transaction: MpesaTransaction | null = existingTransaction as MpesaTransaction | null;
     
-    // Only update if transaction exists and not already completed
+    // Handle both successful and failed transactions
     if (transaction && transaction.status !== "completed" && transaction.status !== "failed") {
       const { data: updatedTx, error: updateError } = await supabase
         .from("mpesa_transactions")
@@ -90,6 +95,7 @@ serve(async (req) => {
         transaction = null;
       } else {
         transaction = updatedTx as MpesaTransaction;
+        console.log(`Transaction status updated to: ${ResultCode === 0 ? "completed" : "failed"}`);
       }
     } else if (!transaction) {
       console.warn(`Transaction not found for checkout request ${CheckoutRequestID}`);

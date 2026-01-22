@@ -96,7 +96,32 @@ serve(async (req) => {
         const timestamp = generateTimestamp();
         const password = generatePassword(timestamp);
         
-        const callbackUrl = `${SUPABASE_URL}/functions/v1/mpesa-callback`;
+        // Log access token response
+        console.log("Access token obtained successfully");
+        
+        // Validate amount
+        if (amount < 1) {
+          throw new Error("Amount must be at least KES 1");
+        }
+        
+        const callbackUrl = `https://oxfkntgntgsebxbpfeyh.supabase.co/functions/v1/mpesa-callback`;
+        
+        const stkPayload = {
+          BusinessShortCode: MPESA_SHORTCODE,
+          Password: password,
+          Timestamp: timestamp,
+          TransactionType: "CustomerPayBillOnline",
+          Amount: amount,
+          PartyA: phoneNumber,
+          PartyB: MPESA_SHORTCODE,
+          PhoneNumber: phoneNumber,
+          CallBackURL: callbackUrl,
+          AccountReference: accountReference || "TuruturuStars",
+          TransactionDesc: transactionDesc || "Contribution",
+        };
+        
+        // Log STK push request payload
+        console.log("STK Push Request Payload:", JSON.stringify(stkPayload, null, 2));
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -106,24 +131,27 @@ serve(async (req) => {
               Authorization: `Bearer ${accessToken}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              BusinessShortCode: MPESA_SHORTCODE,
-              Password: password,
-              Timestamp: timestamp,
-              TransactionType: "CustomerPayBillOnline",
-              Amount: amount,
-              PartyA: phoneNumber,
-              PartyB: MPESA_SHORTCODE,
-              PhoneNumber: phoneNumber,
-              CallBackURL: callbackUrl,
-              AccountReference: accountReference || "TuruturuStars",
-              TransactionDesc: transactionDesc || "Contribution",
-            }),
+            body: JSON.stringify(stkPayload),
           }
         );
         
         result = await response.json();
         
+        // Log Safaricom STK push response
+        console.log("Safaricom STK Push Response:", JSON.stringify(result, null, 2));
+        
+        // Return Safaricom's actual error message instead of generic error
+        if (result.errorCode) {
+          const errorMsg = result.errorMessage || `M-Pesa Error: ${result.errorCode}`;
+          console.error(`STK Push Failed - Code: ${result.errorCode}, Message: ${errorMsg}`);
+          throw new Error(errorMsg);
+        }
+        
+        if (result.ResponseCode !== "0") {
+          const errorMsg = result.ResponseDescription || `Failed with code: ${result.ResponseCode}`;
+          console.error(`STK Push Response Error: ${errorMsg}`);
+          throw new Error(errorMsg);
+        }
         // Log the transaction
         await supabase.from("mpesa_transactions").insert({
           transaction_type: "stk_push",
@@ -292,8 +320,15 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error("M-Pesa error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(`Error details: ${message}`);
+    
+    // Return error with status 400 and detailed message
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ 
+        error: message,
+        success: false,
+        errorCode: "MPESA_REQUEST_FAILED"
+      }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -454,7 +454,10 @@ const PayWithMpesa = ({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-sm p-0 overflow-hidden">
+      <DialogContent className="w-full max-w-sm p-0 overflow-hidden" aria-describedby="mpesa-payment-dialog-description">
+        <div id="mpesa-payment-dialog-description" className="sr-only">
+          M-Pesa payment dialog for Turuturu Stars contributions
+        </div>
         {success && renderSuccessState()}
         {!success && paymentStep === 'processing' && renderProcessingState()}
         {!success && paymentStep === 'form' && renderFormState()}
