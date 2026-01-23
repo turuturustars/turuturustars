@@ -8,7 +8,7 @@ const HeroSection = () => {
   const [typedText, setTypedText] = useState('');
   const fullText = 'Turuturu is Home';
   
-  // Typing effect
+  // Optimized typing effect - faster and non-blocking
   useEffect(() => {
     let currentIndex = 0;
     const typingInterval = setInterval(() => {
@@ -18,7 +18,7 @@ const HeroSection = () => {
       } else {
         clearInterval(typingInterval);
       }
-    }, 100);
+    }, 70); // Faster animation
 
     return () => clearInterval(typingInterval);
   }, []);
@@ -38,10 +38,9 @@ const HeroSection = () => {
       id="home"
       className="relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white min-h-screen"
     >
-      {/* Simplified Background - Only 2 elements */}
+      {/* Simplified Background - Single element for performance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 rounded-full bg-gradient-to-tr from-purple-400/15 to-pink-400/15 blur-3xl"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 blur-2xl"></div>
       </div>
 
       {/* Main Content */}
@@ -168,7 +167,9 @@ const HeroSection = () => {
                     imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
                   } group-hover:scale-105`}
                   onLoad={() => setImageLoaded(true)}
-                  loading="eager"
+                  loading="lazy"
+                  decoding="async"
+                  fetchPriority="high"
                 />
                 
                 {/* Overlay */}
