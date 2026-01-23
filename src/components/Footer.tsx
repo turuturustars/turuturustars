@@ -22,15 +22,14 @@ const Footer = () => {
 
   return (
     <footer className="bg-foreground text-primary-foreground relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse animation-delay-300 -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-gold/5 rounded-full blur-3xl animate-pulse animation-delay-500 -z-10"></div>
+      {/* Animated Background Elements - Reduced */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-2xl -z-10"></div>
 
       <div ref={contentRef} className="section-container py-16 relative z-10">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand */}
-          <div className={`lg:col-span-2 transition-all duration-700 ${
-            contentVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+          <div className={`lg:col-span-2 transition-all duration-500 ${
+            contentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
             <div className="flex items-center gap-3 mb-6">
               <img 
@@ -57,18 +56,16 @@ const Footer = () => {
           </div>
 
           {/* Quick Links */}
-          <div className={`transition-all duration-700 animation-delay-100 ${
-            contentVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+          <div className={`transition-all duration-500 ${
+            contentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
             <h4 className="font-serif text-lg font-semibold mb-6">Quick Links</h4>
             <ul className="space-y-3">
-              {quickLinks.map((link, index) => (
-                <li key={link.label} className={`transition-all duration-500 ${
-                  contentVisible ? `animate-slide-right animation-delay-${(index + 1) * 100}` : 'opacity-0 translate-x-5'
-                }`}>
+              {quickLinks.map((link) => (
+                <li key={link.label} className="transition-all duration-300 hover:translate-x-1">
                   <a 
                     href={link.href}
-                    className="text-primary-foreground/70 hover:text-gold hover:translate-x-1 transition-all duration-300 inline-block"
+                    className="text-primary-foreground/70 hover:text-gold transition-all duration-300 inline-block"
                   >
                     {link.label}
                   </a>
@@ -78,19 +75,17 @@ const Footer = () => {
           </div>
 
           {/* Connect */}
-          <div className={`transition-all duration-700 animation-delay-200 ${
-            contentVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+          <div className={`transition-all duration-500 ${
+            contentVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}>
             <h4 className="font-serif text-lg font-semibold mb-6">Connect With Us</h4>
             <div className="flex gap-4">
-              {socialLinks.map((social, index) => (
+              {socialLinks.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
                   aria-label={social.label}
-                  className={`w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary hover:text-primary-foreground hover:shadow-glow hover:scale-110 flex items-center justify-center transition-all duration-300 animation-delay-${(index + 1) * 100} ${
-                    contentVisible ? 'animate-fade-up' : 'opacity-0 scale-50'
-                  }`}
+                  className="w-10 h-10 rounded-full bg-primary-foreground/10 hover:bg-primary hover:text-primary-foreground hover:shadow-glow hover:scale-110 flex items-center justify-center transition-all duration-300"
                 >
                   <social.icon className="w-5 h-5" />
                 </a>
