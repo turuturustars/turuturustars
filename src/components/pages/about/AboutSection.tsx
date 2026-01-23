@@ -105,10 +105,9 @@ const AboutSection = () => {
       ref={sectionRef}
       className="relative overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-50 py-12 sm:py-16 lg:py-24"
     >
-      {/* Simplified background - only 2 elements */}
-      <div className="pointer-events-none absolute inset-0 opacity-40">
-        <div className="absolute top-0 right-0 h-96 w-96 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-400/30 blur-3xl" />
-        <div className="absolute bottom-0 left-0 h-96 w-96 rounded-full bg-gradient-to-tr from-purple-400/30 to-pink-400/30 blur-3xl" />
+      {/* Simplified background - only 1 element */}
+      <div className="pointer-events-none absolute inset-0 opacity-30">
+        <div className="absolute top-0 right-0 h-96 w-96 rounded-full bg-gradient-to-br from-blue-400/30 to-purple-400/30 blur-2xl" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
