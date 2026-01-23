@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import WelfareContributeDialog from '@/components/dashboard/WelfareContributeDialog';
 
 interface WelfareCase {
   id: string;
@@ -288,6 +289,19 @@ const WelfareManagement = () => {
                       />
                     </div>
                   )}
+                  {/* Contribute Button */}
+                  <div className="mt-3 pt-2 border-t border-border">
+                    <WelfareContributeDialog
+                      welfareCaseId={welfareCase.id}
+                      welfareCaseTitle={welfareCase.title}
+                      targetAmount={welfareCase.target_amount}
+                      collectedAmount={welfareCase.collected_amount}
+                      onContributionSuccess={() => {
+                        fetchWelfareCases();
+                        setSelectedCase(welfareCase);
+                      }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ))}
