@@ -1,14 +1,24 @@
-import { ArrowRight, Star, Sparkles, Users, Award, Heart, ChevronDown, Play } from 'lucide-react';
+import { ArrowRight, Star, Sparkles, Users, Award, Heart, ChevronDown, Play, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import heroCommunity from '@/assets/gallery-members.png';
+import veronikaEvent from '@/assets/turuturu_stars_community_togther_with_senator_veronica_maina.jpg';
+import communityEvent from '@/assets/turuturustars_community_during_prize_giving_day.jpg';
 import { useState, useEffect } from 'react';
 
 const HeroSection = () => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [typedText, setTypedText] = useState('');
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState(0);
   const fullText = 'Turuturu is Home';
   
-  // Optimized typing effect - faster and non-blocking
+  // Carousel images
+  const carouselImages = [
+    { src: heroCommunity, alt: 'Community Members' },
+    { src: veronikaEvent, alt: 'Community with Senator Veronica Maina' },
+    { src: communityEvent, alt: 'Community Prize Giving Day' }
+  ];
+  
+  // Optimized typing effect
   useEffect(() => {
     let currentIndex = 0;
     const typingInterval = setInterval(() => {
@@ -18,9 +28,17 @@ const HeroSection = () => {
       } else {
         clearInterval(typingInterval);
       }
-    }, 70); // Faster animation
+    }, 70);
 
     return () => clearInterval(typingInterval);
+  }, []);
+
+  // Auto-rotate carousel
+  useEffect(() => {
+    const carouselInterval = setInterval(() => {
+      setCurrentCarouselIndex((prev) => (prev + 1) % carouselImages.length);
+    }, 5000);
+    return () => clearInterval(carouselInterval);
   }, []);
 
   const stats = [
@@ -28,6 +46,9 @@ const HeroSection = () => {
     { icon: Award, value: '2019', label: 'Est.', gradient: 'from-purple-500 to-pink-500' },
     { icon: Heart, value: '100%', label: 'Ubuntu', gradient: 'from-rose-500 to-orange-500' },
   ];
+
+  const nextCarousel = () => setCurrentCarouselIndex((prev) => (prev + 1) % carouselImages.length);
+  const prevCarousel = () => setCurrentCarouselIndex((prev) => (prev - 1 + carouselImages.length) % carouselImages.length);
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -145,7 +166,7 @@ const HeroSection = () => {
             </div>
           </div>
 
-          {/* RIGHT: Image */}
+          {/* RIGHT: Interactive Image Carousel */}
           <div className="relative lg:ml-auto max-w-xl w-full">
             
             {/* Background Glow */}
@@ -153,45 +174,85 @@ const HeroSection = () => {
               <div className="w-full h-full rounded-full bg-gradient-to-br from-blue-400/20 to-purple-400/20 blur-3xl"></div>
             </div>
 
-            {/* Image Container */}
+            {/* Carousel Container */}
             <div className="relative group">
               {/* Gradient Border */}
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-3xl blur opacity-40 group-hover:opacity-60 transition-opacity duration-500"></div>
               
-              {/* Image */}
-              <div className="relative rounded-3xl overflow-hidden bg-white p-2 shadow-2xl">
-                <img
-                  src={heroCommunity}
-                  alt="Turuturu community"
-                  className={`w-full h-auto rounded-2xl transition-all duration-700 ${
-                    imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                  } group-hover:scale-105`}
-                  onLoad={() => setImageLoaded(true)}
-                  loading="lazy"
-                  decoding="async"
-                  fetchPriority="high"
-                />
-                
-                {/* Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-blue-900/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl"></div>
-              </div>
-
-              {/* Floating Badge */}
-              <div className="absolute -bottom-4 -left-4 bg-white rounded-xl p-3 shadow-xl border border-gray-100 group-hover:scale-110 transition-transform duration-300">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-white fill-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 font-medium">Community</p>
-                    <p className="text-sm font-bold text-gray-900">United</p>
+              {/* Main Carousel */}
+              <div className="relative rounded-3xl overflow-hidden bg-white p-2 shadow-2xl aspect-square lg:aspect-auto lg:h-96">
+                {/* Carousel Images */}
+                <div className="relative w-full h-full rounded-2xl overflow-hidden bg-gray-100">
+                  {carouselImages.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image.src}
+                      alt={image.alt}
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                        index === currentCarouselIndex ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ))}
+                  
+                  {/* Overlay Gradient */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-blue-900/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  
+                  {/* Navigation Buttons */}
+                  <button
+                    onClick={prevCarousel}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:shadow-xl group/btn"
+                  >
+                    <ChevronLeft className="w-6 h-6 text-gray-900 group-hover/btn:scale-110 transition-transform" />
+                  </button>
+                  
+                  <button
+                    onClick={nextCarousel}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-white/80 hover:bg-white rounded-full shadow-lg transition-all duration-300 hover:shadow-xl group/btn"
+                  >
+                    <ChevronRight className="w-6 h-6 text-gray-900 group-hover/btn:scale-110 transition-transform" />
+                  </button>
+                  
+                  {/* Carousel Indicators */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {carouselImages.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentCarouselIndex(index)}
+                        className={`h-2.5 rounded-full transition-all duration-300 ${
+                          index === currentCarouselIndex 
+                            ? 'bg-white w-8 shadow-lg' 
+                            : 'bg-white/50 w-2.5 hover:bg-white/75'
+                        }`}
+                        aria-label={`Go to image ${index + 1}`}
+                      />
+                    ))}
                   </div>
                 </div>
+
+                {/* Floating Badge */}
+                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl p-3 shadow-xl border border-gray-100 group-hover:scale-110 transition-transform duration-300">
+                  <div className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                      <Heart className="w-5 h-5 text-white fill-white" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 font-medium">Community</p>
+                      <p className="text-sm font-bold text-gray-900">United</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Decorative Elements */}
+                <Star className="absolute -top-4 -right-4 w-8 h-8 text-amber-500 fill-amber-500 animate-pulse" />
+                <Sparkles className="absolute top-10 -left-4 w-6 h-6 text-blue-600 animate-pulse" style={{ animationDelay: '0.5s' }} />
               </div>
 
-              {/* Decorative Stars */}
-              <Star className="absolute -top-4 -right-4 w-8 h-8 text-amber-500 fill-amber-500 animate-pulse" />
-              <Sparkles className="absolute top-10 -left-4 w-6 h-6 text-blue-600 animate-pulse" style={{ animationDelay: '0.5s' }} />
+              {/* Image Counter */}
+              <div className="absolute -bottom-12 right-0 text-sm font-semibold text-gray-600">
+                {currentCarouselIndex + 1} / {carouselImages.length}
+              </div>
             </div>
           </div>
         </div>
