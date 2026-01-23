@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Briefcase, MapPin, Clock, Send, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
+import certificateImage from '@/assets/cerificate_of_registration.png';
+import headteacherImage from '@/assets/headteacher_with_veronica_maina.jpg';
+import welfareImage from '@/assets/gallery-welfare.jpg';
 
 interface Job {
   id: string;
@@ -271,6 +274,76 @@ const CareersSection = () => {
             <Send className="w-4 h-4 mr-2" />
             Send Your Application
           </Button>
+        </div>
+
+        {/* Impact & Community Showcase */}
+        <div className={`mt-16 sm:mt-20 pt-16 sm:pt-20 border-t border-gray-200 transition-all duration-1000 ${
+          jobsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
+        }`}>
+          <div className="text-center mb-10 sm:mb-12">
+            <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">
+              Our Impact
+            </p>
+            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+              Making a Difference Together
+            </h3>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              See how our team and volunteers are creating lasting change in our community
+            </p>
+          </div>
+
+          <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
+            {/* Certificate Image */}
+            <div className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-72">
+              <img
+                src={certificateImage}
+                alt="Official registration certificate"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Certified</h4>
+                  <p className="text-gray-200 text-sm">Officially registered CBO</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Welfare Image */}
+            <div className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-72">
+              <img
+                src={welfareImage}
+                alt="Community welfare programs"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Welfare</h4>
+                  <p className="text-gray-200 text-sm">Supporting our members</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Headteacher Partnership Image */}
+            <div className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-72">
+              <img
+                src={headteacherImage}
+                alt="Partnership with educational leaders"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Education</h4>
+                  <p className="text-gray-200 text-sm">Partnering with schools</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
