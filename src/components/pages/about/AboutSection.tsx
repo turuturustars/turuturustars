@@ -12,6 +12,9 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import veronikaWithPupils from '@/assets/veronica_maina_adressing_parents_and_pupils.jpg';
+import studentMotivation from '@/assets/best_students_with_student_motivation_team.jpg';
+import lowerGradePupils from '@/assets/lower_grade_pupils.jpg';
 
 const AboutSection = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -313,9 +316,83 @@ const AboutSection = () => {
             ))}
           </div>
         </div>
-      </div>
-    </section>
-  );
-};
 
-export default AboutSection;
+        {/* Community Moments Gallery */}
+        <div className="mt-16 sm:mt-20 lg:mt-24 pt-16 sm:pt-20 border-t border-gray-200">
+          <div className="mb-10 sm:mb-12 text-center">
+            <div className="inline-flex items-center gap-2 mb-3 px-4 py-2 rounded-full bg-green-50 border border-green-200">
+              <Sparkles className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-semibold text-green-600 uppercase tracking-wide">
+                Community Moments
+              </span>
+            </div>
+            
+            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+              Our Story in Pictures
+            </h3>
+            
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+              Real moments from our community's journey
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Image 1 */}
+            <div className={`group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-80 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            }`} style={{ transitionDelay: '600ms' }}>
+              <img
+                src={veronikaWithPupils}
+                alt="Leadership addressing community"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Leadership</h4>
+                  <p className="text-gray-200 text-sm">Guiding our community forward</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Image 2 */}
+            <div className={`group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-80 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            }`} style={{ transitionDelay: '650ms' }}>
+              <img
+                src={studentMotivation}
+                alt="Student motivation and mentorship"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Mentorship</h4>
+                  <p className="text-gray-200 text-sm">Empowering young minds</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Image 3 */}
+            <div className={`group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-64 sm:h-80 ${
+              isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            }`} style={{ transitionDelay: '700ms' }}>
+              <img
+                src={lowerGradePupils}
+                alt="Community with pupils"
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                <div>
+                  <h4 className="text-white font-bold text-lg">Education</h4>
+                  <p className="text-gray-200 text-sm">Investing in our future</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>

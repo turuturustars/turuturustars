@@ -128,27 +128,6 @@ const HeroSection = () => {
               </Button>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-3 gap-3 sm:gap-4 pt-4">
-              {stats.map((stat, index) => {
-                const Icon = stat.icon;
-                return (
-                  <div
-                    key={index}
-                    className="group rounded-xl bg-white border border-gray-200 p-4 sm:p-5 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
-                  >
-                    <Icon className="w-6 h-6 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
-                    <p className="text-2xl sm:text-3xl font-bold text-gray-900">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-600 font-medium">
-                      {stat.label}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-
             {/* Trust Indicators */}
             <div className="flex flex-wrap items-center gap-6 pt-4 text-sm text-gray-600">
               <div className="flex items-center gap-2">
