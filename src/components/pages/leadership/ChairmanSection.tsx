@@ -1,5 +1,7 @@
 import { Quote, Users, Calendar, Target, Heart } from 'lucide-react';
 import chairmanImage from '@/assets/chairmain-official-photo.png';
+import veronicaMaina from '@/assets/veronica_maina_member.jpg';
+import veronicaConstitution from '@/assets/veronica_maina_holding_turuturustars_constititution.jpg';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 
 const ChairmanSection = () => {
@@ -148,6 +150,59 @@ const ChairmanSection = () => {
                   <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
                     Presided over by <span className="font-semibold text-gray-900">Hon. Sen. Veronica Maina</span> & <span className="font-semibold text-gray-900">Hon. Joseph Munyoro, MP Kigumo</span>
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Leadership Gallery */}
+          <div className={`mt-16 sm:mt-20 pt-16 sm:pt-20 border-t border-gray-200 transition-all duration-1000 ${
+            isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'
+          }`}>
+            <div className="text-center mb-10 sm:mb-12">
+              <p className="text-sm font-semibold text-primary uppercase tracking-wider mb-2">
+                Our Leaders
+              </p>
+              <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+                Visionary Leadership
+              </h3>
+              <p className="text-gray-600 max-w-2xl mx-auto">
+                Guided by dedicated leaders championing our community's vision
+              </p>
+            </div>
+
+            <div className="grid gap-6 sm:gap-8 lg:grid-cols-2">
+              {/* Senator Veronica Maina */}
+              <div className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-72 sm:h-80">
+                <img
+                  src={veronicaMaina}
+                  alt="Hon. Senator Veronica Maina"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                  <div>
+                    <h4 className="text-white font-bold text-xl">Hon. Senator Veronica Maina</h4>
+                    <p className="text-gray-200 text-sm">Community Champion & Advocate</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Leadership with Constitution */}
+              <div className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 h-72 sm:h-80">
+                <img
+                  src={veronicaConstitution}
+                  alt="Leadership with Constitution"
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                  <div>
+                    <h4 className="text-white font-bold text-xl">Our Constitution</h4>
+                    <p className="text-gray-200 text-sm">Foundation of our governance</p>
+                  </div>
                 </div>
               </div>
             </div>

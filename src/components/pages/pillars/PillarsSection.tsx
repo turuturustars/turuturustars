@@ -1,5 +1,8 @@
 import { GraduationCap, Users, Heart, Sparkles, ArrowRight } from 'lucide-react';
 import { useStaggerAnimation } from '@/hooks/useScrollAnimation';
+import motivationTeam from '@/assets/motivation_team_and mentorsip_program.jpg';
+import veronikaHeadteacher from '@/assets/veronica_maina_and_turuturu_primary_shool_headteacher.jpg';
+import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
 
 const pillars = [
   {
@@ -11,7 +14,9 @@ const pillars = [
     iconColor: 'text-blue-600',
     bgGradient: 'from-blue-50 to-cyan-50/50',
     hoverGlow: 'group-hover:shadow-blue-500/20',
-    features: ['Mentorship Programs', 'Scholarship Funds', 'Learning Resources']
+    features: ['Mentorship Programs', 'Scholarship Funds', 'Learning Resources'],
+    image: motivationTeam,
+    imageAlt: 'Motivation and mentorship program'
   },
   {
     icon: Users,
@@ -22,7 +27,9 @@ const pillars = [
     iconColor: 'text-amber-600',
     bgGradient: 'from-amber-50 to-orange-50/50',
     hoverGlow: 'group-hover:shadow-amber-500/20',
-    features: ['Social Initiatives', 'Cultural Preservation', 'Unity Programs']
+    features: ['Social Initiatives', 'Cultural Preservation', 'Unity Programs'],
+    image: veronikaHeadteacher,
+    imageAlt: 'Community leadership and partnership'
   },
   {
     icon: Heart,
@@ -33,7 +40,9 @@ const pillars = [
     iconColor: 'text-rose-600',
     bgGradient: 'from-rose-50 to-pink-50/50',
     hoverGlow: 'group-hover:shadow-rose-500/20',
-    features: ['Support Networks', 'Emergency Assistance', 'Celebration Together']
+    features: ['Support Networks', 'Emergency Assistance', 'Celebration Together'],
+    image: bestStudents,
+    imageAlt: 'Students and mentors together'
   },
 ];
 
@@ -94,6 +103,17 @@ const PillarsSection = () => {
               `}
               style={{ transitionDelay: `${index * 150}ms` }}
             >
+              {/* Background image with overlay */}
+              <div className="absolute inset-0 opacity-0 group-hover:opacity-15 transition-opacity duration-500">
+                <img
+                  src={pillar.image}
+                  alt={pillar.imageAlt}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
+              </div>
+
               {/* Gradient background overlay */}
               <div className={`absolute inset-0 bg-gradient-to-br ${pillar.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500`}></div>
               
