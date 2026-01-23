@@ -258,6 +258,77 @@ const HeroSection = () => {
         </div>
       </div>
 
+      {/* Community Gallery Section */}
+      <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <div className="space-y-8">
+          {/* Section Header */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 border border-green-200">
+              <Sparkles className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-semibold text-green-600">Gallery Highlights</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900">
+              Our Community in Action
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Celebrating moments that define our journey together
+            </p>
+          </div>
+
+          {/* Gallery Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-12">
+            {[
+              { src: heroCommunity, alt: 'Community Members', label: 'Unity' },
+              { src: veronikaEvent, alt: 'With Senator Veronica Maina', label: 'Leadership' },
+              { src: communityEvent, alt: 'Prize Giving Day', label: 'Excellence' },
+            ].map((item, index) => (
+              <div
+                key={index}
+                className="group relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 h-64 sm:h-72"
+              >
+                {/* Gallery Image */}
+                <img
+                  src={item.src}
+                  alt={item.alt}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  loading="lazy"
+                  decoding="async"
+                />
+                
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-gray-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                  <div>
+                    <h3 className="text-white font-bold text-xl">{item.label}</h3>
+                    <p className="text-gray-200 text-sm mt-1">{item.alt}</p>
+                  </div>
+                </div>
+
+                {/* Corner Badge */}
+                <div className="absolute top-4 right-4 bg-white/90 rounded-full p-2 group-hover:bg-white transition-all">
+                  <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Gallery Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-16 pt-12 border-t border-gray-200">
+            <div className="text-center space-y-2">
+              <p className="text-3xl sm:text-4xl font-bold text-blue-600">50+</p>
+              <p className="text-sm sm:text-base text-gray-600">Events & Activities</p>
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-3xl sm:text-4xl font-bold text-purple-600">1000+</p>
+              <p className="text-sm sm:text-base text-gray-600">Lives Impacted</p>
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-3xl sm:text-4xl font-bold text-green-600">6+</p>
+              <p className="text-sm sm:text-base text-gray-600">Years of Service</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Scroll Indicator */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
         <button 
