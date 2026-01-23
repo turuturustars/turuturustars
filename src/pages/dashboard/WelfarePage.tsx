@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { hasPermission } from '@/lib/rolePermissions';
 import { HandHeart, Loader2, Heart, Users, DollarSign, Plus, Edit2, Trash2, AlertCircle } from 'lucide-react';
+import WelfareContributeDialog from '@/components/dashboard/WelfareContributeDialog';
 
 interface WelfareCase {
   id: string;
@@ -315,6 +316,16 @@ const WelfarePage = () => {
                   <p className="text-xs text-muted-foreground">
                     Created {new Date(welfareCase.created_at).toLocaleDateString()}
                   </p>
+                  {/* Contribute Button */}
+                  <div className="pt-2">
+                    <WelfareContributeDialog
+                      welfareCaseId={welfareCase.id}
+                      welfareCaseTitle={welfareCase.title}
+                      targetAmount={welfareCase.target_amount}
+                      collectedAmount={welfareCase.collected_amount}
+                      onContributionSuccess={() => fetchWelfareCases()}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             ))}
