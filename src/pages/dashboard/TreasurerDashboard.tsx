@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Table,
@@ -64,6 +66,7 @@ const TreasurerDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('pending');
   const { toast } = useToast();
+  const { status: statusMessage, showSuccess } = useStatus();
 
   useEffect(() => {
     fetchData();
@@ -75,13 +78,13 @@ const TreasurerDashboard = () => {
         supabase
           .from('contributions')
           .select(`
-            *,
+            id, amount, contribution_type, status, created_at, paid_at, reference_number, notes,
             member:profiles!contributions_member_id_fkey(full_name, membership_number)
           `)
           .order('created_at', { ascending: false }),
         supabase
           .from('welfare_cases')
-          .select('*')
+          .select('id, title, case_type, target_amount, collected_amount, status, created_at')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -182,21 +185,6 @@ const TreasurerDashboard = () => {
     ),
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, { class: string; icon: React.ReactNode }> = {
-      paid: { class: 'bg-green-100 text-green-800', icon: <CheckCircle2 className="w-3 h-3" /> },
-      pending: { class: 'bg-yellow-100 text-yellow-800', icon: <Clock className="w-3 h-3" /> },
-      missed: { class: 'bg-red-100 text-red-800', icon: <AlertCircle className="w-3 h-3" /> },
-    };
-    const variant = variants[status] || variants.pending;
-    return (
-      <Badge className={`${variant.class} flex items-center gap-1`}>
-        {variant.icon}
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
   const exportReport = () => {
     const csvContent = [
       ['Member', 'Membership #', 'Amount', 'Type', 'Status', 'Date', 'Reference'].join(','),
@@ -214,7 +202,7 @@ const TreasurerDashboard = () => {
     ].join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `contributions-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
@@ -231,15 +219,16 @@ const TreasurerDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-serif font-bold text-foreground">Treasurer Dashboard</h2>
           <p className="text-muted-foreground">Fund tracking, verification, and financial reports</p>
         </div>
-        <Button onClick={exportReport} variant="outline">
+        <AccessibleButton onClick={exportReport} variant="outline" ariaLabel="Export financial report">
           <Download className="w-4 h-4 mr-2" />
           Export Report
-        </Button>
+        </AccessibleButton>
       </div>
 
       {/* Financial Stats */}
@@ -355,26 +344,35 @@ const TreasurerDashboard = () => {
                         <TableCell className="font-mono text-sm">
                           {contribution.reference_number || '-'}
                         </TableCell>
-                        <TableCell>{getStatusBadge(contribution.status)}</TableCell>
+                        <TableCell>
+                          <StatusBadge 
+                            status={contribution.status}
+                            icon={
+                              contribution.status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
+                              contribution.status === 'pending' ? <Clock className="w-3 h-3" /> :
+                              <AlertCircle className="w-3 h-3" />
+                            }
+                          />
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {format(new Date(contribution.created_at), 'MMM dd, yyyy')}
                         </TableCell>
                         <TableCell>
                           {contribution.status === 'pending' && (
                             <div className="flex gap-2">
-                              <Button
-                                size="sm"
+                              <AccessibleButton
+                                ariaLabel="Verify contribution"
                                 onClick={() => verifyContribution(contribution.id)}
                               >
                                 Verify
-                              </Button>
-                              <Button
-                                size="sm"
+                              </AccessibleButton>
+                              <AccessibleButton
                                 variant="destructive"
+                                ariaLabel="Mark contribution as missed"
                                 onClick={() => markAsMissed(contribution.id)}
                               >
                                 Missed
-                              </Button>
+                              </AccessibleButton>
                             </div>
                           )}
                         </TableCell>
