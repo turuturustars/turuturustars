@@ -3,14 +3,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { AlertTriangle, Plus, DollarSign, CheckCircle, Clock, Loader2, Gavel } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -53,6 +55,7 @@ const INCIDENT_TYPES = [
 
 export default function DisciplinePage() {
   const { user, hasRole } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [records, setRecords] = useState<DisciplineRecord[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +85,7 @@ export default function DisciplinePage() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('discipline_records')
-      .select('*')
+      .select('id, member_id, violation_type, severity, description, status, created_at, due_date')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -190,13 +193,13 @@ export default function DisciplinePage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      resolved: 'bg-green-100 text-green-800',
-      appealed: 'bg-blue-100 text-blue-800',
-      dismissed: 'bg-gray-100 text-gray-800'
+    const statusMap: Record<string, string> = {
+      pending: 'pending',
+      resolved: 'active',
+      appealed: 'pending',
+      dismissed: 'closed'
     };
-    return <Badge className={variants[status] || 'bg-gray-100'}>{status}</Badge>;
+    return <StatusBadge status={statusMap[status] || status} />;
   };
 
   const pendingRecords = records.filter(r => r.status === 'pending');
@@ -215,6 +218,11 @@ export default function DisciplinePage() {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Discipline & Fines</h1>
@@ -223,7 +231,7 @@ export default function DisciplinePage() {
         {canManage && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Record Incident</Button>
+              <AccessibleButton ariaLabel="Record new discipline incident" size="sm"><Plus className="h-4 w-4 mr-2" />Record Incident</AccessibleButton>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -271,7 +279,16 @@ export default function DisciplinePage() {
                     onChange={(e) => setNewRecord({ ...newRecord, fine_amount: Number(e.target.value) })}
                   />
                 </div>
-                <Button onClick={createRecord} className="w-full">Record Incident</Button>
+                <AccessibleButton 
+                  ariaLabel="Create discipline record"
+                  onClick={() => {
+                    createRecord();
+                    showSuccess('Incident recorded successfully', 2000);
+                  }} 
+                  className="w-full"
+                >
+                  Record Incident
+                </AccessibleButton>
               </div>
             </DialogContent>
           </Dialog>
@@ -374,19 +391,40 @@ export default function DisciplinePage() {
                           <TableCell>
                             <div className="flex gap-2">
                               {!record.fine_paid && record.fine_amount > 0 && (
-                                <Button variant="outline" size="sm" onClick={() => markFinePaid(record.id)}>
+                                <AccessibleButton 
+                                  variant="outline" 
+                                  size="sm" 
+                                  ariaLabel={`Mark ${record.member?.full_name}'s fine as paid`}
+                                  onClick={() => {
+                                    markFinePaid(record.id);
+                                    showSuccess('Fine marked as paid');
+                                  }}
+                                >
                                   Mark Paid
-                                </Button>
+                                </AccessibleButton>
                               )}
-                              <Button variant="outline" size="sm" onClick={() => {
-                                setSelectedRecord(record);
-                                setShowResolveDialog(true);
-                              }}>
+                              <AccessibleButton 
+                                variant="outline" 
+                                size="sm" 
+                                ariaLabel={`Resolve case for ${record.member?.full_name}`}
+                                onClick={() => {
+                                  setSelectedRecord(record);
+                                  setShowResolveDialog(true);
+                                }}
+                              >
                                 Resolve
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => dismissRecord(record.id)}>
+                              </AccessibleButton>
+                              <AccessibleButton 
+                                variant="ghost" 
+                                size="sm" 
+                                ariaLabel={`Dismiss case for ${record.member?.full_name}`}
+                                onClick={() => {
+                                  dismissRecord(record.id);
+                                  showSuccess('Case dismissed', 1500);
+                                }}
+                              >
                                 Dismiss
-                              </Button>
+                              </AccessibleButton>
                             </div>
                           </TableCell>
                         )}
@@ -453,7 +491,16 @@ export default function DisciplinePage() {
               value={resolutionNotes}
               onChange={(e) => setResolutionNotes(e.target.value)}
             />
-            <Button onClick={resolveRecord} className="w-full">Resolve Case</Button>
+            <AccessibleButton 
+              ariaLabel={`Resolve case for ${selectedRecord?.member?.full_name}`}
+              onClick={() => {
+                resolveRecord();
+                showSuccess('Case resolved successfully', 2000);
+              }} 
+              className="w-full"
+            >
+              Resolve Case
+            </AccessibleButton>
           </div>
         </DialogContent>
       </Dialog>
