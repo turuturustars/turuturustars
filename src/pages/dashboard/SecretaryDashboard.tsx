@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -59,6 +61,7 @@ interface MeetingMinutes {
 const SecretaryDashboard = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const { status: statusMessage, showSuccess } = useStatus();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [meetings, setMeetings] = useState<MeetingMinutes[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,7 +93,7 @@ const SecretaryDashboard = () => {
   const fetchDocuments = async () => {
     const { data, error } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, title, created_at, file_url, created_by')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
@@ -102,7 +105,7 @@ const SecretaryDashboard = () => {
   const fetchMeetings = async () => {
     const { data, error } = await supabase
       .from('meeting_minutes')
-      .select('*')
+      .select('id, title, meeting_date, created_at, content')
       .order('meeting_date', { ascending: false });
     
     if (!error && data) {
@@ -226,14 +229,11 @@ const SecretaryDashboard = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Draft</Badge>;
-      case 'approved':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Approved</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+    const iconMap: Record<string, React.ReactNode> = {
+      draft: <Clock className="w-3 h-3" />,
+      approved: <CheckCircle className="w-3 h-3" />
+    };
+    return <StatusBadge status={status} icon={iconMap[status]} />;
   };
 
   const formatFileSize = (bytes: number | null) => {
@@ -253,6 +253,7 @@ const SecretaryDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       <div>
         <h1 className="text-2xl font-serif font-bold text-foreground">Secretary Dashboard</h1>
         <p className="text-muted-foreground">Manage documents, meeting minutes, and administrative tasks</p>
@@ -331,10 +332,10 @@ const SecretaryDashboard = () => {
             <h2 className="text-lg font-semibold">Document Library</h2>
             <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <AccessibleButton ariaLabel="Upload a new document">
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Document
-                </Button>
+                </AccessibleButton>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -590,9 +591,9 @@ const SecretaryDashboard = () => {
                       <TableCell>{getStatusBadge(meeting.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button variant="ghost" size="sm">
+                          <AccessibleButton variant="ghost" size="sm" ariaLabel={`View document ${doc.title}`}>
                             <Eye className="w-4 h-4" />
-                          </Button>
+                          </AccessibleButton>
                           {meeting.status === 'draft' && (
                             <Button
                               variant="ghost"
