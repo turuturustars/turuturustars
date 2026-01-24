@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { hasPermission } from '@/lib/rolePermissions';
-import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2 } from 'lucide-react';
+import { searchItems, sortItems } from '@/lib/searchUtils';
+import { exportAsCSV } from '@/lib/exportUtils';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
+import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Announcement {
   id: string;
@@ -23,12 +28,16 @@ interface Announcement {
 
 const AnnouncementsPage = () => {
   const { user, roles } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditingId, setIsEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -36,68 +45,93 @@ const AnnouncementsPage = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const pagination = usePaginationState(10);
 
   const userRoles = roles.map(r => r.role);
   const canCreateAnnouncement = hasPermission(userRoles, 'send_announcements');
 
+  // Filter and search announcements
+  const filteredAnnouncements = useMemo(() => {
+    let results = announcements;
+
+    // Search filter
+    if (searchTerm) {
+      results = searchItems(results, searchTerm, ['title', 'content']);
+    }
+
+    // Priority filter
+    if (priorityFilter !== 'all') {
+      results = results.filter((a) => a.priority === priorityFilter);
+    }
+
+    // Sort
+    if (sortBy === 'priority') {
+      const priorityOrder = { high: 0, normal: 1, low: 2 };
+      results = [...results].sort((a, b) => {
+        const aIndex = priorityOrder[a.priority as keyof typeof priorityOrder] || 999;
+        const bIndex = priorityOrder[b.priority as keyof typeof priorityOrder] || 999;
+        return aIndex - bIndex;
+      });
+    } else {
+      results = sortItems(results, 'published_at', 'desc');
+    }
+
+    return results;
+  }, [announcements, searchTerm, priorityFilter, sortBy]);
+
+  // Update pagination when filtered announcements change
   useEffect(() => {
-    fetchAnnouncements();
+    pagination.updateTotal(filteredAnnouncements.length);
+  }, [filteredAnnouncements.length, pagination]);
 
-    // Real-time subscription for new announcements
-    const channel = supabase
-      .channel('announcements_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => {
-        fetchAnnouncements();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' }, () => {
-        fetchAnnouncements();
-      })
-      .subscribe();
+  const paginatedAnnouncements = useMemo(() => {
+    const offset = (pagination.page - 1) * pagination.pageSize;
+    return filteredAnnouncements.slice(offset, offset + pagination.pageSize);
+  }, [filteredAnnouncements, pagination.page, pagination.pageSize]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
+  // Fetch announcements with error handling
   const fetchAnnouncements = async () => {
+    setIsLoading(true);
     try {
-      const announcementsTable = supabase.from('announcements' as 'announcements') as any;
-      const { data, error } = await announcementsTable
-        .select('id, title, content, priority, published_at, created_by')
-        .order('published_at', { ascending: false });
-
-      if (error) throw error;
+      setError(null);
       
-      // Fetch creator information for each announcement
-      if (data && data.length > 0) {
-        const creatorIds = [...new Set(data.map((a: any) => a.created_by).filter(Boolean))] as string[];
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', creatorIds);
+      await retryAsync(
+        async () => {
+          const { data, error: fetchError } = await supabase
+            .from('announcements')
+            .select('id, title, content, priority, published_at, created_by')
+            .order('published_at', { ascending: false });
 
-        const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
-        
-        const announcementsWithCreators = data.map((a: any) => ({
-          ...a,
-          created_by_profile: profileMap.get(a.created_by),
-        }));
-        
-        setAnnouncements(announcementsWithCreators);
-      } else {
-        setAnnouncements([]);
-      }
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-      setError('Failed to load announcements');
+          if (fetchError) throw fetchError;
+          setAnnouncements(data || []);
+          return data;
+        },
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          backoffMultiplier: 2,
+          onRetry: (attempt) => {
+            logError(`Retrying fetch announcements (attempt ${attempt})`, 'AnnouncementsPage', 'warn');
+          },
+        }
+      );
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      logError(err, 'AnnouncementsPage.fetchAnnouncements');
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load announcements on mount
+  useEffect(() => {
+    fetchAnnouncements();
+  }, []);
+
   const handleCreateAnnouncement = async () => {
-    if (!user || !formData.title.trim() || !formData.content.trim()) {
-      setError('Please fill in all fields');
+    if (!formData.title.trim() || !formData.content.trim()) {
+      setError('Please fill in all required fields');
       return;
     }
 
@@ -147,8 +181,9 @@ const AnnouncementsPage = () => {
       // Refresh announcements list
       await fetchAnnouncements();
     } catch (error) {
-      console.error('Error saving announcement:', error);
-      setError('Failed to save announcement. Please try again.');
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'AnnouncementsPage.handleCreateAnnouncement');
+      setError(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -197,8 +232,9 @@ const AnnouncementsPage = () => {
       setSuccess('Announcement deleted successfully!');
       await fetchAnnouncements();
     } catch (error) {
-      console.error('Error deleting announcement:', error);
-      setError('Failed to delete announcement. Please try again.');
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'AnnouncementsPage.handleDeleteAnnouncement');
+      setError(errorMsg);
     } finally {
       setIsDeleting(null);
     }
@@ -210,6 +246,11 @@ const AnnouncementsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-serif font-bold text-foreground">Announcements</h2>
@@ -218,10 +259,10 @@ const AnnouncementsPage = () => {
         {canCreateAnnouncement && (
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <AccessibleButton className="gap-2" ariaLabel="Create new announcement">
                 <Plus className="w-4 h-4" />
                 New Announcement
-              </Button>
+              </AccessibleButton>
             </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
@@ -274,9 +315,10 @@ const AnnouncementsPage = () => {
                   </select>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button
+                  <AccessibleButton
                     onClick={handleCreateAnnouncement}
                     disabled={isSaving}
+                    ariaLabel={isEditingId ? 'Update announcement' : 'Create announcement'}
                     className="flex-1"
                   >
                     {isSaving ? (
@@ -287,9 +329,10 @@ const AnnouncementsPage = () => {
                     ) : (
                       isEditingId ? 'Update Announcement' : 'Create Announcement'
                     )}
-                  </Button>
-                  <Button
+                  </AccessibleButton>
+                  <AccessibleButton
                     variant="outline"
+                    ariaLabel="Cancel"
                     onClick={() => {
                       setIsDialogOpen(false);
                       setIsEditingId(null);
@@ -299,7 +342,7 @@ const AnnouncementsPage = () => {
                     }}
                   >
                     Cancel
-                  </Button>
+                  </AccessibleButton>
                 </div>
               </div>
             </DialogContent>
@@ -322,8 +365,75 @@ const AnnouncementsPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {announcements.map((announcement) => (
+        <>
+          {/* Search and Filter Bar */}
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search announcements..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="normal">Normal</option>
+                  <option value="low">Low</option>
+                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'date' | 'priority')}
+                    className="px-3 py-2 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary flex-1"
+                  >
+                    <option value="date">Sort by Date</option>
+                    <option value="priority">Sort by Priority</option>
+                  </select>
+                  <AccessibleButton
+                    variant="outline"
+                    ariaLabel="Export announcements as CSV"
+                    onClick={() => {
+                      const exportData = filteredAnnouncements.map((a) => ({
+                        'Title': a.title,
+                        'Priority': a.priority,
+                        'Date': new Date(a.published_at).toLocaleDateString(),
+                        'Creator': a.created_by_profile?.full_name || 'Unknown',
+                      }));
+                      exportAsCSV(exportData, { filename: 'announcements' });
+                    }}
+                    className="gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                  </AccessibleButton>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Announcements List */}
+          <div className="space-y-4">
+            {paginatedAnnouncements.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-muted-foreground">
+                    {filteredAnnouncements.length === 0 ? 'No announcements match your search' : 'No announcements to display'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {paginatedAnnouncements.map((announcement) => (
             <Card key={announcement.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-4">
@@ -352,18 +462,21 @@ const AnnouncementsPage = () => {
                     {getPriorityBadge(announcement.priority)}
                     {canEditOrDelete(announcement.created_by) && (
                       <div className="flex gap-1">
-                        <Button
+                        <AccessibleButton
                           variant="ghost"
-                          size="sm"
+                          ariaLabel={`Edit announcement: ${announcement.title}`}
                           onClick={() => handleEditAnnouncement(announcement)}
                           className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                         >
                           <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
+                        </AccessibleButton>
+                        <AccessibleButton
                           variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteAnnouncement(announcement.id)}
+                          ariaLabel={`Delete announcement: ${announcement.title}`}
+                          onClick={() => {
+                            handleDeleteAnnouncement(announcement.id);
+                            showSuccess('Announcement deleted', 1500);
+                          }}
                           disabled={isDeleting === announcement.id}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
@@ -372,7 +485,7 @@ const AnnouncementsPage = () => {
                           ) : (
                             <Trash2 className="w-4 h-4" />
                           )}
-                        </Button>
+                        </AccessibleButton>
                       </div>
                     )}
                   </div>
@@ -382,8 +495,39 @@ const AnnouncementsPage = () => {
                 <p className="text-foreground whitespace-pre-wrap">{announcement.content}</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
+              ))
+              }
+                {/* Pagination Controls */}
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, filteredAnnouncements.length)} of {filteredAnnouncements.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <AccessibleButton
+                      variant="outline"
+                      ariaLabel="Go to previous page"
+                      onClick={() => pagination.page > 1 && pagination.goToPage(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </AccessibleButton>
+                    <div className="text-sm">
+                      Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+                    </div>
+                    <AccessibleButton
+                      variant="outline"
+                      ariaLabel="Go to next page"
+                      onClick={() => pagination.page < pagination.totalPages && pagination.goToPage(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </AccessibleButton>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
