@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { hasRole } from '@/lib/rolePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Badge } from '@/components/ui/badge';
 import {
   Users,
@@ -17,6 +18,7 @@ import {
 const OrganizingSecretaryDashboard = () => {
   const navigate = useNavigate();
   const { roles } = useAuth();
+  const { status: statusMessage, showSuccess } = useStatus();
   const userRoles = roles.map(r => r.role);
   const isOrgSecretary = hasRole(userRoles, 'organizing_secretary');
 
@@ -73,6 +75,7 @@ const OrganizingSecretaryDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       {/* Header */}
       <div className="border-b border-border pb-4">
         <h1 className="text-3xl font-bold">Organizing Secretary / Discipline Master</h1>
@@ -129,6 +132,7 @@ const OrganizingSecretaryDashboard = () => {
             <button
               key={idx}
               onClick={() => navigate(action.path)}
+              aria-label={`Navigate to ${action.title}`}
               className="group"
             >
               <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
