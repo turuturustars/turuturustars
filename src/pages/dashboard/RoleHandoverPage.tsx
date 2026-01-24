@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -58,6 +60,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function RoleHandoverPage() {
   const { user, hasRole } = useAuth();
+  const { status: statusMessage, showSuccess } = useStatus();
   const [handovers, setHandovers] = useState<RoleHandover[]>([]);
   const [officials, setOfficials] = useState<UserRole[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
@@ -87,7 +90,7 @@ export default function RoleHandoverPage() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('role_handovers')
-      .select('*')
+      .select('id, original_user_id, acting_user_id, role, start_date, end_date, reason, status, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -189,10 +192,10 @@ export default function RoleHandoverPage() {
 
   const getStatusBadge = (handover: RoleHandover) => {
     if (handover.status === 'cancelled') {
-      return <Badge className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+      return <StatusBadge status="cancelled" />;
     }
     if (handover.status === 'completed') {
-      return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+      return <StatusBadge status="active" />;
     }
     
     const now = new Date();
@@ -200,15 +203,15 @@ export default function RoleHandoverPage() {
     const end = handover.end_date ? new Date(handover.end_date) : null;
 
     if (isFuture(start)) {
-      return <Badge className="bg-blue-100 text-blue-800">Scheduled</Badge>;
+      return <StatusBadge status="pending" />;
     }
     if (end && isPast(end)) {
-      return <Badge className="bg-yellow-100 text-yellow-800">Expired</Badge>;
+      return <StatusBadge status="closed" />;
     }
     if (!end || isWithinInterval(now, { start, end })) {
-      return <Badge className="bg-green-100 text-green-800">Active</Badge>;
+      return <StatusBadge status="active" />;
     }
-    return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+    return <StatusBadge status="pending" />;
   };
 
   const activeHandovers = handovers.filter(h => {
@@ -239,6 +242,7 @@ export default function RoleHandoverPage() {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Role Handovers</h1>
@@ -247,7 +251,7 @@ export default function RoleHandoverPage() {
         {canManage && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Create Handover</Button>
+                <AccessibleButton ariaLabel="Create new role handover"><Plus className="h-4 w-4 mr-2" />Create Handover</AccessibleButton>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -328,7 +332,7 @@ export default function RoleHandoverPage() {
                   onChange={(e) => setNewHandover({ ...newHandover, reason: e.target.value })}
                 />
 
-                <Button onClick={createHandover} className="w-full">Create Handover</Button>
+                <AccessibleButton onClick={createHandover} className="w-full" ariaLabel="Submit role handover creation">Create Handover</AccessibleButton>
               </div>
             </DialogContent>
           </Dialog>
@@ -403,12 +407,12 @@ export default function RoleHandoverPage() {
                     </div>
                     {canManage && (
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => completeHandover(handover.id)}>
+                        <AccessibleButton variant="outline" ariaLabel="Complete this handover" onClick={() => completeHandover(handover.id)}>
                           <CheckCircle className="h-4 w-4 mr-1" />Complete
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => cancelHandover(handover.id)}>
+                        </AccessibleButton>
+                        <AccessibleButton variant="ghost" ariaLabel="Cancel this handover" onClick={() => cancelHandover(handover.id)}>
                           <XCircle className="h-4 w-4 mr-1" />Cancel
-                        </Button>
+                        </AccessibleButton>
                       </div>
                     )}
                   </div>
