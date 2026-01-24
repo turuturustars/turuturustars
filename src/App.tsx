@@ -5,8 +5,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { ErrorBoundary } from "react-error-boundary";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LocalOrganizationSchema } from "@/components/StructuredData";
+import { Logger } from "@/utils/errorHandler";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -18,21 +19,7 @@ const PageLoader = () => (
   </div>
 );
 
-// Error fallback component
-const ErrorFallback = ({ error, resetErrorBoundary }: any) => (
-  <div className="flex h-screen w-full flex-col items-center justify-center gap-4 p-4">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-destructive">Something went wrong</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-    </div>
-    <button
-      onClick={resetErrorBoundary}
-      className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
-    >
-      Try again
-    </button>
-  </div>
-);
+
 
 // Lazy-loaded components
 const Index = lazy(() => import("./pages/Index"));
@@ -99,8 +86,14 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
+  const handleError = (error: Error, errorInfo: React.ErrorInfo) => {
+    Logger.error('Application error boundary caught error', error, {
+      componentStack: errorInfo.componentStack,
+    });
+  };
+
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback} onReset={() => globalThis.location.href = "/"}>
+    <ErrorBoundary onError={handleError}>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider delayDuration={300}>
           <LocalOrganizationSchema />
