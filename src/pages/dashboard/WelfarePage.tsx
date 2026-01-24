@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { hasPermission } from '@/lib/rolePermissions';
-import { HandHeart, Loader2, Heart, Users, DollarSign, Plus, Edit2, Trash2, AlertCircle } from 'lucide-react';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
+import { HandHeart, Loader2, Heart, Users, DollarSign, Plus, Edit2, Trash2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import WelfareContributeDialog from '@/components/dashboard/WelfareContributeDialog';
 
 interface WelfareCase {
@@ -28,6 +32,7 @@ interface WelfareCase {
 
 const WelfarePage = () => {
   const { user, roles } = useAuth();
+  const { status: statusMessage, showSuccess } = useStatus();
   const [cases, setCases] = useState<WelfareCase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,10 +49,22 @@ const WelfarePage = () => {
     beneficiary_id: '',
   });
   const [beneficiaries, setBeneficiaries] = useState<Array<{id: string; full_name: string}>>([]);
+  const pagination = usePaginationState(12);
 
   const userRoles = roles.map(r => r.role);
   const canCreateWelfare = hasPermission(userRoles, 'create_welfare');
   const canManageWelfare = hasPermission(userRoles, 'manage_welfare');
+
+  // Paginate cases
+  const paginatedCases = useMemo(() => {
+    const offset = (pagination.page - 1) * pagination.pageSize;
+    return cases.slice(offset, offset + pagination.pageSize);
+  }, [cases, pagination.page, pagination.pageSize]);
+
+  // Update pagination when cases change
+  useEffect(() => {
+    pagination.updateTotal(cases.length);
+  }, [cases.length, pagination]);
 
   useEffect(() => {
     fetchWelfareCases();
@@ -107,7 +124,7 @@ const WelfarePage = () => {
           .eq('id', isEditingId);
 
         if (updateError) throw updateError;
-        setSuccess('Welfare case updated successfully!');
+        showSuccess('Welfare case updated successfully!', 5000);
       } else {
         // Create new welfare case
         const { error: createError } = await supabase
@@ -123,7 +140,7 @@ const WelfarePage = () => {
           });
 
         if (createError) throw createError;
-        setSuccess('Welfare case created successfully!');
+        showSuccess('Welfare case created successfully!', 5000);
       }
 
       setFormData({ title: '', description: '', case_type: 'medical', target_amount: '', beneficiary_id: '' });
@@ -153,7 +170,7 @@ const WelfarePage = () => {
   };
 
   const handleDeleteWelfareCase = async (caseId: string) => {
-    if (!window.confirm('Are you sure you want to delete this welfare case?')) {
+    if (!globalThis.confirm('Are you sure you want to delete this welfare case?')) {
       return;
     }
 
@@ -165,32 +182,47 @@ const WelfarePage = () => {
         .eq('id', caseId);
 
       if (deleteError) throw deleteError;
-      setSuccess('Welfare case deleted successfully!');
+      showSuccess('Welfare case deleted successfully!', 5000);
       await fetchWelfareCases();
     } catch (error) {
-      console.error('Error deleting welfare case:', error);
-      setError('Failed to delete welfare case. Please try again.');
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'WelfarePage.handleDeleteWelfareCase');
+      setError(errorMsg);
     } finally {
       setIsDeleting(null);
     }
   };
 
   const fetchWelfareCases = async () => {
+    setIsLoading(true);
     try {
-      // Fetch ALL welfare cases regardless of status to ensure visibility
-      const { data, error } = await supabase
-        .from('welfare_cases')
-        .select(`
-          *,
-          beneficiary:beneficiary_id (full_name)
-        `)
-        .order('created_at', { ascending: false });
+      setError(null);
+      
+      await retryAsync(
+        async () => {
+          // Fetch ALL welfare cases regardless of status to ensure visibility
+          const { data, error: fetchError } = await supabase
+            .from('welfare_cases')
+            .select('id, title, description, case_type, target_amount, collected_amount, status, created_at, beneficiary_id, beneficiary:beneficiary_id(full_name)')
+            .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      console.log('Fetched all welfare cases:', data);
-      setCases(data || []);
+          if (fetchError) throw fetchError;
+          setCases(data || []);
+          return data;
+        },
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          backoffMultiplier: 2,
+          onRetry: (attempt) => {
+            logError(`Retrying fetch welfare cases (attempt ${attempt})`, 'WelfarePage', 'warn');
+          },
+        }
+      );
     } catch (error) {
-      console.error('Error fetching welfare cases:', error);
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'WelfarePage.fetchWelfareCases');
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -207,19 +239,6 @@ const WelfarePage = () => {
       default:
         return <DollarSign className="w-5 h-5 text-primary" />;
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      active: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-    };
-    return (
-      <Badge className={colors[status] || colors.active}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
   };
 
   const activeCases = cases.filter((c) => c.status === 'active');
@@ -239,12 +258,14 @@ const WelfarePage = () => {
 
   const renderCasesList = () => (
     <>
-      {/* Active Cases */}
-      {activeCases.length > 0 && (
+      {/* All Cases with Pagination */}
+      {paginatedCases.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Active Cases</h3>
+          <h3 className="text-lg font-semibold text-foreground">
+            Welfare Cases ({cases.length})
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activeCases.map((welfareCase) => (
+            {paginatedCases.map((welfareCase) => (
               <Card key={welfareCase.id} className="overflow-hidden">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-4">
@@ -258,20 +279,20 @@ const WelfarePage = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {getStatusBadge(welfareCase.status)}
+                      <StatusBadge status={welfareCase.status} />
                       {canManageWelfare && (
                         <div className="flex gap-1">
-                          <Button
+                          <AccessibleButton
                             variant="ghost"
-                            size="sm"
+                            ariaLabel={`Edit welfare case ${welfareCase.title}`}
                             onClick={() => handleEditWelfareCase(welfareCase)}
                             className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
                             <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
+                          </AccessibleButton>
+                          <AccessibleButton
                             variant="ghost"
-                            size="sm"
+                            ariaLabel={`Delete welfare case ${welfareCase.title}`}
                             onClick={() => handleDeleteWelfareCase(welfareCase.id)}
                             disabled={isDeleting === welfareCase.id}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -281,7 +302,7 @@ const WelfarePage = () => {
                             ) : (
                               <Trash2 className="w-4 h-4" />
                             )}
-                          </Button>
+                          </AccessibleButton>
                         </div>
                       )}
                     </div>
@@ -330,33 +351,36 @@ const WelfarePage = () => {
               </Card>
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Past Cases */}
-      {closedCases.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-foreground">Past Cases</h3>
-          <Card>
-            <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {closedCases.map((welfareCase) => (
-                  <div key={welfareCase.id} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {getCaseTypeIcon(welfareCase.case_type)}
-                      <div>
-                        <p className="font-medium">{welfareCase.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Collected: KES {(welfareCase.collected_amount || 0).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    {getStatusBadge(welfareCase.status)}
-                  </div>
-                ))}
+          {/* Pagination Controls */}
+          <div className="flex items-center justify-between mt-6 pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, cases.length)} of {cases.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <AccessibleButton
+                variant="outline"
+                size="sm"
+                ariaLabel="Previous page"
+                onClick={() => pagination.page > 1 && pagination.goToPage(pagination.page - 1)}
+                disabled={pagination.page === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </AccessibleButton>
+              <div className="text-sm">
+                Page {pagination.page} of {Math.max(1, pagination.totalPages)}
               </div>
-            </CardContent>
-          </Card>
+              <AccessibleButton
+                variant="outline"
+                size="sm"
+                ariaLabel="Next page"
+                onClick={() => pagination.page < pagination.totalPages && pagination.goToPage(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </AccessibleButton>
+            </div>
+          </div>
         </div>
       )}
     </>
@@ -364,6 +388,7 @@ const WelfarePage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       <div>
         <div className="flex items-center justify-between">
           <div>
@@ -373,10 +398,10 @@ const WelfarePage = () => {
           {canCreateWelfare && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <AccessibleButton className="gap-2" ariaLabel="Open dialog to create new welfare case">
                   <Plus className="w-4 h-4" />
                   New Welfare Case
-                </Button>
+                </AccessibleButton>
               </DialogTrigger>
               <DialogContent className="max-w-md">
                 <DialogHeader>
@@ -455,7 +480,8 @@ const WelfarePage = () => {
                       className="mt-1"
                     />
                   </div>
-                  <Button
+                  <AccessibleButton
+                    ariaLabel={isEditingId ? 'Update welfare case' : 'Create welfare case'}
                     onClick={handleSaveWelfareCase}
                     disabled={isSaving}
                     className="w-full"
@@ -468,7 +494,7 @@ const WelfarePage = () => {
                     ) : (
                       isEditingId ? 'Update Case' : 'Create Case'
                     )}
-                  </Button>
+                  </AccessibleButton>
                 </div>
               </DialogContent>
             </Dialog>
