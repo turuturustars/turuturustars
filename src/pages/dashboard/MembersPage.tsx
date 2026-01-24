@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -20,7 +20,14 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Users, UserCheck, UserX, Loader2 } from 'lucide-react';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
+import { Search, Users, UserCheck, UserX, Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { StatusBadge } from '@/components/StatusBadge';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { EmptyState } from '@/components/ui/empty-state';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { useDebounce } from '@/hooks/useDebounce';
+import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 
 interface Member {
   id: string;
@@ -36,46 +43,30 @@ interface Member {
 
 const MembersPage = () => {
   const [members, setMembers] = useState<Member[]>([]);
-  const [filteredMembers, setFilteredMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    memberId?: string;
+    newStatus?: string;
+  }>({ open: false });
   const { toast } = useToast();
+  const { status, showSuccess } = useStatus();
+  const pagination = usePaginationState(15);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     fetchMembers();
   }, []);
 
-  useEffect(() => {
-    filterMembers();
-  }, [members, searchTerm, statusFilter]);
-
-  const fetchMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('joined_at', { ascending: false });
-
-      if (error) throw error;
-      setMembers(data || []);
-    } catch (error) {
-      console.error('Error fetching members:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load members',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filterMembers = () => {
+  const filteredMembers = useMemo(() => {
     let filtered = members;
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    if (debouncedSearchTerm) {
+      const term = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(
         (m) =>
           m.full_name.toLowerCase().includes(term) ||
@@ -89,50 +80,113 @@ const MembersPage = () => {
       filtered = filtered.filter((m) => m.status === statusFilter);
     }
 
-    setFilteredMembers(filtered);
+    return filtered;
+  }, [members, debouncedSearchTerm, statusFilter]);
+
+  // Update pagination when filtered members change
+  useEffect(() => {
+    pagination.updateTotal(filteredMembers.length);
+  }, [filteredMembers.length, pagination]);
+
+  const paginatedMembers = useMemo(() => {
+    const offset = pagination.getOffset();
+    return filteredMembers.slice(offset, offset + pagination.pageSize);
+  }, [filteredMembers, pagination]);
+
+  const fetchMembers = async () => {
+    setIsLoading(true);
+    try {
+      setError(null);
+      
+      // Use retry logic for network resilience
+      await retryAsync(
+        async () => {
+          const { data, error: fetchError } = await supabase
+            .from('profiles')
+            .select('id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at')
+            .order('joined_at', { ascending: false });
+
+          if (fetchError) throw fetchError;
+          setMembers(data || []);
+          return data;
+        },
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          backoffMultiplier: 2,
+          onRetry: (attempt) => {
+            logError(`Retrying fetch members (attempt ${attempt})`, 'MembersPage', 'warn');
+          },
+        }
+      );
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      logError(err, 'MembersPage.fetchMembers');
+      setError(errorMsg);
+      toast({
+        title: 'Failed to load members',
+        description: errorMsg,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const updateMemberStatus = async (memberId: string, newStatus: 'active' | 'dormant' | 'pending' | 'suspended') => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: newStatus })
-        .eq('id', memberId);
+  const handleStatusChange = (memberId: string, newStatus: string) => {
+    setConfirmDialog({
+      open: true,
+      memberId,
+      newStatus,
+    });
+  };
 
-      if (error) throw error;
+  const updateMemberStatus = async () => {
+    const { memberId, newStatus } = confirmDialog;
+    if (!memberId || !newStatus) return;
+
+    try {
+      setUpdatingId(memberId);
+      
+      // Use retry logic for updates
+      await retryAsync(
+        async () => {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ status: newStatus as any })
+            .eq('id', memberId);
+
+          if (updateError) throw updateError;
+          return true;
+        },
+        {
+          maxRetries: 2,
+          delayMs: 500,
+        }
+      );
 
       setMembers((prev) =>
         prev.map((m) =>
-          m.id === memberId ? { ...m, status: newStatus as 'active' | 'dormant' | 'pending' | 'suspended' } : m
+          m.id === memberId ? { ...m, status: newStatus as any } : m
         )
       );
 
       toast({
         title: 'Success',
-        description: 'Member status updated',
+        description: 'Member status updated successfully',
       });
-    } catch (error) {
-      console.error('Error updating status:', error);
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      logError(err, 'MembersPage.updateMemberStatus');
       toast({
         title: 'Error',
-        description: 'Failed to update member status',
+        description: errorMsg,
         variant: 'destructive',
       });
+    } finally {
+      setUpdatingId(null);
+      setConfirmDialog({ open: false });
     }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      active: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      dormant: 'bg-red-100 text-red-800',
-      suspended: 'bg-gray-100 text-gray-800',
-    };
-    return (
-      <Badge className={variants[status] || variants.pending}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
   };
 
   const stats = {
@@ -144,6 +198,11 @@ const MembersPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div>
         <h2 className="text-2xl font-serif font-bold text-foreground">Members Management</h2>
         <p className="text-muted-foreground">View and manage all CBO members</p>
@@ -210,109 +269,165 @@ const MembersPage = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="dormant">Dormant</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Members Table */}
+      {/* Members List */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>All Members ({filteredMembers.length})</CardTitle>
+          <AccessibleButton
+            variant="outline"
+            size="sm"
+            onClick={fetchMembers}
+            disabled={isLoading}
+            ariaLabel="Refresh members list"
+          >
+            Refresh
+          </AccessibleButton>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-4 bg-destructive/10 text-destructive rounded-lg text-sm">
+              {error}
+              <AccessibleButton
+                size="sm"
+                variant="outline"
+                onClick={fetchMembers}
+                className="ml-2"
+                ariaLabel="Retry fetching members"
+              >
+                Retry
+              </AccessibleButton>
+            </div>
+          )}
+          
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
+          ) : paginatedMembers.length === 0 ? (
+            <EmptyState
+              title="No members found"
+              description={filteredMembers.length === 0 ? 'Try adjusting your filters or search term' : 'Loading...'}
+            />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Member</TableHead>
-                    <TableHead>Membership #</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredMembers.map((member) => (
-                    <TableRow key={member.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                            <span className="text-sm font-medium">
-                              {member.full_name.charAt(0)}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium">{member.full_name}</p>
-                            {member.is_student && (
-                              <Badge variant="outline" className="text-xs">
-                                Student
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm">
-                          {member.membership_number || '-'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <p>{member.phone}</p>
-                          <p className="text-muted-foreground">{member.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>{getStatusBadge(member.status)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(member.joined_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={member.status}
-                          onValueChange={(value: 'active' | 'dormant' | 'pending' | 'suspended') => updateMemberStatus(member.id, value)}
-                        >
-                          <SelectTrigger className="w-[120px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="active">Activate</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                            <SelectItem value="dormant">Dormant</SelectItem>
-                            <SelectItem value="suspended">Suspend</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Membership #</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Joined</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {filteredMembers.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  No members found
-                </p>
-              )}
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedMembers.map((member) => (
+                      <TableRow key={member.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                              <span className="text-sm font-medium">
+                                {member.full_name.charAt(0)}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium">{member.full_name}</p>
+                              {member.is_student && (
+                                <Badge variant="outline" className="text-xs">
+                                  Student
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-sm">
+                            {member.membership_number || '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <p>{member.phone}</p>
+                            <p className="text-muted-foreground">{member.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={member.status} />
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(member.joined_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={member.status}
+                            onValueChange={(value) => handleStatusChange(member.id, value)}
+                            disabled={updatingId === member.id}
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Activate</SelectItem>
+                              <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="dormant">Dormant</SelectItem>
+                              <SelectItem value="suspended">Suspend</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {pagination.getOffset() + 1}-{Math.min(pagination.getOffset() + pagination.pageSize, filteredMembers.length)} of {filteredMembers.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <AccessibleButton
+                    variant="outline"
+                    ariaLabel="Go to previous page"
+                    onClick={pagination.prevPage}
+                    disabled={pagination.page === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </AccessibleButton>
+                  <div className="text-sm">
+                    Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+                  </div>
+                  <AccessibleButton
+                    variant="outline"
+                    ariaLabel="Go to next page"
+                    onClick={pagination.nextPage}
+                    disabled={pagination.page === pagination.totalPages}
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </AccessibleButton>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title="Change Member Status"
+        description={`Are you sure you want to change this member's status to "${confirmDialog.newStatus}"?`}
+        action="Update"
+        actionVariant={confirmDialog.newStatus === 'suspended' ? 'destructive' : 'default'}
+        onConfirm={updateMemberStatus}
+        onCancel={() => setConfirmDialog({ open: false })}
+        isLoading={updatingId !== null}
+      />
     </div>
   );
 };
