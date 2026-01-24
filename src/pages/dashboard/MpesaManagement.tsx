@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -82,7 +83,7 @@ const MpesaManagement = () => {
   const fetchTransactions = async () => {
     const { data, error } = await supabase
       .from('mpesa_transactions')
-      .select('*')
+      .select('id, transaction_id, phone_number, amount, reference, status, created_at, updated_at')
       .order('created_at', { ascending: false })
       .limit(100);
     
@@ -95,7 +96,7 @@ const MpesaManagement = () => {
   const fetchAuditLogs = async () => {
     const { data, error } = await supabase
       .from('audit_logs')
-      .select('*')
+      .select('id, action, resource, status, user_id, created_at')
       .order('created_at', { ascending: false })
       .limit(50);
     
@@ -214,16 +215,18 @@ const MpesaManagement = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
-      case 'failed':
-        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
-      case 'pending':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
-      default:
-        return <Badge>{status}</Badge>;
-    }
+    const iconMap: Record<string, React.ReactNode> = {
+      completed: <CheckCircle className="w-3 h-3" />,
+      failed: <XCircle className="w-3 h-3" />,
+      pending: <Clock className="w-3 h-3" />
+    };
+    // Map transaction statuses to standard statuses
+    const statusMap: Record<string, string> = {
+      completed: 'active',
+      failed: 'missed',
+      pending: 'pending'
+    };
+    return <StatusBadge status={statusMap[status] || status} icon={iconMap[status]} />;
   };
 
   // Calculate stats
