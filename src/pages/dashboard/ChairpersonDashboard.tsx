@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { hasRole, isManagementCommittee } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Badge } from '@/components/ui/badge';
 import {
   Users,
@@ -20,6 +21,7 @@ import {
 const ChairpersonDashboard = () => {
   const navigate = useNavigate();
   const { roles, profile } = useAuth();
+  const { status: statusMessage, showSuccess } = useStatus();
   const userRoles = roles.map(r => r.role);
   const isChair = hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairperson');
   
@@ -108,6 +110,7 @@ const ChairpersonDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       {/* Header */}
       <div className="border-b border-border pb-4">
         <h1 className="text-3xl font-bold">Chairperson Dashboard</h1>
@@ -128,9 +131,9 @@ const ChairpersonDashboard = () => {
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.totalMembers}</div>
             <p className="text-xs sm:text-xs text-muted-foreground mt-2">Active & registered members</p>
-            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+            <AccessibleButton variant="outline" className="mt-3 w-full text-xs" ariaLabel="View all members" asChild>
               <a href="/dashboard/members">View All</a>
-            </Button>
+            </AccessibleButton>
           </CardContent>
         </Card>
         <Card className="border-2 hover:shadow-lg transition-all hover:border-amber-500/50">
@@ -143,9 +146,9 @@ const ChairpersonDashboard = () => {
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.upcomingMeetings}</div>
             <p className="text-xs sm:text-xs text-muted-foreground mt-2">Scheduled events</p>
-            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+            <AccessibleButton variant="outline" className="mt-3 w-full text-xs" ariaLabel="Schedule a new meeting" asChild>
               <a href="/dashboard/governance/meetings">Schedule</a>
-            </Button>
+            </AccessibleButton>
           </CardContent>
         </Card>
         <Card className="border-2 hover:shadow-lg transition-all hover:border-purple-500/50">
@@ -158,9 +161,9 @@ const ChairpersonDashboard = () => {
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.pendingApprovals}</div>
             <p className="text-xs sm:text-xs text-muted-foreground mt-2">Awaiting review</p>
-            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+            <AccessibleButton variant="outline" className="mt-3 w-full text-xs" ariaLabel="Review pending approvals" asChild>
               <a href="/dashboard/admin-panel/approvals">Review</a>
-            </Button>
+            </AccessibleButton>
           </CardContent>
         </Card>
         <Card className="border-2 hover:shadow-lg transition-all hover:border-pink-500/50">
@@ -173,9 +176,9 @@ const ChairpersonDashboard = () => {
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">{isLoading ? '--' : stats.announcements}</div>
             <p className="text-xs sm:text-xs text-muted-foreground mt-2">Published announcements</p>
-            <Button variant="outline" size="sm" className="mt-3 w-full text-xs" asChild>
+            <AccessibleButton variant="outline" className="mt-3 w-full text-xs" ariaLabel="Create announcement" asChild>
               <a href="/dashboard/communication/announcements">Create</a>
-            </Button>
+            </AccessibleButton>
           </CardContent>
         </Card>
       </div>
