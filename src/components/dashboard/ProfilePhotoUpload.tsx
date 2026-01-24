@@ -5,6 +5,7 @@ import { Camera, Loader2, X, Upload, ImageIcon, Check } from 'lucide-react';
 import { uploadToCloudinary, getAvatarUrl } from '@/lib/cloudinary';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { validatePhotoFile, compressImage, cropToSquare } from '@/lib/photoValidation';
 
 interface ProfilePhotoUploadProps {
   currentPhotoId: string | null;
@@ -27,44 +28,50 @@ const ProfilePhotoUpload = ({
   const { toast } = useToast();
 
   const validateAndProcessFile = async (file: File) => {
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+    // Use the comprehensive validation utility
+    const validation = await validatePhotoFile(file, {
+      maxSizeInMB: 5,
+      allowedFormats: ['image/jpeg', 'image/png', 'image/webp'],
+      maxWidth: 2000,
+      maxHeight: 2000,
+      minWidth: 100,
+      minHeight: 100,
+    });
+
+    if (!validation.isValid) {
       toast({
-        title: 'Invalid File Type',
-        description: 'Please select an image file (JPG, PNG, WebP, etc.)',
+        title: 'Invalid Photo',
+        description: validation.error,
         variant: 'destructive',
       });
-      return false;
+      return null;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'File Too Large',
-        description: 'Please select an image smaller than 5MB',
-        variant: 'destructive',
-      });
-      return false;
-    }
-
-    return true;
+    return validation;
   };
 
   const uploadPhoto = async (file: File) => {
-    const isValid = await validateAndProcessFile(file);
-    if (!isValid) return;
+    const validation = await validateAndProcessFile(file);
+    if (!validation) return;
 
     // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => setPreviewUrl(e.target?.result as string);
-    reader.readAsDataURL(file);
-
+    setPreviewUrl(validation.preview || null);
     setIsUploading(true);
     setUploadSuccess(false);
 
     try {
+      // Compress and crop image before upload
+      let processedFile = validation.file!;
+      try {
+        processedFile = await compressImage(processedFile, 0.8);
+        processedFile = await cropToSquare(processedFile, 512);
+      } catch (error) {
+        console.warn('Error processing image, using original:', error);
+        // Continue with original file if processing fails
+      }
+
       // Upload to Cloudinary
-      const result = await uploadToCloudinary(file, 'turuturu-stars/avatars', 'image');
+      const result = await uploadToCloudinary(processedFile, 'turuturu-stars/avatars', 'image');
 
       // Update profile in database
       const { error } = await supabase
