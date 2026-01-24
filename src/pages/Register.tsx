@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Loader2, Eye, EyeOff, CheckCircle, Phone, MapPin, Briefcase } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
@@ -54,7 +54,6 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [verificationStep, setVerificationStep] = useState<'form' | 'verify' | 'verified'>('form');
   const [verificationCode, setVerificationCode] = useState('');
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -74,7 +73,7 @@ const Register = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { status: statusMessage, showSuccess } = useStatus();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -98,7 +97,9 @@ const Register = () => {
       setErrors({});
 
       if (!formData.phone || formData.phone.length < 10) {
-        setErrors({ phone: 'Please enter a valid phone number' });
+        const errorMsg = 'Please enter a valid phone number';
+        setErrors({ phone: errorMsg });
+        showSuccess(errorMsg, 'error');
         return;
       }
 
@@ -112,17 +113,12 @@ const Register = () => {
       if (sendError) throw sendError;
 
       setVerificationStep('verify');
-      toast({
-        title: 'Verification code sent',
-        description: 'Check your phone for the verification code.',
-      });
+      showSuccess('Verification code sent! Check your phone for the code.');
     } catch (error) {
       console.error('Error sending verification code:', error);
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send verification code',
-        variant: 'destructive',
-      });
+      const errorMsg = error instanceof Error ? error.message : 'Failed to send verification code';
+      setErrors({ phone: errorMsg });
+      showSuccess(errorMsg, 'error');
     } finally {
       setIsSendingCode(false);
     }
@@ -142,20 +138,14 @@ const Register = () => {
       if (verifyError) throw verifyError;
 
       setVerificationStep('verified');
-      toast({
-        title: 'Phone verified successfully!',
-        description: 'You can now complete your registration.',
-      });
+      showSuccess('Phone verified successfully! You can now complete your registration');
     } catch (error) {
       console.error('Error verifying phone:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Invalid verification code';
       setErrors({
-        verification: error instanceof Error ? error.message : 'Invalid verification code',
+        verification: errorMsg,
       });
-      toast({
-        title: 'Verification failed',
-        description: error instanceof Error ? error.message : 'Invalid verification code',
-        variant: 'destructive',
-      });
+      showSuccess(errorMsg, 'error');
     } finally {
       setIsVerifying(false);
     }
@@ -195,20 +185,14 @@ const Register = () => {
     e.preventDefault();
     
     if (!validateForm()) {
-      toast({
-        title: 'Validation error',
-        description: 'Please check the form for errors',
-        variant: 'destructive',
-      });
+      const errorCount = Object.keys(errors).length;
+      const plural = errorCount > 1 ? 's' : '';
+      showSuccess(`Please correct ${errorCount} error${plural} before submitting`, 'error');
       return;
     }
 
     if (verificationStep !== 'verified') {
-      toast({
-        title: 'Phone verification required',
-        description: 'Please verify your phone number first',
-        variant: 'destructive',
-      });
+      showSuccess('Please verify your phone number first', 'error');
       return;
     }
 
@@ -233,13 +217,9 @@ const Register = () => {
 
       if (authError) throw authError;
 
-      // Show success message
-      setSuccessMessage('Account created successfully! Redirecting to login...');
-      toast({
-        title: 'Account created',
-        description: 'Your registration is complete. Redirecting to login...',
-      });
-
+      // Show success message and redirect
+      showSuccess('Account created successfully! Redirecting to login...');
+      
       // Redirect to login after 2 seconds
       setTimeout(() => {
         navigate('/auth');
@@ -248,37 +228,11 @@ const Register = () => {
       console.error('Registration error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Registration failed. Please try again.';
       setErrors({ form: errorMessage });
-      toast({
-        title: 'Registration failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
+      showSuccess(errorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
   };
-
-  if (successMessage) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-hero">
-          <CardContent className="pt-8">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Welcome to Turuturu Stars!</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {successMessage}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex items-center justify-center p-4">
@@ -302,7 +256,8 @@ const Register = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
+          <form onSubmit={handleSubmit} className="space-y-4" aria-label="User registration form">
             {/* Full Name */}
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name *</Label>
@@ -358,15 +313,16 @@ const Register = () => {
                   disabled={verificationStep === 'verified'}
                 />
                 {verificationStep === 'form' && (
-                  <Button
+                  <AccessibleButton
                     type="button"
                     variant="outline"
+                    ariaLabel="Send verification code to phone"
                     onClick={sendVerificationCode}
                     disabled={isSendingCode || !formData.phone || formData.phone.length < 10}
                     className="whitespace-nowrap"
                   >
                     {isSendingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify'}
-                  </Button>
+                  </AccessibleButton>
                 )}
               </div>
               {errors.phone && (
@@ -392,8 +348,9 @@ const Register = () => {
                     <p className="text-sm text-destructive">{errors.verification}</p>
                   )}
                 </div>
-                <Button
+                <AccessibleButton
                   type="button"
+                  ariaLabel="Verify your phone number with the code"
                   onClick={verifyPhoneNumber}
                   disabled={isVerifying || verificationCode.length !== 6}
                   className="w-full"
@@ -406,23 +363,27 @@ const Register = () => {
                   ) : (
                     'Verify Code'
                   )}
-                </Button>
+                </AccessibleButton>
                 <div className="flex gap-2 text-xs">
-                  <button
+                  <AccessibleButton
                     type="button"
+                    variant="ghost"
+                    ariaLabel="Resend verification code"
                     onClick={sendVerificationCode}
                     disabled={isSendingCode}
                     className="text-primary hover:underline"
                   >
                     Resend code
-                  </button>
-                  <button
+                  </AccessibleButton>
+                  <AccessibleButton
                     type="button"
+                    variant="ghost"
+                    ariaLabel="Change phone number"
                     onClick={resetVerification}
                     className="text-xs text-muted-foreground hover:underline"
                   >
                     Change number
-                  </button>
+                  </AccessibleButton>
                 </div>
               </div>
             )}
@@ -514,14 +475,17 @@ const Register = () => {
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                  aria-describedby="password-requirements"
                 />
-                <button
+                <AccessibleButton
                   type="button"
+                  variant="ghost"
+                  ariaLabel={showPassword ? 'Hide password' : 'Show password'}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                </AccessibleButton>
               </div>
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
@@ -540,13 +504,15 @@ const Register = () => {
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className={errors.confirmPassword ? 'border-destructive pr-10' : 'pr-10'}
                 />
-                <button
+                <AccessibleButton
                   type="button"
+                  variant="ghost"
+                  ariaLabel={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                </AccessibleButton>
               </div>
               {errors.confirmPassword && (
                 <p className="text-sm text-destructive">{errors.confirmPassword}</p>
@@ -560,8 +526,9 @@ const Register = () => {
               </div>
             )}
 
-            <Button
+            <AccessibleButton
               type="submit"
+              ariaLabel="Create your account"
               className="btn-primary w-full"
               disabled={isLoading || verificationStep !== 'verified'}
             >
@@ -573,18 +540,21 @@ const Register = () => {
               ) : (
                 'Create Account'
               )}
-            </Button>
+            </AccessibleButton>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Already have an account?{' '}
-              <button
+              <AccessibleButton
+                type="button"
+                variant="ghost"
+                ariaLabel="Sign in to your existing account"
                 onClick={() => navigate('/auth')}
                 className="text-primary hover:underline font-medium"
               >
                 Sign in here
-              </button>
+              </AccessibleButton>
             </p>
           </div>
         </CardContent>
