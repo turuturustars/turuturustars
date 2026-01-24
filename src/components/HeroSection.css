@@ -1,0 +1,362 @@
+/**
+ * HeroSection Animations
+ * 
+ * Ken Burns effect: gentle zoom, pan, and crossfade
+ * Continuous carousel with seamless looping
+ * 
+ * 7 images × 8 seconds each = 56 second full loop
+ * Images crossfade perfectly with zero visible transitions
+ */
+
+/* Base hero background image styling */
+.hero-bg-image {
+  will-change: transform, opacity;
+  position: absolute;
+  inset: 0;
+}
+
+/**
+ * Image 0 (Gallery Members)
+ * Visible: 0% → 14.3% of cycle (0s → 8s)
+ */
+.hero-bg-image:nth-child(1) {
+  animation: heroImageCarousel0 56s ease-in-out infinite;
+}
+
+/**
+ * Image 1 (Veronica Event)
+ * Visible: 14.3% → 28.6% of cycle (8s → 16s)
+ */
+.hero-bg-image:nth-child(2) {
+  animation: heroImageCarousel1 56s ease-in-out infinite;
+}
+
+/**
+ * Image 2 (Prize Giving Day)
+ * Visible: 28.6% → 42.9% of cycle (16s → 24s)
+ */
+.hero-bg-image:nth-child(3) {
+  animation: heroImageCarousel2 56s ease-in-out infinite;
+}
+
+/**
+ * Image 3 (Best Students)
+ * Visible: 42.9% → 57.1% of cycle (24s → 32s)
+ */
+.hero-bg-image:nth-child(4) {
+  animation: heroImageCarousel3 56s ease-in-out infinite;
+}
+
+/**
+ * Image 4 (Motivation Team)
+ * Visible: 57.1% → 71.4% of cycle (32s → 40s)
+ */
+.hero-bg-image:nth-child(5) {
+  animation: heroImageCarousel4 56s ease-in-out infinite;
+}
+
+/**
+ * Image 5 (Veronica Addressing)
+ * Visible: 71.4% → 85.7% of cycle (40s → 48s)
+ */
+.hero-bg-image:nth-child(6) {
+  animation: heroImageCarousel5 56s ease-in-out infinite;
+}
+
+/**
+ * Image 6 (Lower Grade Pupils)
+ * Visible: 85.7% → 100% of cycle (48s → 56s)
+ */
+.hero-bg-image:nth-child(7) {
+  animation: heroImageCarousel6 56s ease-in-out infinite;
+}
+
+/**
+ * Ken Burns Effect for Image 0
+ * Seamless fade in at start, Ken Burns motion, fade out at exact transition point
+ */
+@keyframes heroImageCarousel0 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  /* Fade in: 0-0.7s (0%-1.25%) */
+  1.25% {
+    opacity: 1;
+  }
+  /* Ken Burns: zoom and pan throughout */
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(15px) translateY(-10px);
+  }
+  /* Start fade out just before transition: 7.5-8s */
+  13.4% {
+    opacity: 1;
+    transform: scale(1.12) translateX(30px) translateY(-20px);
+  }
+  14.3% {
+    opacity: 0;
+    transform: scale(1.12) translateX(30px) translateY(-20px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12) translateX(30px) translateY(-20px);
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 1
+ * Hidden until 14.3%, then visible for 8 seconds, fade out at 28.6%
+ */
+@keyframes heroImageCarousel1 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  /* Hidden until this image's turn */
+  14.3% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  /* Fade in: 14.3%-15.55% */
+  15.55% {
+    opacity: 1;
+  }
+  /* Ken Burns motion */
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(-15px) translateY(10px);
+  }
+  /* Start fade out: 27.75% */
+  27.75% {
+    opacity: 1;
+    transform: scale(1.12) translateX(-30px) translateY(20px);
+  }
+  28.6% {
+    opacity: 0;
+    transform: scale(1.12) translateX(-30px) translateY(20px);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12) translateX(-30px) translateY(20px);
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 2
+ * Visible: 28.6% → 42.9%
+ */
+@keyframes heroImageCarousel2 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  28.6% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  29.85% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(20px) translateY(-15px);
+  }
+  42.1% {
+    opacity: 1;
+    transform: scale(1.12) translateX(35px) translateY(-25px);
+  }
+  42.9% {
+    opacity: 0;
+    transform: scale(1.12) translateX(35px) translateY(-25px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 3
+ * Visible: 42.9% → 57.1%
+ */
+@keyframes heroImageCarousel3 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  42.9% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  44.15% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(-20px) translateY(15px);
+  }
+  56.4% {
+    opacity: 1;
+    transform: scale(1.12) translateX(-35px) translateY(25px);
+  }
+  57.1% {
+    opacity: 0;
+    transform: scale(1.12) translateX(-35px) translateY(25px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 4
+ * Visible: 57.1% → 71.4%
+ */
+@keyframes heroImageCarousel4 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  57.1% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  58.35% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(18px) translateY(-12px);
+  }
+  70.6% {
+    opacity: 1;
+    transform: scale(1.12) translateX(32px) translateY(-22px);
+  }
+  71.4% {
+    opacity: 0;
+    transform: scale(1.12) translateX(32px) translateY(-22px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 5
+ * Visible: 71.4% → 85.7%
+ */
+@keyframes heroImageCarousel5 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  71.4% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  72.65% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(-18px) translateY(12px);
+  }
+  84.9% {
+    opacity: 1;
+    transform: scale(1.12) translateX(-32px) translateY(22px);
+  }
+  85.7% {
+    opacity: 0;
+    transform: scale(1.12) translateX(-32px) translateY(22px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/**
+ * Ken Burns Effect for Image 6
+ * Visible: 85.7% → 100%, then loops seamlessly back to Image 0
+ */
+@keyframes heroImageCarousel6 {
+  0% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  85.7% {
+    opacity: 0;
+    transform: scale(1) translateX(0) translateY(0);
+  }
+  86.95% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08) translateX(22px) translateY(-18px);
+  }
+  99.3% {
+    opacity: 1;
+    transform: scale(1.12) translateX(38px) translateY(-28px);
+  }
+  /* Fade out perfectly timed for Image 0 to fade in */
+  100% {
+    opacity: 0;
+    transform: scale(1.12) translateX(38px) translateY(-28px);
+  }
+}
+
+/**
+ * Performance optimizations & Accessibility
+ */
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg-image {
+    animation: none !important;
+    opacity: 0 !important;
+    transform: none !important;
+  }
+  
+  /* Show only first image when motion is reduced */
+  .hero-bg-image:nth-child(1) {
+    opacity: 1 !important;
+  }
+}
+
+/* Mobile: maintain animation but lighter load */
+@media (max-width: 768px) {
+  .hero-bg-image {
+    /* Animations continue but browser handles optimization */
+    /* No changes needed - will-change handles it */
+  }
+}
+
+/**
+ * Smooth fade transition between images
+ * Applied by React's duration-1000 class
+ */
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/**
+ * Text shadow for accessibility over animated background
+ * Ensures headlines and body text remain readable
+ */
+.drop-shadow-lg {
+  filter: drop-shadow(0 4px 6px rgba(10, 61, 98, 0.4));
+}
+
+.drop-shadow-md {
+  filter: drop-shadow(0 2px 4px rgba(10, 61, 98, 0.3));
+}
+
+/**
+ * High-performance rendering hints
+ */
+.hero-bg-image {
+  backface-visibility: hidden;
+  perspective: 1000px;
+  contain: layout style paint;
+}
