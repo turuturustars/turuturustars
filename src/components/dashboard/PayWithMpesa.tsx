@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
@@ -401,34 +401,33 @@ const PayWithMpesa = ({
 
         {/* Action Buttons */}
         <div className="flex gap-3 pt-2">
-          <Button
+          <AccessibleButton
             onClick={handlePay}
             disabled={!isValid || isProcessing}
+            isLoading={isProcessing}
+            loadingText="Processing"
+            ariaLabel="Send M-Pesa prompt"
             className={cn(
               'flex-1 gap-2 font-semibold transition-all',
               isProcessing && 'opacity-90'
             )}
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
+            {!isProcessing && (
               <>
                 <Smartphone className="w-4 h-4" />
                 Send M-Pesa Prompt
               </>
             )}
-          </Button>
-          <Button
+          </AccessibleButton>
+          <AccessibleButton
             variant="outline"
             onClick={() => setOpen(false)}
             disabled={isProcessing}
+            ariaLabel="Cancel payment"
             className="px-4"
           >
             Cancel
-          </Button>
+          </AccessibleButton>
         </div>
 
         {/* Footer Help Text */}
@@ -448,16 +447,16 @@ const PayWithMpesa = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" className="gap-2">
+          <AccessibleButton size="sm" className="gap-2" ariaLabel="Pay with M-Pesa">
             <Smartphone className="w-4 h-4" />
             Pay with M-Pesa
-          </Button>
+          </AccessibleButton>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-sm p-0 overflow-hidden" aria-describedby="mpesa-payment-dialog-description">
-        <div id="mpesa-payment-dialog-description" className="sr-only">
+      <DialogContent className="w-full max-w-sm p-0 overflow-hidden">
+        <DialogDescription className="sr-only">
           M-Pesa payment dialog for Turuturu Stars contributions
-        </div>
+        </DialogDescription>
         {success && renderSuccessState()}
         {!success && paymentStep === 'processing' && renderProcessingState()}
         {!success && paymentStep === 'form' && renderFormState()}
