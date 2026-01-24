@@ -70,7 +70,7 @@ export function useRealtimeChat(roomId = 'global') {
         // Fetch reactions for all messages
         const messageIds = data.map((m: any) => m.id) as string[];
         const { data: reactions } = await (supabase.from('message_reactions' as 'announcements') as any)
-          .select('*')
+          .select('id, message_id, user_id, emoji, created_at')
           .in('message_id', messageIds);
 
         const reactionsMap = new Map<string, MessageReaction[]>();

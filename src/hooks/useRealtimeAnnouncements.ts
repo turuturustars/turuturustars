@@ -22,7 +22,7 @@ export const useRealtimeAnnouncements = () => {
     const fetchAnnouncements = async () => {
       const { data, error } = await supabase
         .from('announcements')
-        .select('*')
+        .select('id, title, content, priority, published, published_at, created_by')
         .eq('published', true)
         .order('published_at', { ascending: false })
         .limit(10);

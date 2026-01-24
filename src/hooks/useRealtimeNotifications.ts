@@ -25,7 +25,7 @@ export const useRealtimeNotifications = () => {
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('*')
+        .select('id, user_id, title, message, read, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);

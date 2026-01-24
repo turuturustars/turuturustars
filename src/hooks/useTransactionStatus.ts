@@ -33,7 +33,7 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
 
       const { data, error: queryError } = await supabase
         .from('mpesa_transactions')
-        .select('*')
+        .select('id, transaction_id, phone_number, amount, reference, status, created_at, updated_at')
         .eq('checkout_request_id', checkoutRequestId)
         .single();
 

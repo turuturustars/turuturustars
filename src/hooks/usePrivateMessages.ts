@@ -42,7 +42,7 @@ export function usePrivateMessages(conversationId?: string) {
 
     try {
       const { data, error } = await (supabase.from('private_conversations' as 'announcements') as any)
-        .select('*')
+        .select('id, participant_one, participant_two, updated_at, created_at')
         .or(`participant_one.eq.${user.id},participant_two.eq.${user.id}`)
         .order('updated_at', { ascending: false });
 
@@ -71,7 +71,7 @@ export function usePrivateMessages(conversationId?: string) {
             
             // Get last message
             const { data: lastMsgData } = await (supabase.from('private_messages' as 'announcements') as any)
-              .select('*')
+              .select('id, sender_id, message, created_at, read_at')
               .eq('conversation_id', conv.id)
               .order('created_at', { ascending: false })
               .limit(1)
@@ -79,7 +79,7 @@ export function usePrivateMessages(conversationId?: string) {
 
             // Get unread count
             const { count } = await (supabase.from('private_messages' as 'announcements') as any)
-              .select('*', { count: 'exact', head: true })
+              .select('id', { count: 'exact', head: true })
               .eq('conversation_id', conv.id)
               .neq('sender_id', user.id)
               .is('read_at', null);
