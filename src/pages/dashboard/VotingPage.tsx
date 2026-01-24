@@ -2,37 +2,40 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/StatusBadge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Vote, Plus, CheckCircle, XCircle, MinusCircle, Loader2, Gavel, Users, Lock, Eye, EyeOff } from 'lucide-react';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
+import { Vote, Plus, CheckCircle, XCircle, MinusCircle, Loader2, Gavel, Eye, EyeOff } from 'lucide-react';
 import { hasPermission } from '@/lib/rolePermissions';
 
 interface VotingMotion {
   id: string;
-  meeting_id: string | null;
+  meeting_id?: string | null;
   title: string;
-  description: string | null;
-  motion_type: string;
-  voting_type: string;
+  description?: string | null;
+  motion_type?: string;
+  voting_type?: string;
   status: string;
-  votes_for: number;
-  votes_against: number;
-  votes_abstain: number;
-  tie_breaker_vote: string | null;
-  tie_breaker_by: string | null;
-  opened_at: string | null;
-  closed_at: string | null;
-  created_by: string;
+  yes_votes: number;
+  no_votes: number;
+  votes_abstain?: number;
+  tie_breaker_vote?: string | null;
+  tie_breaker_by?: string | null;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  created_by?: string;
   created_at: string;
-  is_confidential: boolean;
+  is_confidential?: boolean;
+  total_votes?: number;
+  // For display compatibility
+  votes_for?: number;
+  votes_against?: number;
 }
 
 interface UserVote {
@@ -49,7 +52,8 @@ interface Meeting {
 }
 
 export default function VotingPage() {
-  const { user, hasRole, profile, roles } = useAuth();
+  const { user, hasRole, roles } = useAuth();
+  const { status, showSuccess, showError } = useStatus();
   const userRoles = roles.map(r => r.role);
   const [motions, setMotions] = useState<VotingMotion[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -97,16 +101,22 @@ export default function VotingPage() {
   const fetchMotions = async () => {
     setIsLoading(true);
     const { data, error } = await supabase
-      .from('voting_motions')
-      .select('*')
+      .from('voting_motions_with_vote_breakdown')
+      .select('id, title, status, created_at, yes_votes, no_votes, total_votes')
       .in('status', ['pending', 'open', 'voting'])
       .order('created_at', { ascending: false });
 
     if (error) {
-      toast.error('Failed to fetch motions');
+      showError('Failed to fetch motions');
       console.error('Error fetching voting motions:', error);
     } else {
-      setMotions((data as VotingMotion[]) || []);
+      // Map yes_votes/no_votes to votes_for/votes_against for display compatibility
+      const mappedData = (data as any[])?.map(m => ({
+        ...m,
+        votes_for: m.yes_votes,
+        votes_against: m.no_votes
+      })) || [];
+      setMotions(mappedData as VotingMotion[]);
     }
     setIsLoading(false);
   };
@@ -130,7 +140,7 @@ export default function VotingPage() {
 
   const createMotion = async () => {
     if (!newMotion.title.trim()) {
-      toast.error('Please enter a motion title');
+      showError('Please enter a motion title');
       return;
     }
 
@@ -138,17 +148,16 @@ export default function VotingPage() {
       title: newMotion.title,
       description: newMotion.description || null,
       motion_type: newMotion.motion_type,
-      voting_type: newMotion.voting_type,
       meeting_id: newMotion.meeting_id || null,
       created_by: user?.id,
-      is_confidential: newMotion.is_confidential,
       status: 'pending'
     });
 
     if (error) {
-      toast.error('Failed to create motion');
+      showError('Failed to create motion');
+      console.error('Error creating motion:', error);
     } else {
-      toast.success('Motion created successfully - Confidential by default');
+      showSuccess('Motion created successfully');
       setShowCreateDialog(false);
       setNewMotion({ 
         title: '', 
@@ -169,9 +178,9 @@ export default function VotingPage() {
       .eq('id', motionId);
 
     if (error) {
-      toast.error('Failed to open voting');
+      showError('Failed to open voting');
     } else {
-      toast.success('Voting is now open');
+      showSuccess('Voting is now open');
       fetchMotions();
     }
   };
@@ -193,9 +202,9 @@ export default function VotingPage() {
       .eq('id', motion.id);
 
     if (error) {
-      toast.error('Failed to close voting');
+      showError('Failed to close voting');
     } else {
-      toast.success(`Voting closed - Motion ${finalStatus}`);
+      showSuccess(`Voting closed - Motion ${finalStatus}`);
       fetchMotions();
     }
   };
@@ -203,7 +212,7 @@ export default function VotingPage() {
   const castVote = async (motionId: string, vote: 'for' | 'against' | 'abstain') => {
     const existingVote = userVotes.find(v => v.motion_id === motionId);
     if (existingVote) {
-      toast.error('You have already voted on this motion - Voting is confidential and cannot be changed');
+      showError('You have already voted on this motion - Voting is confidential and cannot be changed');
       return;
     }
 
@@ -212,16 +221,26 @@ export default function VotingPage() {
       member_id: user?.id,
       vote
     });
-
     if (voteError) {
-      toast.error('Failed to cast vote');
+      showError('Failed to cast vote');
       return;
     }
 
     const motion = motions.find(m => m.id === motionId);
     if (motion) {
-      const updateField = vote === 'for' ? 'votes_for' : vote === 'against' ? 'votes_against' : 'votes_abstain';
-      const currentCount = vote === 'for' ? motion.votes_for : vote === 'against' ? motion.votes_against : motion.votes_abstain;
+      let updateField: string;
+      let currentCount: number;
+      
+      if (vote === 'for') {
+        updateField = 'votes_for';
+        currentCount = motion.votes_for;
+      } else if (vote === 'against') {
+        updateField = 'votes_against';
+        currentCount = motion.votes_against;
+      } else {
+        updateField = 'votes_abstain';
+        currentCount = motion.votes_abstain;
+      }
       
       await supabase
         .from('voting_motions')
@@ -229,7 +248,7 @@ export default function VotingPage() {
         .eq('id', motionId);
     }
 
-    toast.success('Your vote has been recorded confidentially');
+    showSuccess('Your vote has been recorded confidentially');
     fetchMotions();
     fetchUserVotes();
   };
@@ -249,23 +268,24 @@ export default function VotingPage() {
       .eq('id', motionId);
 
     if (error) {
-      toast.error('Failed to cast tie-breaker');
+      showError('Failed to cast tie-breaker');
     } else {
-      toast.success(`Tie broken - Motion ${vote === 'for' ? 'passed' : 'failed'}`);
+      showSuccess(`Tie broken - Motion ${vote === 'for' ? 'passed' : 'failed'}`);
       fetchMotions();
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: 'bg-gray-100 text-gray-800',
-      open: 'bg-blue-100 text-blue-800',
-      closed: 'bg-gray-100 text-gray-800',
-      passed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      tied: 'bg-yellow-100 text-yellow-800'
+    // Map voting statuses to standard status names
+    const statusMap: Record<string, string> = {
+      pending: 'pending',
+      open: 'pending',
+      closed: 'closed',
+      passed: 'active',
+      failed: 'missed',
+      tied: 'pending'
     };
-    return <Badge className={variants[status] || 'bg-gray-100'}>{status.toUpperCase()}</Badge>;
+    return <StatusBadge status={statusMap[status] || status} />;
   };
 
   const getVotingTypeBadge = (type: string) => {
@@ -315,6 +335,11 @@ export default function VotingPage() {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Digital Voting System</h1>
@@ -323,11 +348,17 @@ export default function VotingPage() {
         {canManage && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Initiate Voting</Button>
+              <AccessibleButton ariaLabel="Initiate a new voting motion">
+                <Plus className="h-4 w-4 mr-2" />
+                Initiate Voting
+              </AccessibleButton>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Voting Motion</DialogTitle>
+                <DialogDescription>
+                  Enter the motion details, select the voting type, and prepare for voting. All votes will be kept confidential.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <Input
@@ -342,18 +373,6 @@ export default function VotingPage() {
                   className="min-h-24"
                 />
                 
-                <Select value={newMotion.voting_type} onValueChange={(v) => setNewMotion({ ...newMotion, voting_type: v })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Type of Voting" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="agenda">Development Agenda</SelectItem>
-                    <SelectItem value="election">Election (Candidate Voting)</SelectItem>
-                    <SelectItem value="resolution">Resolution</SelectItem>
-                    <SelectItem value="dispute">Dispute Resolution</SelectItem>
-                  </SelectContent>
-                </Select>
-
                 <Select value={newMotion.motion_type} onValueChange={(v) => setNewMotion({ ...newMotion, motion_type: v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Motion Type" />
@@ -378,15 +397,13 @@ export default function VotingPage() {
                   </Select>
                 )}
 
-                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <Lock className="h-5 w-5 text-blue-600" />
-                  <div className="text-sm">
-                    <p className="font-semibold text-blue-900">Confidential by Default</p>
-                    <p className="text-blue-800 text-xs">All votes are kept confidential. Vote history is not tracked publicly.</p>
-                  </div>
-                </div>
-
-                <Button onClick={createMotion} className="w-full">Create & Prepare for Voting</Button>
+                <AccessibleButton 
+                  onClick={createMotion} 
+                  className="w-full"
+                  ariaLabel="Create and prepare this motion for voting"
+                >
+                  Create Motion
+                </AccessibleButton>
               </div>
             </DialogContent>
           </Dialog>
@@ -476,13 +493,14 @@ export default function VotingPage() {
                           {getMotionTypeBadge(motion.motion_type)}
                         </div>
                       </div>
-                      <Button
+                      <AccessibleButton
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowVoteDetails(showDetails ? null : motion.id)}
+                        ariaLabel={showDetails ? "Hide voting results and details" : "Show voting results and details"}
                       >
                         {showDetails ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
+                      </AccessibleButton>
                     </div>
                     {motion.description && (
                       <CardDescription className="mt-2">{motion.description}</CardDescription>
@@ -516,29 +534,41 @@ export default function VotingPage() {
 
                     {canVote && !voted && (
                       <div className="flex flex-wrap gap-2">
-                        <Button
-                          onClick={() => castVote(motion.id, 'for')}
+                        <AccessibleButton
+                          onClick={() => {
+                            castVote(motion.id, 'for');
+                            showSuccess('Your vote for has been recorded confidentially', 2000);
+                          }}
                           className="flex-1 bg-green-600 hover:bg-green-700"
+                          ariaLabel={`Vote for: ${motion.title}`}
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Vote For
-                        </Button>
-                        <Button
-                          onClick={() => castVote(motion.id, 'against')}
+                        </AccessibleButton>
+                        <AccessibleButton
+                          onClick={() => {
+                            castVote(motion.id, 'against');
+                            showSuccess('Your vote against has been recorded confidentially', 2000);
+                          }}
                           variant="destructive"
                           className="flex-1"
+                          ariaLabel={`Vote against: ${motion.title}`}
                         >
                           <XCircle className="h-4 w-4 mr-2" />
                           Vote Against
-                        </Button>
-                        <Button
-                          onClick={() => castVote(motion.id, 'abstain')}
+                        </AccessibleButton>
+                        <AccessibleButton
+                          onClick={() => {
+                            castVote(motion.id, 'abstain');
+                            showSuccess('Your abstention has been recorded confidentially', 2000);
+                          }}
                           variant="outline"
                           className="flex-1"
+                          ariaLabel={`Abstain from voting: ${motion.title}`}
                         >
                           <MinusCircle className="h-4 w-4 mr-2" />
                           Abstain
-                        </Button>
+                        </AccessibleButton>
                       </div>
                     )}
 
@@ -553,13 +583,17 @@ export default function VotingPage() {
 
                     {canManage && (
                       <div className="flex gap-2 pt-2 border-t">
-                        <Button
-                          onClick={() => closeVoting(motion)}
+                        <AccessibleButton
+                          onClick={() => {
+                            closeVoting(motion);
+                            showSuccess('Voting closed', 2000);
+                          }}
                           variant="outline"
                           size="sm"
+                          ariaLabel={`Close voting for: ${motion.title}`}
                         >
                           Close Voting
-                        </Button>
+                        </AccessibleButton>
                       </div>
                     )}
                   </CardContent>
@@ -585,9 +619,16 @@ export default function VotingPage() {
                       </div>
                     </div>
                     {canManage && (
-                      <Button onClick={() => openVoting(motion.id)} size="sm">
+                      <AccessibleButton 
+                        onClick={() => {
+                          openVoting(motion.id);
+                          showSuccess('Voting is now open', 2000);
+                        }} 
+                        size="sm"
+                        ariaLabel={`Open voting for: ${motion.title}`}
+                      >
                         Open Voting
-                      </Button>
+                      </AccessibleButton>
                     )}
                   </div>
                   {motion.description && (
@@ -606,8 +647,14 @@ export default function VotingPage() {
             closedMotions.map(motion => {
               const isTied = motion.status === 'tied';
               
+              const getBorderClass = (status: string): string => {
+                if (status === 'passed') return 'border-l-4 border-l-green-500';
+                if (status === 'failed') return 'border-l-4 border-l-red-500';
+                return 'border-l-4 border-l-yellow-500';
+              };
+              
               return (
-                <Card key={motion.id} className={motion.status === 'passed' ? 'border-l-4 border-l-green-500' : motion.status === 'failed' ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-yellow-500'}>
+                <Card key={motion.id} className={getBorderClass(motion.status)}>
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
@@ -632,20 +679,28 @@ export default function VotingPage() {
                           As chairperson, you may cast the tie-breaking vote.
                         </p>
                         <div className="flex gap-2">
-                          <Button
-                            onClick={() => castTieBreaker(motion.id, 'for')}
+                          <AccessibleButton
+                            onClick={() => {
+                              castTieBreaker(motion.id, 'for');
+                              showSuccess('Motion passed with your tie-breaker vote', 2000);
+                            }}
                             size="sm"
                             className="bg-green-600 hover:bg-green-700"
+                            ariaLabel={`Cast tie-breaking vote for: ${motion.title}`}
                           >
                             Break Tie: For
-                          </Button>
-                          <Button
-                            onClick={() => castTieBreaker(motion.id, 'against')}
+                          </AccessibleButton>
+                          <AccessibleButton
+                            onClick={() => {
+                              castTieBreaker(motion.id, 'against');
+                              showSuccess('Motion failed with your tie-breaker vote', 2000);
+                            }}
                             size="sm"
                             variant="destructive"
+                            ariaLabel={`Cast tie-breaking vote against: ${motion.title}`}
                           >
                             Break Tie: Against
-                          </Button>
+                          </AccessibleButton>
                         </div>
                       </div>
                     </CardContent>
