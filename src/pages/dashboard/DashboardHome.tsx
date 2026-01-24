@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
 import { getPrimaryRole } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
@@ -41,6 +41,7 @@ interface DashboardStats {
 const DashboardHome = () => {
   const navigate = useNavigate();
   const { profile, isOfficial, roles } = useAuth();
+  const { status, showSuccess } = useStatus();
   const { announcements } = useRealtimeAnnouncements();
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
@@ -253,6 +254,11 @@ const DashboardHome = () => {
 
   return (
     <div className="space-y-4 pb-8">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       {/* Welcome Header - Compact & Responsive */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8 lg:py-5 shadow-lg hover:shadow-xl transition-shadow duration-300">
         {/* Animated background elements */}
@@ -369,16 +375,17 @@ const DashboardHome = () => {
                   </div>
                 )}
                 {stat.action && (
-                  <Button 
+                  <AccessibleButton 
                     asChild 
                     variant="outline" 
                     className="w-full text-xs group-hover:border-primary group-hover:text-primary transition-all"
+                    ariaLabel={`Navigate to ${stat.action.label}`}
                   >
                     <Link to={stat.action.path} className="flex items-center gap-1">
                       {stat.action.label}
                       <ArrowRight className="w-3 h-3 ml-1" />
                     </Link>
-                  </Button>
+                  </AccessibleButton>
                 )}
               </CardContent>
             </Card>
@@ -407,11 +414,12 @@ const DashboardHome = () => {
             {quickActions.map((action) => {
               const ActionIcon = action.icon;
               return (
-                <Button
+                <AccessibleButton
                   key={action.path}
                   asChild
                   variant="outline"
                   className="w-full justify-start h-auto py-3 border-2 hover:border-primary group"
+                  ariaLabel={`Quick action: ${action.label}`}
                 >
                   <Link to={action.path}>
                     <div className="flex items-center gap-3 flex-1">
@@ -425,7 +433,7 @@ const DashboardHome = () => {
                       <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                     </div>
                   </Link>
-                </Button>
+                </AccessibleButton>
               );
             })}
             
@@ -433,7 +441,7 @@ const DashboardHome = () => {
               <PayWithMpesa
                 defaultAmount={100}
                 trigger={
-                  <Button className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700">
+                  <AccessibleButton className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" ariaLabel="Pay with M-Pesa for quick mobile payment">
                     <div className="p-2 rounded-lg bg-white/20">
                       <DollarSign className="w-4 h-4" />
                     </div>
@@ -442,15 +450,16 @@ const DashboardHome = () => {
                       <div className="text-xs opacity-90">Quick mobile payment</div>
                     </div>
                     <ArrowRight className="w-4 h-4" />
-                  </Button>
+                  </AccessibleButton>
                 }
               />
             </div>
 
             {isOfficial() && (
-              <Button
+              <AccessibleButton
                 asChild
                 className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 mt-3"
+                ariaLabel="Manage members: Official access"
               >
                 <Link to="/dashboard/members">
                   <div className="p-2 rounded-lg bg-white/20">
@@ -462,7 +471,7 @@ const DashboardHome = () => {
                   </div>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
-              </Button>
+              </AccessibleButton>
             )}
           </CardContent>
         </Card>
@@ -475,12 +484,12 @@ const DashboardHome = () => {
                 <Bell className="w-5 h-5 text-primary" />
                 <CardTitle className="text-lg">Latest Announcements</CardTitle>
               </div>
-              <Button variant="ghost" size="sm" asChild>
+              <AccessibleButton variant="ghost" size="sm" asChild ariaLabel="View all announcements">
                 <Link to="/dashboard/announcements">
                   View All
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Link>
-              </Button>
+              </AccessibleButton>
             </div>
             <CardDescription className="text-xs">Stay updated with organization news</CardDescription>
           </CardHeader>
