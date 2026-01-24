@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,14 +10,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  AccessibleButton,
+  AccessibleStatus,
+  useStatus,
+} from '@/components/accessible';
+import {
   Bell,
   Trash2,
   Check,
   CheckCheck,
   Search,
   Filter,
-  AlertCircle,
-  Archive,
 } from 'lucide-react';
 import { useRealtimeNotificationsEnhanced } from '@/hooks/useRealtimeNotificationsEnhanced';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,7 @@ const NotificationsPage = () => {
     deleteNotification,
     deleteAllNotifications,
   } = useRealtimeNotificationsEnhanced();
+  const { status, showSuccess } = useStatus();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -101,6 +104,11 @@ const NotificationsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus
+        message={status.message}
+        type={status.type}
+        isVisible={status.isVisible}
+      />
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -118,10 +126,10 @@ const NotificationsPage = () => {
         </div>
 
         {unreadCount > 0 && (
-          <Button onClick={() => markAllAsRead()} className="gap-2">
+          <AccessibleButton onClick={() => markAllAsRead()} className="gap-2" ariaLabel={`Mark all ${unreadCount} unread notifications as read`}>
             <CheckCheck className="w-4 h-4" />
             Mark all as read
-          </Button>
+          </AccessibleButton>
         )}
       </div>
 
@@ -275,25 +283,31 @@ const NotificationsPage = () => {
                                 {/* Actions */}
                                 <div className="flex gap-1">
                                   {!notification.read && (
-                                    <Button
+                                    <AccessibleButton
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => markAsRead(notification.id)}
+                                      onClick={() => {
+                                        markAsRead(notification.id);
+                                        showSuccess('Marked as read', 2000);
+                                      }}
                                       className="h-8 px-2 text-xs"
-                                      title="Mark as read"
+                                      ariaLabel="Mark notification as read"
                                     >
                                       <Check className="w-4 h-4 text-green-600" />
-                                    </Button>
+                                    </AccessibleButton>
                                   )}
-                                  <Button
+                                  <AccessibleButton
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => deleteNotification(notification.id)}
+                                    onClick={() => {
+                                      deleteNotification(notification.id);
+                                      showSuccess('Notification deleted', 2000);
+                                    }}
                                     className="h-8 px-2 text-xs"
-                                    title="Delete"
+                                    ariaLabel="Delete notification"
                                   >
                                     <Trash2 className="w-4 h-4 text-red-600" />
-                                  </Button>
+                                  </AccessibleButton>
                                 </div>
                               </div>
                             </div>
@@ -309,18 +323,20 @@ const NotificationsPage = () => {
           {/* Clear All Button */}
           {filtered.length > 0 && (
             <div className="flex justify-center pt-4">
-              <Button
+              <AccessibleButton
                 variant="outline"
                 onClick={() => {
                   if (confirm('Are you sure you want to delete all notifications?')) {
                     deleteAllNotifications();
+                    showSuccess('All notifications cleared', 2000);
                   }
                 }}
                 className="text-red-600 hover:bg-red-50"
+                ariaLabel={`Delete all ${filtered.length} notifications`}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Clear all notifications
-              </Button>
+              </AccessibleButton>
             </div>
           )}
         </>
