@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +32,7 @@ const LOCATIONS = [
 const ProfilePage = () => {
   const { profile, roles } = useAuth();
   const { toast } = useToast();
+  const { status, showSuccess } = useStatus();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -111,6 +113,11 @@ const ProfilePage = () => {
 
   return (
     <div className="space-y-6 max-w-3xl">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div>
         <h2 className="text-2xl font-serif font-bold text-foreground">My Profile</h2>
         <p className="text-muted-foreground">Manage your personal information</p>
@@ -173,9 +180,13 @@ const ProfilePage = () => {
             <CardDescription>Your contact and identification details</CardDescription>
           </div>
           {!isEditing && (
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
+            <AccessibleButton 
+              variant="outline" 
+              ariaLabel="Edit profile information"
+              onClick={() => setIsEditing(true)}
+            >
               Edit Profile
-            </Button>
+            </AccessibleButton>
           )}
         </CardHeader>
         <CardContent className="space-y-6">
@@ -286,7 +297,15 @@ const ProfilePage = () => {
 
           {isEditing && (
             <div className="flex items-center gap-3 pt-4 border-t">
-              <Button onClick={handleSave} disabled={isSaving} className="btn-primary">
+              <AccessibleButton 
+                onClick={() => {
+                  handleSave();
+                  showSuccess('Profile saved successfully', 2000);
+                }} 
+                disabled={isSaving} 
+                className="btn-primary"
+                ariaLabel="Save profile changes"
+              >
                 {isSaving ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -298,10 +317,15 @@ const ProfilePage = () => {
                     Save Changes
                   </>
                 )}
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
+              </AccessibleButton>
+              <AccessibleButton 
+                variant="outline" 
+                onClick={() => setIsEditing(false)} 
+                disabled={isSaving}
+                ariaLabel="Cancel profile editing"
+              >
                 Cancel
-              </Button>
+              </AccessibleButton>
             </div>
           )}
         </CardContent>
