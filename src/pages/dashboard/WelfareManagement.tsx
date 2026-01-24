@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { hasPermission } from '@/lib/rolePermissions';
@@ -48,6 +50,7 @@ interface WelfareContribution {
 
 const WelfareManagement = () => {
   const { user, roles } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [cases, setCases] = useState<WelfareCase[]>([]);
   const [contributions, setContributions] = useState<WelfareContribution[]>([]);
   const [selectedCase, setSelectedCase] = useState<WelfareCase | null>(null);
@@ -218,21 +221,6 @@ const WelfareManagement = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      active: 'bg-green-100 text-green-800',
-      closed: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800',
-      paid: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-    };
-    return (
-      <Badge className={colors[status] || colors.active}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -243,16 +231,25 @@ const WelfareManagement = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-serif font-bold text-foreground">Welfare Management</h1>
           <p className="text-muted-foreground">Manage welfare cases and track contributions</p>
         </div>
         {(canManageContributions || canRecordPayment) && (
-          <Button className="gap-2" onClick={() => window.location.href = '/dashboard/members/welfare'}>
+          <AccessibleButton 
+            className="gap-2" 
+            ariaLabel="Create new welfare case"
+            onClick={() => window.location.href = '/dashboard/members/welfare'}
+          >
             <Plus className="w-4 h-4" />
             Create Welfare Case
-          </Button>
+          </AccessibleButton>
         )}
       </div>
 
@@ -324,7 +321,7 @@ const WelfareManagement = () => {
                         </CardDescription>
                       </div>
                     </div>
-                    {getStatusBadge(selectedCase.status)}
+                    <StatusBadge status={selectedCase.status} />
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -369,10 +366,10 @@ const WelfareManagement = () => {
                   {(canManageContributions || canRecordPayment) && (
                     <Dialog open={isContributionDialogOpen} onOpenChange={setIsContributionDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button className="w-full gap-2">
+                        <AccessibleButton className="w-full gap-2" ariaLabel="Record new welfare contribution">
                           <Plus className="w-4 h-4" />
                           Record Contribution
-                        </Button>
+                        </AccessibleButton>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
@@ -402,10 +399,11 @@ const WelfareManagement = () => {
                             />
                           </div>
 
-                          <Button
+                          <AccessibleButton
                             onClick={handleAddContribution}
                             className="w-full gap-2"
                             disabled={isSaving}
+                            ariaLabel="Confirm contribution record"
                           >
                             {isSaving ? (
                               <>
@@ -418,7 +416,7 @@ const WelfareManagement = () => {
                                 Record Contribution
                               </>
                             )}
-                          </Button>
+                          </AccessibleButton>
                         </div>
                       </DialogContent>
                     </Dialog>
@@ -454,16 +452,19 @@ const WelfareManagement = () => {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {getStatusBadge(contribution.status)}
+                            <StatusBadge status={contribution.status} />
                             {canManageContributions && (
-                              <Button
+                              <AccessibleButton
                                 variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveContribution(contribution.id)}
+                                ariaLabel={`Remove contribution of KES ${contribution.amount.toLocaleString()}`}
+                                onClick={() => {
+                                  handleRemoveContribution(contribution.id);
+                                  showSuccess('Contribution removed', 1500);
+                                }}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
                               >
                                 <Trash2 className="w-4 h-4" />
-                              </Button>
+                              </AccessibleButton>
                             )}
                           </div>
                         </div>
