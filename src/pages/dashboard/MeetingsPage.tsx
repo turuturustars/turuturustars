@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Calendar, Plus, Users, Clock, MapPin, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { format, isFuture, isPast } from 'date-fns';
 import { toast } from 'sonner';
@@ -54,6 +56,7 @@ interface Profile {
 
 export default function MeetingsPage() {
   const { user, hasRole, isOfficial } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
@@ -84,7 +87,7 @@ export default function MeetingsPage() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('meetings')
-      .select('*')
+      .select('id, title, description, scheduled_date, location, status, created_at')
       .order('scheduled_date', { ascending: false });
 
     if (error) {
@@ -106,7 +109,7 @@ export default function MeetingsPage() {
   const fetchAttendance = async (meetingId: string) => {
     const { data } = await supabase
       .from('meeting_attendance')
-      .select('*')
+      .select('id, meeting_id, member_id, status, attended_at')
       .eq('meeting_id', meetingId);
     
     if (data && data.length > 0) {
@@ -265,13 +268,14 @@ export default function MeetingsPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      scheduled: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800'
+    // Map meeting statuses to standard statuses
+    const statusMap: Record<string, string> = {
+      scheduled: 'pending',
+      in_progress: 'active',
+      completed: 'closed',
+      cancelled: 'cancelled'
     };
-    return <Badge className={variants[status] || 'bg-gray-100'}>{status.replace('_', ' ')}</Badge>;
+    return <StatusBadge status={statusMap[status] || status} />;
   };
 
   const upcomingMeetings = meetings.filter(m => isFuture(new Date(m.scheduled_date)) && m.status !== 'cancelled');
@@ -287,6 +291,11 @@ export default function MeetingsPage() {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Meetings</h1>
@@ -295,7 +304,7 @@ export default function MeetingsPage() {
         {canManage && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Schedule Meeting</Button>
+              <AccessibleButton ariaLabel="Schedule new meeting" size="sm"><Plus className="h-4 w-4 mr-2" />Schedule Meeting</AccessibleButton>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -333,7 +342,10 @@ export default function MeetingsPage() {
                   value={newMeeting.agenda}
                   onChange={(e) => setNewMeeting({ ...newMeeting, agenda: e.target.value })}
                 />
-                <Button onClick={createMeeting} className="w-full">Schedule Meeting</Button>
+                <AccessibleButton ariaLabel="Create new meeting" onClick={() => {
+                  createMeeting();
+                  showSuccess('Meeting scheduled successfully', 2000);
+                }} className="w-full">Schedule Meeting</AccessibleButton>
               </div>
             </DialogContent>
           </Dialog>
@@ -423,9 +435,14 @@ export default function MeetingsPage() {
                     </div>
                     {canManage && (
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openAttendanceDialog(meeting)}>
+                        <AccessibleButton 
+                          variant="outline" 
+                          size="sm" 
+                          ariaLabel={`View and manage attendance for meeting: ${meeting.title}`}
+                          onClick={() => openAttendanceDialog(meeting)}
+                        >
                           <Users className="h-4 w-4 mr-1" />Attendance
-                        </Button>
+                        </AccessibleButton>
                         <Select onValueChange={(v) => updateMeetingStatus(meeting.id, v)}>
                           <SelectTrigger className="w-32">
                             <SelectValue placeholder="Status" />
@@ -468,9 +485,14 @@ export default function MeetingsPage() {
                   <TableCell>{getStatusBadge(meeting.status)}</TableCell>
                   {canManage && (
                     <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => openAttendanceDialog(meeting)}>
+                      <AccessibleButton 
+                        variant="ghost" 
+                        size="sm" 
+                        ariaLabel={`View attendance for meeting: ${meeting.title}`}
+                        onClick={() => openAttendanceDialog(meeting)}
+                      >
                         View Attendance
-                      </Button>
+                      </AccessibleButton>
                     </TableCell>
                   )}
                 </TableRow>
@@ -490,9 +512,15 @@ export default function MeetingsPage() {
               <div className="text-center py-4">
                 <p className="text-muted-foreground mb-4">No attendance records yet</p>
                 {canManage && (
-                  <Button onClick={() => selectedMeeting && initializeAttendance(selectedMeeting.id)}>
+                  <AccessibleButton 
+                    ariaLabel="Initialize attendance list for all members"
+                    onClick={() => {
+                      selectedMeeting && initializeAttendance(selectedMeeting.id);
+                      showSuccess('Attendance list initialized', 2000);
+                    }}
+                  >
                     Initialize Attendance List
-                  </Button>
+                  </AccessibleButton>
                 )}
               </div>
             ) : (
@@ -521,13 +549,17 @@ export default function MeetingsPage() {
                       </TableCell>
                       {canManage && (
                         <TableCell>
-                          <Button
+                          <AccessibleButton
                             variant="ghost"
                             size="sm"
-                            onClick={() => toggleAttendance(record.id, record.attended)}
+                            ariaLabel={`Mark ${record.profiles?.full_name} as ${record.attended ? 'absent' : 'present'}`}
+                            onClick={() => {
+                              toggleAttendance(record.id, record.attended);
+                              showSuccess(`${record.profiles?.full_name} marked as ${!record.attended ? 'present' : 'absent'}`, 1500);
+                            }}
                           >
                             {record.attended ? 'Mark Absent' : 'Mark Present'}
-                          </Button>
+                          </AccessibleButton>
                         </TableCell>
                       )}
                     </TableRow>
