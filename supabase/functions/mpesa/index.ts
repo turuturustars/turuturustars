@@ -16,8 +16,20 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Use sandbox for testing, production for live
 const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
 
+// Log loaded credentials (without exposing full secrets)
+console.log("M-Pesa Credentials Loaded:");
+console.log("- MPESA_CONSUMER_KEY:", MPESA_CONSUMER_KEY ? `${MPESA_CONSUMER_KEY.substring(0, 10)}...` : "NOT SET");
+console.log("- MPESA_CONSUMER_SECRET:", MPESA_CONSUMER_SECRET ? `${MPESA_CONSUMER_SECRET.substring(0, 10)}...` : "NOT SET");
+console.log("- MPESA_SHORTCODE:", MPESA_SHORTCODE || "NOT SET");
+console.log("- MPESA_PASSKEY:", MPESA_PASSKEY ? `${MPESA_PASSKEY.substring(0, 10)}...` : "NOT SET");
+console.log("- MPESA_BASE_URL:", MPESA_BASE_URL);
+
 async function getAccessToken(): Promise<string> {
   const credentials = btoa(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`);
+  
+  console.log("Fetching M-Pesa access token...");
+  console.log("- Using Consumer Key:", MPESA_CONSUMER_KEY.substring(0, 15) + "...");
+  console.log("- Credentials base64:", credentials.substring(0, 20) + "...");
   
   const response = await fetch(
     `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
@@ -29,6 +41,15 @@ async function getAccessToken(): Promise<string> {
   );
   
   const data = await response.json();
+  
+  if (!data.access_token) {
+    console.error("Failed to obtain M-Pesa access token");
+    console.error("Response status:", response.status);
+    console.error("Response body:", JSON.stringify(data, null, 2));
+    throw new Error(`M-Pesa auth failed: ${data.error_description || data.error || 'Unknown error'}`);
+  }
+  
+  console.log("✓ Access token obtained successfully");
   return data.access_token;
 }
 
