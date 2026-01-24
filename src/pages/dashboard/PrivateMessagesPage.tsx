@@ -4,12 +4,12 @@ import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessa
 import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users, Bell, BellOff, Edit2, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -21,6 +21,7 @@ interface MemberProfile {
 
 export default function PrivateMessagesPage() {
   const { user } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [newMessageText, setNewMessageText] = useState('');
@@ -165,7 +166,7 @@ export default function PrivateMessagesPage() {
   };
 
   const handleDeleteMessage = async (messageId: string) => {
-    if (!window.confirm('Delete this message?')) return;
+    if (!globalThis.confirm('Delete this message?')) return;
     
     setDeletingMessageId(messageId);
     try {
@@ -197,6 +198,11 @@ export default function PrivateMessagesPage() {
 
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col md:flex-row gap-4">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       {/* Conversations List */}
       <Card className={`md:w-80 lg:w-96 flex flex-col ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
         <CardHeader className="pb-3 flex-shrink-0">
@@ -207,26 +213,29 @@ export default function PrivateMessagesPage() {
             </CardTitle>
             <div className="flex items-center gap-1">
               {isNotificationsSupported() && (
-                <Button
+                <AccessibleButton
                   size="sm"
                   variant={notificationsEnabled ? 'default' : 'outline'}
-                  onClick={handleToggleNotifications}
-                  title={notificationsEnabled ? 'Disable notifications' : 'Enable notifications'}
+                  onClick={() => {
+                    handleToggleNotifications();
+                    showSuccess(notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled', 2000);
+                  }}
                   className="h-8 w-8 p-0"
+                  ariaLabel={notificationsEnabled ? 'Disable message notifications' : 'Enable message notifications'}
                 >
                   {notificationsEnabled ? (
                     <Bell className="h-4 w-4" />
                   ) : (
                     <BellOff className="h-4 w-4" />
                   )}
-                </Button>
+                </AccessibleButton>
               )}
               <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline">
+                  <AccessibleButton size="sm" variant="outline" ariaLabel="Start a new conversation">
                     <Plus className="h-4 w-4 mr-1" />
                     New
-                  </Button>
+                  </AccessibleButton>
                 </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
@@ -321,20 +330,21 @@ export default function PrivateMessagesPage() {
       </Card>
 
       {/* Conversation View */}
-      <Card className={`flex-1 flex flex-col ${!showConversationView ? 'hidden md:flex' : 'flex'}`}>
+      <Card className={`flex-1 flex flex-col ${showConversationView ? 'flex' : 'hidden md:flex'}`}>
         {selectedConversation ? (
           <>
             {/* Header */}
             <CardHeader className="pb-3 flex-shrink-0 border-b">
               <div className="flex items-center gap-3">
-                <Button
+                <AccessibleButton
                   variant="ghost"
                   size="icon"
                   className="md:hidden"
                   onClick={() => setSelectedConversationId(null)}
+                  ariaLabel="Back to conversations list"
                 >
                   <ArrowLeft className="h-5 w-5" />
-                </Button>
+                </AccessibleButton>
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={selectedConversation.other_participant?.photo_url || undefined} />
                   <AvatarFallback className="bg-primary/10 text-primary">
@@ -380,14 +390,18 @@ export default function PrivateMessagesPage() {
                                 }}
                                 autoFocus
                               />
-                              <Button
+                              <AccessibleButton
                                 size="sm"
-                                onClick={() => handleSaveEdit(msg.id)}
+                                onClick={() => {
+                                  handleSaveEdit(msg.id);
+                                  showSuccess('Message updated', 2000);
+                                }}
                                 className="h-9"
+                                ariaLabel="Save message changes"
                               >
                                 Save
-                              </Button>
-                              <Button
+                              </AccessibleButton>
+                              <AccessibleButton
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
@@ -395,9 +409,10 @@ export default function PrivateMessagesPage() {
                                   setEditingContent('');
                                 }}
                                 className="h-9"
+                                ariaLabel="Cancel editing"
                               >
                                 Cancel
-                              </Button>
+                              </AccessibleButton>
                             </div>
                           ) : (
                             <>
@@ -412,29 +427,32 @@ export default function PrivateMessagesPage() {
                               </div>
                               {isOwn && (
                                 <div className="flex gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button
+                                  <AccessibleButton
                                     size="sm"
                                     variant="ghost"
                                     onClick={() => handleEditMessage(msg.id, msg.content)}
                                     className="h-7 w-7 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                    title="Edit message"
+                                    ariaLabel="Edit this message"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button
+                                  </AccessibleButton>
+                                  <AccessibleButton
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => handleDeleteMessage(msg.id)}
+                                    onClick={() => {
+                                      handleDeleteMessage(msg.id);
+                                      showSuccess('Message deleted', 2000);
+                                    }}
                                     disabled={deletingMessageId === msg.id}
                                     className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    title="Delete message"
+                                    ariaLabel="Delete this message"
                                   >
                                     {deletingMessageId === msg.id ? (
                                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                     ) : (
                                       <Trash2 className="w-3.5 h-3.5" />
                                     )}
-                                  </Button>
+                                  </AccessibleButton>
                                 </div>
                               )}
                             </>
@@ -472,17 +490,21 @@ export default function PrivateMessagesPage() {
                   }}
                   disabled={sending}
                 />
-                <Button
-                  onClick={handleSendMessage}
+                <AccessibleButton
+                  onClick={() => {
+                    handleSendMessage();
+                    showSuccess('Message sent', 1500);
+                  }}
                   disabled={!newMessageText.trim() || sending}
                   size="icon"
+                  ariaLabel="Send message"
                 >
                   {sending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                </Button>
+                </AccessibleButton>
               </div>
             </div>
           </>
@@ -508,9 +530,9 @@ function ConversationItem({
   isSelected,
   onClick,
 }: {
-  conversation: PrivateConversation;
-  isSelected: boolean;
-  onClick: () => void;
+  readonly conversation: PrivateConversation;
+  readonly isSelected: boolean;
+  readonly onClick: () => void;
 }) {
   const { other_participant, last_message, unread_count } = conversation;
 
