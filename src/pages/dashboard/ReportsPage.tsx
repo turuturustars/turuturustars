@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -17,7 +18,6 @@ import {
   HandHeart,
   TrendingUp,
   Download,
-  FileText,
   Loader2,
   BarChart3,
   PieChart,
@@ -56,6 +56,7 @@ const ReportsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [reportPeriod, setReportPeriod] = useState('all');
   const { toast } = useToast();
+  const { status, showSuccess } = useStatus();
 
   useEffect(() => {
     fetchReportData();
@@ -82,9 +83,9 @@ const ReportsPage = () => {
     try {
       const dateRange = getDateRange();
       
-      let membersQuery = supabase.from('profiles').select('*');
-      let contributionsQuery = supabase.from('contributions').select('*');
-      let welfareQuery = supabase.from('welfare_cases').select('*');
+      let membersQuery = supabase.from('profiles').select('id, full_name, joined_at, status');
+      let contributionsQuery = supabase.from('contributions').select('id, member_id, amount, contribution_type, created_at, status');
+      let welfareQuery = supabase.from('welfare_cases').select('id, title, case_type, target_amount, collected_amount, status, created_at');
 
       if (dateRange) {
         membersQuery = membersQuery
@@ -102,7 +103,7 @@ const ReportsPage = () => {
         membersQuery,
         contributionsQuery,
         welfareQuery,
-        supabase.from('profiles').select('*'), // Get all members for total count
+        supabase.from('profiles').select('id, full_name, status'), // Get all members for total count
       ]);
 
       if (membersRes.error) throw membersRes.error;
@@ -200,7 +201,7 @@ const ReportsPage = () => {
     }
 
     const blob = new Blob([content], { type: 'text/plain' });
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `turuturu-${type}-report-${date}.txt`;
@@ -219,6 +220,11 @@ const ReportsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-serif font-bold text-foreground">Reports & Analytics</h2>
@@ -302,10 +308,13 @@ const ReportsPage = () => {
                 <Users className="w-5 h-5" />
                 Members Report
               </CardTitle>
-              <Button variant="outline" onClick={() => exportReport('members')}>
+              <AccessibleButton variant="outline" ariaLabel="Export members report as text file" onClick={() => {
+                exportReport('members');
+                showSuccess('Members report exported successfully', 2000);
+              }}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
-              </Button>
+              </AccessibleButton>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -411,10 +420,13 @@ const ReportsPage = () => {
                 <DollarSign className="w-5 h-5" />
                 Contributions Report
               </CardTitle>
-              <Button variant="outline" onClick={() => exportReport('contributions')}>
+              <AccessibleButton variant="outline" ariaLabel="Export contributions report as text file" onClick={() => {
+                exportReport('contributions');
+                showSuccess('Contributions report exported successfully', 2000);
+              }}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
-              </Button>
+              </AccessibleButton>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
@@ -482,10 +494,13 @@ const ReportsPage = () => {
                 <HandHeart className="w-5 h-5" />
                 Welfare Report
               </CardTitle>
-              <Button variant="outline" onClick={() => exportReport('welfare')}>
+              <AccessibleButton variant="outline" ariaLabel="Export welfare report as text file" onClick={() => {
+                exportReport('welfare');
+                showSuccess('Welfare report exported successfully', 2000);
+              }}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
-              </Button>
+              </AccessibleButton>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
