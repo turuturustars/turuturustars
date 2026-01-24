@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -64,6 +65,7 @@ const ApprovalsPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const { toast } = useToast();
+  const { status, showSuccess } = useStatus();
 
   useEffect(() => {
     fetchData();
@@ -74,12 +76,12 @@ const ApprovalsPage = () => {
       const [membersRes, registrationsRes] = await Promise.all([
         supabase
           .from('profiles')
-          .select('*')
+          .select('id, full_name, email, phone, joined_at, status')
           .eq('status', 'pending')
           .order('joined_at', { ascending: false }),
         supabase
           .from('members')
-          .select('*')
+          .select('id, first_name, last_name, email, status, created_at')
           .order('created_at', { ascending: false }),
       ]);
 
@@ -198,6 +200,11 @@ const ApprovalsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       <div>
         <h2 className="text-2xl font-serif font-bold text-foreground">Pending Approvals</h2>
         <p className="text-muted-foreground">Review and approve new member applications</p>
@@ -316,16 +323,21 @@ const ApprovalsPage = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button
+                            <AccessibleButton
                               size="sm"
-                              onClick={() => approveMember(member.id)}
+                              ariaLabel={`Approve membership for ${member.full_name}`}
+                              onClick={() => {
+                                approveMember(member.id);
+                                showSuccess(`${member.full_name} approved successfully`, 2000);
+                              }}
                             >
                               <CheckCircle2 className="w-4 h-4 mr-1" />
                               Approve
-                            </Button>
-                            <Button
+                            </AccessibleButton>
+                            <AccessibleButton
                               size="sm"
                               variant="destructive"
+                              ariaLabel={`Reject membership for ${member.full_name}`}
                               onClick={() => {
                                 setSelectedMember(member);
                                 setShowRejectDialog(true);
@@ -333,7 +345,7 @@ const ApprovalsPage = () => {
                             >
                               <XCircle className="w-4 h-4 mr-1" />
                               Reject
-                            </Button>
+                            </AccessibleButton>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -388,13 +400,17 @@ const ApprovalsPage = () => {
                           {format(new Date(reg.created_at), 'MMM dd, yyyy')}
                         </TableCell>
                         <TableCell>
-                          <Button
+                          <AccessibleButton
                             size="sm"
                             variant="destructive"
-                            onClick={() => deleteRegistration(reg.id)}
+                            ariaLabel={`Delete registration for ${reg.full_name}`}
+                            onClick={() => {
+                              deleteRegistration(reg.id);
+                              showSuccess(`Registration deleted`, 2000);
+                            }}
                           >
                             <UserX className="w-4 h-4" />
-                          </Button>
+                          </AccessibleButton>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -427,12 +443,23 @@ const ApprovalsPage = () => {
             onChange={(e) => setRejectReason(e.target.value)}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRejectDialog(false)}>
+            <AccessibleButton 
+              variant="outline" 
+              ariaLabel="Cancel rejection dialog"
+              onClick={() => setShowRejectDialog(false)}
+            >
               Cancel
-            </Button>
-            <Button variant="destructive" onClick={rejectMember}>
+            </AccessibleButton>
+            <AccessibleButton 
+              variant="destructive" 
+              ariaLabel={`Confirm rejection of ${selectedMember?.full_name}'s application`}
+              onClick={() => {
+                rejectMember();
+                showSuccess(`${selectedMember?.full_name} rejected`, 2000);
+              }}
+            >
               Reject Application
-            </Button>
+            </AccessibleButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
