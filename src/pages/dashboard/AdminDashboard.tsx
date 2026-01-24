@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -33,6 +33,7 @@ import {
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { status, showSuccess } = useStatus();
   const [stats, setStats] = useState({
     totalMembers: 0,
     activeMembers: 0,
@@ -52,31 +53,31 @@ const AdminDashboard = () => {
       // Get total members
       const { count: totalCount } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       // Get active members (status = 'active')
       const { count: activeCount } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'active');
 
       // Get upcoming meetings (status = 'scheduled')
       const { data: upcomingData } = await supabase
         .from('meetings')
-        .select('*')
+        .select('id')
         .eq('status', 'scheduled')
         .gt('scheduled_date', new Date().toISOString());
 
       // Get pending approvals (using profiles with pending status)
       const { count: approvalsCount } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('status', 'pending');
 
       // Get published announcements
       const { count: announcementsCount } = await supabase
         .from('announcements')
-        .select('*', { count: 'exact', head: true })
+        .select('id', { count: 'exact', head: true })
         .eq('published', true);
 
       setStats({
@@ -207,6 +208,11 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6 pb-8">
+      <AccessibleStatus 
+        message={status.message} 
+        type={status.type} 
+        isVisible={status.isVisible} 
+      />
       {/* Enhanced Header */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-purple-600 to-pink-600 p-8 sm:p-10 shadow-2xl">
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
@@ -344,22 +350,54 @@ const AdminDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/members')}>
+            <AccessibleButton 
+              variant="outline" 
+              className="justify-start gap-2 h-auto py-3" 
+              onClick={() => {
+                navigate('/dashboard/members');
+                showSuccess('Navigating to members', 1500);
+              }}
+              ariaLabel="Add new member to system"
+            >
               <Users className="w-4 h-4" />
               Add Member
-            </Button>
-            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/announcements')}>
+            </AccessibleButton>
+            <AccessibleButton 
+              variant="outline" 
+              className="justify-start gap-2 h-auto py-3" 
+              onClick={() => {
+                navigate('/dashboard/announcements');
+                showSuccess('Navigating to announcements', 1500);
+              }}
+              ariaLabel="Create new announcement"
+            >
               <Bell className="w-4 h-4" />
               New Announcement
-            </Button>
-            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/reports')}>
+            </AccessibleButton>
+            <AccessibleButton 
+              variant="outline" 
+              className="justify-start gap-2 h-auto py-3" 
+              onClick={() => {
+                navigate('/dashboard/reports');
+                showSuccess('Navigating to reports', 1500);
+              }}
+              ariaLabel="Generate new financial or membership report"
+            >
               <BarChart3 className="w-4 h-4" />
               Generate Report
-            </Button>
-            <Button variant="outline" className="justify-start gap-2 h-auto py-3" onClick={() => navigate('/dashboard/settings')}>
+            </AccessibleButton>
+            <AccessibleButton 
+              variant="outline" 
+              className="justify-start gap-2 h-auto py-3" 
+              onClick={() => {
+                navigate('/dashboard/settings');
+                showSuccess('Navigating to system settings', 1500);
+              }}
+              ariaLabel="Access system settings and configuration"
+            >
               <Settings className="w-4 h-4" />
               System Settings
-            </Button>
+            </AccessibleButton>
           </div>
         </CardContent>
       </Card>
