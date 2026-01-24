@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import {
   Table,
   TableBody,
@@ -20,12 +21,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  AccessibleButton,
+  AccessibleFormField,
+  useStatus,
+  AccessibleStatus,
+} from '@/components/accessible';
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { supabase } from '@/integrations/supabase/client';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X } from 'lucide-react';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
+import { amountSchema } from '@/lib/validation';
+import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 
 interface Contribution {
   id: string;
@@ -43,11 +53,13 @@ interface Contribution {
 const ContributionsPage = () => {
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { status, showSuccess, showError } = useStatus();
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPendingViewOpen, setIsPendingViewOpen] = useState(false);
+  const pagination = usePaginationState(15);
   
   const [newContribution, setNewContribution] = useState({
     amount: '',
@@ -55,6 +67,19 @@ const ContributionsPage = () => {
     reference_number: '',
     notes: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Paginate contributions
+  const paginatedContributions = useMemo(() => {
+    const offset = (pagination.page - 1) * pagination.pageSize;
+    return contributions.slice(offset, offset + pagination.pageSize);
+  }, [contributions, pagination.page, pagination.pageSize]);
+
+  // Update pagination when contributions change
+  useEffect(() => {
+    pagination.updateTotal(contributions.length);
+  }, [contributions.length, pagination]);
 
   useEffect(() => {
     if (profile?.id) {
@@ -78,20 +103,35 @@ const ContributionsPage = () => {
   }, [profile?.id]);
 
   const fetchContributions = async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('contributions')
-        .select(`
-          *,
-          member:member_id (full_name, id)
-        `)
-        .eq('member_id', profile?.id)
-        .order('created_at', { ascending: false });
+      setError(null);
+      
+      await retryAsync(
+        async () => {
+          const { data, error: fetchError } = await supabase
+            .from('contributions')
+            .select('id, amount, contribution_type, status, due_date, paid_at, reference_number, notes, created_at, welfare_case_id')
+            .eq('member_id', profile?.id)
+            .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setContributions(data || []);
+          if (fetchError) throw fetchError;
+          setContributions(data || []);
+          return data;
+        },
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          backoffMultiplier: 2,
+          onRetry: (attempt) => {
+            logError(`Retrying fetch contributions (attempt ${attempt})`, 'ContributionsPage', 'warn');
+          },
+        }
+      );
     } catch (error) {
-      console.error('Error fetching contributions:', error);
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'ContributionsPage.fetchContributions');
+      setError(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -100,26 +140,65 @@ const ContributionsPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!profile?.id || !newContribution.amount) return;
+    // Reset errors
+    setError(null);
+    setFieldErrors({});
+
+    // Validate required fields
+    const errors: Record<string, string> = {};
+    if (!newContribution.amount) {
+      errors.amount = 'Amount is required';
+    } else {
+      try {
+        amountSchema.parse(newContribution.amount);
+      } catch (err: any) {
+        errors.amount = err.errors[0]?.message || 'Invalid amount';
+      }
+    }
+
+    if (!newContribution.reference_number.trim()) {
+      errors.reference_number = 'Reference number is required';
+    } else if (newContribution.reference_number.trim().length < 3) {
+      errors.reference_number = 'Reference number must be at least 3 characters';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setError('Please fix the errors below');
+      return;
+    }
+
+    if (!profile?.id) {
+      setError('User profile not found');
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase.from('contributions').insert({
-        member_id: profile.id,
-        amount: parseFloat(newContribution.amount),
-        contribution_type: newContribution.contribution_type,
-        reference_number: newContribution.reference_number || null,
-        notes: newContribution.notes || null,
-        status: 'pending',
-      });
+      await retryAsync(
+        async () => {
+          const { error: insertError } = await supabase.from('contributions').insert({
+            member_id: profile.id,
+            amount: parseFloat(newContribution.amount),
+            contribution_type: newContribution.contribution_type,
+            reference_number: newContribution.reference_number || null,
+            notes: newContribution.notes || null,
+            status: 'pending',
+          });
 
-      if (error) throw error;
+          if (insertError) throw insertError;
+          return true;
+        },
+        { maxRetries: 2, delayMs: 500 }
+      );
 
       toast({
         title: 'Contribution Recorded',
         description: 'Your contribution has been submitted for verification.',
       });
+
+      showSuccess('Your contribution has been submitted for verification', 3000);
 
       setIsDialogOpen(false);
       setNewContribution({
@@ -128,35 +207,19 @@ const ContributionsPage = () => {
         reference_number: '',
         notes: '',
       });
+      setFieldErrors({});
       fetchContributions();
     } catch (error) {
-      console.error('Error submitting contribution:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to submit contribution. Please try again.',
-        variant: 'destructive',
-      });
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'ContributionsPage.handleSubmit');
+      setError(errorMsg);
+      showError(errorMsg, 5000);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   
-
-  const getStatusBadge = (status: string) => {
-    const config: Record<string, { color: string; icon: React.ReactNode }> = {
-      paid: { color: 'bg-green-100 text-green-800', icon: <CheckCircle2 className="w-3 h-3" /> },
-      pending: { color: 'bg-yellow-100 text-yellow-800', icon: <Clock className="w-3 h-3" /> },
-      missed: { color: 'bg-red-100 text-red-800', icon: <Clock className="w-3 h-3" /> },
-    };
-    const { color, icon } = config[status] || config.pending;
-    return (
-      <Badge className={`${color} flex items-center gap-1`}>
-        {icon}
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
 
   const stats = {
     total: contributions.filter((c) => c.status === 'paid').reduce((sum, c) => sum + c.amount, 0),
@@ -166,6 +229,29 @@ const ContributionsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus
+        message={status.message}
+        type={status.type}
+        isVisible={status.isVisible}
+      />
+      {error && (
+        <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">Error</p>
+            <p className="text-sm text-destructive/80 mt-1">{error}</p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={fetchContributions}
+            className="flex-shrink-0"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-serif font-bold text-foreground">My Contributions</h2>
@@ -173,29 +259,30 @@ const ContributionsPage = () => {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="btn-primary">
+            <AccessibleButton className="btn-primary" ariaLabel="Record a new contribution">
               <Plus className="w-4 h-4 mr-2" />
               Record Contribution
-            </Button>
+            </AccessibleButton>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record New Contribution</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-              <div className="space-y-2">
-                <Label htmlFor="amount">Amount (KES)</Label>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="e.g., 500"
-                  value={newContribution.amount}
-                  onChange={(e) =>
-                    setNewContribution({ ...newContribution, amount: e.target.value })
+              <AccessibleFormField
+                label="Amount (KES)"
+                type="number"
+                placeholder="e.g., 500"
+                value={newContribution.amount}
+                onChange={(e) => {
+                  setNewContribution({ ...newContribution, amount: e.target.value });
+                  if (fieldErrors.amount) {
+                    setFieldErrors({ ...fieldErrors, amount: '' });
                   }
-                  required
-                />
-              </div>
+                }}
+                error={fieldErrors.amount}
+                required
+              />
               <div className="space-y-2">
                 <Label htmlFor="type">Contribution Type</Label>
                 <Select
@@ -215,38 +302,30 @@ const ContributionsPage = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="reference">Payment Reference (Optional)</Label>
-                <Input
-                  id="reference"
-                  placeholder="M-Pesa confirmation code"
-                  value={newContribution.reference_number}
-                  onChange={(e) =>
-                    setNewContribution({ ...newContribution, reference_number: e.target.value })
+              <AccessibleFormField
+                label="Payment Reference"
+                placeholder="M-Pesa confirmation code"
+                value={newContribution.reference_number}
+                onChange={(e) => {
+                  setNewContribution({ ...newContribution, reference_number: e.target.value });
+                  if (fieldErrors.reference_number) {
+                    setFieldErrors({ ...fieldErrors, reference_number: '' });
                   }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Input
-                  id="notes"
-                  placeholder="Any additional notes"
-                  value={newContribution.notes}
-                  onChange={(e) =>
-                    setNewContribution({ ...newContribution, notes: e.target.value })
-                  }
-                />
-              </div>
-              <Button type="submit" className="w-full btn-primary" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit Contribution'
-                )}
-              </Button>
+                }}
+                error={fieldErrors.reference_number}
+                required
+              />
+              <AccessibleFormField
+                label="Notes (Optional)"
+                placeholder="Any additional notes"
+                value={newContribution.notes}
+                onChange={(e) =>
+                  setNewContribution({ ...newContribution, notes: e.target.value })
+                }
+              />
+              <AccessibleButton type="submit" className="w-full btn-primary" disabled={isSubmitting} isLoading={isSubmitting} loadingText="Submitting...">
+                Submit Contribution
+              </AccessibleButton>
             </form>
           </DialogContent>
         </Dialog>
@@ -332,7 +411,7 @@ const ContributionsPage = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contributions.map((contribution) => (
+                  {paginatedContributions.map((contribution) => (
                     <TableRow key={contribution.id}>
                       <TableCell className="text-sm">
                         {new Date(contribution.created_at).toLocaleDateString()}
@@ -346,13 +425,22 @@ const ContributionsPage = () => {
                       <TableCell className="font-mono text-sm">
                         {contribution.reference_number || '-'}
                       </TableCell>
-                      <TableCell>{getStatusBadge(contribution.status)}</TableCell>
+                      <TableCell>
+                        <StatusBadge 
+                          status={contribution.status} 
+                          icon={
+                            contribution.status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
+                            contribution.status === 'pending' ? <Clock className="w-3 h-3" /> :
+                            <Clock className="w-3 h-3" />
+                          }
+                        />
+                      </TableCell>
                       <TableCell>
                         {contribution.status !== 'paid' ? (
                           <PayWithMpesa
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<Button size="sm" className="btn-outline">Pay with M-Pesa</Button>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -362,6 +450,35 @@ const ContributionsPage = () => {
                   ))}
                 </TableBody>
               </Table>
+              {/* Pagination Controls */}
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, contributions.length)} of {contributions.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <AccessibleButton
+                    variant="outline"
+                    size="sm"
+                    onClick={() => pagination.page > 1 && pagination.goToPage(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                    ariaLabel="Go to previous page"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </AccessibleButton>
+                  <div className="text-sm">
+                    Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+                  </div>
+                  <AccessibleButton
+                    variant="outline"
+                    size="sm"
+                    onClick={() => pagination.page < pagination.totalPages && pagination.goToPage(pagination.page + 1)}
+                    disabled={pagination.page === pagination.totalPages}
+                    ariaLabel="Go to next page"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </AccessibleButton>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -373,12 +490,15 @@ const ContributionsPage = () => {
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Pending Payments</DialogTitle>
-              <button
+              <AccessibleButton
                 onClick={() => setIsPendingViewOpen(false)}
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                ariaLabel="Close pending payments dialog"
+                variant="ghost"
+                size="sm"
               >
                 <X className="w-5 h-5" />
-              </button>
+              </AccessibleButton>
             </div>
           </DialogHeader>
 
