@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/StatusBadge';
 import {
   Table,
   TableBody,
@@ -80,6 +81,7 @@ const AllContributionsPage = () => {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const { toast } = useToast();
+  const { status: statusMessage, showSuccess } = useStatus();
 
   // New contribution form
   const [newContribution, setNewContribution] = useState({
@@ -178,10 +180,7 @@ const AllContributionsPage = () => {
         status: 'pending',
       });
 
-      toast({
-        title: 'Success',
-        description: 'Contribution added successfully',
-      });
+      showSuccess('Contribution added successfully', 5000);
     } catch (error) {
       console.error('Error adding contribution:', error);
       toast({
@@ -214,19 +213,6 @@ const AllContributionsPage = () => {
     missed: contributions.filter((c) => c.status === 'missed').reduce((sum, c) => sum + c.amount, 0),
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      paid: 'bg-green-100 text-green-800',
-      pending: 'bg-yellow-100 text-yellow-800',
-      missed: 'bg-red-100 text-red-800',
-    };
-    return (
-      <Badge className={variants[status] || variants.pending}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -237,6 +223,7 @@ const AllContributionsPage = () => {
 
   return (
     <div className="space-y-6">
+      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-serif font-bold text-foreground">All Contributions</h2>
@@ -244,10 +231,10 @@ const AllContributionsPage = () => {
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
           <DialogTrigger asChild>
-            <Button>
+            <AccessibleButton ariaLabel="Open dialog to add new contribution">
               <Plus className="w-4 h-4 mr-2" />
               Add Contribution
-            </Button>
+            </AccessibleButton>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -369,10 +356,10 @@ const AllContributionsPage = () => {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              <AccessibleButton variant="outline" ariaLabel="Cancel adding contribution" onClick={() => setShowAddDialog(false)}>
                 Cancel
-              </Button>
-              <Button onClick={addContribution}>Add Contribution</Button>
+              </AccessibleButton>
+              <AccessibleButton ariaLabel="Submit new contribution" onClick={addContribution}>Add Contribution</AccessibleButton>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -503,7 +490,7 @@ const AllContributionsPage = () => {
                     <TableCell className="font-mono text-sm">
                       {contribution.reference_number || '-'}
                     </TableCell>
-                    <TableCell>{getStatusBadge(contribution.status)}</TableCell>
+                    <TableCell><StatusBadge status={contribution.status} /></TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {format(new Date(contribution.created_at), 'MMM dd, yyyy')}
                     </TableCell>
