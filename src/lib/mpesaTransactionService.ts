@@ -28,7 +28,7 @@ export class MpesaTransactionService {
     try {
       const { data, error } = await supabase
         .from("mpesa_transactions")
-        .select("*")
+        .select("id, transaction_id, phone_number, amount, reference, status, created_at")
         .eq("checkout_request_id", checkoutRequestId)
         .single();
 
