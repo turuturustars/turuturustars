@@ -27,6 +27,7 @@ interface PaymentStats {
   successRate: number;
   averageAmount: number;
   totalTransactions: number;
+  uniqueCustomers: number;
 }
 
 interface MpesaTransaction {
@@ -96,10 +97,10 @@ const MpesaPaymentManager = () => {
 
       // Amount range filter
       if (filter.minAmount !== null) {
-        filtered = filtered.filter(t => t.amount >= filter.minAmount!);
+        filtered = filtered.filter(t => t.amount >= filter.minAmount);
       }
       if (filter.maxAmount !== null) {
-        filtered = filtered.filter(t => t.amount <= filter.maxAmount!);
+        filtered = filtered.filter(t => t.amount <= filter.maxAmount);
       }
 
       // Phone search
@@ -130,7 +131,9 @@ const MpesaPaymentManager = () => {
 
     const totalCompleted = completed.reduce((sum, t) => sum + t.amount, 0);
     const totalPending = pending.reduce((sum, t) => sum + t.amount, 0);
-    const totalAll = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+    // Calculate unique phone numbers (unique customers)
+    const uniquePhones = new Set(transactions.map(t => t.phone_number));
 
     return {
       totalReceived: totalCompleted,
@@ -143,13 +146,14 @@ const MpesaPaymentManager = () => {
       averageAmount:
         completed.length > 0 ? Math.round(totalCompleted / completed.length) : 0,
       totalTransactions: transactions.length,
+      uniqueCustomers: uniquePhones.size,
     };
   }, [transactions]);
 
   // Retry failed payment
   const retryPayment = async (transactionId: string) => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('mpesa_transactions')
         .select('*')
         .eq('id', transactionId)
@@ -166,6 +170,7 @@ const MpesaPaymentManager = () => {
       // Reload transactions
       loadTransactions();
     } catch (error) {
+      console.error('Error retrying payment:', error);
       toast({
         title: 'Error',
         description: 'Failed to retry payment',
@@ -191,12 +196,12 @@ const MpesaPaymentManager = () => {
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `mpesa-transactions-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-    window.URL.revokeObjectURL(url);
+    globalThis.URL.revokeObjectURL(url);
 
     toast({
       title: 'Exported',
@@ -207,15 +212,18 @@ const MpesaPaymentManager = () => {
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         <Card className="border-2 hover:shadow-lg transition-all hover:border-green-500/50">
           <CardHeader className="pb-2 sm:pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-xs sm:text-sm font-medium truncate">
                 Total Received
               </CardTitle>
-              <CheckCircle className="w-4 h-4 flex-shrink-0 text-green-600" />
+              <DollarSign className="w-4 h-4 flex-shrink-0 text-green-600" />
             </div>
+            <CardDescription className="text-xs mt-1">
+              Successfully processed payments
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">
@@ -235,6 +243,9 @@ const MpesaPaymentManager = () => {
               </CardTitle>
               <Clock className="w-4 h-4 flex-shrink-0 text-amber-600" />
             </div>
+            <CardDescription className="text-xs mt-1">
+              Awaiting confirmation from M-Pesa
+            </CardDescription>
           </CardHeader>
           <CardContent className="p-3 sm:p-4">
             <div className="text-2xl sm:text-2xl md:text-3xl font-bold">
@@ -265,6 +276,28 @@ const MpesaPaymentManager = () => {
           </CardContent>
         </Card>
 
+        <Card className="border-2 hover:shadow-lg transition-all hover:border-purple-500/50">
+          <CardHeader className="pb-2 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">
+                Customers
+              </CardTitle>
+              <Users className="w-4 h-4 flex-shrink-0 text-purple-600" />
+            </div>
+            <CardDescription className="text-xs mt-1">
+              Active payment contributors
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-3 sm:p-4">
+            <div className="text-2xl sm:text-2xl md:text-3xl font-bold">
+              {stats.uniqueCustomers}
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Unique phone numbers
+            </p>
+          </CardContent>
+        </Card>
+
         <Card className="border-2 hover:shadow-lg transition-all hover:border-red-500/50">
           <CardHeader className="pb-2 sm:pb-3">
             <div className="flex items-center justify-between gap-2">
@@ -289,7 +322,12 @@ const MpesaPaymentManager = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Transaction History</CardTitle>
+            <div>
+              <CardTitle>Transaction History</CardTitle>
+              <CardDescription>
+                Complete record of all M-Pesa payments and their status
+              </CardDescription>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -321,7 +359,7 @@ const MpesaPaymentManager = () => {
                 id="status-filter"
                 value={filter.status}
                 onChange={(e) =>
-                  setFilter({ ...filter, status: e.target.value as any })
+                  setFilter({ ...filter, status: e.target.value as PaymentFilter['status'] })
                 }
                 className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background"
               >
@@ -333,12 +371,15 @@ const MpesaPaymentManager = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date-filter">Date Range</Label>
+              <Label htmlFor="date-filter" className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Date Range
+              </Label>
               <select
                 id="date-filter"
                 value={filter.dateRange}
                 onChange={(e) =>
-                  setFilter({ ...filter, dateRange: e.target.value as any })
+                  setFilter({ ...filter, dateRange: e.target.value as PaymentFilter['dateRange'] })
                 }
                 className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background"
               >
@@ -392,25 +433,34 @@ const MpesaPaymentManager = () => {
                   </tr>
                 ) : (
                   transactions.map((tx) => (
-                    <tr key={tx.id} className="border-b hover:bg-muted/50">
+                    <tr 
+                      key={tx.id} 
+                      className={cn(
+                        "border-b hover:bg-muted/50 transition-colors",
+                        tx.status === 'completed' && 'bg-green-50/30',
+                        tx.status === 'pending' && 'bg-amber-50/30',
+                        tx.status === 'failed' && 'bg-red-50/30'
+                      )}
+                    >
                       <td className="px-3 py-2">
                         {new Date(tx.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-3 py-2">{tx.phone_number}</td>
                       <td className="px-3 py-2">KES {tx.amount.toLocaleString()}</td>
                       <td className="px-3 py-2">
-                        <Badge
-                          variant={
-                            tx.status === 'completed'
-                              ? 'default'
-                              : tx.status === 'pending'
-                                ? 'secondary'
-                                : 'destructive'
-                          }
-                          className="text-xs"
-                        >
-                          {tx.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {tx.status === 'completed' && (
+                            <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                          )}
+                          {(() => {
+                            const variant: 'default' | 'secondary' | 'destructive' = tx.status === 'completed' ? 'default' : tx.status === 'pending' ? 'secondary' : 'destructive';
+                            return (
+                              <Badge variant={variant} className="text-xs">
+                                {tx.status}
+                              </Badge>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-3 py-2">
                         {tx.mpesa_receipt_number || '-'}
