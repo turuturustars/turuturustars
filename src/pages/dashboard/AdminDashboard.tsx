@@ -7,18 +7,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Users,
-  Settings,
-  BarChart3,
   Shield,
   ChevronRight,
   TrendingUp,
-  TrendingDown,
   Activity,
   Clock,
-  AlertCircle,
   CheckCircle2,
-  ArrowUpRight,
-  Zap,
   MessageSquare,
   Calendar,
   DollarSign,
@@ -28,11 +22,12 @@ import {
   Eye,
   Database,
   Sparkles,
+  BarChart3,
+  Settings,
 } from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { status, showSuccess } = useStatus();
   const [stats, setStats] = useState({
     totalMembers: 0,
@@ -241,11 +236,9 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
-          const isUp = stat.trend === 'up';
-          const isDown = stat.trend === 'down';
           
           return (
-            <Card key={idx} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden">
+            <Card key={String(idx)} className="group hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/50 cursor-pointer overflow-hidden">
               <CardHeader className="pb-2 sm:pb-3">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
@@ -286,7 +279,7 @@ const AdminDashboard = () => {
           const SectionIcon = section.icon;
           
           return (
-            <div key={idx} className="space-y-4">
+            <div key={String(idx)} className="space-y-4">
               {/* Section Header */}
               <div className="flex items-start gap-4">
                 <div className={`relative p-4 rounded-2xl bg-gradient-to-br ${section.bgGradient} border-2 border-white dark:border-gray-800 shadow-lg`}>
@@ -310,7 +303,7 @@ const AdminDashboard = () => {
                   
                   return (
                     <Card
-                      key={itemIdx}
+                      key={String(itemIdx)}
                       onClick={() => navigate(item.path)}
                       className="group cursor-pointer border-2 hover:border-primary transition-all duration-300 hover:shadow-xl hover:-translate-y-1"
                     >
@@ -421,7 +414,7 @@ const AdminDashboard = () => {
               const PermIcon = permission.icon;
               return (
                 <div
-                  key={idx}
+                  key={String(idx)}
                   className="flex items-center gap-3 p-3 rounded-lg bg-background/80 backdrop-blur-sm border border-primary/20 hover:border-primary/40 transition-colors"
                 >
                   <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">

@@ -176,6 +176,19 @@ const WelfarePage = () => {
 
     setIsDeleting(caseId);
     try {
+      // Check if there are linked contributions
+      const { data: linkedContributions, error: checkError } = await supabase
+        .from('contributions')
+        .select('id', { count: 'exact', head: true })
+        .eq('welfare_case_id', caseId);
+      
+      if (checkError) throw checkError;
+      
+      if (linkedContributions && linkedContributions.length > 0) {
+        setError(`Cannot delete this welfare case as it has ${linkedContributions.length} linked contribution(s). Please remove the contributions first.`);
+        return;
+      }
+      
       const { error: deleteError } = await supabase
         .from('welfare_cases')
         .delete()

@@ -80,8 +80,9 @@ const ApprovalsPage = () => {
           .eq('status', 'pending')
           .order('joined_at', { ascending: false }),
         supabase
-          .from('members')
-          .select('id, first_name, last_name, email, status, created_at')
+          .from('profiles')
+          .select('id, full_name, email, status, created_at')
+          .eq('status', 'pending')
           .order('created_at', { ascending: false }),
       ]);
 

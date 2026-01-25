@@ -9,9 +9,8 @@ import { cn } from '@/lib/utils';
  * Status badge component - reusable across pages
  */
 export interface StatusBadgeProps {
-  status: string;
-  variant?: 'default' | 'secondary' | 'destructive' | 'outline';
-  className?: string;
+  readonly status: string;
+  readonly className?: string;
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
@@ -53,7 +52,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
 /**
  * Priority badge component
  */
-export function PriorityBadge({ priority }: { priority: string }) {
+export function PriorityBadge({ priority }: { readonly priority: string }) {
   const priorityConfig: Record<string, { color: string; icon: string }> = {
     low: { color: 'text-blue-600 dark:text-blue-400', icon: '↓' },
     normal: { color: 'text-gray-600 dark:text-gray-400', icon: '→' },
@@ -73,12 +72,12 @@ export function PriorityBadge({ priority }: { priority: string }) {
 /**
  * Loading skeleton for lists
  */
-export function ListSkeleton({ count = 5 }: { count?: number }) {
+export function ListSkeleton({ count = 5 }: { readonly count?: number }) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
         <div
-          key={i}
+          key={String(i)}
           className="h-12 bg-muted rounded-lg animate-pulse"
         />
       ))}
@@ -90,10 +89,10 @@ export function ListSkeleton({ count = 5 }: { count?: number }) {
  * Empty state component
  */
 export interface EmptyStateProps {
-  icon?: React.ReactNode;
-  title: string;
-  description?: string;
-  action?: React.ReactNode;
+  readonly icon?: React.ReactNode;
+  readonly title: string;
+  readonly description?: string;
+  readonly action?: React.ReactNode;
 }
 
 export function EmptyState({
@@ -118,11 +117,11 @@ export function EmptyState({
  * Stats card component
  */
 export interface StatCardProps {
-  label: string;
-  value: string | number;
-  icon?: React.ReactNode;
-  trend?: { value: number; direction: 'up' | 'down' };
-  color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple';
+  readonly label: string;
+  readonly value: string | number;
+  readonly icon?: React.ReactNode;
+  readonly trend?: { readonly value: number; readonly direction: 'up' | 'down' };
+  readonly color?: 'blue' | 'green' | 'red' | 'yellow' | 'purple';
 }
 
 export function StatCard({

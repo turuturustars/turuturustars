@@ -3,10 +3,10 @@ import { Badge } from '@/components/ui/badge';
 type Status = 'active' | 'pending' | 'dormant' | 'suspended' | 'paid' | 'missed' | 'closed' | 'cancelled' | string;
 
 interface StatusBadgeProps {
-  status: Status;
-  variant?: 'default' | 'outline' | 'secondary' | 'destructive';
-  icon?: React.ReactNode;
-  className?: string;
+  readonly status: Status;
+  readonly variant?: 'default' | 'outline' | 'secondary' | 'destructive';
+  readonly icon?: React.ReactNode;
+  readonly className?: string;
 }
 
 const STATUS_COLORS: Record<Status, { bg: string; text: string; label?: string }> = {

@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -20,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   AccessibleButton,
   AccessibleFormField,
@@ -29,7 +28,6 @@ import {
 } from '@/components/accessible';
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { supabase } from '@/integrations/supabase/client';
-import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { usePaginationState } from '@/hooks/usePaginationState';
@@ -180,7 +178,7 @@ const ContributionsPage = () => {
         async () => {
           const { error: insertError } = await supabase.from('contributions').insert({
             member_id: profile.id,
-            amount: parseFloat(newContribution.amount),
+            amount: Number.parseFloat(newContribution.amount),
             contribution_type: newContribution.contribution_type,
             reference_number: newContribution.reference_number || null,
             notes: newContribution.notes || null,
@@ -267,6 +265,7 @@ const ContributionsPage = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record New Contribution</DialogTitle>
+              <DialogDescription>Submit a new contribution record with payment details</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
               <AccessibleFormField
@@ -488,18 +487,8 @@ const ContributionsPage = () => {
       <Dialog open={isPendingViewOpen} onOpenChange={setIsPendingViewOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>Pending Payments</DialogTitle>
-              <AccessibleButton
-                onClick={() => setIsPendingViewOpen(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                ariaLabel="Close pending payments dialog"
-                variant="ghost"
-                size="sm"
-              >
-                <X className="w-5 h-5" />
-              </AccessibleButton>
-            </div>
+            <DialogTitle>Pending Payments</DialogTitle>
+            <DialogDescription>View and manage all your pending contribution payments</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">

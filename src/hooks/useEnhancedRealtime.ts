@@ -21,10 +21,13 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 // Enhanced Real-time Hook with All Features
 // ============================================================================
 
+type FilterOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike' | 'like';
+type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
+
 export interface UseEnhancedRealtimeOptions<T> {
   table: string;
-  filter?: { column: string; operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike' | 'like'; value: unknown };
-  events?: Array<'INSERT' | 'UPDATE' | 'DELETE'>;
+  filter?: { column: string; operator: FilterOperator; value: unknown };
+  events?: RealtimeEvent[];
   enableOfflineSync?: boolean;
   enableCrossTabSync?: boolean;
   enableOptimisticUpdates?: boolean;
@@ -84,7 +87,7 @@ export function useEnhancedRealtime<T extends { id: string }>(
   const handleIncrementalUpdate = useCallback(
     (change: IncrementalUpdate<T>) => {
       if (change.type === 'INSERT' && onInsert && change.new) {
-        onInsert(change.new as T);
+        onInsert(change.new);
       }
       if (change.type === 'UPDATE' && onUpdate) {
         onUpdate(change);
@@ -96,7 +99,7 @@ export function useEnhancedRealtime<T extends { id: string }>(
       // Update local state
       setItems(prev => {
         if (change.type === 'INSERT' && change.new) {
-          return [...prev, change.new as T];
+          return [...prev, change.new];
         } else if (change.type === 'UPDATE') {
           return prev.map(item =>
             item.id === change.id
@@ -152,7 +155,7 @@ export function useEnhancedRealtime<T extends { id: string }>(
         let query = supabase.from(table).select('*');
         
         if (filter) {
-          const filterFunc = query[filter.operator as 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike' | 'like'];
+          const filterFunc = query[filter.operator];
           if (filterFunc) {
             query = filterFunc(filter.column, filter.value);
           }
@@ -171,16 +174,16 @@ export function useEnhancedRealtime<T extends { id: string }>(
           .on(
             'postgres_changes',
             {
-              event: events.length === 3 ? '*' : (events[0] as 'INSERT' | 'UPDATE' | 'DELETE'),
+              event: events.length === 3 ? '*' : events[0],
               schema: 'public',
               table,
             },
             (payload: { eventType: string; new: T | null; old: T | null }) => {
               const change: IncrementalUpdate<T> = {
-                id: (payload.new?.id || payload.old?.id || '') as string,
-                type: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+                id: (payload.new?.id || payload.old?.id || ''),
+                type: payload.eventType as RealtimeEvent,
                 timestamp: Date.now(),
-                changes: payload.new ? (payload.new as Partial<T>) : {},
+                changes: payload.new ? (payload.new) : {},
                 new: payload.new,
                 old: payload.old,
               };

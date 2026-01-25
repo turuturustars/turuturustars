@@ -35,7 +35,7 @@ export function useOfflineCapability() {
       if (wasOffline) {
         setWasOffline(false);
         // Trigger any pending syncs
-        window.dispatchEvent(new Event('app-back-online'));
+        globalThis.dispatchEvent(new Event('app-back-online'));
       }
     };
 
@@ -44,12 +44,12 @@ export function useOfflineCapability() {
       setWasOffline(true);
     };
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    globalThis.addEventListener('online', handleOnline);
+    globalThis.addEventListener('offline', handleOffline);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      globalThis.removeEventListener('online', handleOnline);
+      globalThis.removeEventListener('offline', handleOffline);
     };
   }, [wasOffline]);
 
@@ -159,7 +159,7 @@ export function useOfflineSync(storageKey: string) {
   useEffect(() => {
     if (isOnline && wasOffline && getUnsyncedItems().length > 0) {
       // Dispatch event to notify app that sync is needed
-      window.dispatchEvent(
+      globalThis.dispatchEvent(
         new CustomEvent('offline-sync-needed', {
           detail: { items: getUnsyncedItems(), storageKey },
         })
@@ -188,7 +188,7 @@ export function useConnectionQuality() {
   useEffect(() => {
     // Use Network Information API if available
     if ('connection' in navigator) {
-      const connection = (navigator as any).connection;
+      const { connection } = navigator as any;
 
       if (connection) {
         const updateQuality = () => {

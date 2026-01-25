@@ -12,11 +12,37 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          radix: ['@radix-ui/react-accordion', '@radix-ui/react-alert-dialog', '@radix-ui/react-aspect-ratio', '@radix-ui/react-avatar'],
-          supabase: ['@supabase/supabase-js'],
-          hooks: ['@tanstack/react-query'],
+        manualChunks: (id) => {
+          // Core vendor chunks
+          if (id.includes('node_modules/react')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'vendor-radix';
+          }
+          if (id.includes('node_modules/@supabase')) {
+            return 'vendor-supabase';
+          }
+          if (id.includes('node_modules/@tanstack')) {
+            return 'vendor-query';
+          }
+          if (id.includes('node_modules/recharts')) {
+            return 'vendor-charts';
+          }
+          
+          // Feature-based chunks for dashboard
+          if (id.includes('pages/dashboard/') && id.includes('Financial')) {
+            return 'dashboard-finance';
+          }
+          if (id.includes('pages/dashboard/') && id.includes(('Members' || 'Approvals' || 'Welfare'))) {
+            return 'dashboard-members';
+          }
+          if (id.includes('pages/dashboard/') && id.includes(('Chairman' || 'Secretary' || 'Treasurer' || 'Organizing' || 'Patron'))) {
+            return 'dashboard-roles';
+          }
+          if (id.includes('components/dashboard/')) {
+            return 'dashboard-components';
+          }
         }
       }
     },

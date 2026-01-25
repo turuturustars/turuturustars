@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { hasRole, isManagementCommittee } from '@/lib/rolePermissions';
+import { hasRole } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
@@ -10,20 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import {
   Users,
   FileText,
-  Settings,
-  BarChart3,
   Bell,
   TrendingUp,
-  ArrowRight,
   CheckCircle2,
 } from 'lucide-react';
 
 const ChairpersonDashboard = () => {
   const navigate = useNavigate();
-  const { roles, profile } = useAuth();
-  const { status: statusMessage, showSuccess } = useStatus();
+  const { roles } = useAuth();
+  const { status: statusMessage } = useStatus();
   const userRoles = roles.map(r => r.role);
-  const isChair = hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairperson');
   
   const [stats, setStats] = useState({
     totalMembers: 0,
@@ -189,7 +185,7 @@ const ChairpersonDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           {quickActions.map((action, idx) => (
             <button
-              key={idx}
+              key={String(idx)}
               onClick={() => navigate(action.path)}
               className="group"
             >

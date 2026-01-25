@@ -6,10 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
+import { OptimizedAvatarImage } from '@/components/ui/OptimizedAvatarImage';
 import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users, Bell, BellOff, Edit2, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -267,12 +267,12 @@ export default function PrivateMessagesPage() {
                             onClick={() => handleStartConversation(member.id)}
                             className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
                           >
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={member.photo_url || undefined} />
-                              <AvatarFallback className="bg-primary/10 text-primary">
-                                {member.full_name.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
+                            <OptimizedAvatarImage
+                              photoUrl={member.photo_url}
+                              fallback={member.full_name.charAt(0).toUpperCase()}
+                              size={40}
+                              className="h-10 w-10"
+                            />
                             <span className="font-medium">{member.full_name}</span>
                           </button>
                         ))}
@@ -345,12 +345,12 @@ export default function PrivateMessagesPage() {
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </AccessibleButton>
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={selectedConversation.other_participant?.photo_url || undefined} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {selectedConversation.other_participant?.full_name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <OptimizedAvatarImage
+                  photoUrl={selectedConversation.other_participant?.photo_url}
+                  fallback={selectedConversation.other_participant?.full_name.charAt(0).toUpperCase() || 'M'}
+                  size={40}
+                  className="h-10 w-10"
+                />
                 <div>
                   <h3 className="font-semibold">
                     {selectedConversation.other_participant?.full_name}
@@ -545,12 +545,12 @@ function ConversationItem({
           : 'hover:bg-muted'
       }`}
     >
-      <Avatar className="h-12 w-12 flex-shrink-0">
-        <AvatarImage src={other_participant?.photo_url || undefined} />
-        <AvatarFallback className="bg-primary/10 text-primary">
-          {other_participant?.full_name.charAt(0).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
+      <OptimizedAvatarImage
+        photoUrl={other_participant?.photo_url}
+        fallback={other_participant?.full_name.charAt(0).toUpperCase() || 'M'}
+        size={48}
+        className="h-12 w-12 flex-shrink-0"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
           <span className="font-medium truncate">

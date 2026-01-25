@@ -1,15 +1,14 @@
 import { Loader2 } from 'lucide-react';
 
 interface SkeletonProps {
-  count?: number;
-  className?: string;
+  readonly count?: number;
 }
 
 export function TableSkeleton({ count = 5 }: SkeletonProps) {
   return (
     <div className="space-y-3">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex gap-4">
+        <div key={String(i)} className="flex gap-4">
           <div className="h-10 bg-muted rounded animate-pulse flex-1" />
           <div className="h-10 bg-muted rounded animate-pulse flex-1" />
           <div className="h-10 bg-muted rounded animate-pulse w-32" />

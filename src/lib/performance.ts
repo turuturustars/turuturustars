@@ -149,11 +149,11 @@ export function getMemoryMetrics(): MemoryMetric | null {
     return null;
   }
 
-  const memory = (performance as any).memory;
+  const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
   return {
-    usedJSHeapSize: memory.usedJSHeapSize,
-    totalJSHeapSize: memory.totalJSHeapSize,
-    jsHeapSizeLimit: memory.jsHeapSizeLimit,
+    usedJSHeapSize,
+    totalJSHeapSize,
+    jsHeapSizeLimit,
     timestamp: Date.now(),
   };
 }
@@ -192,11 +192,11 @@ export interface WebVital {
 
 export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
   // Largest Contentful Paint (LCP)
-  if ('PerformanceObserver' in window) {
+  if ('PerformanceObserver' in globalThis) {
     try {
       const lcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        const lastEntry = entries[entries.length - 1];
+        const lastEntry = entries.at(-1);
         const lcp: WebVital = {
           name: 'LCP',
           value: lastEntry.renderTime || lastEntry.loadTime,
@@ -207,8 +207,8 @@ export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
         callback?.(lcp);
       });
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
-    } catch (e) {
-      // LCP not supported
+    } catch {
+      // LCP not supported - ignore error
     }
 
     // Cumulative Layout Shift (CLS)
@@ -230,8 +230,8 @@ export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
         }
       });
       clsObserver.observe({ entryTypes: ['layout-shift'] });
-    } catch (e) {
-      // CLS not supported
+    } catch {
+      // CLS not supported - ignore error
     }
 
     // First Input Delay (FID) / Interaction to Next Paint (INP)
@@ -249,8 +249,8 @@ export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
         }
       });
       fidObserver.observe({ entryTypes: ['first-input'] });
-    } catch (e) {
-      // FID not supported
+    } catch {
+      // FID not supported - ignore error
     }
   }
 
@@ -268,7 +268,7 @@ export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
   }
 
   // First Contentful Paint (FCP)
-  if ('PerformanceObserver' in window) {
+  if ('PerformanceObserver' in globalThis) {
     try {
       const fcpObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
@@ -285,8 +285,8 @@ export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
         }
       });
       fcpObserver.observe({ entryTypes: ['paint'] });
-    } catch (e) {
-      // FCP not supported
+    } catch {
+      // FCP not supported - ignore error
     }
   }
 }
@@ -304,50 +304,39 @@ export interface PerformanceRecommendation {
 }
 
 export function getPerformanceRecommendations(): PerformanceRecommendation[] {
-  const recommendations: PerformanceRecommendation[] = [];
-
-  // Check API performance
   const slowCalls = getSlowestApiCalls(1);
-  if (slowCalls.length > 0 && slowCalls[0].duration > 2000) {
-    recommendations.push({
+  const memory = getMemoryMetrics();
+  
+  return [
+    ...(slowCalls.length > 0 && slowCalls[0].duration > 2000 ? [{
       category: 'Network',
       issue: 'Slow API calls detected',
-      severity: 'high',
+      severity: 'high' as const,
       suggestion: `Optimize ${slowCalls[0].endpoint} endpoint or implement caching`,
       estimatedImprovement: '50-70% faster',
-    });
-  }
-
-  // Check memory
-  const memory = getMemoryMetrics();
-  if (memory && memory.usedJSHeapSize / memory.jsHeapSizeLimit > 0.8) {
-    recommendations.push({
+    }] : []),
+    ...(memory && memory.usedJSHeapSize / memory.jsHeapSizeLimit > 0.8 ? [{
       category: 'Memory',
       issue: 'High memory usage detected',
-      severity: 'high',
+      severity: 'high' as const,
       suggestion: 'Check for memory leaks, implement virtualization for large lists',
       estimatedImprovement: '30-50% less memory',
-    });
-  }
-
-  // Check for render optimization opportunities
-  recommendations.push({
-    category: 'Rendering',
-    issue: 'Consider memoizing expensive components',
-    severity: 'medium',
-    suggestion: 'Use React.memo() for components that receive same props',
-    estimatedImprovement: '10-20% faster renders',
-  });
-
-  recommendations.push({
-    category: 'Data Fetching',
-    issue: 'Ensure pagination is implemented',
-    severity: 'medium',
-    suggestion: 'Load data in chunks instead of entire datasets',
-    estimatedImprovement: '5-10x faster initial load',
-  });
-
-  return recommendations;
+    }] : []),
+    {
+      category: 'Rendering',
+      issue: 'Consider memoizing expensive components',
+      severity: 'medium' as const,
+      suggestion: 'Use React.memo() for components that receive same props',
+      estimatedImprovement: '10-20% faster renders',
+    },
+    {
+      category: 'Data Fetching',
+      issue: 'Ensure pagination is implemented',
+      severity: 'medium' as const,
+      suggestion: 'Load data in chunks instead of entire datasets',
+      estimatedImprovement: '5-10x faster initial load',
+    },
+  ];
 }
 
 // ============================================================================

@@ -50,6 +50,7 @@ const TreasurerRole = lazy(() => import("./pages/dashboard/TreasurerRole"));
 const OrganizingSecretaryDashboard = lazy(() => import("./pages/dashboard/OrganizingSecretaryDashboard"));
 const PatronDashboard = lazy(() => import("./pages/dashboard/PatronDashboard"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
+const RolesPage = lazy(() => import("./pages/dashboard/RolesPage"));
 
 // Feature pages
 const ContributionsPage = lazy(() => import("./pages/dashboard/ContributionsPage"));
@@ -127,7 +128,7 @@ const App = () => {
                   <Route path="home" element={<DashboardHome />} />
 
                   {/* Role-specific dashboards - organized by hierarchy */}
-                  <Route path="roles">
+                  <Route path="roles" element={<RolesPage />}>
                     <Route path="chairperson" element={<ChairpersonDashboard />} />
                     <Route path="vice-chairperson" element={<ViceChairmanDashboard />} />
                     <Route path="secretary" element={<SecretaryRole />} />
