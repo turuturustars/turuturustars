@@ -17,40 +17,56 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
 
 // Log loaded credentials (without exposing full secrets)
-console.log("M-Pesa Credentials Loaded:");
-console.log("- MPESA_CONSUMER_KEY:", MPESA_CONSUMER_KEY ? `${MPESA_CONSUMER_KEY.substring(0, 10)}...` : "NOT SET");
-console.log("- MPESA_CONSUMER_SECRET:", MPESA_CONSUMER_SECRET ? `${MPESA_CONSUMER_SECRET.substring(0, 10)}...` : "NOT SET");
-console.log("- MPESA_SHORTCODE:", MPESA_SHORTCODE || "NOT SET");
-console.log("- MPESA_PASSKEY:", MPESA_PASSKEY ? `${MPESA_PASSKEY.substring(0, 10)}...` : "NOT SET");
-console.log("- MPESA_BASE_URL:", MPESA_BASE_URL);
+const logInitialization = () => {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] M-Pesa Edge Function Initialized`);
+  console.log("📋 Credentials Status:");
+  console.log(`  ✓ MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY ? `${MPESA_CONSUMER_KEY.substring(0, 10)}...` : "❌ NOT SET"}`);
+  console.log(`  ✓ MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET ? `${MPESA_CONSUMER_SECRET.substring(0, 10)}...` : "❌ NOT SET"}`);
+  console.log(`  ✓ MPESA_SHORTCODE: ${MPESA_SHORTCODE || "❌ NOT SET"}`);
+  console.log(`  ✓ MPESA_PASSKEY: ${MPESA_PASSKEY ? `${MPESA_PASSKEY.substring(0, 10)}...` : "❌ NOT SET"}`);
+  console.log(`  ✓ MPESA_BASE_URL: ${MPESA_BASE_URL}`);
+  console.log(`  ✓ Environment: ${MPESA_BASE_URL.includes("sandbox") ? "SANDBOX (Testing)" : "PRODUCTION"}`);
+};
+logInitialization();
 
 async function getAccessToken(): Promise<string> {
   const credentials = btoa(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`);
+  const timestamp = new Date().toISOString();
   
-  console.log("Fetching M-Pesa access token...");
-  console.log("- Using Consumer Key:", MPESA_CONSUMER_KEY.substring(0, 15) + "...");
-  console.log("- Credentials base64:", credentials.substring(0, 20) + "...");
+  console.log(`[${timestamp}] 🔐 Fetching M-Pesa access token...`);
+  console.log(`  Consumer Key: ${MPESA_CONSUMER_KEY.substring(0, 15)}...`);
+  console.log(`  Base64 Credentials: ${credentials.substring(0, 20)}...`);
   
-  const response = await fetch(
-    `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
-    {
-      headers: {
-        Authorization: `Basic ${credentials}`,
-      },
+  try {
+    const response = await fetch(
+      `${MPESA_BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+      {
+        headers: {
+          Authorization: `Basic ${credentials}`,
+        },
+      }
+    );
+    
+    const data = await response.json();
+    
+    if (!data.access_token) {
+      const errorTime = new Date().toISOString();
+      console.error(`[${errorTime}] ❌ M-Pesa Access Token Request Failed`);
+      console.error(`  HTTP Status: ${response.status}`);
+      console.error(`  Error Code: ${data.error}`);
+      console.error(`  Error Description: ${data.error_description}`);
+      console.error(`  Full Response: ${JSON.stringify(data, null, 2)}`);
+      throw new Error(`M-Pesa auth failed: ${data.error_description || data.error || 'Unknown error'}`);
     }
-  );
-  
-  const data = await response.json();
-  
-  if (!data.access_token) {
-    console.error("Failed to obtain M-Pesa access token");
-    console.error("Response status:", response.status);
-    console.error("Response body:", JSON.stringify(data, null, 2));
-    throw new Error(`M-Pesa auth failed: ${data.error_description || data.error || 'Unknown error'}`);
+    
+    console.log(`[${new Date().toISOString()}] ✅ Access token obtained successfully`);
+    console.log(`  Token Expires In: ${data.expires_in} seconds`);
+    return data.access_token;
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] ❌ Access token fetch error:`, error);
+    throw error;
   }
-  
-  console.log("✓ Access token obtained successfully");
-  return data.access_token;
 }
 
 function generateTimestamp(): string {
@@ -116,12 +132,19 @@ serve(async (req) => {
         const { phoneNumber, amount, accountReference, transactionDesc, memberId, contributionId } = params;
         const timestamp = generateTimestamp();
         const password = generatePassword(timestamp);
+        const requestTime = new Date().toISOString();
         
-        // Log access token response
-        console.log("Access token obtained successfully");
+        console.log(`[${requestTime}] 💳 STK Push Request Initiated`);
+        console.log(`  Phone Number: ${phoneNumber}`);
+        console.log(`  Amount: KSh ${amount}`);
+        console.log(`  Account Reference: ${accountReference || "TuruturuStars"}`);
+        console.log(`  Transaction Description: ${transactionDesc || "Contribution"}`);
+        if (memberId) console.log(`  Member ID: ${memberId}`);
+        if (contributionId) console.log(`  Contribution ID: ${contributionId}`);
         
         // Validate amount
         if (amount < 1) {
+          console.error(`[${new Date().toISOString()}] ❌ Invalid amount: ${amount} (minimum: 1)`);
           throw new Error("Amount must be at least KES 1");
         }
         
@@ -141,8 +164,8 @@ serve(async (req) => {
           TransactionDesc: transactionDesc || "Contribution",
         };
         
-        // Log STK push request payload
-        console.log("STK Push Request Payload:", JSON.stringify(stkPayload, null, 2));
+        console.log(`[${requestTime}] 📤 Sending STK Push to Safaricom`);
+        console.log(`  Payload: ${JSON.stringify(stkPayload, null, 2)}`);
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -157,23 +180,31 @@ serve(async (req) => {
         );
         
         result = await response.json();
+        const responseTime = new Date().toISOString();
         
-        // Log Safaricom STK push response
-        console.log("Safaricom STK Push Response:", JSON.stringify(result, null, 2));
+        console.log(`[${responseTime}] 📥 Safaricom STK Push Response Received`);
+        console.log(`  Response Code: ${result.ResponseCode}`);
+        console.log(`  Response Description: ${result.ResponseDescription}`);
+        if (result.MerchantRequestID) console.log(`  Merchant Request ID: ${result.MerchantRequestID}`);
+        if (result.CheckoutRequestID) console.log(`  Checkout Request ID: ${result.CheckoutRequestID}`);
+        console.log(`  Full Response: ${JSON.stringify(result, null, 2)}`);
         
         // Return Safaricom's actual error message instead of generic error
         if (result.errorCode) {
           const errorMsg = result.errorMessage || `M-Pesa Error: ${result.errorCode}`;
-          console.error(`STK Push Failed - Code: ${result.errorCode}, Message: ${errorMsg}`);
+          console.error(`[${new Date().toISOString()}] ❌ STK Push Failed - Code: ${result.errorCode}`);
+          console.error(`  Message: ${errorMsg}`);
           throw new Error(errorMsg);
         }
         
         if (result.ResponseCode !== "0") {
           const errorMsg = result.ResponseDescription || `Failed with code: ${result.ResponseCode}`;
-          console.error(`STK Push Response Error: ${errorMsg}`);
+          console.error(`[${new Date().toISOString()}] ❌ STK Push Response Error: ${errorMsg}`);
           throw new Error(errorMsg);
         }
+        
         // Log the transaction
+        console.log(`[${new Date().toISOString()}] 💾 Recording transaction in database...`);
         await supabase.from("mpesa_transactions").insert({
           transaction_type: "stk_push",
           merchant_request_id: result.MerchantRequestID,
@@ -185,14 +216,17 @@ serve(async (req) => {
           status: result.ResponseCode === "0" ? "pending" : "failed",
           initiated_by: user.id,
         });
+        console.log(`[${new Date().toISOString()}] ✅ Transaction recorded`);
 
         // Create audit log
+        console.log(`[${new Date().toISOString()}] 📝 Creating audit log...`);
         await supabase.rpc("log_audit_action", {
           p_action_type: "MPESA_STK_PUSH",
           p_action_description: `Initiated STK push for KSh ${amount} to ${phoneNumber}`,
           p_entity_type: "mpesa_transaction",
           p_metadata: { amount, phoneNumber, checkoutRequestId: result.CheckoutRequestID },
         });
+        console.log(`[${new Date().toISOString()}] ✅ Audit log created`);
         
         break;
       }
@@ -201,6 +235,10 @@ serve(async (req) => {
         const { checkoutRequestId } = params;
         const timestamp = generateTimestamp();
         const password = generatePassword(timestamp);
+        const queryTime = new Date().toISOString();
+        
+        console.log(`[${queryTime}] 🔍 Querying STK Push Status`);
+        console.log(`  Checkout Request ID: ${checkoutRequestId}`);
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/stkpushquery/v1/query`,
@@ -220,17 +258,36 @@ serve(async (req) => {
         );
         
         result = await response.json();
+        const statusResponseTime = new Date().toISOString();
+        
+        console.log(`[${statusResponseTime}] 📊 Status Query Response Received`);
+        console.log(`  Result Code: ${result.ResultCode}`);
+        console.log(`  Result Description: ${result.ResultDesc}`);
+        console.log(`  Response: ${JSON.stringify(result, null, 2)}`);
         
         // Update transaction status
         if (result.ResultCode !== undefined) {
+          console.log(`[${new Date().toISOString()}] 💾 Updating transaction status in database...`);
+          const updateTime = new Date().toISOString();
+          const statusMap = {
+            0: "completed",
+            1: "incomplete",
+            2: "failed",
+            "1032": "request_timeout",
+            "1037": "user_cancelled"
+          };
+          const newStatus = statusMap[result.ResultCode] || "unknown";
+          
           await supabase
             .from("mpesa_transactions")
             .update({
               result_code: result.ResultCode,
               result_desc: result.ResultDesc,
-              status: result.ResultCode === 0 ? "completed" : "failed",
+              status: newStatus,
             })
             .eq("checkout_request_id", checkoutRequestId);
+          
+          console.log(`[${updateTime}] ✅ Transaction status updated: ${newStatus}`);
         }
         
         break;
@@ -238,6 +295,12 @@ serve(async (req) => {
 
       case "generate_qr": {
         const { amount, merchantName, refNumber } = params;
+        const qrTime = new Date().toISOString();
+        
+        console.log(`[${qrTime}] 🔲 QR Code Generation Request`);
+        console.log(`  Merchant: ${merchantName || "Turuturu Stars CBO"}`);
+        console.log(`  Reference: ${refNumber || "TSCBO"}`);
+        console.log(`  Amount: KSh ${amount}`);
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/qrcode/v1/generate`,
@@ -259,21 +322,34 @@ serve(async (req) => {
         );
         
         result = await response.json();
+        const qrResponseTime = new Date().toISOString();
+        
+        console.log(`[${qrResponseTime}] ✅ QR Code Generated Successfully`);
+        if (result.QRcode) console.log(`  QR Code: ${result.QRcode.substring(0, 50)}...`);
+        console.log(`  Response Code: ${result.ResponseCode}`);
 
         // Create audit log
+        console.log(`[${new Date().toISOString()}] 📝 Creating QR generation audit log...`);
         await supabase.rpc("log_audit_action", {
           p_action_type: "MPESA_QR_GENERATED",
           p_action_description: `Generated QR code for KSh ${amount}`,
           p_entity_type: "mpesa_qr",
-          p_metadata: { amount, refNumber },
+          p_metadata: { amount, refNumber, merchantName },
         });
+        console.log(`[${new Date().toISOString()}] ✅ Audit log created`);
         
         break;
       }
 
       case "register_urls": {
+        const registerTime = new Date().toISOString();
         const validationUrl = `${SUPABASE_URL}/functions/v1/mpesa-validation`;
         const confirmationUrl = `${SUPABASE_URL}/functions/v1/mpesa-confirmation`;
+        
+        console.log(`[${registerTime}] 🔗 Registering M-Pesa Callback URLs`);
+        console.log(`  Validation URL: ${validationUrl}`);
+        console.log(`  Confirmation URL: ${confirmationUrl}`);
+        console.log(`  Short Code: ${MPESA_SHORTCODE}`);
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/c2b/v1/registerurl`,
@@ -293,20 +369,33 @@ serve(async (req) => {
         );
         
         result = await response.json();
+        const registerResponseTime = new Date().toISOString();
+        
+        console.log(`[${registerResponseTime}] 📊 URL Registration Response`);
+        console.log(`  Response Code: ${result.ResponseCode}`);
+        console.log(`  Response Description: ${result.ResponseDescription}`);
 
         // Create audit log
+        console.log(`[${new Date().toISOString()}] 📝 Creating URL registration audit log...`);
         await supabase.rpc("log_audit_action", {
           p_action_type: "MPESA_URL_REGISTERED",
           p_action_description: "Registered M-Pesa callback URLs",
           p_entity_type: "mpesa_config",
           p_metadata: { validationUrl, confirmationUrl },
         });
+        console.log(`[${new Date().toISOString()}] ✅ Audit log created`);
         
         break;
       }
 
       case "simulate_c2b": {
         const { phoneNumber, amount, billRefNumber } = params;
+        const simulateTime = new Date().toISOString();
+        
+        console.log(`[${simulateTime}] 🧪 Simulating C2B Transaction (Testing)`);
+        console.log(`  Phone: ${phoneNumber}`);
+        console.log(`  Amount: KSh ${amount}`);
+        console.log(`  Bill Reference: ${billRefNumber || "Test"}`);
         
         const response = await fetch(
           `${MPESA_BASE_URL}/mpesa/c2b/v1/simulate`,
@@ -327,6 +416,12 @@ serve(async (req) => {
         );
         
         result = await response.json();
+        const simulateResponseTime = new Date().toISOString();
+        
+        console.log(`[${simulateResponseTime}] 📊 C2B Simulation Response`);
+        console.log(`  Response Code: ${result.ResponseCode}`);
+        console.log(`  Response Description: ${result.ResponseDescription}`);
+        console.log(`  Full Response: ${JSON.stringify(result, null, 2)}`);
         
         break;
       }
@@ -339,16 +434,24 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
-    console.error("M-Pesa error:", error);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error(`Error details: ${message}`);
+    const errorTime = new Date().toISOString();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    console.error(`[${errorTime}] ❌ M-Pesa Edge Function Error Occurred`);
+    console.error(`  Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`);
+    console.error(`  Error Message: ${errorMessage}`);
+    if (error instanceof Error && error.stack) {
+      console.error(`  Stack Trace: ${error.stack}`);
+    }
+    console.error(`  Error Details: ${JSON.stringify(error, null, 2)}`);
     
     // Return error with status 400 and detailed message
     return new Response(
       JSON.stringify({ 
-        error: message,
+        error: errorMessage,
         success: false,
-        errorCode: "MPESA_REQUEST_FAILED"
+        errorCode: "MPESA_REQUEST_FAILED",
+        timestamp: errorTime,
       }),
       {
         status: 400,
