@@ -61,7 +61,7 @@ const ProfilePhotoUpload = ({
 
     try {
       // Compress and crop image before upload
-      let processedFile = validation.file!;
+      let processedFile = validation.file;
       try {
         processedFile = await compressImage(processedFile, 0.8);
         processedFile = await cropToSquare(processedFile, 512);

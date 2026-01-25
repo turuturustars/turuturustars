@@ -121,13 +121,16 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row, index) => (
-                <TableRow key={row.id ? String(row.id) : String(index)} role="row">
+              data.map((row, index) => {
+                const rowId = row.id ? String(row.id) : String(index);
+                return (
+                <TableRow key={rowId} role="row">
                   {columns.map((column) => {
+                    const cellId = row.id ? `${String(row.id)}-${column.id}` : `${index}-${column.id}`;
                     const alignClass = column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : '';
                     return (
                     <TableCell
-                      key={row.id ? `${String(row.id)}-${column.id}` : `${index}-${column.id}`}
+                      key={cellId}
                       className={alignClass}
                     >
                       {row[column.id]}
@@ -138,7 +141,8 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
                     <TableCell>{renderRowActions(row, index)}</TableCell>
                   )}
                 </TableRow>
-              ))
+              );
+              })
             )}
           </TableBody>
         </Table>

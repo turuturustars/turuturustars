@@ -100,7 +100,7 @@ export const AccessibleStatus = React.forwardRef<HTMLDivElement, AccessibleStatu
     },
     ref
   ) => {
-    const { announceRef, announce } = useLiveRegion(politeness) as UseLiveRegionReturn;
+    const { announce } = useLiveRegion(politeness) as UseLiveRegionReturn;
     const config = statusConfig[type];
     const IconComponent = config.icon;
 

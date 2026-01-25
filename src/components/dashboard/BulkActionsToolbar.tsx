@@ -8,11 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card } from '@/components/ui/card';
 import {
-  Download,
-  Trash2,
-  Mail,
-  Eye,
-  ChevronDown,
   X,
   MoreHorizontal,
 } from 'lucide-react';
@@ -21,7 +16,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 
 export interface BulkAction {
@@ -34,13 +28,13 @@ export interface BulkAction {
 }
 
 export interface BulkActionsToolbarProps {
-  selectedCount: number;
-  totalCount: number;
-  isAllSelected: boolean;
-  onSelectAll: () => void;
-  onClearSelection: () => void;
-  actions: BulkAction[];
-  showQuickActions?: boolean;
+  readonly selectedCount: number;
+  readonly totalCount: number;
+  readonly isAllSelected: boolean;
+  readonly onSelectAll: () => void;
+  readonly onClearSelection: () => void;
+  readonly actions: readonly BulkAction[];
+  readonly showQuickActions?: boolean;
 }
 
 export function BulkActionsToolbar({
@@ -85,9 +79,9 @@ export function BulkActionsToolbar({
         <div className="flex items-center gap-2 flex-wrap">
           {/* Quick action buttons */}
           {showQuickActions &&
-            quickActions.map((action, index) => (
+            quickActions.map((action) => (
               <Button
-                key={index}
+                key={action.label}
                 size="sm"
                 variant={action.variant || 'outline'}
                 onClick={action.onClick}
@@ -108,9 +102,9 @@ export function BulkActionsToolbar({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {menuActions.map((action, index) => (
+                {menuActions.map((action) => (
                   <DropdownMenuItem
-                    key={index}
+                    key={action.label}
                     onClick={action.onClick}
                     disabled={action.disabled || (action.requiresSelection && selectedCount === 0)}
                     className={action.variant === 'destructive' ? 'text-red-600' : ''}
@@ -146,9 +140,9 @@ export function BulkActionCheckbox({
   onChange,
   disabled = false,
 }: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  disabled?: boolean;
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+  readonly disabled?: boolean;
 }) {
   return (
     <Checkbox
