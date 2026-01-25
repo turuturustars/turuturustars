@@ -32,10 +32,6 @@ export interface AccessibleListProps {
    */
   items: (React.ReactNode | ListItemProps)[];
   /**
-   * List type: ordered or unordered
-   */
-  ordered?: boolean;
-  /**
    * ARIA label for the list
    */
   ariaLabel?: string;
@@ -66,47 +62,48 @@ export const ListItem = React.forwardRef<HTMLLIElement, ListItemProps>(
 ListItem.displayName = 'ListItem';
 
 /**
+ * Shared renderItem function for list components
+ */
+const renderItem = (item: React.ReactNode | ListItemProps, index: number) => {
+  if (React.isValidElement(item)) {
+    return item;
+  }
+
+  if (typeof item === 'object' && item !== null && 'children' in item) {
+    const props = item as ListItemProps;
+    return (
+      <ListItem
+        key={props.ariaLabel || index}
+        ariaLabel={props.ariaLabel}
+        className={props.className}
+        action={props.action}
+      >
+        {props.children}
+      </ListItem>
+    );
+  }
+
+  return (
+    <ListItem key={index}>
+      {item}
+    </ListItem>
+  );
+};
+
+/**
  * Accessible unordered list
  */
 export const UnorderedList = React.forwardRef<HTMLUListElement, AccessibleListProps>(
-  ({ items, ariaLabel, className, complex }, ref) => {
-    const renderItem = (item: React.ReactNode | ListItemProps, index: number) => {
-      if (React.isValidElement(item)) {
-        return item;
-      }
-
-      if (typeof item === 'object' && item !== null && 'children' in item) {
-        const props = item as ListItemProps;
-        return (
-          <ListItem
-            key={props.ariaLabel || index}
-            ariaLabel={props.ariaLabel}
-            className={props.className}
-            action={props.action}
-          >
-            {props.children}
-          </ListItem>
-        );
-      }
-
-      return (
-        <ListItem key={index}>
-          {item}
-        </ListItem>
-      );
-    };
-
-    return (
-      <ul
-        ref={ref}
-        aria-label={ariaLabel}
-        className={`list-disc list-inside space-y-2 ${className || ''}`}
-        role={complex ? 'list' : undefined}
-      >
-        {items.map((item, index) => renderItem(item, index))}
-      </ul>
-    );
-  }
+  ({ items, ariaLabel, className, complex }, ref) => (
+    <ul
+      ref={ref}
+      aria-label={ariaLabel}
+      className={`list-disc list-inside space-y-2 ${className || ''}`}
+      role={complex ? 'list' : undefined}
+    >
+      {items.map((item, index) => renderItem(item, index))}
+    </ul>
+  )
 );
 
 UnorderedList.displayName = 'UnorderedList';
@@ -115,44 +112,16 @@ UnorderedList.displayName = 'UnorderedList';
  * Accessible ordered list
  */
 export const OrderedList = React.forwardRef<HTMLOListElement, AccessibleListProps>(
-  ({ items, ariaLabel, className, complex }, ref) => {
-    const renderItem = (item: React.ReactNode | ListItemProps, index: number) => {
-      if (React.isValidElement(item)) {
-        return item;
-      }
-
-      if (typeof item === 'object' && item !== null && 'children' in item) {
-        const props = item as ListItemProps;
-        return (
-          <ListItem
-            key={props.ariaLabel || index}
-            ariaLabel={props.ariaLabel}
-            className={props.className}
-            action={props.action}
-          >
-            {props.children}
-          </ListItem>
-        );
-      }
-
-      return (
-        <ListItem key={index}>
-          {item}
-        </ListItem>
-      );
-    };
-
-    return (
-      <ol
-        ref={ref}
-        aria-label={ariaLabel}
-        className={`list-decimal list-inside space-y-2 ${className || ''}`}
-        role={complex ? 'list' : undefined}
-      >
-        {items.map((item, index) => renderItem(item, index))}
-      </ol>
-    );
-  }
+  ({ items, ariaLabel, className, complex }, ref) => (
+    <ol
+      ref={ref}
+      aria-label={ariaLabel}
+      className={`list-decimal list-inside space-y-2 ${className || ''}`}
+      role={complex ? 'list' : undefined}
+    >
+      {items.map((item, index) => renderItem(item, index))}
+    </ol>
+  )
 );
 
 OrderedList.displayName = 'OrderedList';
@@ -174,8 +143,8 @@ export interface DescriptionListProps {
 export const DescriptionList = React.forwardRef<HTMLDListElement, DescriptionListProps>(
   ({ items, className }, ref) => (
     <dl ref={ref} className={`space-y-4 ${className || ''}`}>
-      {items.map((item, index) => (
-        <div key={index} className="flex flex-col gap-1">
+      {items.map((item) => (
+        <div key={item.term} className="flex flex-col gap-1">
           <dt className="font-semibold text-gray-900 dark:text-gray-100">
             {item.term}
           </dt>
@@ -218,8 +187,8 @@ export const NavigationList = React.forwardRef<HTMLNavElement, NavigationListPro
   ({ items, className, ariaLabel }, ref) => (
     <nav ref={ref} aria-label={ariaLabel || 'Navigation'}>
       <ul className={`space-y-1 ${className || ''}`}>
-        {items.map((item, index) => (
-          <li key={index}>
+        {items.map((item) => (
+          <li key={item.label}>
             {item.href ? (
               <a
                 href={item.href}
