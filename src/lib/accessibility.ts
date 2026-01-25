@@ -148,52 +148,52 @@ export const keyboardShortcuts = {
   /**
    * Escape key - close modals, cancel operations
    */
-  isEscapeKey: (e: KeyboardEvent): boolean => e.key === 'Escape' || e.keyCode === 27,
+  isEscapeKey: (e: KeyboardEvent): boolean => e.key === 'Escape',
 
   /**
    * Enter key - submit forms, confirm actions
    */
-  isEnterKey: (e: KeyboardEvent): boolean => e.key === 'Enter' || e.keyCode === 13,
+  isEnterKey: (e: KeyboardEvent): boolean => e.key === 'Enter',
 
   /**
    * Space key - toggle checkboxes, activate buttons
    */
-  isSpaceKey: (e: KeyboardEvent): boolean => e.key === ' ' || e.keyCode === 32,
+  isSpaceKey: (e: KeyboardEvent): boolean => e.key === ' ',
 
   /**
    * Tab key - navigate between focusable elements
    */
-  isTabKey: (e: KeyboardEvent): boolean => e.key === 'Tab' || e.keyCode === 9,
+  isTabKey: (e: KeyboardEvent): boolean => e.key === 'Tab',
 
   /**
    * Arrow Up - navigate up in lists/menus
    */
-  isArrowUp: (e: KeyboardEvent): boolean => e.key === 'ArrowUp' || e.keyCode === 38,
+  isArrowUp: (e: KeyboardEvent): boolean => e.key === 'ArrowUp',
 
   /**
    * Arrow Down - navigate down in lists/menus
    */
-  isArrowDown: (e: KeyboardEvent): boolean => e.key === 'ArrowDown' || e.keyCode === 40,
+  isArrowDown: (e: KeyboardEvent): boolean => e.key === 'ArrowDown',
 
   /**
    * Arrow Left - navigate left in tabs/carousels
    */
-  isArrowLeft: (e: KeyboardEvent): boolean => e.key === 'ArrowLeft' || e.keyCode === 37,
+  isArrowLeft: (e: KeyboardEvent): boolean => e.key === 'ArrowLeft',
 
   /**
    * Arrow Right - navigate right in tabs/carousels
    */
-  isArrowRight: (e: KeyboardEvent): boolean => e.key === 'ArrowRight' || e.keyCode === 39,
+  isArrowRight: (e: KeyboardEvent): boolean => e.key === 'ArrowRight',
 
   /**
    * Home key
    */
-  isHomeKey: (e: KeyboardEvent): boolean => e.key === 'Home' || e.keyCode === 36,
+  isHomeKey: (e: KeyboardEvent): boolean => e.key === 'Home',
 
   /**
    * End key
    */
-  isEndKey: (e: KeyboardEvent): boolean => e.key === 'End' || e.keyCode === 35,
+  isEndKey: (e: KeyboardEvent): boolean => e.key === 'End',
 };
 
 /**
@@ -269,12 +269,11 @@ export const focusManagement = {
     announcement.setAttribute('role', 'status');
     announcement.setAttribute('aria-live', priority);
     announcement.setAttribute('aria-atomic', 'true');
-    announcement.className = 'sr-only'; // Hidden from visual view
+    announcement.className = 'sr-only';
     announcement.textContent = message;
     document.body.appendChild(announcement);
 
-    // Remove after announcement is read
-    setTimeout(() => document.body.removeChild(announcement), 1000);
+    setTimeout(() => announcement.remove(), 1000);
   },
 
   /**
@@ -411,10 +410,10 @@ export const SkipLinks = {
  */
 export function hasGoodContrast(hexColor1: string, hexColor2: string): boolean {
   const getLuminance = (hex: string): number => {
-    const rgb = parseInt(hex.slice(1), 16);
-    const r = (rgb >> 16) & 0xff;
-    const g = (rgb >> 8) & 0xff;
-    const b = (rgb >> 0) & 0xff;
+    const rgb = Number.parseInt(hex.slice(1), 16);
+    const r = Math.trunc(rgb / 65536) & 0xff;
+    const g = Math.trunc(rgb / 256) & 0xff;
+    const b = rgb & 0xff;
 
     // Relative luminance formula
     const luminance = (value: number) => {

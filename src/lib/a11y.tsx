@@ -37,7 +37,7 @@ export function useFocusTrap(isOpen: boolean) {
 
       const firstElement = focusableElements[0];
       const lastElement = focusableElements[focusableElements.length - 1];
-      const activeElement = document.activeElement;
+      const { activeElement } = document;
 
       // Trap focus at boundaries
       if (e.shiftKey && activeElement === firstElement) {
@@ -83,7 +83,7 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
   ].join(',');
 
   return Array.from(container.querySelectorAll(focusableSelectors)).filter((element) => {
-    const style = window.getComputedStyle(element as HTMLElement);
+    const style = globalThis.getComputedStyle(element as HTMLElement);
     return style.display !== 'none' && style.visibility !== 'hidden';
   }) as HTMLElement[];
 }
@@ -138,7 +138,7 @@ export function announceToScreenReader(message: string, politeness: 'polite' | '
 
   // Remove after announcement
   setTimeout(() => {
-    document.body.removeChild(announcement);
+    announcement.remove();
   }, 1000);
 }
 
@@ -165,7 +165,7 @@ export function useAriaAnnounce() {
  */
 function getLuminance(r: number, g: number, b: number): number {
   const [rs, gs, bs] = [r, g, b].map(x => {
-    x = x / 255;
+    x /= 255;
     return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
   });
   return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
@@ -197,9 +197,9 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
     ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
+        r: Number.parseInt(result[1], 16),
+        g: Number.parseInt(result[2], 16),
+        b: Number.parseInt(result[3], 16),
       }
     : null;
 }
@@ -224,12 +224,12 @@ export function useArrowKeyNavigation(
   itemCount: number,
   onSelect?: (index: number) => void
 ) {
-  const [focusedIndex, setFocusedIndexState] = useState(0);
+  const [focusedIndex, setFocusedIndex] = useState(0);
 
-  const setFocusedIndex = useCallback(
+  const updateFocusedIndex = useCallback(
     (newIndex: number) => {
       const normalized = ((newIndex % itemCount) + itemCount) % itemCount;
-      setFocusedIndexState(normalized);
+      setFocusedIndex(normalized);
       if (onSelect) {
         onSelect(normalized);
       }
@@ -243,29 +243,29 @@ export function useArrowKeyNavigation(
         case 'ArrowDown':
         case 'ArrowRight':
           e.preventDefault();
-          setFocusedIndex(focusedIndex + 1);
+          updateFocusedIndex(focusedIndex + 1);
           break;
         case 'ArrowUp':
         case 'ArrowLeft':
           e.preventDefault();
-          setFocusedIndex(focusedIndex - 1);
+          updateFocusedIndex(focusedIndex - 1);
           break;
         case 'Home':
           e.preventDefault();
-          setFocusedIndex(0);
+          updateFocusedIndex(0);
           break;
         case 'End':
           e.preventDefault();
-          setFocusedIndex(itemCount - 1);
+          updateFocusedIndex(itemCount - 1);
           break;
       }
     },
-    [focusedIndex, itemCount, setFocusedIndex]
+    [focusedIndex, itemCount, updateFocusedIndex]
   );
 
   return {
     focusedIndex,
-    setFocusedIndex,
+    setFocusedIndex: updateFocusedIndex,
     handleKeyDown,
   };
 }
@@ -303,7 +303,7 @@ export function validateHeadingHierarchy(): string[] {
   let h1Count = 0;
 
   for (const heading of headings) {
-    const level = parseInt(heading.tagName[1]);
+    const level = Number.parseInt(heading.tagName[1]);
 
     if (level === 1) {
       h1Count++;
