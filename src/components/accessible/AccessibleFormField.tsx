@@ -49,7 +49,7 @@ export const AccessibleFormField = React.forwardRef<HTMLInputElement, Accessible
     },
     ref
   ) => {
-    const { inputId, errorId, descriptionId, inputProps, labelProps, errorProps } = useFormField(
+    const { descriptionId, inputProps, labelProps, errorProps } = useFormField(
       props.name || 'field',
       error
     );

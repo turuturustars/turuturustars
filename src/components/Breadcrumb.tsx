@@ -7,7 +7,7 @@ interface BreadcrumbItem {
 }
 
 interface BreadcrumbProps {
-  items?: BreadcrumbItem[];
+  readonly items?: readonly BreadcrumbItem[];
 }
 
 const ROUTE_LABELS: Record<string, string> = {
@@ -39,7 +39,7 @@ const ROUTE_LABELS: Record<string, string> = {
   'welfare-management': 'Welfare Management',
 };
 
-export function Breadcrumb({ items }: BreadcrumbProps) {
+export function Breadcrumb({ items }: readonly BreadcrumbProps) {
   const location = useLocation();
 
   // Auto-generate breadcrumbs from path if not provided
@@ -74,7 +74,8 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const breadcrumbs: BreadcrumbItem[] = [];
 
   let currentPath = '';
-  for (let i = 0; i < parts.length; i++) {
+  let i = 0;
+  while (i < parts.length) {
     const part = parts[i];
     currentPath += `/${part}`;
 
@@ -86,16 +87,17 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
         label: roleLabel,
         path: currentPath + `/${rolePart}`,
       });
-      i++; // Skip next iteration
+      i += 2; // Skip next iteration
       currentPath += `/${rolePart}`;
       continue;
     }
 
-    const label = ROUTE_LABELS[part] || part.replace(/-/g, ' ');
+    const label = ROUTE_LABELS[part] || part.replaceAll('-', ' ');
     breadcrumbs.push({
       label,
       path: i < parts.length - 1 ? currentPath : undefined,
     });
+    i++;
   }
 
   return breadcrumbs;

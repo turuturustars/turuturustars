@@ -75,7 +75,7 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
     ref
   ) => {
     return (
-      <div ref={ref} role="region" aria-label="Data table" className="overflow-x-auto">
+      <section ref={ref} aria-label="Data table" className="overflow-x-auto">
         <Table>
           <caption className="sr-only">{caption}</caption>
           
@@ -85,13 +85,7 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
                 <TableHead
                   key={column.id}
                   role="columnheader"
-                  aria-sort={
-                    sortedBy === column.id
-                      ? sortDirection === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
+                  aria-sort={sortedBy === column.id ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
                   className={column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}
                 >
                   {isSortable && column.sortable ? (
@@ -128,21 +122,18 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
               </TableRow>
             ) : (
               data.map((row, index) => (
-                <TableRow key={`${row.id || index}`} role="row">
-                  {columns.map((column) => (
+                <TableRow key={row.id ? String(row.id) : String(index)} role="row">
+                  {columns.map((column) => {
+                    const alignClass = column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : '';
+                    return (
                     <TableCell
-                      key={`${row.id || index}-${column.id}`}
-                      className={
-                        column.align === 'right'
-                          ? 'text-right'
-                          : column.align === 'center'
-                            ? 'text-center'
-                            : ''
-                      }
+                      key={row.id ? `${String(row.id)}-${column.id}` : `${index}-${column.id}`}
+                      className={alignClass}
                     >
                       {row[column.id]}
                     </TableCell>
-                  ))}
+                    );
+                  })}
                   {renderRowActions && (
                     <TableCell>{renderRowActions(row, index)}</TableCell>
                   )}
@@ -151,7 +142,7 @@ export const AccessibleTable = React.forwardRef<HTMLDivElement, AccessibleTableP
             )}
           </TableBody>
         </Table>
-      </div>
+      </section>
     );
   }
 );

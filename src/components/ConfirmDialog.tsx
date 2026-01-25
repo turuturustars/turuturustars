@@ -1,15 +1,15 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface ConfirmDialogProps {
-  open: boolean;
-  title: string;
-  description?: string;
-  action?: string;
-  actionVariant?: 'default' | 'destructive';
-  cancelText?: string;
-  onConfirm: () => void | Promise<void>;
-  onCancel: () => void;
-  isLoading?: boolean;
+  readonly open: boolean;
+  readonly title: string;
+  readonly description?: string;
+  readonly action?: string;
+  readonly actionVariant?: 'default' | 'destructive';
+  readonly cancelText?: string;
+  readonly onConfirm: () => void | Promise<void>;
+  readonly onCancel: () => void;
+  readonly isLoading?: boolean;
 }
 
 export function ConfirmDialog({

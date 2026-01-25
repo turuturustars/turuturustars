@@ -78,7 +78,7 @@ export const AccessibleSelect = React.forwardRef<HTMLSelectElement, AccessibleSe
       onChange?.(e.target.value);
     };
 
-    const describedBy = error ? errorId : helperText ? helperId : undefined;
+    const describedBy = error ? errorId : (helperText ? helperId : undefined);
 
     return (
       <div className={`space-y-2 ${className || ''}`}>

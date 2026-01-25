@@ -129,9 +129,8 @@ export const AccessibleStatus = React.forwardRef<HTMLDivElement, AccessibleStatu
     }
 
     return (
-      <div
+      <output
         ref={ref}
-        role="status"
         aria-live={politeness}
         aria-atomic="true"
         className={`
@@ -149,9 +148,7 @@ export const AccessibleStatus = React.forwardRef<HTMLDivElement, AccessibleStatu
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium break-words">{message}</p>
         </div>
-        {/* Live region announcement container - hidden from view */}
-        <div ref={announceRef} className="sr-only" role="status" aria-live={politeness} />
-      </div>
+      </output>
     );
   }
 );
