@@ -12,6 +12,22 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (CRITICAL - Do not commit!)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Sensitive credentials and files
+.supabase/
+.supabase-secrets
+supabase/.env
+supabase/.env.local
+*.pem
+*.key
+*.crt
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +38,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+Thumbs.db
