@@ -13,13 +13,18 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Core vendor chunks
-          if (id.includes('node_modules/react')) {
+          // Core vendor chunks - ensure React/React-DOM load first
+          if (id.includes('node_modules/react-dom')) {
+            return 'vendor-react-dom';
+          }
+          if (id.includes('node_modules/react') && !id.includes('react-dom')) {
             return 'vendor-react';
           }
+          // Radix-UI depends on React, so it goes in its own chunk
           if (id.includes('node_modules/@radix-ui')) {
             return 'vendor-radix';
           }
+          // Other major vendors
           if (id.includes('node_modules/@supabase')) {
             return 'vendor-supabase';
           }
