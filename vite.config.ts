@@ -12,42 +12,41 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Core vendor chunks - ensure React/React-DOM load first
-          if (id.includes('node_modules/react-dom')) {
-            return 'vendor-react-dom';
-          }
-          if (id.includes('node_modules/react') && !id.includes('react-dom')) {
-            return 'vendor-react';
-          }
-          // Radix-UI depends on React, so it goes in its own chunk
-          if (id.includes('node_modules/@radix-ui')) {
-            return 'vendor-radix';
-          }
-          // Other major vendors
-          if (id.includes('node_modules/@supabase')) {
-            return 'vendor-supabase';
-          }
-          if (id.includes('node_modules/@tanstack')) {
-            return 'vendor-query';
-          }
-          if (id.includes('node_modules/recharts')) {
-            return 'vendor-charts';
-          }
-          
-          // Feature-based chunks for dashboard
-          if (id.includes('pages/dashboard/') && id.includes('Financial')) {
-            return 'dashboard-finance';
-          }
-          if (id.includes('pages/dashboard/') && id.includes(('Members' || 'Approvals' || 'Welfare'))) {
-            return 'dashboard-members';
-          }
-          if (id.includes('pages/dashboard/') && id.includes(('Chairman' || 'Secretary' || 'Treasurer' || 'Organizing' || 'Patron'))) {
-            return 'dashboard-roles';
-          }
-          if (id.includes('components/dashboard/')) {
-            return 'dashboard-components';
-          }
+        manualChunks: {
+          // Consolidate all vendor dependencies into one chunk to avoid circular dependency issues
+          'vendor': [
+            'react',
+            'react-dom',
+            '@radix-ui/react-accordion',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-aspect-ratio',
+            '@radix-ui/react-avatar',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-collapsible',
+            '@radix-ui/react-context-menu',
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-hover-card',
+            '@radix-ui/react-label',
+            '@radix-ui/react-menubar',
+            '@radix-ui/react-navigation-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-progress',
+            '@radix-ui/react-radio-group',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-select',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-toggle',
+            '@radix-ui/react-toggle-group',
+            '@radix-ui/react-tooltip',
+            'recharts',
+            'lucide-react'
+          ]
         }
       }
     },
