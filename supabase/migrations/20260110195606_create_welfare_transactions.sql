@@ -5,7 +5,7 @@ create table if not exists welfare_transactions (
   amount numeric(12, 2) not null,
   transaction_type text not null check (transaction_type in ('contribution', 'refund')),
   mpesa_code text,
-  recorded_by_id uuid not null references users(id),
+  recorded_by_id uuid not null references auth.users(id),
   notes text,
   status text not null check (status in ('completed', 'pending', 'failed')) default 'completed',
   created_at timestamp with time zone default now(),
@@ -34,9 +34,8 @@ create policy "Authorized roles can insert transactions" on welfare_transactions
   for insert with check (
     exists (
       select 1 from user_roles ur
-      join roles r on ur.role_id = r.id
       where ur.user_id = auth.uid()
-      and r.role in ('admin', 'chairperson', 'treasurer')
+      and ur.role in ('admin', 'chairperson', 'treasurer')
     )
   );
 
@@ -45,8 +44,7 @@ create policy "Authorized roles can delete transactions" on welfare_transactions
   for delete using (
     exists (
       select 1 from user_roles ur
-      join roles r on ur.role_id = r.id
       where ur.user_id = auth.uid()
-      and r.role in ('admin', 'chairperson', 'treasurer')
+      and ur.role in ('admin', 'chairperson', 'treasurer')
     )
   );

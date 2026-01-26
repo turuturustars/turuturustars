@@ -24,7 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_meetings_created_by ON meetings(created_by);
 -- Meeting attendance indexes
 CREATE INDEX IF NOT EXISTS idx_meeting_attendance_meeting_id ON meeting_attendance(meeting_id);
 CREATE INDEX IF NOT EXISTS idx_meeting_attendance_member_id ON meeting_attendance(member_id);
-CREATE INDEX IF NOT EXISTS idx_meeting_attendance_status ON meeting_attendance(status);
 
 -- Discipline records indexes
 CREATE INDEX IF NOT EXISTS idx_discipline_records_member_id ON discipline_records(member_id);
@@ -43,9 +42,9 @@ CREATE INDEX IF NOT EXISTS idx_announcements_created_by ON announcements(created
 CREATE INDEX IF NOT EXISTS idx_announcements_created_at ON announcements(created_at DESC);
 
 -- Audit logs indexes
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_performed_by ON audit_logs(performed_by);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_action_type ON audit_logs(action_type);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_entity_type ON audit_logs(entity_type);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
 -- ============================================================================
@@ -122,8 +121,8 @@ CREATE INDEX IF NOT EXISTS idx_meetings_date_status_composite
   ON meetings(status, scheduled_date DESC);
 
 -- Meeting attendance with member participation
-CREATE INDEX IF NOT EXISTS idx_meeting_attendance_member_status_composite 
-  ON meeting_attendance(member_id, status, meeting_id);
+CREATE INDEX IF NOT EXISTS idx_meeting_attendance_member_composite 
+  ON meeting_attendance(member_id, meeting_id);
 
 -- Discipline records for member history
 CREATE INDEX IF NOT EXISTS idx_discipline_records_member_status_composite 

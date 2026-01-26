@@ -96,10 +96,10 @@ ALTER TABLE voting_motions ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMP 
 
 -- Optimize timestamp-based queries for incremental updates
 CREATE INDEX IF NOT EXISTS idx_contributions_updated_at 
-  ON contributions(updated_at DESC) WHERE deleted_at IS NULL;
+  ON contributions(updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_announcements_updated_at 
-  ON announcements(updated_at DESC) WHERE deleted_at IS NULL;
+  ON announcements(updated_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_notifications_updated_at 
   ON notifications(updated_at DESC);
@@ -110,8 +110,8 @@ CREATE INDEX IF NOT EXISTS idx_notifications_read_updated
 CREATE INDEX IF NOT EXISTS idx_messages_created_at 
   ON messages(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_private_messages_read 
-  ON private_messages(read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_private_messages_read_at
+  ON private_messages(read_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_voting_motions_status_updated 
   ON voting_motions(status, status_updated_at DESC);
@@ -131,9 +131,7 @@ CREATE TABLE IF NOT EXISTS realtime_change_log (
   client_id TEXT, -- Client/user making the change
   conflict_resolved BOOLEAN DEFAULT FALSE,
   conflict_strategy TEXT, -- 'remote-wins', 'local-wins', 'merge'
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  
-  CONSTRAINT realtime_change_log_pkey PRIMARY KEY (id)
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_realtime_change_log_table 
@@ -266,4 +264,4 @@ CREATE POLICY "Users can update own notifications"
 GRANT EXECUTE ON FUNCTION log_realtime_change TO authenticated;
 GRANT EXECUTE ON FUNCTION current_user_id TO authenticated;
 GRANT SELECT ON TABLE realtime_change_log TO authenticated;
-GRANT SELECT ON VIEW recent_changes TO authenticated;
+-- GRANT SELECT ON VIEW recent_changes TO authenticated;

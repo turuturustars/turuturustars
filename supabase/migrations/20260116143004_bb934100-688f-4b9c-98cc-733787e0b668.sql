@@ -1,3 +1,11 @@
+-- Create messages table for group chat
+CREATE TABLE public.messages (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  sender_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
+);
+
 -- Create message_reactions table for emoji reactions
 CREATE TABLE public.message_reactions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -38,10 +46,15 @@ CREATE TABLE public.typing_indicators (
 );
 
 -- Enable RLS on all new tables
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.private_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.private_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.typing_indicators ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies for messages
+CREATE POLICY "Users can view all messages" ON public.messages FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Users can create messages" ON public.messages FOR INSERT WITH CHECK (auth.uid() = sender_id);
 
 -- RLS policies for message_reactions
 CREATE POLICY "Users can view all reactions" ON public.message_reactions FOR SELECT USING (auth.uid() IS NOT NULL);
@@ -70,6 +83,7 @@ CREATE POLICY "Users can update their typing indicator" ON public.typing_indicat
 CREATE POLICY "Users can delete their typing indicator" ON public.typing_indicators FOR DELETE USING (auth.uid() = user_id);
 
 -- Enable realtime for new tables
+ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.message_reactions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.private_messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.typing_indicators;

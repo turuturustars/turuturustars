@@ -1,4 +1,4 @@
-project_id = "oxfkntgntgsebxbpfeyh"
+project_id = "mkcgkfzltohxagqvsbqk"
 
 [functions.mpesa]
 verify_jwt = false
