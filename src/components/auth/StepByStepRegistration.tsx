@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { useTurnstile } from '@/hooks/useTurnstile';
 import {
   Loader2,
   MapPin,
@@ -25,6 +26,7 @@ import {
   Trophy,
   ArrowRight,
   TrendingUp,
+  Shield,
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -145,6 +147,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     isStudent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const { token: turnstileToken, error: turnstileError, renderCaptcha, reset: resetCaptcha, remove: removeCaptcha } = useTurnstile();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -179,6 +182,27 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     checkExistingProfile();
   }, [user.id, navigate]);
 
+  // Manage Turnstile widget lifecycle
+  useEffect(() => {
+    if (currentStep === 0) {
+      // First step - render Turnstile
+      const timer = setTimeout(() => {
+        renderCaptcha('turnstile-container').catch(err => {
+          console.error('Failed to render Turnstile:', err);
+          toast({
+            title: 'Security Error',
+            description: 'Failed to load security verification. Please refresh the page.',
+            variant: 'destructive',
+          });
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      // Other steps - remove Turnstile
+      removeCaptcha();
+    }
+  }, [currentStep, renderCaptcha, removeCaptcha, toast]);
+
   const validateStep = (stepId: string): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -188,6 +212,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
         if (formData.phone.length < 10) newErrors.phone = 'Invalid phone number';
         if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
+        // Turnstile token required on first step
+        if (!turnstileToken) newErrors.turnstile = 'Please complete the security verification';
         break;
       case 'location':
         if (!formData.location) newErrors.location = 'Please select a location';
@@ -524,6 +550,31 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Cloudflare Turnstile Captcha */}
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-semibold">Security Verification</Label>
+                    <span className="text-red-500">*</span>
+                  </div>
+                  <div id="turnstile-container" className="flex justify-center py-2" />
+                  {turnstileError && (
+                    <p className="text-xs text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded">
+                      <AlertCircle className="w-3 h-3" />
+                      {turnstileError}
+                    </p>
+                  )}
+                  {!turnstileError && turnstileToken && (
+                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Security verification completed
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    This helps us keep your account secure
+                  </p>
                 </div>
               </div>
             )}
