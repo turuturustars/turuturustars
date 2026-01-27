@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import Auth from '@/pages/Auth';
-import PostAuthDetailsForm from '@/components/auth/PostAuthDetailsForm';
+import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
 
 const AuthFlow = () => {
   const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'details-required'>('loading');
@@ -25,7 +25,7 @@ const AuthFlow = () => {
             .eq('id', session.user.id)
             .single();
 
-          if (profile && profile.full_name && profile.phone && profile.id_number) {
+          if (profile?.full_name && profile?.phone && profile?.id_number) {
             // Profile is complete
             navigate('/dashboard', { replace: true });
           } else {
@@ -56,7 +56,7 @@ const AuthFlow = () => {
           .eq('id', session.user.id)
           .single();
 
-        if (profile && profile.full_name && profile.phone && profile.id_number) {
+        if (profile?.full_name && profile?.phone && profile?.id_number) {
           navigate('/dashboard', { replace: true });
         } else {
           setAuthState('details-required');
@@ -87,7 +87,7 @@ const AuthFlow = () => {
   }
 
   if (authState === 'details-required' && user) {
-    return <PostAuthDetailsForm user={user} />;
+    return <StepByStepRegistration user={user} />;
   }
 
   return <Auth />;
