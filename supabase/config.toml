@@ -2,9 +2,6 @@ project_id = "mkcgkfzltohxagqvsbqk"
 
 [auth]
 site_url = "https://turuturustars.co.ke"
-disable_signup = false
-enable_signup_captcha = true
-captcha_provider = "turnstile"
 
 [functions.mpesa]
 verify_jwt = false

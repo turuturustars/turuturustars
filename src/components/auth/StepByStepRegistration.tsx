@@ -305,6 +305,41 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     setIsSaving(true);
 
     try {
+      // Step 1: Verify Turnstile token with Edge Function
+      if (!turnstileToken) {
+        throw new Error('Security verification token is missing. Please complete the CAPTCHA.');
+      }
+
+      const verifyResponse = await fetch(
+        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: turnstileToken }),
+        }
+      );
+
+      if (!verifyResponse.ok) {
+        throw new Error(`Verification service error: ${verifyResponse.statusText}`);
+      }
+
+      const verificationData = await verifyResponse.json();
+
+      // Check if verification was successful
+      if (!verificationData.success || !verificationData.data?.success) {
+        const errorCodes = verificationData.data?.error_codes || [];
+        const errorMessage = errorCodes.includes('timeout-or-duplicate')
+          ? 'Security verification expired. Please try again.'
+          : errorCodes.includes('invalid-input-response')
+          ? 'Invalid security verification. Please refresh and try again.'
+          : 'Security verification failed. Please try again.';
+
+        throw new Error(errorMessage);
+      }
+
+      // Step 2: Proceed with profile creation only if captcha is verified
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
       const { error } = await supabase
@@ -326,6 +361,9 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
       if (error) throw error;
 
+      // Reset captcha after successful verification
+      resetCaptcha();
+
       toast({
         title: 'Success!',
         description: 'Your profile has been created successfully',
@@ -335,12 +373,22 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         navigate('/dashboard', { replace: true });
       }, 1500);
     } catch (error) {
-      console.error('Error saving profile:', error);
+      console.error('Error during signup:', error);
+
+      // Provide user-friendly error messages
+      let errorDescription = 'Failed to complete signup';
+      if (error instanceof Error) {
+        errorDescription = error.message;
+      }
+
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save profile',
+        title: 'Signup Error',
+        description: errorDescription,
         variant: 'destructive',
       });
+
+      // Reset captcha on error for retry
+      resetCaptcha();
     } finally {
       setIsSaving(false);
     }

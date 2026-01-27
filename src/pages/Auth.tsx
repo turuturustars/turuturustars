@@ -146,12 +146,46 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
+      // Step 1: Verify Turnstile token with Edge Function
+      const verifyResponse = await fetch(
+        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: captchaToken }),
+        }
+      );
+
+      if (!verifyResponse.ok) {
+        throw new Error(`Verification service error: ${verifyResponse.statusText}`);
+      }
+
+      const verificationData = await verifyResponse.json();
+
+      // Check if verification was successful
+      if (!verificationData.success || !verificationData.data?.success) {
+        const errorCodes = verificationData.data?.error_codes || [];
+        const errorMessage = errorCodes.includes('timeout-or-duplicate')
+          ? 'Security verification expired. Please try again.'
+          : errorCodes.includes('invalid-input-response')
+          ? 'Invalid security verification. Please refresh and try again.'
+          : 'Security verification failed. Please try again.';
+
+        toast({
+          title: 'Security Verification Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        resetCaptcha('captcha-container');
+        return;
+      }
+
+      // Step 2: Proceed with login only if captcha is verified
       const { error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
-        options: {
-          captchaToken: captchaToken || undefined,
-        },
       });
 
       if (error) {
@@ -161,13 +195,6 @@ const Auth = () => {
             description: 'Invalid email or password. Please try again.',
             variant: 'destructive',
           });
-        } else if (error.message.includes('captcha')) {
-          toast({
-            title: 'Security Verification Failed',
-            description: 'Please try the captcha again.',
-            variant: 'destructive',
-          });
-          resetCaptcha('captcha-container');
         } else {
           toast({
             title: 'Login Failed',
@@ -175,6 +202,8 @@ const Auth = () => {
             variant: 'destructive',
           });
         }
+        // Reset captcha on login failure for retry
+        resetCaptcha('captcha-container');
       } else {
         toast({
           title: 'Welcome Back!',
@@ -189,6 +218,8 @@ const Auth = () => {
         description: errorMsg,
         variant: 'destructive',
       });
+      // Reset captcha on error for retry
+      resetCaptcha('captcha-container');
     } finally {
       setIsLoading(false);
     }
