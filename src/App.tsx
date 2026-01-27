@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LocalOrganizationSchema } from "@/components/StructuredData";
 import { Logger } from "@/utils/errorHandler";
+import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -103,26 +104,48 @@ const App = () => {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense fallback={<PageLoader />}>
               <Routes>
-                {/* Public routes */}
+                {/* ==================== PUBLIC ROUTES ==================== */}
+                
+                {/* Landing Pages */}
                 <Route path="/" element={<Index />} />
                 <Route path="/home" element={<Home />} />
+                
+                {/* Information Pages */}
                 <Route path="/about" element={<About />} />
                 <Route path="/pillars" element={<Pillars />} />
                 <Route path="/careers" element={<Careers />} />
                 <Route path="/leadership" element={<Leadership />} />
                 <Route path="/benefits" element={<Benefits />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
+                
+                {/* Legal & Support */}
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms-of-service" element={<TermsOfService />} />
                 <Route path="/constitution" element={<Constitution />} />
                 <Route path="/help" element={<Help />} />
                 <Route path="/faq" element={<FAQPage />} />
                 <Route path="/support" element={<Support />} />
+                
+                {/* Auth Routes */}
                 <Route path="/register" element={<Register />} />
-                <Route path="/auth" element={<AuthFlow />} />
-
-                {/* Dashboard routes */}
-                <Route path="/dashboard" element={<DashboardLayout />}>
+                <Route
+                  path="/auth"
+                  element={
+                    <PublicRoute>
+                      <AuthFlow />
+                    </PublicRoute>
+                  }
+                />
+                
+                {/* ==================== PROTECTED DASHBOARD ROUTES ==================== */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                >
                   {/* Default dashboard route */}
                   <Route index element={<Navigate to="home" replace />} />
                   <Route path="home" element={<DashboardHome />} />
@@ -205,7 +228,7 @@ const App = () => {
                   <Route path="approvals" element={<Navigate to="/dashboard/admin-panel/approvals" replace />} />
                 </Route>
 
-                {/* 404 - Not Found */}
+                {/* ==================== ERROR PAGES ==================== */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
