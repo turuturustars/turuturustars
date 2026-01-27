@@ -21,9 +21,14 @@ import {
   BookOpen,
   Home,
   AlertCircle,
+  Sparkles,
+  Trophy,
+  ArrowRight,
+  TrendingUp,
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
+import './RegistrationAnimations.css';
 
 const LOCATIONS = [
   'Turuturu',
@@ -336,12 +341,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background p-4">
-      <div className="w-full max-w-3xl space-y-6">
+      <div className="w-full max-w-3xl space-y-6 card-stagger">
         {/* Progress Section */}
-        <div className="space-y-3">
+        <div className="space-y-3 progress-bar">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-primary engagement-icon" />
                 Welcome to Turuturu Stars
               </h1>
               <p className="text-sm text-muted-foreground mt-1">
@@ -349,7 +355,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-primary">
+              <p className="text-sm font-semibold text-primary flex items-center gap-1 justify-end">
+                <TrendingUp className="w-4 h-4" />
                 Step {currentStep + 1} of {REGISTRATION_STEPS.length}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -357,11 +364,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
               </p>
             </div>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-2 progress-fill" />
         </div>
 
         {/* Steps Navigation */}
-        <div className="hidden md:grid grid-cols-6 gap-2">
+        <div className="hidden md:grid grid-cols-6 gap-2 step-indicators">
           {REGISTRATION_STEPS.map((step, index) => {
             const isCompleted = index < currentStep;
             const isActive = index === currentStep;
@@ -380,7 +387,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
               <button
                 key={step.id}
                 type="button"
-                className="relative transition-all"
+                className={`relative transition-all step-indicator ${isActive ? 'active' : ''}`}
                 onClick={() => {
                   if (index <= currentStep) {
                     setCurrentStep(index);
@@ -403,7 +410,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     className={`p-2 rounded-lg ${iconBgClass}`}
                   >
                     {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4" />
+                      <CheckCircle2 className="w-4 h-4 step-completion-check" />
                     ) : (
                       step.icon
                     )}
@@ -426,10 +433,10 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         </div>
 
         {/* Main Card */}
-        <Card className="shadow-xl">
-          <CardHeader className="space-y-2 pb-4">
+        <Card className="shadow-xl registration-card registration-step-content">
+          <CardHeader className="space-y-2 pb-4 bg-gradient-to-r from-primary/5 to-transparent">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg mt-1">
+              <div className="p-3 bg-primary/10 rounded-lg mt-1 step-badge">
                 {currentStepData.icon}
               </div>
               <div className="flex-1">
@@ -440,7 +447,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   {currentStepData.description}
                 </CardDescription>
                 {!currentStepData.required && (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded">
+                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded tooltip-animation">
                     <Clock className="w-3 h-3" />
                     Optional - You can skip this step
                   </div>
@@ -450,6 +457,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           </CardHeader>
 
           <CardContent className="space-y-6">
+
             {/* Personal Info Step */}
             {currentStepData.id === 'personal-info' && (
               <div className="space-y-5">
@@ -464,7 +472,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     placeholder="e.g., John Doe"
                     value={formData.fullName}
                     onChange={(e) => handleChange('fullName', e.target.value)}
-                    className={errors.fullName ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                    className={`registration-input transition-all ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : ''}`}
                     disabled={isSaving}
                   />
                   {errors.fullName && (
@@ -767,13 +775,21 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         </Card>
 
         {/* Footer Info */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
           <p className="text-xs text-muted-foreground">
-            Fields marked with <span className="text-red-500">*</span> are required
+            Fields marked with <span className="text-red-500 font-bold">*</span> are required
           </p>
           <p className="text-xs text-muted-foreground">
-            You can update any information anytime in your dashboard settings
+            ✨ You can update any information anytime in your dashboard settings
           </p>
+          {currentStep === REGISTRATION_STEPS.length - 1 && (
+            <div className="pt-2">
+              <p className="text-sm font-semibold text-green-600 dark:text-green-400 flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                Almost done! Review and submit to complete registration
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
