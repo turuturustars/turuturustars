@@ -20,6 +20,28 @@ interface ResponseBody {
 }
 
 serve(async (req: Request): Promise<Response> => {
+  // CORS headers for localhost development and production
+  const origin = req.headers.get('origin') || '';
+  const corsHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': 
+      origin.includes('localhost') || 
+      origin.includes('127.0.0.1') ||
+      origin.includes('turuturustars.co.ke')
+        ? origin
+        : 'https://turuturustars.co.ke',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return new Response(
@@ -29,7 +51,7 @@ serve(async (req: Request): Promise<Response> => {
       }),
       {
         status: 405,
-        headers: { 'Content-Type': 'application/json' },
+        headers: corsHeaders,
       }
     );
   }
@@ -47,7 +69,7 @@ serve(async (req: Request): Promise<Response> => {
         }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: corsHeaders,
         }
       );
     }
@@ -62,7 +84,7 @@ serve(async (req: Request): Promise<Response> => {
         }),
         {
           status: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: corsHeaders,
         }
       );
     }
@@ -78,7 +100,7 @@ serve(async (req: Request): Promise<Response> => {
         }),
         {
           status: 500,
-          headers: { 'Content-Type': 'application/json' },
+          headers: corsHeaders,
         }
       );
     }
@@ -110,7 +132,7 @@ serve(async (req: Request): Promise<Response> => {
         }),
         {
           status: 502,
-          headers: { 'Content-Type': 'application/json' },
+          headers: corsHeaders,
         }
       );
     }
@@ -127,7 +149,7 @@ serve(async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify(responseBody), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
     });
   } catch (error) {
     console.error('Unexpected error:', error);
@@ -138,7 +160,7 @@ serve(async (req: Request): Promise<Response> => {
       }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: corsHeaders,
       }
     );
   }
