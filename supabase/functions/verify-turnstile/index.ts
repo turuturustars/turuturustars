@@ -57,11 +57,17 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    // Log the incoming request
+    console.log('Request received:', req);
+
     // Parse request body
     let body: VerificationRequest;
     try {
-      body = await req.json();
-    } catch {
+      const rawBody = await req.text();
+      console.log('Raw Request Body:', rawBody);
+      body = JSON.parse(rawBody);
+    } catch (err) {
+      console.error('Error parsing JSON:', err);
       return new Response(
         JSON.stringify({
           success: false,
@@ -77,6 +83,7 @@ serve(async (req: Request): Promise<Response> => {
     // Validate token is present
     const { token } = body;
     if (!token || typeof token !== 'string' || token.trim() === '') {
+      console.error('Missing or invalid token:', token);
       return new Response(
         JSON.stringify({
           success: false,
@@ -91,6 +98,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Get secret key from environment
     const secretKey = Deno.env.get('TURNSTILE_SECRET_KEY');
+    console.log('TURNSTILE_SECRET_KEY:', secretKey ? 'Loaded' : 'Not Loaded');
     if (!secretKey) {
       console.error('TURNSTILE_SECRET_KEY environment variable not set');
       return new Response(
@@ -120,6 +128,10 @@ serve(async (req: Request): Promise<Response> => {
       }
     );
 
+    // Log Cloudflare response
+    const cloudflareRawResponse = await cloudflareResponse.text();
+    console.log('Cloudflare Raw Response:', cloudflareRawResponse);
+
     // Check if Cloudflare API call was successful
     if (!cloudflareResponse.ok) {
       console.error(
@@ -138,8 +150,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Parse Cloudflare response
-    const cloudflareData: CloudflareResponse =
-      await cloudflareResponse.json();
+    const cloudflareData: CloudflareResponse = JSON.parse(cloudflareRawResponse);
 
     // Return Cloudflare response
     const responseBody: ResponseBody = {
