@@ -38,18 +38,18 @@ const Register = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
-        if (!session?.user) {
-          // Not authenticated - redirect to auth page
-          navigate('/auth', { replace: true });
-          return;
+        if (session?.user) {
+          // User is already authenticated - proceed with profile setup
+          setUser({ id: session.user.id, email: session.user.email });
+          setIsLoading(false);
+        } else {
+          // Not authenticated - redirect to auth page for signup
+          navigate('/auth?mode=signup', { replace: true });
         }
-
-        // User is authenticated
-        setUser({ id: session.user.id, email: session.user.email });
-        setIsLoading(false);
       } catch (error) {
         console.error('Error checking auth:', error);
-        navigate('/auth', { replace: true });
+        // Default to redirecting to auth on error
+        navigate('/auth?mode=signup', { replace: true });
       }
     };
 
@@ -72,19 +72,21 @@ const Register = () => {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Redirecting...</h1>
-          <p className="text-muted-foreground">Please log in first to continue registration.</p>
-        </div>
-      </div>
-    );
+  // If user is authenticated, show profile setup
+  if (user) {
+    return <StepByStepRegistration user={user} />;
   }
 
-  // Return the interactive step-by-step registration
-  return <StepByStepRegistration user={user} />;
+  // Not authenticated - redirect to auth to sign up
+  // useEffect will handle navigation on mount
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Redirecting to sign up...</p>
+      </div>
+    </div>
+  );
 };
 
 export default Register;

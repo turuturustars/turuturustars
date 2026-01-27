@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,7 +38,14 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [signupData, setSignupData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+  });
   const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
+  const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -51,6 +58,11 @@ const Auth = () => {
 
   // Check if already logged in
   useEffect(() => {
+    // Check URL params for signup mode
+    if (searchParams.get('mode') === 'signup') {
+      setIsSignup(true);
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         navigate('/dashboard', { replace: true });
@@ -66,7 +78,7 @@ const Auth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   // Captcha management
   useEffect(() => {
@@ -123,6 +135,121 @@ const Auth = () => {
         description: 'An unexpected error occurred',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validate signup form
+    if (!signupData.email || !signupData.password || !signupData.confirmPassword) {
+      setErrors({
+        email: !signupData.email ? 'Email is required' : '',
+        password: !signupData.password ? 'Password is required' : '',
+        confirmPassword: !signupData.confirmPassword ? 'Please confirm your password' : '',
+      });
+      return;
+    }
+
+    if (signupData.password !== signupData.confirmPassword) {
+      setErrors({ confirmPassword: 'Passwords do not match' });
+      return;
+    }
+
+    if (signupData.password.length < 6) {
+      setErrors({ password: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    // Captcha must be completed
+    if (!captchaToken) {
+      toast({
+        title: 'Security Verification Required',
+        description: 'Please complete the captcha verification',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Step 1: Verify Turnstile token with Edge Function
+      const verifyResponse = await fetch(
+        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token: captchaToken }),
+        }
+      );
+
+      if (!verifyResponse.ok) {
+        throw new Error(`Verification service error: ${verifyResponse.statusText}`);
+      }
+
+      const verificationData = await verifyResponse.json();
+
+      // Check if verification was successful
+      if (!verificationData.success || !verificationData.data?.success) {
+        const errorCodes = verificationData.data?.error_codes || [];
+        const errorMessage = errorCodes.includes('timeout-or-duplicate')
+          ? 'Security verification expired. Please try again.'
+          : 'Security verification failed. Please try again.';
+
+        toast({
+          title: 'Security Verification Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        resetCaptcha('captcha-container');
+        return;
+      }
+
+      // Step 2: Create account
+      const { data, error } = await supabase.auth.signUp({
+        email: signupData.email,
+        password: signupData.password,
+        options: {
+          emailRedirectTo: `${globalThis.location.origin}/register`,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: 'Sign Up Failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+        resetCaptcha('captcha-container');
+        return;
+      }
+
+      if (data.user) {
+        // Account created successfully, redirect to registration profile setup
+        toast({
+          title: 'Account Created!',
+          description: 'Please complete your profile information',
+        });
+
+        // Wait a moment then redirect to registration
+        setTimeout(() => {
+          navigate('/register', { replace: true });
+        }, 1500);
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
+      console.error('Sign up error:', error);
+      toast({
+        title: 'Error',
+        description: errorMsg,
+        variant: 'destructive',
+      });
+      resetCaptcha('captcha-container');
     } finally {
       setIsLoading(false);
     }
@@ -243,117 +370,236 @@ const Auth = () => {
               />
             </div>
             <div>
-              <CardTitle className="heading-display text-2xl">Welcome Back</CardTitle>
+              <CardTitle className="heading-display text-2xl">
+                {isSignup ? 'Create Account' : 'Welcome Back'}
+              </CardTitle>
               <CardDescription className="mt-2">
-                Sign in to access your member dashboard
+                {isSignup 
+                  ? 'Join Turuturu Stars Community today' 
+                  : 'Sign in to access your member dashboard'}
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email Input */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={errors.email ? 'border-destructive' : ''}
-                  autoComplete="email"
-                />
-                {errors.email && (
-                  <p className="text-sm text-destructive">{errors.email}</p>
-                )}
-              </div>
-
-              {/* Password Input */}
-              <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
-                <div className="relative">
+            {isSignup ? (
+              // SIGNUP FORM
+              <form onSubmit={handleSignup} className="space-y-4">
+                {/* Email Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email Address *</Label>
                   <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
-                    autoComplete="current-password"
+                    id="signup-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={signupData.email}
+                    onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
+                    className={errors.email ? 'border-destructive' : ''}
+                    autoComplete="email"
                   />
+                  {errors.email && (
+                    <p className="text-sm text-destructive">{errors.email}</p>
+                  )}
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={signupData.password}
+                      onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                      className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-sm text-destructive">{errors.password}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">At least 6 characters</p>
+                </div>
+
+                {/* Confirm Password Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={signupData.confirmPassword}
+                      onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                      className={errors.confirmPassword ? 'border-destructive pr-10' : 'pr-10'}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.confirmPassword && (
+                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
+                  )}
+                </div>
+
+                {/* Captcha */}
+                <div className="space-y-3 my-4">
+                  <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
+                    <div id="captcha-container" className="flex justify-center w-full"></div>
+                  </div>
+                  
+                  {captchaError && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                      <p className="text-sm text-destructive flex items-center gap-2">
+                        <span className="text-lg">⚠️</span>
+                        {captchaError}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {captchaToken && !captchaError && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-green-700">Security verification complete ✓</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Create Account Button */}
+                <Button
+                  type="submit"
+                  className="btn-primary w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Create Account'
+                  )}
+                </Button>
+              </form>
+            ) : (
+              // LOGIN FORM
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Email Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className={errors.email ? 'border-destructive' : ''}
+                    autoComplete="email"
+                  />
+                  {errors.email && (
+                    <p className="text-sm text-destructive">{errors.email}</p>
+                  )}
+                </div>
+
+                {/* Password Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
+                      autoComplete="current-password"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-sm text-destructive">{errors.password}</p>
+                  )}
+                </div>
+
+                {/* Forgot Password Link */}
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setIsForgotPassword(true)}
+                    className="text-xs text-primary hover:underline transition-colors font-medium"
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    Forgot your password?
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-sm text-destructive">{errors.password}</p>
-                )}
-              </div>
 
-              {/* Forgot Password Link */}
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setIsForgotPassword(true)}
-                  className="text-xs text-primary hover:underline transition-colors font-medium"
-                >
-                  Forgot your password?
-                </button>
-              </div>
-
-              {/* Captcha */}
-              <div className="space-y-3 my-4">
-                <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
-                  <div id="captcha-container" className="flex justify-center w-full"></div>
+                {/* Captcha */}
+                <div className="space-y-3 my-4">
+                  <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
+                    <div id="captcha-container" className="flex justify-center w-full"></div>
+                  </div>
+                  
+                  {captchaError && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                      <p className="text-sm text-destructive flex items-center gap-2">
+                        <span className="text-lg">⚠️</span>
+                        {captchaError}
+                      </p>
+                      <p className="text-xs text-destructive/70 mt-2">
+                        💡 If the problem persists:
+                        <br />
+                        1. Refresh the page
+                        <br />
+                        2. Check your browser's cookies/storage settings
+                        <br />
+                        3. Try a different browser
+                      </p>
+                    </div>
+                  )}
+                  
+                  {captchaToken && !captchaError && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-green-700">Security verification complete ✓</span>
+                    </div>
+                  )}
                 </div>
-                
-                {captchaError && (
-                  <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                    <p className="text-sm text-destructive flex items-center gap-2">
-                      <span className="text-lg">⚠️</span>
-                      {captchaError}
-                    </p>
-                    <p className="text-xs text-destructive/70 mt-2">
-                      💡 If the problem persists:
-                      <br />
-                      1. Refresh the page
-                      <br />
-                      2. Check your browser's cookies/storage settings
-                      <br />
-                      3. Try a different browser
-                    </p>
-                  </div>
-                )}
-                
-                {captchaToken && !captchaError && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <span className="text-sm text-green-700">Security verification complete ✓</span>
-                  </div>
-                )}
-              </div>
 
-              {/* Sign In Button */}
-              <Button
-                type="submit"
-                className="btn-primary w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-            </form>
+                {/* Sign In Button */}
+                <Button
+                  type="submit"
+                  className="btn-primary w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+            )}
 
             {/* Divider */}
             <div className="relative my-6">
@@ -396,23 +642,29 @@ const Auth = () => {
               Continue with Google
             </Button>
 
-            {/* Sign Up Link */}
+            {/* Sign Up / Sign In Toggle Link */}
             <div className="mt-6 text-center space-y-3">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?
+                {isSignup ? 'Already have an account?' : "Don't have an account?"}
               </p>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => navigate('/register')}
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setErrors({});
+                  resetCaptcha('captcha-container');
+                }}
                 disabled={isLoading}
               >
-                Create an Account
+                {isSignup ? 'Sign In' : 'Create an Account'}
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Join Turuturu Stars Community to access member benefits and participate in community activities.
-              </p>
+              {!isSignup && (
+                <p className="text-xs text-muted-foreground">
+                  Join Turuturu Stars Community to access member benefits and participate in community activities.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
