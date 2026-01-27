@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
+import { useCaptcha } from '@/hooks/useCaptcha';
 
 // Location options
 const LOCATIONS = [
@@ -77,6 +78,8 @@ const Auth = () => {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationFailed, setVerificationFailed] = useState(false);
   
+  const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
+  
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -106,8 +109,25 @@ const Auth = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
+
+  // Separate effect for captcha management
+  useEffect(() => {
+    if (isLogin && !isForgotPassword) {
+      // Delay rendering to ensure DOM is ready
+      const timer = setTimeout(() => {
+        renderCaptcha('captcha-container');
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // Clean up captcha when not on login page
+      removeCaptcha('captcha-container');
+    }
+  }, [isLogin, isForgotPassword, renderCaptcha, removeCaptcha]);
 
   const validateForm = () => {
     try {
@@ -260,6 +280,16 @@ const Auth = () => {
       });
       return;
     }
+
+    // For login, captcha must be completed
+    if (isLogin && !captchaToken) {
+      toast({
+        title: 'Captcha Required',
+        description: 'Please complete the captcha verification',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     setIsLoading(true);
 
@@ -268,6 +298,9 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
+          options: {
+            captchaToken: captchaToken || undefined,
+          },
         });
 
         if (error) {
@@ -277,6 +310,13 @@ const Auth = () => {
               description: 'Invalid email or password. Please try again.',
               variant: 'destructive',
             });
+          } else if (error.message.includes('captcha')) {
+            toast({
+              title: 'Captcha Verification Failed',
+              description: 'Please try the captcha again.',
+              variant: 'destructive',
+            });
+            resetCaptcha('captcha-container');
           } else {
             toast({
               title: 'Login Failed',
@@ -304,6 +344,7 @@ const Auth = () => {
               occupation: formData.occupation || null,
               location: finalLocation,
             },
+            captchaToken: captchaToken || undefined,
           },
         });
 
@@ -315,6 +356,12 @@ const Auth = () => {
               variant: 'destructive',
             });
             setIsLogin(true);
+          } else if (error.message.includes('captcha')) {
+            toast({
+              title: 'Captcha Verification Failed',
+              description: 'Please try the captcha again.',
+              variant: 'destructive',
+            });
           } else {
             toast({
               title: 'Registration Failed',
@@ -659,6 +706,40 @@ const Auth = () => {
                 >
                   Forgot Password?
                 </button>
+              </div>
+            )}
+
+            {/* Captcha (Login only) */}
+            {isLogin && (
+              <div className="space-y-3 my-4">
+                <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
+                  <div id="captcha-container" className="flex justify-center w-full"></div>
+                </div>
+                
+                {captchaError && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                    <p className="text-sm text-destructive flex items-center gap-2">
+                      <span className="text-lg">⚠️</span>
+                      {captchaError}
+                    </p>
+                    <p className="text-xs text-destructive/70 mt-2">
+                      💡 If the problem persists:
+                      <br />
+                      1. Refresh the page
+                      <br />
+                      2. Check your browser's cookies/storage settings
+                      <br />
+                      3. Try a different browser
+                    </p>
+                  </div>
+                )}
+                
+                {captchaToken && !captchaError && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-sm text-green-700">Security verification complete ✓</span>
+                  </div>
+                )}
               </div>
             )}
 
