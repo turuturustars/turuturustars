@@ -140,6 +140,7 @@ const Auth = () => {
     }
   };
 
+  // Removed captcha from signup flow
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -163,54 +164,10 @@ const Auth = () => {
       return;
     }
 
-    // Captcha must be completed
-    if (!captchaToken) {
-      toast({
-        title: 'Security Verification Required',
-        description: 'Please complete the captcha verification',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
-      // Step 1: Verify Turnstile token with Edge Function
-      const verifyResponse = await fetch(
-        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: captchaToken }),
-        }
-      );
-
-      if (!verifyResponse.ok) {
-        throw new Error(`Verification service error: ${verifyResponse.statusText}`);
-      }
-
-      const verificationData = await verifyResponse.json();
-
-      // Check if verification was successful
-      if (!verificationData.success || !verificationData.data?.success) {
-        const errorCodes = verificationData.data?.error_codes || [];
-        const errorMessage = errorCodes.includes('timeout-or-duplicate')
-          ? 'Security verification expired. Please try again.'
-          : 'Security verification failed. Please try again.';
-
-        toast({
-          title: 'Security Verification Failed',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-        resetCaptcha('captcha-container');
-        return;
-      }
-
-      // Step 2: Create account
+      // Step 1: Create account
       const { data, error } = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
@@ -225,7 +182,6 @@ const Auth = () => {
           description: error.message,
           variant: 'destructive',
         });
-        resetCaptcha('captcha-container');
         return;
       }
 
@@ -249,15 +205,15 @@ const Auth = () => {
         description: errorMsg,
         variant: 'destructive',
       });
-      resetCaptcha('captcha-container');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Ensure captcha is only used for login
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
 
     // Captcha must be completed for login
@@ -269,7 +225,7 @@ const Auth = () => {
       });
       return;
     }
-    
+
     setIsLoading(true);
 
     try {
@@ -309,44 +265,37 @@ const Auth = () => {
         return;
       }
 
-      // Step 2: Proceed with login only if captcha is verified
-      const { error } = await supabase.auth.signInWithPassword({
+      // Step 2: Log in user
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
       });
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast({
-            title: 'Login Failed',
-            description: 'Invalid email or password. Please try again.',
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Login Failed',
-            description: error.message,
-            variant: 'destructive',
-          });
-        }
-        // Reset captcha on login failure for retry
-        resetCaptcha('captcha-container');
-      } else {
         toast({
-          title: 'Welcome Back!',
-          description: 'You have been signed in successfully.',
+          title: 'Login Failed',
+          description: error.message,
+          variant: 'destructive',
         });
+        resetCaptcha('captcha-container');
+        return;
+      }
+
+      if (data.user) {
+        toast({
+          title: 'Login Successful',
+          description: 'Welcome back!',
+        });
+        navigate('/dashboard', { replace: true });
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
-      console.error('Authentication error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
+      console.error('Login error:', error);
       toast({
         title: 'Error',
         description: errorMsg,
         variant: 'destructive',
       });
-      // Reset captcha on error for retry
-      resetCaptcha('captcha-container');
     } finally {
       setIsLoading(false);
     }
@@ -451,29 +400,6 @@ const Auth = () => {
                   </div>
                   {errors.confirmPassword && (
                     <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                  )}
-                </div>
-
-                {/* Captcha */}
-                <div className="space-y-3 my-4">
-                  <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
-                    <div id="captcha-container" className="flex justify-center w-full"></div>
-                  </div>
-                  
-                  {captchaError && (
-                    <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-                      <p className="text-sm text-destructive flex items-center gap-2">
-                        <span className="text-lg">⚠️</span>
-                        {captchaError}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {captchaToken && !captchaError && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-green-700">Security verification complete ✓</span>
-                    </div>
                   )}
                 </div>
 
