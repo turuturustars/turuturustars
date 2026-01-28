@@ -520,7 +520,7 @@ const Auth = () => {
                     </div>
                   )}
                 </div>
-                */
+                */}
 
                 {/* Sign In Button */}
                 <Button
