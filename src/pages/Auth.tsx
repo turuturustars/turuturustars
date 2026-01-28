@@ -11,7 +11,9 @@ import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
+/* Captcha integration (disabled for now)
 import { useCaptcha } from '@/hooks/useCaptcha';
+*/
 
 // Login schema only
 const loginSchema = z.object({
@@ -44,7 +46,9 @@ const Auth = () => {
     password: '',
     confirmPassword: '',
   });
+  /* Captcha integration (temporarily commented out)
   const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
+  */
   const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
@@ -80,7 +84,7 @@ const Auth = () => {
     };
   }, [navigate, searchParams]);
 
-  // Captcha management
+  /* Captcha management (disabled)
   useEffect(() => {
     if (!isForgotPassword) {
       const timer = setTimeout(() => {
@@ -91,6 +95,7 @@ const Auth = () => {
       removeCaptcha('captcha-container');
     }
   }, [isForgotPassword, renderCaptcha, removeCaptcha]);
+  */
 
   const validateForm = () => {
     try {
@@ -168,15 +173,18 @@ const Auth = () => {
 
     try {
       // Step 1: Create account
-      const { data, error } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
-        options: {
-          emailRedirectTo: `${globalThis.location.origin}/register`,
+      const { data, error } = await supabase.auth.signUp(
+        {
+          email: signupData.email,
+          password: signupData.password,
         },
-      });
+        {
+          redirectTo: `${globalThis.location.origin}/register`,
+        }
+      );
 
       if (error) {
+        console.error('Supabase auth.signUp error:', error);
         toast({
           title: 'Sign Up Failed',
           description: error.message,
@@ -216,6 +224,7 @@ const Auth = () => {
 
     if (!validateForm()) return;
 
+    /* Captcha check for login (disabled)
     // Captcha must be completed for login
     if (!captchaToken) {
       toast({
@@ -225,10 +234,12 @@ const Auth = () => {
       });
       return;
     }
+    */
 
     setIsLoading(true);
 
     try {
+      /* Turnstile verification (disabled)
       // Step 1: Verify Turnstile token with Edge Function
       const verifyResponse = await fetch(
         'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
@@ -264,6 +275,7 @@ const Auth = () => {
         resetCaptcha('captcha-container');
         return;
       }
+      */
 
       // Step 2: Log in user
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -477,7 +489,7 @@ const Auth = () => {
                   </button>
                 </div>
 
-                {/* Captcha */}
+                {/* Captcha UI (disabled)
                 <div className="space-y-3 my-4">
                   <div className="flex justify-center p-4 bg-card border border-border rounded-lg">
                     <div id="captcha-container" className="flex justify-center w-full"></div>
@@ -508,6 +520,7 @@ const Auth = () => {
                     </div>
                   )}
                 </div>
+                */
 
                 {/* Sign In Button */}
                 <Button

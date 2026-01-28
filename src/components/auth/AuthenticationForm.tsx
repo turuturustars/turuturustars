@@ -129,6 +129,7 @@ const AuthenticationForm = ({
     confirmPassword: '',
   });
 
+  /* Turnstile captcha state (disabled)
   // Turnstile captcha state
   const [turnstile, setTurnstile] = useState<TurnstileState>({
     token: null,
@@ -140,14 +141,14 @@ const AuthenticationForm = ({
   // Refs
   const turnstileContainerRef = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
+  */
 
   // =========================================================================
   // TURNSTILE MANAGEMENT
   // =========================================================================
 
-  /**
-   * Load Turnstile script from CDN
-   */
+  /*
+  Load Turnstile script from CDN (disabled)
   const loadTurnstileScript = useCallback(() => {
     if (scriptLoadedRef.current || window.turnstile) {
       return;
@@ -171,10 +172,10 @@ const AuthenticationForm = ({
     };
     document.head.appendChild(script);
   }, []);
+  */
 
-  /**
-   * Render Turnstile widget
-   */
+  /*
+  Render Turnstile widget (disabled)
   const renderTurnstile = useCallback(async () => {
     if (!turnstileContainerRef.current) return;
 
@@ -267,10 +268,9 @@ const AuthenticationForm = ({
       }));
     }
   }, [turnstile.widgetId]);
+  */
 
-  /**
-   * Reset Turnstile widget
-   */
+  /* Reset Turnstile widget (disabled)
   const resetTurnstile = useCallback(() => {
     if (!window.turnstile || !turnstile.widgetId) return;
 
@@ -284,10 +284,9 @@ const AuthenticationForm = ({
       console.error('Error resetting Turnstile:', err);
     }
   }, [turnstile.widgetId]);
+  */
 
-  /**
-   * Remove Turnstile widget
-   */
+  /* Remove Turnstile widget (disabled)
   const removeTurnstile = useCallback(() => {
     if (!window.turnstile || !turnstile.widgetId) return;
 
@@ -303,6 +302,7 @@ const AuthenticationForm = ({
       console.error('Error removing Turnstile:', err);
     }
   }, [turnstile.widgetId]);
+  */
 
   // =========================================================================
   // LIFECYCLE EFFECTS
@@ -311,13 +311,16 @@ const AuthenticationForm = ({
   /**
    * Load Turnstile script on mount
    */
+  /* Load Turnstile script on mount (disabled)
   useEffect(() => {
     loadTurnstileScript();
   }, [loadTurnstileScript]);
+  */
 
   /**
    * Render/remove Turnstile when mode changes
    */
+  /* Render/remove Turnstile when mode changes (disabled)
   useEffect(() => {
     if (mode === 'signup') {
       renderTurnstile();
@@ -325,6 +328,7 @@ const AuthenticationForm = ({
       removeTurnstile();
     }
   }, [mode, renderTurnstile, removeTurnstile]);
+  */
 
   /**
    * Check if already authenticated
@@ -387,6 +391,7 @@ const AuthenticationForm = ({
   /**
    * Verify Turnstile token with backend
    */
+  /* Verify Turnstile token with backend (disabled)
   const verifyTurnstileToken = async (token: string): Promise<boolean> => {
     if (token === 'unsupported') {
       console.warn('Proceeding without Turnstile verification');
@@ -416,6 +421,7 @@ const AuthenticationForm = ({
       return false;
     }
   };
+  */
 
   /**
    * Handle login submission
@@ -486,18 +492,7 @@ const AuthenticationForm = ({
 
     if (!validateSignup()) return;
 
-    // Verify captcha
-    if (!turnstile.token) {
-      setErrors({ captcha: 'Please complete the security verification' });
-      return;
-    }
-
-    const isTokenValid = await verifyTurnstileToken(turnstile.token);
-    if (!isTokenValid) {
-      setErrors({ captcha: 'Security verification failed. Please try again.' });
-      resetTurnstile();
-      return;
-    }
+    // Signup does not require captcha; create account directly
 
     setIsLoading(true);
 
@@ -509,6 +504,7 @@ const AuthenticationForm = ({
       });
 
       if (authError) {
+        console.error('Supabase auth.signUp error:', authError);
         if (authError.message.includes('User already registered')) {
           setErrors({ submit: 'This email is already registered. Please log in instead.' });
         } else {

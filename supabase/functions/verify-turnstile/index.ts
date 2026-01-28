@@ -19,6 +19,8 @@ interface ResponseBody {
   error?: string;
 }
 
+/*
+Original Turnstile verification implementation (commented out for now).
 serve(async (req: Request): Promise<Response> => {
   // CORS headers for localhost development and production
   const origin = req.headers.get('origin') || '';
@@ -175,4 +177,20 @@ serve(async (req: Request): Promise<Response> => {
       }
     );
   }
+});
+*/
+
+// Temporary stubbed handler: Turnstile verification is commented out above.
+// Returns OK so clients don't receive 401/500 while captcha is disabled.
+serve(() => {
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': 'https://turuturustars.co.ke',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  });
+  return new Response(JSON.stringify({ success: true, data: { success: true } }), {
+    status: 200,
+    headers,
+  });
 });
