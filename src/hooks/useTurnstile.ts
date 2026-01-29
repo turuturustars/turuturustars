@@ -44,12 +44,25 @@ interface TurnstileOptions {
  * @returns Object with methods to manage Turnstile widget
  */
 export const useTurnstile = () => {
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const widgetIdRef = useRef<string | null>(null);
-  const containerIdRef = useRef<string | null>(null);
-  const isScriptLoadedRef = useRef(false);
+  // Turnstile integration is currently disabled and preserved for future re-enable.
+  // The original implementation has been commented out in this file for reference.
+  // Provide a safe no-op placeholder API so existing components don't break.
+
+  const token = null as string | null;
+  const isLoading = false;
+  const error = null as string | null;
+  const renderCaptcha = async (_containerId?: string, _options?: Partial<TurnstileOptions>) => {
+    // no-op placeholder
+    return;
+  };
+  const reset = () => {
+    // no-op placeholder
+  };
+  const remove = () => {
+    // no-op placeholder
+  };
+  const getToken = () => null as string | null;
+  const isExpired = () => false;
 
   /**
    * Waits for Turnstile script to be available
