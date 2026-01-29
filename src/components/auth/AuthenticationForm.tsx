@@ -561,7 +561,8 @@ const AuthenticationForm = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          // Redirect back to auth flow so we can check profile completion
+          redirectTo: `${window.location.origin}/auth`,
         },
       });
 

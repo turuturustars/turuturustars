@@ -128,7 +128,8 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${globalThis.location.origin}/dashboard`,
+          // Redirect back to auth flow so profile completion can be enforced
+          redirectTo: `${globalThis.location.origin}/auth`,
         },
       });
 
