@@ -143,6 +143,13 @@ const AuthenticationForm = ({
   const scriptLoadedRef = useRef(false);
   */
 
+  // Placeholders while Turnstile is disabled to avoid ReferenceErrors
+  const loadTurnstileScript = () => {};
+  const renderTurnstile = (_el?: HTMLElement) => '' as string;
+  const resetTurnstile = () => {};
+  const removeTurnstile = () => {};
+  const verifyTurnstileToken = async (_token: string): Promise<boolean> => true;
+
   // =========================================================================
   // TURNSTILE MANAGEMENT
   // =========================================================================
@@ -520,28 +527,8 @@ const AuthenticationForm = ({
         return;
       }
 
-      // Create profile with RLS headers
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: signupData.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          // Don't fail signup if profile creation fails - user can complete it later
-          if (!profileError.message.includes('Row Level Security')) {
-            setErrors({ submit: 'Account created but profile setup failed. Please contact support.' });
-          }
-        }
-      }
+      // Profile is created by the DB trigger on auth.user creation.
+      // Avoid inserting here to prevent conflicts when trigger runs.
 
       toast({
         title: 'Welcome!',

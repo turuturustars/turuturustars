@@ -47,8 +47,14 @@ const Auth = () => {
     confirmPassword: '',
   });
   /* Captcha integration (temporarily commented out)
-  const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
-  */
+    const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
+    */
+  // Placeholders while captcha is disabled to avoid ReferenceErrors
+  const captchaToken = null as string | null;
+  const renderCaptcha = (_containerId?: string) => {};
+  const resetCaptcha = (_containerId?: string) => {};
+  const removeCaptcha = (_containerId?: string) => {};
+  const captchaError = null as string | null;
   const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
