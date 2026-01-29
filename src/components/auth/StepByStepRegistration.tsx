@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useTurnstile } from '@/hooks/useTurnstile';
+// Turnstile / CAPTCHA disabled — the hook implementation is preserved but the integration is turned off.
 import {
   Loader2,
   MapPin,
@@ -147,7 +147,12 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     isStudent: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { token: turnstileToken, error: turnstileError, renderCaptcha, reset: resetCaptcha, remove: removeCaptcha } = useTurnstile();
+  // Placeholders while CAPTCHA/Turnstile is disabled
+  const turnstileToken = null as string | null;
+  const turnstileError = null as string | null;
+  const renderCaptcha = async (_containerId?: string) => {};
+  const resetCaptcha = () => {};
+  const removeCaptcha = () => {};
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -182,26 +187,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     checkExistingProfile();
   }, [user.id, navigate]);
 
-  // Manage Turnstile widget lifecycle
-  useEffect(() => {
-    if (currentStep === 0) {
-      // First step - render Turnstile
-      const timer = setTimeout(() => {
-        renderCaptcha('turnstile-container').catch(err => {
-          console.error('Failed to render Turnstile:', err);
-          toast({
-            title: 'Security Error',
-            description: 'Failed to load security verification. Please refresh the page.',
-            variant: 'destructive',
-          });
-        });
-      }, 100);
-      return () => clearTimeout(timer);
-    } else {
-      // Other steps - remove Turnstile
-      removeCaptcha();
-    }
-  }, [currentStep, renderCaptcha, removeCaptcha, toast]);
+  // Turnstile lifecycle code is disabled while CAPTCHA is turned off.
+  // Original behavior: render CAPTCHA on step 0 and remove on other steps.
 
   const validateStep = (stepId: string): boolean => {
     const newErrors: Record<string, string> = {};
@@ -212,8 +199,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
         if (formData.phone.length < 10) newErrors.phone = 'Invalid phone number';
         if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
-        // Turnstile token required on first step
-        if (!turnstileToken) newErrors.turnstile = 'Please complete the security verification';
+        // Turnstile token required on first step (disabled)
+        // if (!turnstileToken) newErrors.turnstile = 'Please complete the security verification';
         break;
       case 'location':
         if (!formData.location) newErrors.location = 'Please select a location';
@@ -305,39 +292,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     setIsSaving(true);
 
     try {
-      // Step 1: Verify Turnstile token with Edge Function
-      if (!turnstileToken) {
-        throw new Error('Security verification token is missing. Please complete the CAPTCHA.');
-      }
-
-      const verifyResponse = await fetch(
-        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token: turnstileToken }),
-        }
-      );
-
-      if (!verifyResponse.ok) {
-        throw new Error(`Verification service error: ${verifyResponse.statusText}`);
-      }
-
-      const verificationData = await verifyResponse.json();
-
-      // Check if verification was successful
-      if (!verificationData.success || !verificationData.data?.success) {
-        const errorCodes = verificationData.data?.error_codes || [];
-        const errorMessage = errorCodes.includes('timeout-or-duplicate')
-          ? 'Security verification expired. Please try again.'
-          : errorCodes.includes('invalid-input-response')
-          ? 'Invalid security verification. Please refresh and try again.'
-          : 'Security verification failed. Please try again.';
-
-        throw new Error(errorMessage);
-      }
+      // CAPTCHA verification is currently disabled — skip Turnstile verification step.
+      // If you re-enable Turnstile, restore the POST to /functions/v1/verify-turnstile here.
 
       // Step 2: Proceed with profile creation only if captcha is verified
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
@@ -361,7 +317,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
       if (error) throw error;
 
-      // Reset captcha after successful verification
+      // Reset captcha (no-op placeholder)
       resetCaptcha();
 
       toast({
