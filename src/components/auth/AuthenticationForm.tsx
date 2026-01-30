@@ -540,6 +540,19 @@ const AuthenticationForm = ({
       resetTurnstile();
       setMode('login');
 
+      // If a user ID was returned, wait briefly for the profile row (DB trigger)
+      try {
+        if (authData.user?.id) {
+          // import is static at top; use dynamic import to avoid circular issues in some setups
+          const { waitForProfile } = await import('@/utils/waitForProfile');
+          await waitForProfile(authData.user.id, 5, 400);
+        }
+      } catch (e) {
+        // ignore polling failures; user will be able to complete profile on /register
+        // eslint-disable-next-line no-console
+        console.warn('Profile polling after signup failed', e);
+      }
+
       if (onSuccess) {
         onSuccess();
       }

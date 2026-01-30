@@ -139,9 +139,9 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
     try {
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
+      const { data, error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
+        'profiles',
+        {
           id: user.id,
           full_name: formData.fullName,
           phone: formData.phone,
@@ -150,9 +150,11 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
           location: finalLocation,
           email: user.email,
           status: 'pending',
-        }, {
-          onConflict: 'id'
-        });
+        },
+        { onConflict: 'id' },
+        3,
+        300
+      );
 
       if (error) throw error;
 

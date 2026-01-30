@@ -58,9 +58,14 @@ export const useStepRegistration = () => {
         }
       });
 
-      const { error: upsertError } = await supabase
-        .from('profiles')
-        .upsert(profileData, { onConflict: 'id' });
+      // Use retryUpsert to handle transient failures and DB trigger race conditions
+      const { data, error: upsertError } = await (await import('@/utils/supabaseRetry')).retryUpsert(
+        'profiles',
+        profileData,
+        { onConflict: 'id' },
+        3,
+        300
+      );
 
       if (upsertError) throw upsertError;
 

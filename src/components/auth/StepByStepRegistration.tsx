@@ -298,9 +298,10 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
       // Step 2: Proceed with profile creation only if captcha is verified
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
+      // Use retryUpsert to tolerate transient failures and reduce trigger race conditions
+      const { data, error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
+        'profiles',
+        {
           id: user.id,
           full_name: formData.fullName,
           phone: formData.phone,
@@ -311,9 +312,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           is_student: formData.isStudent,
           status: 'pending',
           updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'id'
-        });
+        },
+        { onConflict: 'id' },
+        3,
+        300
+      );
 
       if (error) throw error;
 

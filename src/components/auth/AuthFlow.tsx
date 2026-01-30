@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import Auth from '@/pages/Auth';
 import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
+import { waitForProfile } from '@/utils/waitForProfile';
 
 const AuthFlow = () => {
   const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'details-required'>('loading');
@@ -19,13 +20,11 @@ const AuthFlow = () => {
         if (session?.user) {
           // User is authenticated, check if profile is complete
           setUser({ id: session.user.id, email: session.user.email });
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
 
-          if (profile?.full_name && profile?.phone && profile?.id_number) {
+          // Attempt to read profile; wait briefly for trigger-created profiles
+          const profile = await waitForProfile(session.user.id, 5, 400);
+
+          if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
             // Profile is complete
             navigate('/dashboard', { replace: true });
           } else {
@@ -46,17 +45,13 @@ const AuthFlow = () => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
         setUser({ id: session.user.id, email: session.user.email });
         
-        // Check profile completion
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // Check profile completion (wait briefly for DB trigger if needed)
+        const profile = await waitForProfile(session.user.id, 5, 400);
 
-        if (profile?.full_name && profile?.phone && profile?.id_number) {
+        if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
           navigate('/dashboard', { replace: true });
         } else {
           setAuthState('details-required');

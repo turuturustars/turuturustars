@@ -208,9 +208,19 @@ const Auth = () => {
         });
 
         // Wait a moment then redirect to registration
-        setTimeout(() => {
-          navigate('/register', { replace: true });
-        }, 1500);
+        // Try to wait briefly for a profile row created by DB trigger, then redirect
+        (async () => {
+          try {
+            const { waitForProfile } = await import('@/utils/waitForProfile');
+            await waitForProfile(data.user.id, 5, 400);
+          } catch (e) {
+            // ignore
+          } finally {
+            setTimeout(() => {
+              navigate('/register', { replace: true });
+            }, 700);
+          }
+        })();
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
