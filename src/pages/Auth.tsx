@@ -186,7 +186,8 @@ const Auth = () => {
           password: signupData.password,
         },
         {
-          redirectTo: `${globalThis.location.origin}/register`,
+          // Ensure the user returns to auth flow after email confirmation
+          redirectTo: `${globalThis.location.origin}/auth?mode=complete-profile`,
         }
       );
 
@@ -201,26 +202,40 @@ const Auth = () => {
       }
 
       if (data.user) {
-        // Account created successfully, redirect to registration profile setup
+        // Account created successfully with an immediate session (some providers/browser combos)
         toast({
           title: 'Account Created!',
           description: 'Please complete your profile information',
         });
 
-        // Wait a moment then redirect to registration
         // Try to wait briefly for a profile row created by DB trigger, then redirect
         (async () => {
           try {
             const { waitForProfile } = await import('@/utils/waitForProfile');
-            await waitForProfile(data.user.id, 5, 400);
+            await waitForProfile(data.user.id, 6, 400);
           } catch (e) {
-            // ignore
+            // ignore polling failures
           } finally {
             setTimeout(() => {
               navigate('/register', { replace: true });
             }, 700);
           }
         })();
+      } else {
+        // No immediate session returned (email confirmation required).
+        // Persist pending signup data so we can complete profile after email confirmation.
+        try {
+          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now() }));
+        } catch (e) {
+          // ignore storage errors
+        }
+
+        toast({
+          title: 'Account Created — Confirm Email',
+          description: 'Check your email and follow the confirmation link. After confirming, return to Sign In to complete your profile.',
+        });
+        // Switch to login mode
+        setIsSignup(false);
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';

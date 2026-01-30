@@ -505,10 +505,16 @@ const AuthenticationForm = ({
 
     try {
       // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
-      });
+      const { data: authData, error: authError } = await supabase.auth.signUp(
+        {
+          email: signupData.email,
+          password: signupData.password,
+        },
+        {
+          // Keep signup redirect consistent with other auth flows
+          redirectTo: `${window.location.origin}/auth?mode=complete-profile`,
+        }
+      );
 
       if (authError) {
         console.error('Supabase auth.signUp error:', authError);
@@ -522,35 +528,43 @@ const AuthenticationForm = ({
       }
 
       if (!authData.user) {
-        setErrors({ submit: 'Signup failed. Please try again.' });
-        resetTurnstile();
-        return;
-      }
-
-      // Profile is created by the DB trigger on auth.user creation.
-      // Avoid inserting here to prevent conflicts when trigger runs.
-
-      toast({
-        title: 'Welcome!',
-        description: 'Your account has been created. Please check your email to confirm your account.',
-      });
-
-      // Reset form and switch to login
-      setSignupData({ email: '', password: '', confirmPassword: '' });
-      resetTurnstile();
-      setMode('login');
-
-      // If a user ID was returned, wait briefly for the profile row (DB trigger)
-      try {
-        if (authData.user?.id) {
-          // import is static at top; use dynamic import to avoid circular issues in some setups
-          const { waitForProfile } = await import('@/utils/waitForProfile');
-          await waitForProfile(authData.user.id, 5, 400);
+        // No session returned — email confirmation required. Persist pending signup.
+        try {
+          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now() }));
+        } catch (e) {
+          // ignore
         }
-      } catch (e) {
-        // ignore polling failures; user will be able to complete profile on /register
-        // eslint-disable-next-line no-console
-        console.warn('Profile polling after signup failed', e);
+
+        toast({
+          title: 'Account Created — Confirm Email',
+          description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.',
+        });
+
+        // Reset form and switch to login
+        setSignupData({ email: '', password: '', confirmPassword: '' });
+        resetTurnstile();
+        setMode('login');
+
+        // do not attempt profile polling since no user session was returned
+      } else {
+        // Immediate session present — try to wait for trigger-created profile then route
+        toast({
+          title: 'Welcome!',
+          description: 'Your account has been created. Please complete your profile.',
+        });
+        setSignupData({ email: '', password: '', confirmPassword: '' });
+        resetTurnstile();
+        setMode('login');
+
+        try {
+          if (authData.user?.id) {
+            const { waitForProfile } = await import('@/utils/waitForProfile');
+            await waitForProfile(authData.user.id, 6, 400);
+          }
+        } catch (e) {
+          // ignore
+          console.warn('Profile polling after signup failed', e);
+        }
       }
 
       if (onSuccess) {
