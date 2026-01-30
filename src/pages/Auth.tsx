@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { generateRequestId } from '@/utils/requestId';
 import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
@@ -192,10 +193,11 @@ const Auth = () => {
       );
 
       if (error) {
-        console.error('Supabase auth.signUp error:', error);
+        const requestId = generateRequestId();
+        console.error('Supabase auth.signUp error:', { requestId, error });
         toast({
           title: 'Sign Up Failed',
-          description: error.message,
+          description: `${error.message} (ref: ${requestId})`,
           variant: 'destructive',
         });
         return;
@@ -210,22 +212,55 @@ const Auth = () => {
 
         // Try to wait briefly for a profile row created by DB trigger, then redirect
         (async () => {
-          try {
-            const { waitForProfile } = await import('@/utils/waitForProfile');
-            await waitForProfile(data.user.id, 6, 400);
-          } catch (e) {
-            // ignore polling failures
-          } finally {
-            setTimeout(() => {
-              navigate('/register', { replace: true });
-            }, 700);
-          }
+            try {
+              const { waitForProfile } = await import('@/utils/waitForProfile');
+              const profile = await waitForProfile(data.user.id, 6, 400, {
+                onAttempt: (attempt, delayMs) => console.debug(`waitForProfile attempt ${attempt}, next delay ${delayMs}ms`),
+              });
+
+              if (!profile) {
+                try {
+                  const { completeProfileViaBackend } = await import('@/utils/completeProfile');
+                  const email = data.user.email ?? (() => {
+                    try {
+                      const pending = localStorage.getItem('pendingSignup');
+                      if (pending) return JSON.parse(pending)?.email;
+                    } catch (e) {}
+                    return null;
+                  })();
+                  const pending = (() => {
+                    try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
+                  })();
+                  const requestId = pending?.requestId || generateRequestId();
+                  if (email) {
+                    try {
+                      await completeProfileViaBackend(email, undefined, requestId);
+                      toast({ title: 'Profile created', description: 'Your profile was created successfully.' });
+                      try { localStorage.removeItem('pendingSignup'); } catch (e) {}
+                    } catch (e) {
+                      console.warn('completeProfileViaBackend fallback failed', e);
+                      toast({ title: 'Profile creation pending', description: 'We will retry automatically. If the issue persists, contact support.', variant: 'destructive' });
+                    }
+                  }
+                } catch (e) {
+                  console.warn('completeProfileViaBackend fallback failed', e);
+                }
+              }
+            } catch (e) {
+              // ignore polling failures but log for telemetry
+              console.warn('Profile polling after signup failed', e);
+            } finally {
+              setTimeout(() => {
+                navigate('/register', { replace: true });
+              }, 700);
+            }
         })();
       } else {
         // No immediate session returned (email confirmation required).
         // Persist pending signup data so we can complete profile after email confirmation.
         try {
-          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now() }));
+          const requestId = generateRequestId();
+          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now(), requestId }));
         } catch (e) {
           // ignore storage errors
         }

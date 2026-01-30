@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { generateRequestId } from '@/utils/requestId';
 import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle, Mail, Lock } from 'lucide-react';
 import { z } from 'zod';
 
@@ -517,20 +518,22 @@ const AuthenticationForm = ({
       );
 
       if (authError) {
-        console.error('Supabase auth.signUp error:', authError);
+        const requestId = generateRequestId();
+        console.error('Supabase auth.signUp error:', { requestId, error: authError });
         if (authError.message.includes('User already registered')) {
           setErrors({ submit: 'This email is already registered. Please log in instead.' });
         } else {
-          setErrors({ submit: authError.message || 'Signup failed. Please try again.' });
+          setErrors({ submit: authError.message || `Signup failed. Please try again. (${requestId})` });
         }
         resetTurnstile();
         return;
       }
 
       if (!authData.user) {
-        // No session returned — email confirmation required. Persist pending signup.
+        // No session returned — email confirmation required. Persist pending signup with a request id.
         try {
-          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now() }));
+          const requestId = generateRequestId();
+          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now(), requestId }));
         } catch (e) {
           // ignore
         }
@@ -559,10 +562,36 @@ const AuthenticationForm = ({
         try {
           if (authData.user?.id) {
             const { waitForProfile } = await import('@/utils/waitForProfile');
-            await waitForProfile(authData.user.id, 6, 400);
+            const profile = await waitForProfile(authData.user.id, 6, 400, {
+              onAttempt: (attempt, delayMs) => console.debug(`waitForProfile attempt ${attempt}, next delay ${delayMs}ms`),
+            });
+
+            if (!profile) {
+              // fallback: try server-side completion via backend proxy
+              try {
+                const { completeProfileViaBackend } = await import('@/utils/completeProfile');
+                const email = authData.user.email ?? tryGetPendingEmail();
+                const pending = (() => {
+                  try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
+                })();
+                const requestId = pending?.requestId || generateRequestId();
+                if (email) {
+                  try {
+                    await completeProfileViaBackend(email, undefined, requestId);
+                    // inform user silently
+                    toast({ title: 'Profile created', description: 'Your profile was created successfully.' });
+                  } catch (e) {
+                    console.warn('completeProfileViaBackend fallback failed', e);
+                    toast({ title: 'Profile creation pending', description: 'We will retry automatically. If the issue persists, contact support.', variant: 'destructive' });
+                  }
+                }
+              } catch (e) {
+                console.warn('completeProfileViaBackend fallback failed', e);
+              }
+            }
           }
         } catch (e) {
-          // ignore
+          // ignore but ensure we log for observability
           console.warn('Profile polling after signup failed', e);
         }
       }
@@ -578,6 +607,19 @@ const AuthenticationForm = ({
       setIsLoading(false);
     }
   };
+
+  function tryGetPendingEmail() {
+    try {
+      const pending = localStorage.getItem('pendingSignup');
+      if (pending) {
+        const parsed = JSON.parse(pending);
+        return parsed?.email;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
+  }
 
   /**
    * Handle Google OAuth

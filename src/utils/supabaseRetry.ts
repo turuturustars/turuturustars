@@ -13,10 +13,13 @@ export async function retryUpsert(
   row: any,
   options: Record<string, unknown> = {},
   attempts = 3,
-  initialDelayMs = 300
+  initialDelayMs = 300,
+  meta?: { requestId?: string }
 ) {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
+      // structured debug: include requestId when available
+      if (meta?.requestId) console.debug(`retryUpsert requestId=${meta.requestId} attempt=${attempt} table=${table}`);
       const res = await supabase.from(table).upsert(row, options);
       // supabase returns { data, error }
       // @ts-ignore
@@ -30,6 +33,7 @@ export async function retryUpsert(
       // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, delay));
     } catch (err) {
+      if (meta?.requestId) console.warn(`retryUpsert requestId=${meta.requestId} attempt=${attempt} error=${String(err)}`);
       if (attempt === attempts) {
         throw err;
       }
