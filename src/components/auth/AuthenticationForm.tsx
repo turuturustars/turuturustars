@@ -476,7 +476,7 @@ const AuthenticationForm = ({
         if (profile?.full_name && profile?.phone && profile?.id_number) {
           navigate('/dashboard', { replace: true });
         } else {
-          navigate('/auth?mode=complete-profile', { replace: true });
+          navigate('/register', { replace: true });
         }
       }
 
@@ -512,8 +512,8 @@ const AuthenticationForm = ({
           password: signupData.password,
         },
         {
-          // Keep signup redirect consistent with other auth flows
-          redirectTo: `${window.location.origin}/auth?mode=complete-profile`,
+          // Keep signup redirect consistent with consolidated registration flow
+          redirectTo: `${window.location.origin}/register?mode=complete-profile`,
         }
       );
 
@@ -538,17 +538,42 @@ const AuthenticationForm = ({
           // ignore
         }
 
-        toast({
-          title: 'Account Created — Confirm Email',
-          description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.',
-        });
+        // Try Option B: attempt to create a server-side pending profile keyed by email
+        try {
+          const pending = (() => {
+            try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
+          })();
+          const requestId = pending?.requestId || generateRequestId();
+          try {
+            const { completeProfileViaBackend } = await import('@/utils/completeProfile');
+            await completeProfileViaBackend(signupData.email, { created_via: 'signup' }, requestId);
+            // Optionally poll for the profile row by email
+            const { waitForProfileByEmail } = await import('@/utils/waitForProfileByEmail');
+            const profile = await waitForProfileByEmail(signupData.email, 4, 300, {
+              onAttempt: (a, d) => console.debug(`poll profile by email attempt ${a}, next delay ${d}ms`),
+            });
+
+            if (profile) {
+              toast({ title: 'Profile created', description: 'We created a profile for your email. After confirming your email, sign in to continue.' });
+            } else {
+              toast({ title: 'Account Created — Confirm Email', description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.' });
+            }
+          } catch (err) {
+            console.warn('create-profile-pending failed', err);
+            toast({ title: 'Account Created — Confirm Email', description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.' });
+          }
+        } catch (e) {
+          // fallback UX
+          toast({
+            title: 'Account Created — Confirm Email',
+            description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.',
+          });
+        }
 
         // Reset form and switch to login
         setSignupData({ email: '', password: '', confirmPassword: '' });
         resetTurnstile();
         setMode('login');
-
-        // do not attempt profile polling since no user session was returned
       } else {
         // Immediate session present — try to wait for trigger-created profile then route
         toast({

@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "config:dev": "node scripts/switch-email-config.js dev",
+    "config:prod": "node scripts/switch-email-config.js prod",
+    "config:show": "node scripts/switch-email-config.js show"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -181,14 +181,15 @@ const Auth = () => {
 
     try {
       // Step 1: Create account
+      // Redirect back to `/register` after email confirmation so the UI is consolidated.
       const { data, error } = await supabase.auth.signUp(
         {
           email: signupData.email,
           password: signupData.password,
         },
         {
-          // Ensure the user returns to auth flow after email confirmation
-          redirectTo: `${globalThis.location.origin}/auth?mode=complete-profile`,
+          // Ensure the user returns to register flow after email confirmation
+          redirectTo: `${globalThis.location.origin}/register?mode=complete-profile`,
         }
       );
 
@@ -257,20 +258,43 @@ const Auth = () => {
         })();
       } else {
         // No immediate session returned (email confirmation required).
-        // Persist pending signup data so we can complete profile after email confirmation.
+        // Persist pending signup data so Register can complete the profile after confirmation.
         try {
           const requestId = generateRequestId();
           localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now(), requestId }));
         } catch (e) {
           // ignore storage errors
         }
+        // Try Option B: attempt to create a server-side pending profile keyed by email.
+        try {
+          const pending = (() => {
+            try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
+          })();
+          const requestId = pending?.requestId || generateRequestId();
+          try {
+            const { completeProfileViaBackend } = await import('@/utils/completeProfile');
+            await completeProfileViaBackend(signupData.email, { created_via: 'signup' }, requestId);
+            // Poll for profile existence by email
+            const { waitForProfileByEmail } = await import('@/utils/waitForProfileByEmail');
+            const profile = await waitForProfileByEmail(signupData.email, 4, 300, {
+              onAttempt: (a, d) => console.debug(`poll profile by email attempt ${a}, next delay ${d}ms`),
+            });
 
-        toast({
-          title: 'Account Created — Confirm Email',
-          description: 'Check your email and follow the confirmation link. After confirming, return to Sign In to complete your profile.',
-        });
-        // Switch to login mode
-        setIsSignup(false);
+            if (profile) {
+              toast({ title: 'Profile created', description: 'We created a profile for your email. After confirming your email, sign in to continue.' });
+            } else {
+              toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
+            }
+          } catch (err) {
+            console.warn('create-profile-pending failed', err);
+            toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
+          }
+        } catch (e) {
+          toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
+        }
+
+        // Navigate to consolidated registration flow which will show the pending-email guidance
+        navigate('/register', { replace: true });
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';

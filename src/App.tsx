@@ -39,6 +39,8 @@ const Constitution = lazy(() => import("./pages/Constitution"));
 const Help = lazy(() => import("./pages/Help"));
 const FAQPage = lazy(() => import("./pages/FAQ"));
 const Support = lazy(() => import("./pages/Support"));
+const AuthDiagnostics = lazy(() => import("./pages/AuthDiagnostics"));
+const EmailDiagnostics = lazy(() => import("./pages/EmailDiagnostics"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -128,6 +130,8 @@ const App = () => {
                 
                 {/* Auth Routes */}
                 <Route path="/register" element={<Register />} />
+                <Route path="/auth-diagnostics" element={<AuthDiagnostics />} />
+                <Route path="/email-diagnostics" element={<EmailDiagnostics />} />
                 <Route
                   path="/auth"
                   element={
