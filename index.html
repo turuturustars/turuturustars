@@ -13,17 +13,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://mkcgkfzltohxagqvsbqk.supabase.co" />
-    
-    <!-- Prefetch non-critical resources for future navigation -->
-    <link rel="prefetch" href="https://cdn.jsdelivr.net" />
-    
-    <!-- Preload Critical Images for LCP Optimization (discovered in HTML, not CSS) -->
-    <link rel="preload" as="image" href="/src/assets/gallery-members.png" />
-    <link rel="preload" as="image" href="/src/assets/turuturu_stars_community_togther_with_senator_veronica_maina.jpg" />
-    <link rel="preload" as="image" href="/src/assets/turuturustars_community_during_prize_giving_day.jpg" />
-    
-    <!-- Preload critical fonts (if using Google Fonts) -->
-    <link rel="preload" as="font" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHAPMtISVQ-gL0.woff2" crossorigin type="font/woff2" />
+    <link rel="preconnect" href="https://challenges.cloudflare.com" />
     
     <!-- Favicon and Links -->
     <link rel="icon" type="image/png" href="https://img.icons8.com/nolan/64/star.png" />
@@ -200,13 +190,15 @@
     }
     </script>
 
-    <!-- Cloudflare Turnstile Captcha - Async Loading (doesn't block rendering) -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async></script>
   </head>
 
   <body>
     <div id="root"></div>
+    
     <!-- Main app script with defer (loads after HTML parse, before DOMContentLoaded) -->
     <script type="module" src="/src/main.tsx" defer></script>
+    
+    <!-- Cloudflare Turnstile Captcha - Async Loading (loads after app init) -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async></script>
   </body>
 </html>

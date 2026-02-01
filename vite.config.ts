@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 8081,
   },
   build: {
     // Optimize images during build
@@ -61,6 +61,8 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-toggle',
             '@radix-ui/react-toggle-group',
             '@radix-ui/react-tooltip',
+            'cmdk',
+            'input-otp',
           ],
           
           // Charting library (only loaded if dashboard/charts accessed)
@@ -68,6 +70,9 @@ export default defineConfig(({ mode }) => ({
           
           // Icons (frequently used, worth separate chunk for caching)
           'icons': ['lucide-react'],
+          
+          // Utilities
+          'utils': ['zod', 'clsx', 'class-variance-authority', '@hookform/resolvers'],
         },
         
         assetFileNames: (assetInfo) => {
