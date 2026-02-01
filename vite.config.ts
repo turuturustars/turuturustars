@@ -12,47 +12,67 @@ export default defineConfig(({ mode }) => ({
   build: {
     // Optimize images during build
     assetsInlineLimit: 4096,
+    
+    // Smaller chunk size warning to catch bloated modules
+    chunkSizeWarningLimit: 500,
+    
     rollupOptions: {
       output: {
+        // Better code splitting: separate vendor, UI, and business logic
         manualChunks: {
-          // Consolidate all vendor dependencies into one chunk to avoid circular dependency issues
-          'vendor': [
-            'react',
-            'react-dom',
-            '@radix-ui/react-accordion',
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-collapsible',
-            '@radix-ui/react-context-menu',
+          // Core React (essential for everything)
+          'react-core': ['react', 'react-dom'],
+          
+          // UI Components (radix-ui - large, but split for parallelization)
+          'ui-components': [
             '@radix-ui/react-dialog',
             '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
             '@radix-ui/react-hover-card',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-accordion',
+          ],
+          
+          'ui-forms': [
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-radio-group',
+            '@radix-ui/react-switch',
             '@radix-ui/react-label',
+            '@radix-ui/react-slider',
+          ],
+          
+          'ui-layout': [
+            '@radix-ui/react-separator',
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-aspect-ratio',
+            '@radix-ui/react-avatar',
             '@radix-ui/react-menubar',
             '@radix-ui/react-navigation-menu',
-            '@radix-ui/react-popover',
+          ],
+          
+          'ui-other': [
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-collapsible',
+            '@radix-ui/react-context-menu',
             '@radix-ui/react-progress',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-select',
-            '@radix-ui/react-separator',
-            '@radix-ui/react-slider',
             '@radix-ui/react-slot',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-tabs',
             '@radix-ui/react-toast',
             '@radix-ui/react-toggle',
             '@radix-ui/react-toggle-group',
             '@radix-ui/react-tooltip',
-            'recharts',
-            'lucide-react'
-          ]
+          ],
+          
+          // Charting library (only loaded if dashboard/charts accessed)
+          'charts': ['recharts'],
+          
+          // Icons (frequently used, worth separate chunk for caching)
+          'icons': ['lucide-react'],
         },
+        
         assetFileNames: (assetInfo) => {
           let extType = assetInfo.name.split('.').at(1);
-          if (/png|jpe?g|gif|tiff|bmp|ico/i.test(extType)) {
+          if (/png|jpe?g|gif|tiff|bmp|ico|webp|avif/i.test(extType)) {
             extType = 'img';
           } else if (/woff|woff2|ttf|otf|eot/.test(extType)) {
             extType = 'fonts';
