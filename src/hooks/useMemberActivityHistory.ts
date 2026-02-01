@@ -1,9 +1,10 @@
 /**
  * Hook for tracking and displaying member activity history
+ * Note: This hook requires a member_activities table that may not exist yet.
+ * Until that table is created, this provides stub functionality.
  */
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export interface MemberActivity {
@@ -18,7 +19,7 @@ export interface MemberActivity {
     | 'payment';
   description: string;
   created_at: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MemberActivityStats {
@@ -38,85 +39,31 @@ export function useMemberActivityHistory(memberId?: string) {
 
   useEffect(() => {
     if (memberId) {
-      fetchActivityHistory(memberId);
+      // The member_activities table doesn't exist yet
+      // This is a stub that provides empty data
+      setActivities([]);
+      setStats({
+        lastLogin: null,
+        lastContribution: null,
+        lastWelfareRequest: null,
+        lastProfileUpdate: null,
+        totalActivities: 0,
+        activitiesByType: {},
+      });
+      setIsLoading(false);
+    } else {
+      setIsLoading(false);
     }
   }, [memberId]);
 
-  const fetchActivityHistory = async (id: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('member_activities')
-        .select('*')
-        .eq('member_id', id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      if (data) {
-        setActivities(data as MemberActivity[]);
-        calculateStats(data as MemberActivity[]);
-      }
-    } catch (error) {
-      console.error('Error fetching activity history:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load activity history',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const calculateStats = (activities: MemberActivity[]) => {
-    const activityTypes: Record<string, number> = {};
-
-    activities.forEach((activity) => {
-      activityTypes[activity.activity_type] = (activityTypes[activity.activity_type] || 0) + 1;
-    });
-
-    const stats: MemberActivityStats = {
-      lastLogin:
-        activities.find((a) => a.activity_type === 'login')?.created_at || null,
-      lastContribution:
-        activities.find((a) => a.activity_type === 'contribution')?.created_at || null,
-      lastWelfareRequest:
-        activities.find((a) => a.activity_type === 'welfare_request')?.created_at || null,
-      lastProfileUpdate:
-        activities.find((a) => a.activity_type === 'profile_update')?.created_at ||
-        null,
-      totalActivities: activities.length,
-      activitiesByType: activityTypes,
-    };
-
-    setStats(stats);
-  };
-
   const recordActivity = async (
-    id: string,
-    activityType: MemberActivity['activity_type'],
-    description: string,
-    metadata?: Record<string, any>
+    _id: string,
+    _activityType: MemberActivity['activity_type'],
+    _description: string,
+    _metadata?: Record<string, unknown>
   ) => {
-    try {
-      const { error } = await supabase.from('member_activities').insert({
-        member_id: id,
-        activity_type: activityType,
-        description,
-        metadata,
-        created_at: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-
-      // Refresh activity history
-      if (memberId === id) {
-        await fetchActivityHistory(id);
-      }
-    } catch (error) {
-      console.error('Error recording activity:', error);
-    }
+    // Stub: member_activities table doesn't exist yet
+    console.debug('recordActivity called but member_activities table does not exist');
   };
 
   return {
@@ -124,21 +71,19 @@ export function useMemberActivityHistory(memberId?: string) {
     stats,
     isLoading,
     recordActivity,
-    refreshHistory: () => memberId && fetchActivityHistory(memberId),
+    refreshHistory: () => {
+      // No-op until table exists
+    },
   };
 }
 
 /**
  * Hook to record login activity
  */
-export function useRecordLogin(memberId?: string) {
-  const { recordActivity } = useMemberActivityHistory(memberId);
-
-  const recordLogin = async (id: string) => {
-    await recordActivity(id, 'login', 'User logged in', {
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-    });
+export function useRecordLogin(_memberId?: string) {
+  const recordLogin = async (_id: string) => {
+    // Stub: member_activities table doesn't exist yet
+    console.debug('recordLogin called but member_activities table does not exist');
   };
 
   return { recordLogin };
@@ -147,21 +92,15 @@ export function useRecordLogin(memberId?: string) {
 /**
  * Hook to record contribution activity
  */
-export function useRecordContribution(memberId?: string) {
-  const { recordActivity } = useMemberActivityHistory(memberId);
-
+export function useRecordContribution(_memberId?: string) {
   const recordContribution = async (
-    id: string,
-    amount: number,
-    type: string,
-    reference?: string
+    _id: string,
+    _amount: number,
+    _type: string,
+    _reference?: string
   ) => {
-    await recordActivity(id, 'contribution', `Contributed ${type}`, {
-      amount,
-      type,
-      reference,
-      timestamp: new Date().toISOString(),
-    });
+    // Stub: member_activities table doesn't exist yet
+    console.debug('recordContribution called but member_activities table does not exist');
   };
 
   return { recordContribution };
@@ -170,19 +109,14 @@ export function useRecordContribution(memberId?: string) {
 /**
  * Hook to record welfare request
  */
-export function useRecordWelfareRequest(memberId?: string) {
-  const { recordActivity } = useMemberActivityHistory(memberId);
-
+export function useRecordWelfareRequest(_memberId?: string) {
   const recordWelfareRequest = async (
-    id: string,
-    caseType: string,
-    amount?: number
+    _id: string,
+    _caseType: string,
+    _amount?: number
   ) => {
-    await recordActivity(id, 'welfare_request', `Created welfare request: ${caseType}`, {
-      caseType,
-      amount,
-      timestamp: new Date().toISOString(),
-    });
+    // Stub: member_activities table doesn't exist yet
+    console.debug('recordWelfareRequest called but member_activities table does not exist');
   };
 
   return { recordWelfareRequest };

@@ -39,7 +39,7 @@ const ROUTE_LABELS: Record<string, string> = {
   'welfare-management': 'Welfare Management',
 };
 
-export function Breadcrumb({ items }: readonly BreadcrumbProps) {
+export function Breadcrumb({ items }: BreadcrumbProps) {
   const location = useLocation();
 
   // Auto-generate breadcrumbs from path if not provided
@@ -92,7 +92,7 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
       continue;
     }
 
-    const label = ROUTE_LABELS[part] || part.replaceAll('-', ' ');
+    const label = ROUTE_LABELS[part] || part.split('-').join(' ');
     breadcrumbs.push({
       label,
       path: i < parts.length - 1 ? currentPath : undefined,

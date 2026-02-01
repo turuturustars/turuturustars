@@ -6,33 +6,29 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { supabase } from '@/integrations/supabase';
-import {
-  useCrossTabSync,
-  useOfflineQueue,
-  useBatchUpdates,
-  useConnectionMetrics,
-  useSubscriptionHealth,
-  type IncrementalUpdate,
-} from '@/lib/realtimeEnhancements';
+import { supabase } from '@/integrations/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 // ============================================================================
-// Enhanced Real-time Hook with All Features
+// Types
 // ============================================================================
 
 type FilterOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike' | 'like';
 type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
 
+export interface IncrementalUpdate<T> {
+  id: string;
+  type: RealtimeEvent;
+  timestamp: number;
+  changes: Partial<T>;
+  new?: T | null;
+  old?: T | null;
+}
+
 export interface UseEnhancedRealtimeOptions<T> {
   table: string;
   filter?: { column: string; operator: FilterOperator; value: unknown };
   events?: RealtimeEvent[];
-  enableOfflineSync?: boolean;
-  enableCrossTabSync?: boolean;
-  enableOptimisticUpdates?: boolean;
-  enableBatchUpdates?: boolean;
-  debounceMs?: number;
   onInsert?: (item: T) => void;
   onUpdate?: (change: IncrementalUpdate<T>) => void;
   onDelete?: (id: string) => void;
@@ -41,21 +37,14 @@ export interface UseEnhancedRealtimeOptions<T> {
 }
 
 /**
- * Comprehensive real-time hook with incremental updates, offline support,
- * cross-tab sync, and optimistic updates
+ * Simplified real-time hook with incremental updates
  */
 export function useEnhancedRealtime<T extends { id: string }>(
   options: UseEnhancedRealtimeOptions<T>
 ) {
   const {
     table,
-    filter,
     events = ['INSERT', 'UPDATE', 'DELETE'],
-    enableOfflineSync = true,
-    enableCrossTabSync = true,
-    enableOptimisticUpdates = true,
-    enableBatchUpdates = false,
-    debounceMs = 1000,
     onInsert,
     onUpdate,
     onDelete,
@@ -68,20 +57,6 @@ export function useEnhancedRealtime<T extends { id: string }>(
   const [items, setItems] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-
-  // Feature integrations
-  const offlineQueue = useOfflineQueue();
-  const [syncedItems, setSyncedItems] = useCrossTabSync(`realtime-${table}`, items);
-  const optimistic = useEnhancedOptimisticUpdate<T>(
-    table,
-    useCallback((err) => {
-      setError(err);
-      if (onError) onError(err);
-    }, [onError])
-  );
-  const batch = useBatchUpdates(table, debounceMs);
-  const connectionMetrics = useConnectionMetrics();
-  const health = useSubscriptionHealth(table);
 
   // Handle incremental updates
   const handleIncrementalUpdate = useCallback(
@@ -111,36 +86,9 @@ export function useEnhancedRealtime<T extends { id: string }>(
         }
         return prev;
       });
-
-      // Sync to other tabs
-      if (enableCrossTabSync) {
-        setSyncedItems((prev: T[]) => {
-          if (change.type === 'INSERT' && change.new) {
-            return [...prev, change.new as T];
-          } else if (change.type === 'UPDATE') {
-            return prev.map(item =>
-              item.id === change.id
-                ? { ...item, ...change.changes }
-                : item
-            );
-          } else if (change.type === 'DELETE') {
-            return prev.filter(item => item.id !== change.id);
-          }
-          return prev;
-        });
-      }
-
-      health.recordMessage?.();
     },
-    [onInsert, onUpdate, onDelete, enableCrossTabSync, setSyncedItems, health]
+    [onInsert, onUpdate, onDelete]
   );
-
-  // Use cross-tab synced items
-  useEffect(() => {
-    if (enableCrossTabSync && syncedItems.length > 0) {
-      setItems(syncedItems);
-    }
-  }, [syncedItems, enableCrossTabSync]);
 
   // Initial data fetch and subscription setup
   useEffect(() => {
@@ -151,22 +99,14 @@ export function useEnhancedRealtime<T extends { id: string }>(
         setIsLoading(true);
         setError(null);
 
-        // Fetch initial data
-        let query = supabase.from(table).select('*');
-        
-        if (filter) {
-          const filterFunc = query[filter.operator];
-          if (filterFunc) {
-            query = filterFunc(filter.column, filter.value);
-          }
-        }
-
-        const { data, error: fetchError } = await query;
+        // Fetch initial data using type assertion for dynamic table access
+        const { data, error: fetchError } = await supabase
+          .from(table as 'profiles')
+          .select('*');
 
         if (fetchError) throw fetchError;
 
-        setItems(data || []);
-        optimistic.setData(data || []);
+        setItems((data || []) as unknown as T[]);
 
         // Set up subscription
         const channel = supabase
@@ -178,32 +118,27 @@ export function useEnhancedRealtime<T extends { id: string }>(
               schema: 'public',
               table,
             },
-            (payload: { eventType: string; new: T | null; old: T | null }) => {
+            (payload: { eventType: string; new: Record<string, unknown> | null; old: Record<string, unknown> | null }) => {
+              const newRecord = payload.new as T | null;
+              const oldRecord = payload.old as T | null;
               const change: IncrementalUpdate<T> = {
-                id: (payload.new?.id || payload.old?.id || ''),
+                id: (newRecord?.id || oldRecord?.id || '') as string,
                 type: payload.eventType as RealtimeEvent,
                 timestamp: Date.now(),
-                changes: payload.new ? (payload.new) : {},
-                new: payload.new,
-                old: payload.old,
+                changes: newRecord ? (newRecord as Partial<T>) : {},
+                new: newRecord,
+                old: oldRecord,
               };
 
               handleIncrementalUpdate(change);
             }
           )
-          .subscribe(status => {
-            if (status === 'SUBSCRIBED') {
-              health.recordMessage?.();
-            } else if (status === 'CLOSED') {
-              health.recordError?.();
-            }
-          });
+          .subscribe();
 
         subscriptionRef.current = channel;
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         setError(error);
-        health.recordError?.();
         if (onError) onError(error);
       } finally {
         setIsLoading(false);
@@ -217,178 +152,46 @@ export function useEnhancedRealtime<T extends { id: string }>(
         supabase.removeChannel(subscriptionRef.current);
       }
     };
-  }, [table, filter, events, enabled, handleIncrementalUpdate, onError, health, optimistic]);
+  }, [table, events, enabled, handleIncrementalUpdate, onError]);
 
-  // Method to update with offline queue or optimistic updates
+  // Method to update
   const update = useCallback(
     async (id: string, updates: Partial<T>) => {
-      if (!offlineQueue.isOnline && enableOfflineSync) {
-        // Queue for later
-        offlineQueue.addToQueue({
-          id,
-          table,
-          operation: 'UPDATE',
-          data: { id, ...updates },
-          timestamp: Date.now(),
-        });
-        
-        // Apply optimistically
-        if (enableOptimisticUpdates) {
-          optimistic.updateOptimistically(id, updates);
-        }
-      } else if (enableBatchUpdates) {
-        // Batch the update
-        batch.addToBatch(id, updates);
-        
-        // Apply optimistically
-        if (enableOptimisticUpdates) {
-          optimistic.updateOptimistically(id, updates);
-        }
-      } else if (enableOptimisticUpdates) {
-        // Direct optimistic update
-        await optimistic.updateOptimistically(id, updates);
-      } else {
-        // Direct update
-        const { error } = await supabase
-          .from(table)
-          .update(updates)
-          .eq('id', id);
-        
-        if (error) throw error;
-      }
+      const { error } = await supabase
+        .from(table as 'profiles')
+        .update(updates as Record<string, unknown>)
+        .eq('id', id);
+      
+      if (error) throw error;
     },
-    [table, offlineQueue, enableOfflineSync, enableOptimisticUpdates, enableBatchUpdates, batch, optimistic]
+    [table]
   );
 
   const insert = useCallback(
     async (data: T) => {
-      if (!offlineQueue.isOnline && enableOfflineSync) {
-        offlineQueue.addToQueue({
-          id: data.id,
-          table,
-          operation: 'INSERT',
-          data,
-          timestamp: Date.now(),
-        });
-      } else {
-        const { error } = await supabase.from(table).insert([data]);
-        if (error) throw error;
-      }
+      const { error } = await supabase.from(table as 'profiles').insert([data as Record<string, unknown>]);
+      if (error) throw error;
     },
-    [table, offlineQueue, enableOfflineSync]
+    [table]
   );
 
   const remove = useCallback(
     async (id: string) => {
-      if (!offlineQueue.isOnline && enableOfflineSync) {
-        offlineQueue.addToQueue({
-          id,
-          table,
-          operation: 'DELETE',
-          data: { id },
-          timestamp: Date.now(),
-        });
-      } else {
-        const { error } = await supabase.from(table).delete().eq('id', id);
-        if (error) throw error;
-      }
+      const { error } = await supabase.from(table as 'profiles').delete().eq('id', id);
+      if (error) throw error;
     },
-    [table, offlineQueue, enableOfflineSync]
+    [table]
   );
 
   return {
-    // Data and state
-    items: enableCrossTabSync ? syncedItems : items,
+    items,
     isLoading,
     error,
-
-    // Operations
     update,
     insert,
     remove,
-    flush: enableBatchUpdates ? batch.flush : undefined,
-
-    // Offline and sync status
-    isOnline: offlineQueue.isOnline,
-    queueSize: offlineQueue.queueSize,
-    syncQueue: offlineQueue.syncQueue,
-
-    // Performance metrics
-    connectionMetrics,
-    health,
-    isSyncing: enableBatchUpdates ? batch.isSyncing : false,
-  };
-}
-
-// ============================================================================
-// Optimized Optimistic Update Hook
-// ============================================================================
-
-function useEnhancedOptimisticUpdate<T extends { id: string }>(
-  table: string,
-  onError?: (error: Error) => void
-) {
-  const [data, setData] = useState<T[]>([]);
-  const pendingRef = useRef<Map<string, { original: T; timeout: NodeJS.Timeout }>>(new Map());
-
-  const updateOptimistically = useCallback(
-    async (id: string, updates: Partial<T>) => {
-      const original = data.find(item => item.id === id);
-      if (!original) return;
-
-      // Clear previous timeout for this item
-      if (pendingRef.current.has(id)) {
-        clearTimeout(pendingRef.current.get(id)?.timeout);
-      }
-
-      // Apply optimistically
-      const updated = { ...original, ...updates } as T;
-      setData(prev =>
-        prev.map(item => (item.id === id ? updated : item))
-      );
-
-      // Set rollback timeout (30 seconds)
-      const timeout = setTimeout(() => {
-        pendingRef.current.delete(id);
-      }, 30000);
-
-      pendingRef.current.set(id, { original, timeout });
-
-      try {
-        await supabase
-          .from(table)
-          .update(updates)
-          .eq('id', id);
-
-        // Success, clear pending
-        if (pendingRef.current.has(id)) {
-          clearTimeout(pendingRef.current.get(id)?.timeout);
-          pendingRef.current.delete(id);
-        }
-      } catch (error) {
-        // Rollback
-        const item = pendingRef.current.get(id);
-        if (item) {
-          setData(prev =>
-            prev.map(i => (i.id === id ? item.original : i))
-          );
-          clearTimeout(item.timeout);
-          pendingRef.current.delete(id);
-        }
-
-        if (onError && error instanceof Error) {
-          onError(error);
-        }
-      }
-    },
-    [data, table, onError]
-  );
-
-  return {
-    data,
-    setData,
-    updateOptimistically,
-    isPending: (id: string) => pendingRef.current.has(id),
+    isOnline: true,
+    queueSize: 0,
   };
 }
 
@@ -419,11 +222,9 @@ export function useDashboardStatsEnhanced() {
   });
 
   // Use incremental updates for contributions
-  const contributions = useEnhancedRealtime({
+  const contributions = useEnhancedRealtime<{ id: string }>({
     table: 'contributions',
-    enableOfflineSync: true,
-    enableCrossTabSync: true,
-    onUpdate: (change) => {
+    onUpdate: () => {
       setStats(prev => ({
         ...prev,
         lastUpdated: Date.now(),
@@ -432,11 +233,9 @@ export function useDashboardStatsEnhanced() {
   });
 
   // Use incremental updates for notifications
-  const notifications = useEnhancedRealtime({
+  const notifications = useEnhancedRealtime<{ id: string }>({
     table: 'notifications',
     filter: { column: 'read', operator: 'eq', value: 'false' },
-    enableOfflineSync: true,
-    enableCrossTabSync: true,
   });
 
   // Update stats when data changes

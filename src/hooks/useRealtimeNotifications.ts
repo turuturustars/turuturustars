@@ -25,13 +25,13 @@ export const useRealtimeNotifications = () => {
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, read, created_at')
+        .select('id, user_id, title, message, type, read, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (!error && data) {
-        setNotifications(data);
+        setNotifications(data as Notification[]);
         setUnreadCount(data.filter(n => !n.read).length);
       }
     };
@@ -71,11 +71,12 @@ export const useRealtimeNotifications = () => {
         },
         (payload) => {
           const updatedNotification = payload.new as Notification;
+          const oldNotification = payload.old as { read?: boolean };
           setNotifications(prev =>
             prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
           );
           setUnreadCount(prev => {
-            const wasUnread = !payload.old?.read;
+            const wasUnread = !oldNotification?.read;
             const isNowRead = updatedNotification.read;
             if (wasUnread && isNowRead) return Math.max(0, prev - 1);
             return prev;

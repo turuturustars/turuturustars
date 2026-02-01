@@ -93,9 +93,9 @@ export function useOfflineCapability() {
  * Hook for managing offline data storage and sync
  */
 export function useOfflineSync(storageKey: string) {
-  const [pendingSync, setPendingSync] = useState<any[]>([]);
+  const [pendingSync, setPendingSync] = useState<Array<{ id: string; syncedAt: string | null }>>([]);
   const [isSyncing, setIsSyncing] = useState(false);
-  const { isOnline } = useOfflineCapability();
+  const { isOnline, wasOffline } = useOfflineCapability();
 
   // Load pending sync items from localStorage
   useEffect(() => {
@@ -110,14 +110,14 @@ export function useOfflineSync(storageKey: string) {
   }, [storageKey]);
 
   // Save pending sync items to localStorage
-  const savePendingSync = useCallback((items: any[]) => {
+  const savePendingSync = useCallback((items: Array<{ id: string; syncedAt: string | null }>) => {
     setPendingSync(items);
     localStorage.setItem(`offline_${storageKey}`, JSON.stringify(items));
   }, [storageKey]);
 
   // Add item to pending sync
   const addPendingSync = useCallback(
-    (item: any) => {
+    (item: { id: string }) => {
       const updated = [...pendingSync, { ...item, syncedAt: null }];
       savePendingSync(updated);
     },
@@ -165,7 +165,7 @@ export function useOfflineSync(storageKey: string) {
         })
       );
     }
-  }, [isOnline, getUnsyncedItems, storageKey]);
+  }, [isOnline, wasOffline, getUnsyncedItems, storageKey]);
 
   return {
     pendingSync,
@@ -180,48 +180,54 @@ export function useOfflineSync(storageKey: string) {
 }
 
 /**
- * Hook for detecting connection quality
+ * Hook for caching data offline using localStorage
  */
-export function useConnectionQuality() {
-  const [quality, setQuality] = useState<'4g' | '3g' | '2g' | 'slow-2g' | 'unknown'>('unknown');
+export function useOfflineCache<T>(cacheKey: string, ttlMinutes = 60) {
+  const [cachedData, setCachedData] = useState<T | null>(null);
+  const [isStale, setIsStale] = useState(false);
 
+  // Load cached data
   useEffect(() => {
-    // Use Network Information API if available
-    if ('connection' in navigator) {
-      const { connection } = navigator as any;
+    const stored = localStorage.getItem(`cache_${cacheKey}`);
+    if (stored) {
+      try {
+        const { data, timestamp } = JSON.parse(stored);
+        const age = Date.now() - timestamp;
+        const ttlMs = ttlMinutes * 60 * 1000;
 
-      if (connection) {
-        const updateQuality = () => {
-          setQuality(connection.effectiveType || 'unknown');
-        };
-
-        updateQuality();
-        connection.addEventListener('change', updateQuality);
-
-        return () => {
-          connection.removeEventListener('change', updateQuality);
-        };
+        setCachedData(data);
+        setIsStale(age > ttlMs);
+      } catch (error) {
+        console.error('Error parsing cached data:', error);
       }
     }
-  }, []);
+  }, [cacheKey, ttlMinutes]);
 
-  const getQualityBadge = () => {
-    switch (quality) {
-      case '4g':
-        return { color: 'green', label: 'Excellent' };
-      case '3g':
-        return { color: 'yellow', label: 'Good' };
-      case '2g':
-        return { color: 'orange', label: 'Poor' };
-      case 'slow-2g':
-        return { color: 'red', label: 'Very Poor' };
-      default:
-        return { color: 'gray', label: 'Unknown' };
-    }
-  };
+  // Save data to cache
+  const saveToCache = useCallback(
+    (data: T) => {
+      const cacheEntry = {
+        data,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(`cache_${cacheKey}`, JSON.stringify(cacheEntry));
+      setCachedData(data);
+      setIsStale(false);
+    },
+    [cacheKey]
+  );
+
+  // Clear cache
+  const clearCache = useCallback(() => {
+    localStorage.removeItem(`cache_${cacheKey}`);
+    setCachedData(null);
+    setIsStale(false);
+  }, [cacheKey]);
 
   return {
-    quality,
-    getQualityBadge,
+    cachedData,
+    isStale,
+    saveToCache,
+    clearCache,
   };
 }

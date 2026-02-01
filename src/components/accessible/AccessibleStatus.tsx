@@ -86,7 +86,7 @@ interface UseLiveRegionReturn {
  * Accessible status component with live region announcements
  * Auto-announces changes to screen readers
  */
-export const AccessibleStatus = React.forwardRef<HTMLDivElement, AccessibleStatusProps>(
+export const AccessibleStatus = React.forwardRef<HTMLOutputElement, AccessibleStatusProps>(
   (
     {
       message,
