@@ -16,64 +16,15 @@ export default defineConfig(({ mode }) => ({
     // Smaller chunk size warning to catch bloated modules
     chunkSizeWarningLimit: 1000,
     
+    // Disable code splitting to avoid circular dependency issues
+    commonjsOptions: {
+      transformMixedEsm: true,
+    },
+    
     rollupOptions: {
       output: {
-        // Better code splitting: separate vendor, UI, and business logic
-        manualChunks: {
-          // Core React (essential for everything)
-          'react-core': ['react', 'react-dom'],
-          
-          // UI Components (radix-ui - large, but split for parallelization)
-          'ui-components': [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-select',
-            '@radix-ui/react-hover-card',
-            '@radix-ui/react-popover',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-accordion',
-          ],
-          
-          'ui-forms': [
-            '@radix-ui/react-checkbox',
-            '@radix-ui/react-radio-group',
-            '@radix-ui/react-switch',
-            '@radix-ui/react-label',
-            '@radix-ui/react-slider',
-          ],
-          
-          'ui-layout': [
-            '@radix-ui/react-separator',
-            '@radix-ui/react-scroll-area',
-            '@radix-ui/react-aspect-ratio',
-            '@radix-ui/react-avatar',
-            '@radix-ui/react-menubar',
-            '@radix-ui/react-navigation-menu',
-          ],
-          
-          'ui-other': [
-            '@radix-ui/react-alert-dialog',
-            '@radix-ui/react-collapsible',
-            '@radix-ui/react-context-menu',
-            '@radix-ui/react-progress',
-            '@radix-ui/react-slot',
-            '@radix-ui/react-toast',
-            '@radix-ui/react-toggle',
-            '@radix-ui/react-toggle-group',
-            '@radix-ui/react-tooltip',
-            'cmdk',
-            'input-otp',
-          ],
-          
-          // Charting library (only loaded if dashboard/charts accessed)
-          'charts': ['recharts'],
-          
-          // Icons (frequently used, worth separate chunk for caching)
-          'icons': ['lucide-react'],
-          
-          // Utilities
-          'utils': ['zod', 'clsx', 'class-variance-authority', '@hookform/resolvers'],
-        },
+        // Single bundle initially to avoid initialization issues
+        manualChunks: undefined,
         
         assetFileNames: (assetInfo) => {
           const name = assetInfo.name || '';
