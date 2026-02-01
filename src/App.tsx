@@ -41,6 +41,7 @@ const FAQPage = lazy(() => import("./pages/FAQ"));
 const Support = lazy(() => import("./pages/Support"));
 const AuthDiagnostics = lazy(() => import("./pages/AuthDiagnostics"));
 const EmailDiagnostics = lazy(() => import("./pages/EmailDiagnostics"));
+const ProfileSetup = lazy(() => import("./pages/ProfileSetup"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -132,6 +133,14 @@ const App = () => {
                 <Route path="/register" element={<Register />} />
                 <Route path="/auth-diagnostics" element={<AuthDiagnostics />} />
                 <Route path="/email-diagnostics" element={<EmailDiagnostics />} />
+                <Route
+                  path="/profile-setup"
+                  element={
+                    <ProtectedRoute>
+                      <ProfileSetup />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="/auth"
                   element={

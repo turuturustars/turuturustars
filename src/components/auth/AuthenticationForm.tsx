@@ -506,16 +506,13 @@ const AuthenticationForm = ({
 
     try {
       // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp(
-        {
-          email: signupData.email,
-          password: signupData.password,
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: signupData.email,
+        password: signupData.password,
+        options: {
+          emailRedirectTo: `${globalThis.location?.origin}/register?mode=complete-profile`,
         },
-        {
-          // Keep signup redirect consistent with consolidated registration flow
-          redirectTo: `${window.location.origin}/register?mode=complete-profile`,
-        }
-      );
+      });
 
       if (authError) {
         const requestId = generateRequestId();

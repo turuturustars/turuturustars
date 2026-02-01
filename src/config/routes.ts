@@ -33,6 +33,7 @@ export const PUBLIC_ROUTES = {
   REGISTER: '/register',
   AUTH: '/auth',
   LANDING_HOME: '/home',
+  PROFILE_SETUP: '/profile-setup',
 } as const;
 
 /**

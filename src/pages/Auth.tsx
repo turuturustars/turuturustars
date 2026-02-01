@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { generateRequestId } from '@/utils/requestId';
-import { Loader2, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
@@ -180,18 +180,15 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      // Step 1: Create account
-      // Redirect back to `/register` after email confirmation so the UI is consolidated.
-      const { data, error } = await supabase.auth.signUp(
-        {
-          email: signupData.email,
-          password: signupData.password,
+      // Step 1: Create account with proper redirect to profile setup
+      const { data, error } = await supabase.auth.signUp({
+        email: signupData.email,
+        password: signupData.password,
+        options: {
+          // Redirect to profile setup after email confirmation
+          emailRedirectTo: `${globalThis.location.origin}/profile-setup`,
         },
-        {
-          // Ensure the user returns to register flow after email confirmation
-          redirectTo: `${globalThis.location.origin}/register?mode=complete-profile`,
-        }
-      );
+      });
 
       if (error) {
         const requestId = generateRequestId();
@@ -205,96 +202,23 @@ const Auth = () => {
       }
 
       if (data.user) {
-        // Account created successfully with an immediate session (some providers/browser combos)
+        // Account created successfully
         toast({
           title: 'Account Created!',
-          description: 'Please complete your profile information',
+          description: 'Check your email to verify your account and complete your profile',
         });
 
-        // Try to wait briefly for a profile row created by DB trigger, then redirect
-        (async () => {
-            try {
-              const { waitForProfile } = await import('@/utils/waitForProfile');
-              const profile = await waitForProfile(data.user.id, 6, 400, {
-                onAttempt: (attempt, delayMs) => console.debug(`waitForProfile attempt ${attempt}, next delay ${delayMs}ms`),
-              });
-
-              if (!profile) {
-                try {
-                  const { completeProfileViaBackend } = await import('@/utils/completeProfile');
-                  const email = data.user.email ?? (() => {
-                    try {
-                      const pending = localStorage.getItem('pendingSignup');
-                      if (pending) return JSON.parse(pending)?.email;
-                    } catch (e) {}
-                    return null;
-                  })();
-                  const pending = (() => {
-                    try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
-                  })();
-                  const requestId = pending?.requestId || generateRequestId();
-                  if (email) {
-                    try {
-                      await completeProfileViaBackend(email, undefined, requestId);
-                      toast({ title: 'Profile created', description: 'Your profile was created successfully.' });
-                      try { localStorage.removeItem('pendingSignup'); } catch (e) {}
-                    } catch (e) {
-                      console.warn('completeProfileViaBackend fallback failed', e);
-                      toast({ title: 'Profile creation pending', description: 'We will retry automatically. If the issue persists, contact support.', variant: 'destructive' });
-                    }
-                  }
-                } catch (e) {
-                  console.warn('completeProfileViaBackend fallback failed', e);
-                }
-              }
-            } catch (e) {
-              // ignore polling failures but log for telemetry
-              console.warn('Profile polling after signup failed', e);
-            } finally {
-              setTimeout(() => {
-                navigate('/register', { replace: true });
-              }, 700);
-            }
-        })();
+        // Redirect to profile setup
+        setTimeout(() => {
+          navigate('/profile-setup', { replace: true });
+        }, 1500);
       } else {
-        // No immediate session returned (email confirmation required).
-        // Persist pending signup data so Register can complete the profile after confirmation.
-        try {
-          const requestId = generateRequestId();
-          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now(), requestId }));
-        } catch (e) {
-          // ignore storage errors
-        }
-        // Try Option B: attempt to create a server-side pending profile keyed by email.
-        try {
-          const pending = (() => {
-            try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
-          })();
-          const requestId = pending?.requestId || generateRequestId();
-          try {
-            const { completeProfileViaBackend } = await import('@/utils/completeProfile');
-            await completeProfileViaBackend(signupData.email, { created_via: 'signup' }, requestId);
-            // Poll for profile existence by email
-            const { waitForProfileByEmail } = await import('@/utils/waitForProfileByEmail');
-            const profile = await waitForProfileByEmail(signupData.email, 4, 300, {
-              onAttempt: (a, d) => console.debug(`poll profile by email attempt ${a}, next delay ${d}ms`),
-            });
-
-            if (profile) {
-              toast({ title: 'Profile created', description: 'We created a profile for your email. After confirming your email, sign in to continue.' });
-            } else {
-              toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
-            }
-          } catch (err) {
-            console.warn('create-profile-pending failed', err);
-            toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
-          }
-        } catch (e) {
-          toast({ title: 'Account Created — Confirm Email', description: 'A confirmation link was sent. After confirming, return here to continue registration.' });
-        }
-
-        // Navigate to consolidated registration flow which will show the pending-email guidance
-        navigate('/register', { replace: true });
+        // This shouldn't happen, but handle it gracefully
+        toast({
+          title: 'Account Created',
+          description: 'Please verify your email to continue',
+        });
+        navigate('/profile-setup', { replace: true });
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
