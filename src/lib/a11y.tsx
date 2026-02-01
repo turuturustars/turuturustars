@@ -50,9 +50,12 @@ export function useFocusTrap(isOpen: boolean) {
     };
 
     // Focus first element on open
-    const focusableElements = getFocusableElements(container);
-    if (focusableElements.length > 0) {
-      focusableElements[0].focus();
+    const containerElement = containerRef.current;
+    if (containerElement) {
+      const focusableElements = getFocusableElements(containerElement);
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus();
+      }
     }
 
     document.addEventListener('keydown', handleKeyDown);

@@ -22,13 +22,13 @@ export const useRealtimeAnnouncements = () => {
     const fetchAnnouncements = async () => {
       const { data, error } = await supabase
         .from('announcements')
-        .select('id, title, content, priority, published, published_at, created_by')
+        .select('id, title, content, priority, published, published_at, created_at, created_by')
         .eq('published', true)
         .order('published_at', { ascending: false })
         .limit(10);
 
       if (!error && data) {
-        setAnnouncements(data);
+        setAnnouncements(data as Announcement[]);
       }
       setIsLoading(false);
     };
@@ -90,7 +90,7 @@ export const useRealtimeAnnouncements = () => {
           table: 'announcements',
         },
         (payload) => {
-          const deletedId = payload.old?.id;
+          const deletedId = (payload.old as { id?: string })?.id;
           if (deletedId) {
             setAnnouncements(prev => prev.filter(a => a.id !== deletedId));
           }

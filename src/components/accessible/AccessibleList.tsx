@@ -85,7 +85,7 @@ const renderItem = (item: React.ReactNode | ListItemProps, index: number) => {
 
   return (
     <ListItem key={index}>
-      {item}
+      {item as React.ReactNode}
     </ListItem>
   );
 };
@@ -183,7 +183,7 @@ export interface NavigationListProps {
   ariaLabel?: string;
 }
 
-export const NavigationList = React.forwardRef<HTMLNavElement, NavigationListProps>(
+export const NavigationList = React.forwardRef<HTMLElement, NavigationListProps>(
   ({ items, className, ariaLabel }, ref) => (
     <nav ref={ref} aria-label={ariaLabel || 'Navigation'}>
       <ul className={`space-y-1 ${className || ''}`}>

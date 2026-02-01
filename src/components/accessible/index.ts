@@ -7,22 +7,16 @@
 
 // Core accessible components
 export { AccessibleButton } from './AccessibleButton';
-export type { AccessibleButtonProps } from './AccessibleButton';
 
 export { AccessibleFormField } from './AccessibleFormField';
-export type { AccessibleFormFieldProps } from './AccessibleFormField';
 
 export { AccessibleDialog } from './AccessibleDialog';
-export type { AccessibleDialogProps } from './AccessibleDialog';
 
 export { AccessibleTable } from './AccessibleTable';
-export type { AccessibleTableProps } from './AccessibleTable';
 
 export { AccessibleStatus, useStatus } from './AccessibleStatus';
-export type { AccessibleStatusProps } from './AccessibleStatus';
 
 export { AccessibleSelect } from './AccessibleSelect';
-export type { AccessibleSelectProps } from './AccessibleSelect';
 
 // List components
 export {

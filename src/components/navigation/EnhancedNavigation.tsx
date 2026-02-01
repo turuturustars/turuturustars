@@ -89,12 +89,12 @@ interface EnhancedNavigationProps {
 
 export const EnhancedNavigation = ({ onClose, isOpen = false }: EnhancedNavigationProps) => {
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [openItems, setOpenItems] = useState<string[]>([]);
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/auth');
   };
 

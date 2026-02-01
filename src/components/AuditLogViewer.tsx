@@ -79,7 +79,7 @@ export function AuditLogViewer() {
     }
   };
 
-  const handleExport = (format: 'csv' | 'json') => {
+  const handleExport = (exportFormat: 'csv' | 'json') => {
     const dataToExport = filteredLogs.map((log) => ({
       'Action Type': log.action_type,
       Description: log.action_description,
@@ -88,7 +88,7 @@ export function AuditLogViewer() {
       Details: JSON.stringify(log.metadata || {}),
     }));
 
-    if (format === 'csv') {
+    if (exportFormat === 'csv') {
       exportToCSV(dataToExport, ['Action Type', 'Description', 'Performed By', 'Date', 'Details']);
     } else {
       exportToJSON(dataToExport, `audit_logs_${new Date().toISOString().split('T')[0]}.json`);
@@ -96,7 +96,7 @@ export function AuditLogViewer() {
 
     toast({
       title: 'Success',
-      description: `Audit logs exported as ${format.toUpperCase()}`,
+      description: `Audit logs exported as ${exportFormat.toUpperCase()}`,
     });
   };
 
