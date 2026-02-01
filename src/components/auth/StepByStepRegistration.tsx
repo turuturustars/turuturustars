@@ -373,26 +373,26 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   const progress = ((currentStep + 1) / REGISTRATION_STEPS.length) * 100;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background p-4">
-      <div className="w-full max-w-3xl space-y-6 card-stagger">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 py-12">
+      <div className="w-full max-w-4xl space-y-6 card-stagger">
         {/* Progress Section */}
         <div className="space-y-3 progress-bar">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
-                <Sparkles className="w-6 h-6 text-primary engagement-icon" />
-                Welcome to Turuturu Stars
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+                <Sparkles className="w-6 h-6 text-blue-500 engagement-icon flex-shrink-0" />
+                <span>Welcome to Turuturu Stars</span>
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 mt-1">
                 Let's set up your profile step by step
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-sm font-semibold text-primary flex items-center gap-1 justify-end">
+            <div className="text-left md:text-right flex-shrink-0">
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                 <TrendingUp className="w-4 h-4" />
                 Step {currentStep + 1} of {REGISTRATION_STEPS.length}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {Math.round(progress)}% complete
               </p>
             </div>
@@ -466,36 +466,36 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         </div>
 
         {/* Main Card */}
-        <Card className="shadow-xl registration-card registration-step-content">
-          <CardHeader className="space-y-2 pb-4 bg-gradient-to-r from-primary/5 to-transparent">
+        <Card className="shadow-lg registration-card registration-step-content bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700">
+          <CardHeader className="space-y-2 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg mt-1 step-badge">
+              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg mt-1 step-badge text-blue-600 dark:text-blue-400">
                 {currentStepData.icon}
               </div>
-              <div className="flex-1">
-                <CardTitle className="text-xl md:text-2xl">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-2xl md:text-3xl text-slate-900 dark:text-white break-words">
                   {currentStepData.title}
                 </CardTitle>
-                <CardDescription className="mt-1">
+                <CardDescription className="mt-1 text-slate-600 dark:text-slate-300">
                   {currentStepData.description}
                 </CardDescription>
                 {!currentStepData.required && (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 px-2 py-1 rounded tooltip-animation">
-                    <Clock className="w-3 h-3" />
-                    Optional - You can skip this step
+                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-3 py-2 rounded-md tooltip-animation font-medium">
+                    <Clock className="w-3 h-3 flex-shrink-0" />
+                    <span>Optional - You can skip this step</span>
                   </div>
                 )}
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-6 pt-6 pb-8 px-4 md:px-8">
 
             {/* Personal Info Step */}
             {currentStepData.id === 'personal-info' && (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="flex items-center gap-2">
+                  <Label htmlFor="fullName" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
                     Full Name
                     {' '}
                     <span className="text-red-500">*</span>
@@ -505,11 +505,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     placeholder="e.g., John Doe"
                     value={formData.fullName}
                     onChange={(e) => handleChange('fullName', e.target.value)}
-                    className={`registration-input transition-all ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : ''}`}
+                    className={`registration-input transition-all border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                     disabled={isSaving}
                   />
                   {errors.fullName && (
-                    <p className="text-xs text-red-500 flex items-center gap-1">
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
                       {errors.fullName}
                     </p>
@@ -518,19 +518,21 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="idNumber" className="flex items-center gap-2">
-                      ID Number                    {' '}                      <span className="text-red-500">*</span>
+                    <Label htmlFor="idNumber" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
+                      ID Number
+                      {' '}
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="idNumber"
                       placeholder="e.g., 12345678"
                       value={formData.idNumber}
                       onChange={(e) => handleChange('idNumber', e.target.value)}
-                      className={errors.idNumber ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                      className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.idNumber ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                       disabled={isSaving}
                     />
                     {errors.idNumber && (
-                      <p className="text-xs text-red-500 flex items-center gap-1">
+                      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
                         {errors.idNumber}
                       </p>
@@ -538,8 +540,10 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2">
-                      Phone Number                    {' '}                      <span className="text-red-500">*</span>
+                    <Label htmlFor="phone" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
+                      Phone Number
+                      {' '}
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="phone"
@@ -547,7 +551,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => handleChange('phone', e.target.value)}
-                      className={errors.phone ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                      className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                       disabled={isSaving}
                     />
                     {errors.phone && (
