@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   build: {
+    // Optimize images during build
+    assetsInlineLimit: 4096,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -47,6 +49,15 @@ export default defineConfig(({ mode }) => ({
             'recharts',
             'lucide-react'
           ]
+        },
+        assetFileNames: (assetInfo) => {
+          let extType = assetInfo.name.split('.').at(1);
+          if (/png|jpe?g|gif|tiff|bmp|ico/i.test(extType)) {
+            extType = 'img';
+          } else if (/woff|woff2|ttf|otf|eot/.test(extType)) {
+            extType = 'fonts';
+          }
+          return `assets/${extType}/[name]-[hash][extname]`;
         }
       }
     },

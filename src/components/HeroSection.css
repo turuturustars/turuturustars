@@ -6,6 +6,12 @@
  * 
  * 7 images × 8 seconds each = 56 second full loop
  * Images crossfade perfectly with zero visible transitions
+ * 
+ * Optimizations:
+ * - First image loads immediately (LCP optimization)
+ * - Images are preloaded during page load
+ * - contain-layout prevents repaints during animations
+ * - Reduced motion respects user preferences
  */
 
 /* Base hero background image styling */
@@ -13,6 +19,14 @@
   will-change: transform, opacity;
   position: absolute;
   inset: 0;
+  contain: layout style paint;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Optimize first image for LCP (Largest Contentful Paint) */
+.hero-bg-image:nth-child(1) {
+  content-visibility: auto;
 }
 
 /**

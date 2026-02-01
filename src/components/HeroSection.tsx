@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './HeroSection.css';
 
 // Community images for background animation
@@ -14,6 +14,7 @@ import lowerGradePupils from '@/assets/lower_grade_pupils.jpg';
 
 const HeroSection = () => {
   const [isReducedMotion, setIsReducedMotion] = useState(false);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Check for prefers-reduced-motion on mount
   useEffect(() => {
@@ -25,13 +26,25 @@ const HeroSection = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const scrollToSection = (id) => {
+  // Preload images for better performance
+  useEffect(() => {
+    backgroundImages.forEach((image) => {
+      const img = new Image();
+      img.src = image;
+      // Add fetchpriority="high" for the first image (LCP optimization)
+      if (image === backgroundImages[0]) {
+        img.fetchPriority = 'high';
+      }
+    });
+  }, []);
+
+  const scrollToSection = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, []);
 
   // Array of community images for background rotation
   const backgroundImages = [
-    galleryMembers,
+    galleryMembers,      // LCP image - preload with high priority
     veronikaEvent,
     prizeGivingDay,
     bestStudents,
