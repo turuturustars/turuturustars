@@ -25,30 +25,6 @@ interface OptimizedImageProps {
  * - WebP support with JPEG fallback for modern/legacy browsers
  * - Loading state management with skeleton animation
  * - Error handling and fallback UI
- * 
- * Usage Examples:
- * 
- * 1. Basic image (will lazy load):
- *    <OptimizedImage src="/image.jpg" alt="Description" />
- * 
- * 2. Priority image (LCP - will eager load and preload):
- *    <OptimizedImage src="/hero.jpg" alt="Hero" priority={true} />
- * 
- * 3. Responsive with sizes:
- *    <OptimizedImage
- *      src="/image.jpg"
- *      alt="Responsive"
- *      sizes="(max-width: 768px) 100vw, 50vw"
- *      srcset="/img-640w.jpg 640w, /img-1280w.jpg 1280w"
- *    />
- * 
- * 4. With WebP fallback:
- *    <OptimizedImage
- *      src="/image.jpg"
- *      alt="Modern format"
- *      webpSrc="/image.webp"
- *      priority={true}
- *    />
  */
 export const OptimizedImage: React.FC<OptimizedImageProps> = ({
   src,
@@ -81,7 +57,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         webpLink.href = webpSrc;
         webpLink.type = 'image/webp';
         if (sizes) {
-          webpLink.imagesizes = sizes;
+          (webpLink as any).imagesizes = sizes;
         }
         document.head.appendChild(webpLink);
       }
@@ -92,7 +68,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       jpegLink.as = 'image';
       jpegLink.href = src;
       if (sizes) {
-        jpegLink.imagesizes = sizes;
+        (jpegLink as any).imagesizes = sizes;
       }
       document.head.appendChild(jpegLink);
       
@@ -171,3 +147,13 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       )}
 
       {/* Error state */}
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-200 text-gray-500">
+          <span className="text-sm">Image not available</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default OptimizedImage;

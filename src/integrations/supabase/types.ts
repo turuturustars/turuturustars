@@ -24,6 +24,7 @@ export type Database = {
           published: boolean | null
           published_at: string | null
           title: string
+          updated_at: string | null
         }
         Insert: {
           content: string
@@ -34,6 +35,7 @@ export type Database = {
           published?: boolean | null
           published_at?: string | null
           title: string
+          updated_at?: string | null
         }
         Update: {
           content?: string
@@ -44,6 +46,7 @@ export type Database = {
           published?: boolean | null
           published_at?: string | null
           title?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -133,6 +136,7 @@ export type Database = {
           paid_at: string | null
           reference_number: string | null
           status: Database["public"]["Enums"]["contribution_status"] | null
+          updated_at: string | null
           welfare_case_id: string | null
         }
         Insert: {
@@ -146,6 +150,7 @@ export type Database = {
           paid_at?: string | null
           reference_number?: string | null
           status?: Database["public"]["Enums"]["contribution_status"] | null
+          updated_at?: string | null
           welfare_case_id?: string | null
         }
         Update: {
@@ -159,6 +164,7 @@ export type Database = {
           paid_at?: string | null
           reference_number?: string | null
           status?: Database["public"]["Enums"]["contribution_status"] | null
+          updated_at?: string | null
           welfare_case_id?: string | null
         }
         Relationships: [
@@ -494,6 +500,7 @@ export type Database = {
           id: string
           room_id: string
           sender_id: string
+          updated_at: string | null
         }
         Insert: {
           content: string
@@ -501,6 +508,7 @@ export type Database = {
           id?: string
           room_id?: string
           sender_id: string
+          updated_at?: string | null
         }
         Update: {
           content?: string
@@ -508,6 +516,7 @@ export type Database = {
           id?: string
           room_id?: string
           sender_id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -654,6 +663,7 @@ export type Database = {
           sent_via: string[] | null
           title: string
           type: string
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -664,6 +674,7 @@ export type Database = {
           sent_via?: string[] | null
           title: string
           type: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -674,6 +685,7 @@ export type Database = {
           sent_via?: string[] | null
           title?: string
           type?: string
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -710,6 +722,7 @@ export type Database = {
           id: string
           read_at: string | null
           sender_id: string
+          updated_at: string | null
         }
         Insert: {
           content: string
@@ -718,6 +731,7 @@ export type Database = {
           id?: string
           read_at?: string | null
           sender_id: string
+          updated_at?: string | null
         }
         Update: {
           content?: string
@@ -726,6 +740,7 @@ export type Database = {
           id?: string
           read_at?: string | null
           sender_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -920,6 +935,20 @@ export type Database = {
             referencedRelation: "voting_motions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "votes_motion_id_fkey"
+            columns: ["motion_id"]
+            isOneToOne: false
+            referencedRelation: "voting_motions_with_vote_breakdown"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_motion_id_fkey"
+            columns: ["motion_id"]
+            isOneToOne: false
+            referencedRelation: "voting_motions_with_vote_count"
+            referencedColumns: ["id"]
+          },
         ]
       }
       voting_motions: {
@@ -1036,7 +1065,28 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      voting_motions_with_vote_breakdown: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          no_votes: number | null
+          status: string | null
+          title: string | null
+          total_votes: number | null
+          yes_votes: number | null
+        }
+        Relationships: []
+      }
+      voting_motions_with_vote_count: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          status: string | null
+          title: string | null
+          vote_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       generate_membership_number: { Args: never; Returns: string }

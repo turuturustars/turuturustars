@@ -3,8 +3,6 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 export interface PaginationConfig {
   currentPage: number;
@@ -82,7 +80,7 @@ export function usePagination<T>(
 }
 
 /**
- * Pagination component
+ * Pagination component props
  */
 export interface PaginationProps {
   currentPage: number;
@@ -94,100 +92,49 @@ export interface PaginationProps {
   showSizeSelector?: boolean;
 }
 
-export function Pagination({
-  currentPage,
-  totalPages,
-  onPageChange,
-  onPageSizeChange,
-  pageSize = 10,
-  pageSizeOptions = [5, 10, 25, 50, 100],
-  showSizeSelector = true,
-}: PaginationProps) {
-  const canGoPrevious = currentPage > 1;
-  const canGoNext = currentPage < totalPages;
+/**
+ * Calculate pagination range
+ */
+export function getPaginationRange(
+  currentPage: number,
+  totalPages: number,
+  siblingCount: number = 1
+): (number | 'ellipsis')[] {
+  const range: (number | 'ellipsis')[] = [];
+  
+  const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
+  const rightSiblingIndex = Math.min(currentPage + siblingCount, totalPages);
 
-  return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
-      {/* Page size selector */}
-      {showSizeSelector && onPageSizeChange && (
-        <div className="flex items-center gap-2">
-          <label htmlFor="page-size" className="text-sm text-muted-foreground">
-            Items per page:
-          </label>
-          <select
-            id="page-size"
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(parseInt(e.target.value))}
-            className="px-2 py-1 border border-input rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+  const shouldShowLeftDots = leftSiblingIndex > 2;
+  const shouldShowRightDots = rightSiblingIndex < totalPages - 1;
 
-      {/* Pagination controls */}
-      <div className="flex items-center gap-1 sm:gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(1)}
-          disabled={!canGoPrevious}
-          title="First page"
-          className="hidden sm:flex"
-        >
-          <ChevronsLeft className="w-4 h-4" />
-        </Button>
+  if (!shouldShowLeftDots && shouldShowRightDots) {
+    const leftItemCount = 3 + 2 * siblingCount;
+    for (let i = 1; i <= Math.min(leftItemCount, totalPages); i++) {
+      range.push(i);
+    }
+    range.push('ellipsis');
+    range.push(totalPages);
+  } else if (shouldShowLeftDots && !shouldShowRightDots) {
+    range.push(1);
+    range.push('ellipsis');
+    const rightItemCount = 3 + 2 * siblingCount;
+    for (let i = Math.max(totalPages - rightItemCount + 1, 1); i <= totalPages; i++) {
+      range.push(i);
+    }
+  } else if (shouldShowLeftDots && shouldShowRightDots) {
+    range.push(1);
+    range.push('ellipsis');
+    for (let i = leftSiblingIndex; i <= rightSiblingIndex; i++) {
+      range.push(i);
+    }
+    range.push('ellipsis');
+    range.push(totalPages);
+  } else {
+    for (let i = 1; i <= totalPages; i++) {
+      range.push(i);
+    }
+  }
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={!canGoPrevious}
-          title="Previous page"
-          className="gap-2"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span className="hidden sm:inline">Previous</span>
-        </Button>
-
-        <div className="flex items-center gap-2 px-2 sm:px-4">
-          <span className="text-sm font-medium">
-            Page {currentPage} of {totalPages}
-          </span>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={!canGoNext}
-          title="Next page"
-          className="gap-2"
-        >
-          <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onPageChange(totalPages)}
-          disabled={!canGoNext}
-          title="Last page"
-          className="hidden sm:flex"
-        >
-          <ChevronsRight className="w-4 h-4" />
-        </Button>
-      </div>
-
-      {/* Page info */}
-      <div className="text-xs sm:text-sm text-muted-foreground text-center sm:text-right">
-        Showing page {currentPage} of {totalPages}
-      </div>
-    </div>
-  );
+  return range;
 }
