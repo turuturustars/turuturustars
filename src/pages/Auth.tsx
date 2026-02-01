@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { generateRequestId } from '@/utils/requestId';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
@@ -41,22 +40,6 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [isSignup, setIsSignup] = useState(false);
-  const [signupData, setSignupData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  /* Captcha integration (temporarily commented out)
-    const { captchaToken, renderCaptcha, resetCaptcha, removeCaptcha, error: captchaError } = useCaptcha();
-    */
-  // Placeholders while captcha is disabled to avoid ReferenceErrors
-  const captchaToken = null as string | null;
-  const renderCaptcha = (_containerId?: string) => {};
-  const resetCaptcha = (_containerId?: string) => {};
-  const removeCaptcha = (_containerId?: string) => {};
-  const captchaError = null as string | null;
-  const [searchParams] = useSearchParams();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -69,11 +52,6 @@ const Auth = () => {
 
   // Check if already logged in
   useEffect(() => {
-    // Check URL params for signup mode
-    if (searchParams.get('mode') === 'signup') {
-      setIsSignup(true);
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         navigate('/dashboard', { replace: true });
@@ -89,7 +67,7 @@ const Auth = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate, searchParams]);
+  }, [navigate]);
 
   /* Captcha management (disabled)
   useEffect(() => {
@@ -154,86 +132,6 @@ const Auth = () => {
   };
 
   // Removed captcha from signup flow
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate signup form
-    if (!signupData.email || !signupData.password || !signupData.confirmPassword) {
-      setErrors({
-        email: !signupData.email ? 'Email is required' : '',
-        password: !signupData.password ? 'Password is required' : '',
-        confirmPassword: !signupData.confirmPassword ? 'Please confirm your password' : '',
-      });
-      return;
-    }
-
-    if (signupData.password !== signupData.confirmPassword) {
-      setErrors({ confirmPassword: 'Passwords do not match' });
-      return;
-    }
-
-    if (signupData.password.length < 6) {
-      setErrors({ password: 'Password must be at least 6 characters' });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      // Step 1: Create account with proper redirect to profile setup
-      const { data, error } = await supabase.auth.signUp({
-        email: signupData.email,
-        password: signupData.password,
-        options: {
-          // Redirect to profile setup after email confirmation
-          emailRedirectTo: `${globalThis.location.origin}/profile-setup`,
-        },
-      });
-
-      if (error) {
-        const requestId = generateRequestId();
-        console.error('Supabase auth.signUp error:', { requestId, error });
-        toast({
-          title: 'Sign Up Failed',
-          description: `${error.message} (ref: ${requestId})`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (data.user) {
-        // Account created successfully
-        toast({
-          title: 'Account Created!',
-          description: 'Check your email to verify your account and complete your profile',
-        });
-
-        // Redirect to profile setup
-        setTimeout(() => {
-          navigate('/profile-setup', { replace: true });
-        }, 1500);
-      } else {
-        // This shouldn't happen, but handle it gracefully
-        toast({
-          title: 'Account Created',
-          description: 'Please verify your email to continue',
-        });
-        navigate('/profile-setup', { replace: true });
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
-      console.error('Sign up error:', error);
-      toast({
-        title: 'Error',
-        description: errorMsg,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Ensure captcha is only used for login
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -347,108 +245,16 @@ const Auth = () => {
             </div>
             <div>
               <CardTitle className="heading-display text-2xl">
-                {isSignup ? 'Create Account' : 'Welcome Back'}
+                Welcome Back
               </CardTitle>
               <CardDescription className="mt-2">
-                {isSignup 
-                  ? 'Join Turuturu Stars Community today' 
-                  : 'Sign in to access your member dashboard'}
+                Sign in to access your member dashboard
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
-            {isSignup ? (
-              // SIGNUP FORM
-              <form onSubmit={handleSignup} className="space-y-4">
-                {/* Email Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email Address *</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={signupData.email}
-                    onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
-                    className={errors.email ? 'border-destructive' : ''}
-                    autoComplete="email"
-                  />
-                  {errors.email && (
-                    <p className="text-sm text-destructive">{errors.email}</p>
-                  )}
-                </div>
-
-                {/* Password Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="signup-password">Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="signup-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={signupData.password}
-                      onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
-                      className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <p className="text-sm text-destructive">{errors.password}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">At least 6 characters</p>
-                </div>
-
-                {/* Confirm Password Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirm-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={signupData.confirmPassword}
-                      onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
-                      className={errors.confirmPassword ? 'border-destructive pr-10' : 'pr-10'}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className="text-sm text-destructive">{errors.confirmPassword}</p>
-                  )}
-                </div>
-
-                {/* Create Account Button */}
-                <Button
-                  type="submit"
-                  className="btn-primary w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating Account...
-                    </>
-                  ) : (
-                    'Create Account'
-                  )}
-                </Button>
-              </form>
-            ) : (
-              // LOGIN FORM
-              <form onSubmit={handleSubmit} className="space-y-4">
+            {/* LOGIN FORM */}
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Email Input */}
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address *</Label>
@@ -553,7 +359,6 @@ const Auth = () => {
                   )}
                 </Button>
               </form>
-            )}
 
             {/* Divider */}
             <div className="relative my-6">
@@ -599,26 +404,20 @@ const Auth = () => {
             {/* Sign Up / Sign In Toggle Link */}
             <div className="mt-6 text-center space-y-3">
               <p className="text-sm text-muted-foreground">
-                {isSignup ? 'Already have an account?' : "Don't have an account?"}
+                Don't have an account?
               </p>
               <Button
                 type="button"
                 variant="outline"
                 className="w-full"
-                onClick={() => {
-                  setIsSignup(!isSignup);
-                  setErrors({});
-                  resetCaptcha('captcha-container');
-                }}
+                onClick={() => navigate('/register', { replace: true })}
                 disabled={isLoading}
               >
-                {isSignup ? 'Sign In' : 'Create an Account'}
+                Create an Account
               </Button>
-              {!isSignup && (
-                <p className="text-xs text-muted-foreground">
-                  Join Turuturu Stars Community to access member benefits and participate in community activities.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                Join Turuturu Stars Community to access member benefits and participate in community activities.
+              </p>
             </div>
           </CardContent>
         </Card>
