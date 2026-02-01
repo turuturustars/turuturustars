@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => ({
     assetsInlineLimit: 4096,
     
     // Smaller chunk size warning to catch bloated modules
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 1000,
     
     rollupOptions: {
       output: {
@@ -71,17 +71,17 @@ export default defineConfig(({ mode }) => ({
         },
         
         assetFileNames: (assetInfo) => {
-          let extType = assetInfo.name.split('.').at(1);
+          const name = assetInfo.name || '';
+          const extType = name.split('.').at(1) || '';
           if (/png|jpe?g|gif|tiff|bmp|ico|webp|avif/i.test(extType)) {
-            extType = 'img';
+            return `assets/img/[name]-[hash][extname]`;
           } else if (/woff|woff2|ttf|otf|eot/.test(extType)) {
-            extType = 'fonts';
+            return `assets/fonts/[name]-[hash][extname]`;
           }
           return `assets/${extType}/[name]-[hash][extname]`;
         }
       }
     },
-    chunkSizeWarningLimit: 1000,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

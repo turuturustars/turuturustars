@@ -269,14 +269,14 @@ serve(async (req) => {
         if (result.ResultCode !== undefined) {
           console.log(`[${new Date().toISOString()}] 💾 Updating transaction status in database...`);
           const updateTime = new Date().toISOString();
-          const statusMap = {
+          const statusMap: Record<number | string, string> = {
             0: "completed",
             1: "incomplete",
             2: "failed",
             "1032": "request_timeout",
             "1037": "user_cancelled"
           };
-          const newStatus = statusMap[result.ResultCode] || "unknown";
+          const newStatus = statusMap[result.ResultCode as number | string] || "unknown";
           
           await supabase
             .from("mpesa_transactions")
