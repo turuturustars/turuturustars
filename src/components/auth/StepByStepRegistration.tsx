@@ -292,14 +292,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     setIsSaving(true);
 
     try {
-      // CAPTCHA verification is currently disabled — skip Turnstile verification step.
-      // If you re-enable Turnstile, restore the POST to /functions/v1/verify-turnstile here.
-
-      // Step 2: Proceed with profile creation only if captcha is verified
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
-      // Use retryUpsert to tolerate transient failures and reduce trigger race conditions
-      const { data, error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
+      // Save profile data to database
+      // Status is 'pending' until email is verified
+      const { error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
         'profiles',
         {
           id: user.id,
@@ -310,7 +307,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           location: finalLocation,
           occupation: formData.occupation || null,
           is_student: formData.isStudent,
-          status: 'pending',
+          status: 'pending', // Pending email verification
+          email_verified_at: null, // Will be set after email confirmation
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' },
@@ -320,16 +318,29 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
       if (error) throw error;
 
-      // Reset captcha (no-op placeholder)
+      // Store pending signup info in localStorage for recovery
+      try {
+        localStorage.setItem('pendingSignup', JSON.stringify({
+          email: user.email,
+          userId: user.id,
+          timestamp: new Date().toISOString(),
+        }));
+      } catch (e) {
+        console.warn('Could not save pending signup to localStorage');
+      }
+
       resetCaptcha();
 
+      // Note: Email verification is handled by Supabase automatically
+      // User will receive a confirmation email at user.email
       toast({
-        title: 'Success!',
-        description: 'Your profile has been created successfully',
+        title: 'Account Created!',
+        description: 'Check your email to verify your account and complete registration.',
       });
 
+      // Redirect to check email page
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
+        navigate('/register', { replace: true });
       }, 1500);
     } catch (error) {
       console.error('Error during signup:', error);
