@@ -1,6 +1,5 @@
 /**
  * Performance monitoring and optimization utilities
- * Tracks metrics, detects bottlenecks, and provides optimization recommendations
  */
 
 import { useEffect, useRef } from 'react';
@@ -35,17 +34,14 @@ export function useRenderTime(componentName: string) {
     renderCountRef.current += 1;
 
     if (renderTime > 16) {
-      // 60fps = 16ms per frame
       console.warn(
         `[Performance] ${componentName} took ${renderTime}ms to render (${renderCountRef.current} renders)`
       );
     }
 
-    // Reset for next render
     renderStartRef.current = Date.now();
 
     return () => {
-      // Optional: Log average render time when component unmounts
       if (renderCountRef.current > 0) {
         const avgTime =
           renderTimesRef.current.reduce((a, b) => a + b, 0) /
@@ -78,12 +74,10 @@ const apiMetricsStorage: ApiCallMetric[] = [];
 export function trackApiCall(metric: ApiCallMetric) {
   apiMetricsStorage.push(metric);
 
-  // Keep only last 100 calls
   if (apiMetricsStorage.length > 100) {
     apiMetricsStorage.shift();
   }
 
-  // Log slow calls
   if (metric.duration > 1000) {
     console.warn(
       `[API Performance] ${metric.method} ${metric.endpoint} took ${metric.duration}ms`
@@ -145,11 +139,19 @@ export interface MemoryMetric {
 }
 
 export function getMemoryMetrics(): MemoryMetric | null {
-  if (!(performance as any).memory) {
+  const perfWithMemory = performance as Performance & {
+    memory?: {
+      usedJSHeapSize: number;
+      totalJSHeapSize: number;
+      jsHeapSizeLimit: number;
+    };
+  };
+  
+  if (!perfWithMemory.memory) {
     return null;
   }
 
-  const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = (performance as any).memory;
+  const { usedJSHeapSize, totalJSHeapSize, jsHeapSizeLimit } = perfWithMemory.memory;
   return {
     usedJSHeapSize,
     totalJSHeapSize,
@@ -173,7 +175,7 @@ export function useMemoryMonitoring(warningThreshold: number = 0.8) {
       }
     };
 
-    const interval = setInterval(checkMemory, 30000); // Check every 30 seconds
+    const interval = setInterval(checkMemory, 30000);
     return () => clearInterval(interval);
   }, [warningThreshold]);
 }
@@ -190,104 +192,108 @@ export interface WebVital {
   timestamp: number;
 }
 
+interface LCPEntry extends PerformanceEntry {
+  renderTime: number;
+  loadTime: number;
+}
+
+interface LayoutShiftEntry extends PerformanceEntry {
+  hadRecentInput: boolean;
+  value: number;
+}
+
+interface FirstInputEntry extends PerformanceEntry {
+  processingDuration: number;
+}
+
 export function initWebVitalsMonitoring(callback?: (vital: WebVital) => void) {
+  if (!('PerformanceObserver' in globalThis)) return;
+
   // Largest Contentful Paint (LCP)
-  if ('PerformanceObserver' in globalThis) {
-    try {
-      const lcpObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        const lastEntry = entries.at(-1);
+  try {
+    const lcpObserver = new PerformanceObserver((list) => {
+      const entries = list.getEntries();
+      const lastEntry = entries.at(-1) as LCPEntry | undefined;
+      if (lastEntry) {
+        const value = lastEntry.renderTime || lastEntry.loadTime;
         const lcp: WebVital = {
           name: 'LCP',
-          value: lastEntry.renderTime || lastEntry.loadTime,
+          value,
           unit: 'ms',
-          rating: lastEntry.renderTime < 2500 ? 'good' : 'poor',
+          rating: value < 2500 ? 'good' : 'poor',
           timestamp: Date.now(),
         };
         callback?.(lcp);
-      });
-      lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
-    } catch {
-      // LCP not supported - ignore error
-    }
-
-    // Cumulative Layout Shift (CLS)
-    try {
-      let clsValue = 0;
-      const clsObserver = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          if (!(entry as any).hadRecentInput) {
-            clsValue += (entry as any).value;
-            const cls: WebVital = {
-              name: 'CLS',
-              value: clsValue,
-              unit: 'score',
-              rating: clsValue < 0.1 ? 'good' : 'poor',
-              timestamp: Date.now(),
-            };
-            callback?.(cls);
-          }
-        }
-      });
-      clsObserver.observe({ entryTypes: ['layout-shift'] });
-    } catch {
-      // CLS not supported - ignore error
-    }
-
-    // First Input Delay (FID) / Interaction to Next Paint (INP)
-    try {
-      const fidObserver = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          const fid: WebVital = {
-            name: 'FID',
-            value: (entry as any).processingDuration,
-            unit: 'ms',
-            rating: (entry as any).processingDuration < 100 ? 'good' : 'poor',
-            timestamp: Date.now(),
-          };
-          callback?.(fid);
-        }
-      });
-      fidObserver.observe({ entryTypes: ['first-input'] });
-    } catch {
-      // FID not supported - ignore error
-    }
+      }
+    });
+    lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
+  } catch {
+    // LCP not supported
   }
 
-  // Time to First Byte (TTFB)
-  if ('navigation' in performance) {
-    const ttfb = (performance as any).timing.responseStart - (performance as any).timing.fetchStart;
-    const vital: WebVital = {
-      name: 'TTFB',
-      value: ttfb,
-      unit: 'ms',
-      rating: ttfb < 600 ? 'good' : 'poor',
-      timestamp: Date.now(),
-    };
-    callback?.(vital);
+  // Cumulative Layout Shift (CLS)
+  try {
+    let clsValue = 0;
+    const clsObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const layoutEntry = entry as LayoutShiftEntry;
+        if (!layoutEntry.hadRecentInput) {
+          clsValue += layoutEntry.value;
+          const cls: WebVital = {
+            name: 'CLS',
+            value: clsValue,
+            unit: 'score',
+            rating: clsValue < 0.1 ? 'good' : 'poor',
+            timestamp: Date.now(),
+          };
+          callback?.(cls);
+        }
+      }
+    });
+    clsObserver.observe({ entryTypes: ['layout-shift'] });
+  } catch {
+    // CLS not supported
+  }
+
+  // First Input Delay (FID)
+  try {
+    const fidObserver = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        const fidEntry = entry as FirstInputEntry;
+        const fid: WebVital = {
+          name: 'FID',
+          value: fidEntry.processingDuration,
+          unit: 'ms',
+          rating: fidEntry.processingDuration < 100 ? 'good' : 'poor',
+          timestamp: Date.now(),
+        };
+        callback?.(fid);
+      }
+    });
+    fidObserver.observe({ entryTypes: ['first-input'] });
+  } catch {
+    // FID not supported
   }
 
   // First Contentful Paint (FCP)
-  if ('PerformanceObserver' in globalThis) {
-    try {
-      const fcpObserver = new PerformanceObserver((list) => {
-        const entries = list.getEntries();
-        if (entries.length > 0) {
-          const fcp: WebVital = {
-            name: 'FCP',
-            value: entries[0].startTime,
-            unit: 'ms',
-            rating: entries[0].startTime < 1800 ? 'good' : 'poor',
-            timestamp: Date.now(),
-          };
-          callback?.(fcp);
-          fcpObserver.disconnect();
-        }
-      });
-      fcpObserver.observe({ entryTypes: ['paint'] });
-    } catch {
-      // FCP not supported - ignore error
-    }
+  try {
+    const fcpObserver = new PerformanceObserver((list) => {
+      const entries = list.getEntries();
+      if (entries.length > 0) {
+        const fcp: WebVital = {
+          name: 'FCP',
+          value: entries[0].startTime,
+          unit: 'ms',
+          rating: entries[0].startTime < 1800 ? 'good' : 'poor',
+          timestamp: Date.now(),
+        };
+        callback?.(fcp);
+        fcpObserver.disconnect();
+      }
+    });
+    fcpObserver.observe({ entryTypes: ['paint'] });
+  } catch {
+    // FCP not supported
   }
 }
 
@@ -379,13 +385,10 @@ export function logPerformanceReport() {
 // Memoization Utilities
 // ============================================================================
 
-/**
- * Wrap expensive calculations with memoization
- */
-export function memoize<T extends (...args: any[]) => any>(fn: T): T {
+export function memoize<T extends (...args: unknown[]) => unknown>(fn: T): T {
   const cache = new Map();
 
-  return ((...args: any[]) => {
+  return ((...args: unknown[]) => {
     const key = JSON.stringify(args);
     if (cache.has(key)) {
       return cache.get(key);
@@ -396,16 +399,13 @@ export function memoize<T extends (...args: any[]) => any>(fn: T): T {
   }) as T;
 }
 
-/**
- * Debounce function calls (useful for search, resize, etc.)
- */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delay: number
 ): T {
-  let timeoutId: NodeJS.Timeout | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  return ((...args: any[]) => {
+  return ((...args: unknown[]) => {
     if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => {
       fn(...args);
@@ -413,16 +413,13 @@ export function debounce<T extends (...args: any[]) => any>(
   }) as T;
 }
 
-/**
- * Throttle function calls (useful for scroll, resize, etc.)
- */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limit: number
 ): T {
   let inThrottle: boolean = false;
 
-  return ((...args: any[]) => {
+  return ((...args: unknown[]) => {
     if (!inThrottle) {
       fn(...args);
       inThrottle = true;

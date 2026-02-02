@@ -1,128 +1,46 @@
 /**
  * Type-safe database operations and query builders
- * Prevents N+1 queries, type casting issues, and improves performance
+ * Uses actual database schema from Supabase
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { PostgrestFilterBuilder } from '@supabase/postgrest-js';
+import type { Database } from '@/integrations/supabase/types';
 
 // ============================================================================
-// Database Types (Strict Type Definitions)
+// Database Types (from actual schema)
 // ============================================================================
 
-export interface Member {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  idNumber: string;
-  dateOfBirth: string;
-  address: string;
-  occupation: string;
-  profilePhotoUrl?: string;
-  status: 'active' | 'pending' | 'dormant' | 'suspended';
-  joinedDate: string;
-  lastActive: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Contribution {
-  id: string;
-  memberId: string;
-  amount: number;
-  description: string;
-  paymentMethod: 'mpesa' | 'cash' | 'bank_transfer';
-  reference: string;
-  date: string;
-  status: 'pending' | 'completed' | 'failed';
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WelfareCase {
-  id: string;
-  memberId: string;
-  type: 'death' | 'illness' | 'accident' | 'other';
-  description: string;
-  amount?: number;
-  status: 'active' | 'resolved' | 'closed';
-  supportDetails?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  targetAudience: string[];
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface AuditLog {
-  id: string;
-  userId: string;
-  action: string;
-  resource: string;
-  resourceId: string;
-  changes?: Record<string, any>;
-  status: 'success' | 'failure';
-  errorMessage?: string;
-  ipAddress?: string;
-  userAgent?: string;
-  createdAt: string;
-}
-
-export interface Meeting {
-  id: string;
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  location: string;
-  attendees: string[];
-  agenda: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Contribution = Database['public']['Tables']['contributions']['Row'];
+export type WelfareCase = Database['public']['Tables']['welfare_cases']['Row'];
+export type Announcement = Database['public']['Tables']['announcements']['Row'];
+export type AuditLog = Database['public']['Tables']['audit_logs']['Row'];
+export type Meeting = Database['public']['Tables']['meetings']['Row'];
+export type Member = Database['public']['Tables']['members']['Row'];
 
 // ============================================================================
 // Query Builders with Type Safety
 // ============================================================================
 
 /**
- * Fetch members with specific columns (avoid SELECT *)
+ * Fetch profiles with specific columns
  */
-export async function fetchMembers(
+export async function fetchProfiles(
   filters?: {
-    status?: Member['status'];
+    status?: Profile['status'];
     limit?: number;
     offset?: number;
-    sortBy?: 'createdAt' | 'firstName' | 'lastActive';
-    ascending?: boolean;
   }
 ) {
   let query = supabase
-    .from('members')
-    .select(
-      'id, email, firstName, lastName, phone, idNumber, status, joinedDate, lastActive, createdAt, updatedAt'
-    ) as PostgrestFilterBuilder<any, any, any, any>;
+    .from('profiles')
+    .select('id, full_name, phone, email, status, membership_number, created_at, updated_at');
 
   if (filters?.status) {
     query = query.eq('status', filters.status);
   }
 
-  if (filters?.sortBy) {
-    query = query.order(filters.sortBy, { ascending: filters.ascending ?? false });
-  }
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.limit) {
     query = query.limit(filters.limit);
@@ -134,25 +52,25 @@ export async function fetchMembers(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Member[];
+  return data;
 }
 
 /**
- * Fetch single member with full details
+ * Fetch single profile by ID
  */
-export async function fetchMemberById(memberId: string) {
+export async function fetchProfileById(profileId: string) {
   const { data, error } = await supabase
-    .from('members')
+    .from('profiles')
     .select('*')
-    .eq('id', memberId)
+    .eq('id', profileId)
     .single();
 
   if (error) throw error;
-  return data as Member;
+  return data;
 }
 
 /**
- * Fetch contributions with member details (prevents N+1)
+ * Fetch contributions with filters
  */
 export async function fetchContributions(
   filters?: {
@@ -166,10 +84,10 @@ export async function fetchContributions(
 ) {
   let query = supabase
     .from('contributions')
-    .select('id, memberId, amount, description, paymentMethod, reference, date, status, createdAt, updatedAt') as PostgrestFilterBuilder<any, any, any, any>;
+    .select('id, member_id, amount, contribution_type, status, due_date, paid_at, created_at, updated_at');
 
   if (filters?.memberId) {
-    query = query.eq('memberId', filters.memberId);
+    query = query.eq('member_id', filters.memberId);
   }
 
   if (filters?.status) {
@@ -177,14 +95,14 @@ export async function fetchContributions(
   }
 
   if (filters?.dateFrom) {
-    query = query.gte('date', filters.dateFrom);
+    query = query.gte('created_at', filters.dateFrom);
   }
 
   if (filters?.dateTo) {
-    query = query.lte('date', filters.dateTo);
+    query = query.lte('created_at', filters.dateTo);
   }
 
-  query = query.order('date', { ascending: false });
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.limit) query = query.limit(filters.limit);
   if (filters?.offset) {
@@ -193,43 +111,7 @@ export async function fetchContributions(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Contribution[];
-}
-
-/**
- * Fetch contributions with member info (single query, prevents N+1)
- */
-export async function fetchContributionsWithMembers(
-  filters?: {
-    limit?: number;
-    offset?: number;
-  }
-) {
-  const { data, error } = await supabase
-    .from('contributions')
-    .select(
-      `
-        id,
-        amount,
-        paymentMethod,
-        status,
-        date,
-        memberId,
-        members:memberId (
-          id,
-          firstName,
-          lastName,
-          phone,
-          email
-        )
-      `
-    )
-    .order('date', { ascending: false })
-    .limit(filters?.limit ?? 20)
-    .range(filters?.offset ?? 0, (filters?.offset ?? 0) + (filters?.limit ?? 20) - 1);
-
-  if (error) throw error;
-  return data as any[];
+  return data;
 }
 
 /**
@@ -237,25 +119,20 @@ export async function fetchContributionsWithMembers(
  */
 export async function fetchWelfareCases(
   filters?: {
-    status?: WelfareCase['status'];
-    type?: WelfareCase['type'];
+    status?: string;
     limit?: number;
     offset?: number;
   }
 ) {
   let query = supabase
     .from('welfare_cases')
-    .select('id, memberId, type, description, amount, status, createdAt, updatedAt') as PostgrestFilterBuilder<any, any, any, any>;
+    .select('id, title, description, case_type, status, target_amount, collected_amount, created_at');
 
   if (filters?.status) {
     query = query.eq('status', filters.status);
   }
 
-  if (filters?.type) {
-    query = query.eq('type', filters.type);
-  }
-
-  query = query.order('createdAt', { ascending: false });
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.limit) query = query.limit(filters.limit);
   if (filters?.offset) {
@@ -264,7 +141,7 @@ export async function fetchWelfareCases(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as WelfareCase[];
+  return data;
 }
 
 /**
@@ -272,20 +149,25 @@ export async function fetchWelfareCases(
  */
 export async function fetchAnnouncements(
   filters?: {
-    priority?: Announcement['priority'];
+    priority?: string;
+    published?: boolean;
     limit?: number;
     offset?: number;
   }
 ) {
   let query = supabase
     .from('announcements')
-    .select('id, title, content, priority, targetAudience, createdBy, createdAt, updatedAt') as PostgrestFilterBuilder<any, any, any, any>;
+    .select('id, title, content, priority, published, created_at, updated_at');
 
   if (filters?.priority) {
     query = query.eq('priority', filters.priority);
   }
 
-  query = query.order('createdAt', { ascending: false });
+  if (filters?.published !== undefined) {
+    query = query.eq('published', filters.published);
+  }
+
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.limit) query = query.limit(filters.limit);
   if (filters?.offset) {
@@ -294,7 +176,7 @@ export async function fetchAnnouncements(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Announcement[];
+  return data;
 }
 
 /**
@@ -302,10 +184,9 @@ export async function fetchAnnouncements(
  */
 export async function fetchAuditLogs(
   filters?: {
-    userId?: string;
-    action?: string;
-    resource?: string;
-    status?: AuditLog['status'];
+    performedBy?: string;
+    actionType?: string;
+    entityType?: string;
     dateFrom?: string;
     dateTo?: string;
     limit?: number;
@@ -314,18 +195,15 @@ export async function fetchAuditLogs(
 ) {
   let query = supabase
     .from('audit_logs')
-    .select(
-      'id, userId, action, resource, resourceId, status, createdAt'
-    ) as PostgrestFilterBuilder<any, any, any, any>;
+    .select('id, action_type, action_description, entity_type, entity_id, performed_by, performed_by_name, created_at');
 
-  if (filters?.userId) query = query.eq('userId', filters.userId);
-  if (filters?.action) query = query.eq('action', filters.action);
-  if (filters?.resource) query = query.eq('resource', filters.resource);
-  if (filters?.status) query = query.eq('status', filters.status);
-  if (filters?.dateFrom) query = query.gte('createdAt', filters.dateFrom);
-  if (filters?.dateTo) query = query.lte('createdAt', filters.dateTo);
+  if (filters?.performedBy) query = query.eq('performed_by', filters.performedBy);
+  if (filters?.actionType) query = query.eq('action_type', filters.actionType);
+  if (filters?.entityType) query = query.eq('entity_type', filters.entityType);
+  if (filters?.dateFrom) query = query.gte('created_at', filters.dateFrom);
+  if (filters?.dateTo) query = query.lte('created_at', filters.dateTo);
 
-  query = query.order('createdAt', { ascending: false });
+  query = query.order('created_at', { ascending: false });
 
   if (filters?.limit) query = query.limit(filters.limit);
   if (filters?.offset) {
@@ -334,16 +212,19 @@ export async function fetchAuditLogs(
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as AuditLog[];
+  return data;
 }
 
 /**
  * Count total records (for pagination)
  */
-export async function countRecords(table: string, filters?: Record<string, any>) {
+export async function countRecords(
+  table: 'profiles' | 'contributions' | 'announcements' | 'meetings' | 'welfare_cases',
+  filters?: Record<string, unknown>
+) {
   let query = supabase
     .from(table)
-    .select('id', { count: 'exact', head: true }) as PostgrestFilterBuilder<any, any, any, any>;
+    .select('id', { count: 'exact', head: true });
 
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
@@ -359,10 +240,10 @@ export async function countRecords(table: string, filters?: Record<string, any>)
 }
 
 /**
- * Batch fetch related records (prevents N+1 queries)
+ * Batch fetch related records
  */
 export async function fetchBatch<T>(
-  table: string,
+  table: 'profiles' | 'contributions' | 'announcements' | 'meetings',
   ids: string[],
   columns: string = '*'
 ): Promise<T[]> {
@@ -375,177 +256,4 @@ export async function fetchBatch<T>(
 
   if (error) throw error;
   return data as T[];
-}
-
-// ============================================================================
-// Mutation Helpers
-// ============================================================================
-
-/**
- * Insert with automatic audit log
- */
-export async function insertWithAudit<T>(
-  table: string,
-  data: T,
-  userId: string,
-  action: string
-) {
-  try {
-    const { data: insertedData, error } = await supabase
-      .from(table)
-      .insert([data])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Log to audit trail
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: (insertedData as any).id,
-        status: 'success',
-        changes: data,
-      },
-    ]);
-
-    return insertedData;
-  } catch (error) {
-    // Log failure
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: 'unknown',
-        status: 'failure',
-        errorMessage: (error as Error).message,
-      },
-    ]);
-
-    throw error;
-  }
-}
-
-/**
- * Update with automatic audit log
- */
-export async function updateWithAudit<T extends { id: string }>(
-  table: string,
-  data: Partial<T>,
-  userId: string,
-  action: string
-) {
-  try {
-    const { data: updatedData, error } = await supabase
-      .from(table)
-      .update(data)
-      .eq('id', data.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Log to audit trail
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: data.id,
-        status: 'success',
-        changes: data,
-      },
-    ]);
-
-    return updatedData;
-  } catch (error) {
-    // Log failure
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: data.id,
-        status: 'failure',
-        errorMessage: (error as Error).message,
-      },
-    ]);
-
-    throw error;
-  }
-}
-
-/**
- * Delete with automatic audit log
- */
-export async function deleteWithAudit(
-  table: string,
-  id: string,
-  userId: string,
-  action: string
-) {
-  try {
-    const { error } = await supabase
-      .from(table)
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-
-    // Log to audit trail
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: id,
-        status: 'success',
-      },
-    ]);
-  } catch (error) {
-    // Log failure
-    await supabase.from('audit_logs').insert([
-      {
-        userId,
-        action,
-        resource: table,
-        resourceId: id,
-        status: 'failure',
-        errorMessage: (error as Error).message,
-      },
-    ]);
-
-    throw error;
-  }
-}
-
-// ============================================================================
-// Real-time Subscriptions Helper
-// ============================================================================
-
-export function subscribeToTable(
-  table: string,
-  callback: (payload: any) => void,
-  filter?: { column: string; value: string }
-) {
-  const subscription = supabase
-    .channel(`${table}-changes`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table,
-        ...(filter && { filter: `${filter.column}=eq.${filter.value}` }),
-      },
-      callback
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(subscription);
-  };
 }

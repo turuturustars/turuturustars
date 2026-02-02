@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -6,53 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { generateRequestId } from '@/utils/requestId';
-import { Loader2, Eye, EyeOff, AlertCircle, CheckCircle, Mail, Lock } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, Mail, Lock } from 'lucide-react';
 import { z } from 'zod';
-
-// ============================================================================
-// TYPE DEFINITIONS
-// ============================================================================
-
-declare global {
-  interface Window {
-    turnstile: {
-      render: (element: HTMLElement, options: TurnstileOptions) => string;
-      reset: (widgetId: string) => void;
-      remove: (widgetId: string) => void;
-      getResponse: (widgetId: string) => string | undefined;
-      isExpired: (widgetId: string) => boolean;
-    };
-  }
-}
-
-interface TurnstileOptions {
-  sitekey: string;
-  theme?: 'light' | 'dark';
-  size?: 'normal' | 'compact';
-  callback?: (token: string) => void;
-  'error-callback'?: () => void;
-  'expired-callback'?: () => void;
-  'timeout-callback'?: () => void;
-  'unsupported-callback'?: () => void;
-  appearance?: 'always' | 'execute' | 'interaction-only';
-  'auto-reset-on-expire'?: boolean;
-}
-
-interface FormErrors {
-  email?: string;
-  password?: string;
-  confirmPassword?: string;
-  captcha?: string;
-  submit?: string;
-}
-
-interface TurnstileState {
-  token: string | null;
-  widgetId: string | null;
-  isLoading: boolean;
-  error: string | null;
-}
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -72,26 +27,12 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
-// ============================================================================
-// COLOR PALETTE - PRODUCTION COLORS
-// ============================================================================
-
-const COLORS = {
-  primary: '#00B2E3', // Aqua Blue
-  darkBlue: '#003366', // Deep Blue
-  softWhite: '#FFFFFF',
-  lightGray: '#F0F0F0',
-  richBlack: '#1C1C1C',
-  accentGreen: '#00CC99',
-  crispBlue: '#007BFF',
-  deepNavy: '#1A1A2E',
-  skyBlue: '#00BFFF',
-  lightGrayBg: '#F5F5F5',
-  error: '#EF4444',
-  success: '#22C55E',
-  border: '#E5E7EB',
-  textSecondary: '#6B7280',
-};
+interface FormErrors {
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+  submit?: string;
+}
 
 // ============================================================================
 // AUTHENTICATION FORM COMPONENT
@@ -106,241 +47,27 @@ const AuthenticationForm = ({
   initialMode = 'login',
   onSuccess 
 }: AuthenticationFormProps) => {
-  // Navigation and notifications
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Form state
   const [mode, setMode] = useState<'login' | 'signup'>(initialMode);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
 
-  // Login form data
   const [loginData, setLoginData] = useState({
     email: '',
     password: '',
   });
 
-  // Signup form data
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
     confirmPassword: '',
   });
 
-  /* Turnstile captcha state (disabled)
-  // Turnstile captcha state
-  const [turnstile, setTurnstile] = useState<TurnstileState>({
-    token: null,
-    widgetId: null,
-    isLoading: false,
-    error: null,
-  });
-
-  // Refs
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const scriptLoadedRef = useRef(false);
-  */
-
-  // Placeholders while Turnstile is disabled to avoid ReferenceErrors
-  const loadTurnstileScript = () => {};
-  const renderTurnstile = (_el?: HTMLElement) => '' as string;
-  const resetTurnstile = () => {};
-  const removeTurnstile = () => {};
-  const verifyTurnstileToken = async (_token: string): Promise<boolean> => true;
-
-  // =========================================================================
-  // TURNSTILE MANAGEMENT
-  // =========================================================================
-
-  /*
-  Load Turnstile script from CDN (disabled)
-  const loadTurnstileScript = useCallback(() => {
-    if (scriptLoadedRef.current || window.turnstile) {
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      scriptLoadedRef.current = true;
-      console.log('✅ Turnstile script loaded');
-    };
-    script.onerror = () => {
-      console.error('❌ Failed to load Turnstile script');
-      setTurnstile((prev) => ({
-        ...prev,
-        error: 'Failed to load security verification. Please refresh and try again.',
-        isLoading: false,
-      }));
-    };
-    document.head.appendChild(script);
-  }, []);
-  */
-
-  /*
-  Render Turnstile widget (disabled)
-  const renderTurnstile = useCallback(async () => {
-    if (!turnstileContainerRef.current) return;
-
-    // If widget is already rendered, don't render again
-    if (turnstile.widgetId) return;
-
-    setTurnstile((prev) => ({ ...prev, isLoading: true }));
-
-    try {
-      const siteKey = import.meta.env.VITE_CLOUDFLARE_SITE_KEY;
-      if (!siteKey) {
-        throw new Error('Cloudflare site key not configured');
-      }
-
-      // Wait for Turnstile to be available
-      let attempts = 0;
-      const maxAttempts = 50;
-      while (!window.turnstile && attempts < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!window.turnstile) {
-        throw new Error('Turnstile failed to load');
-      }
-
-      // Render the widget
-      const widgetId = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: siteKey,
-        theme: 'light',
-        appearance: 'managed',
-        callback: (token: string) => {
-          setTurnstile((prev) => ({
-            ...prev,
-            token,
-            error: null,
-            isLoading: false,
-          }));
-          setErrors((prev) => ({ ...prev, captcha: '' }));
-          console.log('✅ Captcha verified');
-        },
-        'error-callback': () => {
-          setTurnstile((prev) => ({
-            ...prev,
-            token: null,
-            error: 'Captcha verification failed. Please try again.',
-            isLoading: false,
-          }));
-          console.error('❌ Captcha error');
-        },
-        'expired-callback': () => {
-          setTurnstile((prev) => ({
-            ...prev,
-            token: null,
-            error: 'Captcha expired. Please verify again.',
-            isLoading: false,
-          }));
-        },
-        'timeout-callback': () => {
-          setTurnstile((prev) => ({
-            ...prev,
-            token: null,
-            error: 'Captcha timeout. Please try again.',
-            isLoading: false,
-          }));
-        },
-        'unsupported-callback': () => {
-          console.warn('⚠️ Turnstile not supported in this browser');
-          // In unsupported browsers, proceed without captcha
-          setTurnstile((prev) => ({
-            ...prev,
-            token: 'unsupported', // Use special token to indicate unsupported
-            isLoading: false,
-          }));
-        },
-      });
-
-      setTurnstile((prev) => ({
-        ...prev,
-        widgetId,
-        isLoading: false,
-      }));
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load captcha';
-      console.error('Turnstile error:', err);
-      setTurnstile((prev) => ({
-        ...prev,
-        error: errorMessage,
-        isLoading: false,
-      }));
-    }
-  }, [turnstile.widgetId]);
-  */
-
-  /* Reset Turnstile widget (disabled)
-  const resetTurnstile = useCallback(() => {
-    if (!window.turnstile || !turnstile.widgetId) return;
-
-    try {
-      window.turnstile.reset(turnstile.widgetId);
-      setTurnstile((prev) => ({
-        ...prev,
-        token: null,
-      }));
-    } catch (err) {
-      console.error('Error resetting Turnstile:', err);
-    }
-  }, [turnstile.widgetId]);
-  */
-
-  /* Remove Turnstile widget (disabled)
-  const removeTurnstile = useCallback(() => {
-    if (!window.turnstile || !turnstile.widgetId) return;
-
-    try {
-      window.turnstile.remove(turnstile.widgetId);
-      setTurnstile({
-        token: null,
-        widgetId: null,
-        isLoading: false,
-        error: null,
-      });
-    } catch (err) {
-      console.error('Error removing Turnstile:', err);
-    }
-  }, [turnstile.widgetId]);
-  */
-
-  // =========================================================================
-  // LIFECYCLE EFFECTS
-  // =========================================================================
-
-  /**
-   * Load Turnstile script on mount
-   */
-  /* Load Turnstile script on mount (disabled)
-  useEffect(() => {
-    loadTurnstileScript();
-  }, [loadTurnstileScript]);
-  */
-
-  /**
-   * Render/remove Turnstile when mode changes
-   */
-  /* Render/remove Turnstile when mode changes (disabled)
-  useEffect(() => {
-    if (mode === 'signup') {
-      renderTurnstile();
-    } else {
-      removeTurnstile();
-    }
-  }, [mode, renderTurnstile, removeTurnstile]);
-  */
-
-  /**
-   * Check if already authenticated
-   */
+  // Check if already authenticated
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -348,13 +75,8 @@ const AuthenticationForm = ({
         navigate('/dashboard', { replace: true });
       }
     };
-
     checkAuth();
   }, [navigate]);
-
-  // =========================================================================
-  // FORM VALIDATION
-  // =========================================================================
 
   const validateLogin = (): boolean => {
     try {
@@ -392,48 +114,6 @@ const AuthenticationForm = ({
     }
   };
 
-  // =========================================================================
-  // FORM SUBMISSION
-  // =========================================================================
-
-  /**
-   * Verify Turnstile token with backend
-   */
-  /* Verify Turnstile token with backend (disabled)
-  const verifyTurnstileToken = async (token: string): Promise<boolean> => {
-    if (token === 'unsupported') {
-      console.warn('Proceeding without Turnstile verification');
-      return true;
-    }
-
-    try {
-      const response = await fetch(
-        'https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/verify-turnstile',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Verification failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      return data.success === true || data.data?.success === true;
-    } catch (err) {
-      console.error('Turnstile verification error:', err);
-      return false;
-    }
-  };
-  */
-
-  /**
-   * Handle login submission
-   */
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -464,7 +144,6 @@ const AuthenticationForm = ({
         description: 'You have been signed in successfully',
       });
 
-      // Check if user needs to complete profile
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -491,131 +170,40 @@ const AuthenticationForm = ({
     }
   };
 
-  /**
-   * Handle signup submission
-   */
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
     if (!validateSignup()) return;
 
-    // Signup does not require captcha; create account directly
-
     setIsLoading(true);
 
     try {
-      // Create auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: signupData.email,
         password: signupData.password,
         options: {
-          emailRedirectTo: `${globalThis.location?.origin}/register?mode=complete-profile`,
+          emailRedirectTo: `https://turuturustars.co.ke/auth/callback`,
         },
       });
 
-      if (authError) {
-        const requestId = generateRequestId();
-        console.error('Supabase auth.signUp error:', { requestId, error: authError });
-        if (authError.message.includes('User already registered')) {
-          setErrors({ submit: 'This email is already registered. Please log in instead.' });
+      if (error) {
+        if (error.message.includes('User already registered')) {
+          setErrors({ submit: 'An account with this email already exists' });
         } else {
-          setErrors({ submit: authError.message || `Signup failed. Please try again. (${requestId})` });
+          setErrors({ submit: error.message || 'Signup failed. Please try again.' });
         }
-        resetTurnstile();
         return;
       }
 
-      if (!authData.user) {
-        // No session returned — email confirmation required. Persist pending signup with a request id.
-        try {
-          const requestId = generateRequestId();
-          localStorage.setItem('pendingSignup', JSON.stringify({ email: signupData.email, createdAt: Date.now(), requestId }));
-        } catch (e) {
-          // ignore
-        }
-
-        // Try Option B: attempt to create a server-side pending profile keyed by email
-        try {
-          const pending = (() => {
-            try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
-          })();
-          const requestId = pending?.requestId || generateRequestId();
-          try {
-            const { completeProfileViaBackend } = await import('@/utils/completeProfile');
-            await completeProfileViaBackend(signupData.email, { created_via: 'signup' }, requestId);
-            // Optionally poll for the profile row by email
-            const { waitForProfileByEmail } = await import('@/utils/waitForProfileByEmail');
-            const profile = await waitForProfileByEmail(signupData.email, 4, 300, {
-              onAttempt: (a, d) => console.debug(`poll profile by email attempt ${a}, next delay ${d}ms`),
-            });
-
-            if (profile) {
-              toast({ title: 'Profile created', description: 'We created a profile for your email. After confirming your email, sign in to continue.' });
-            } else {
-              toast({ title: 'Account Created — Confirm Email', description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.' });
-            }
-          } catch (err) {
-            console.warn('create-profile-pending failed', err);
-            toast({ title: 'Account Created — Confirm Email', description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.' });
-          }
-        } catch (e) {
-          // fallback UX
-          toast({
-            title: 'Account Created — Confirm Email',
-            description: 'Please check your email to confirm your account. After confirming, sign in to complete your profile.',
-          });
-        }
-
-        // Reset form and switch to login
-        setSignupData({ email: '', password: '', confirmPassword: '' });
-        resetTurnstile();
-        setMode('login');
-      } else {
-        // Immediate session present — try to wait for trigger-created profile then route
+      if (data.user && !data.user.email_confirmed_at) {
         toast({
-          title: 'Welcome!',
-          description: 'Your account has been created. Please complete your profile.',
+          title: 'Check your email',
+          description: 'We sent you a verification link. Please check your inbox and spam folder.',
         });
-        setSignupData({ email: '', password: '', confirmPassword: '' });
-        resetTurnstile();
-        setMode('login');
-
-        try {
-          if (authData.user?.id) {
-            const { waitForProfile } = await import('@/utils/waitForProfile');
-            const profile = await waitForProfile(authData.user.id, 6, 400, {
-              onAttempt: (attempt, delayMs) => console.debug(`waitForProfile attempt ${attempt}, next delay ${delayMs}ms`),
-            });
-
-            if (!profile) {
-              // fallback: try server-side completion via backend proxy
-              try {
-                const { completeProfileViaBackend } = await import('@/utils/completeProfile');
-                const email = authData.user.email ?? tryGetPendingEmail();
-                const pending = (() => {
-                  try { return JSON.parse(localStorage.getItem('pendingSignup') || '{}'); } catch (e) { return {}; }
-                })();
-                const requestId = pending?.requestId || generateRequestId();
-                if (email) {
-                  try {
-                    await completeProfileViaBackend(email, undefined, requestId);
-                    // inform user silently
-                    toast({ title: 'Profile created', description: 'Your profile was created successfully.' });
-                  } catch (e) {
-                    console.warn('completeProfileViaBackend fallback failed', e);
-                    toast({ title: 'Profile creation pending', description: 'We will retry automatically. If the issue persists, contact support.', variant: 'destructive' });
-                  }
-                }
-              } catch (e) {
-                console.warn('completeProfileViaBackend fallback failed', e);
-              }
-            }
-          }
-        } catch (e) {
-          // ignore but ensure we log for observability
-          console.warn('Profile polling after signup failed', e);
-        }
+        navigate('/auth/email-confirmation', { state: { email: signupData.email } });
+      } else {
+        navigate('/register', { replace: true });
       }
 
       if (onSuccess) {
@@ -624,495 +212,280 @@ const AuthenticationForm = ({
     } catch (error) {
       console.error('Signup error:', error);
       setErrors({ submit: 'An unexpected error occurred. Please try again.' });
-      resetTurnstile();
     } finally {
       setIsLoading(false);
     }
   };
 
-  function tryGetPendingEmail() {
-    try {
-      const pending = localStorage.getItem('pendingSignup');
-      if (pending) {
-        const parsed = JSON.parse(pending);
-        return parsed?.email;
-      }
-    } catch (e) {
-      // ignore
-    }
-    return null;
-  }
-
-  /**
-   * Handle Google OAuth
-   */
   const handleGoogleSignIn = async () => {
     try {
-      setIsLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          // Redirect back to auth flow so we can check profile completion
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `https://turuturustars.co.ke/auth/callback`,
         },
       });
 
-      if (error) {
-        setErrors({ submit: error.message || 'Google sign in failed' });
-      }
+      if (error) throw error;
     } catch (error) {
       console.error('Google sign in error:', error);
-      setErrors({ submit: 'An unexpected error occurred' });
+      toast({
+        title: 'Error',
+        description: 'Failed to sign in with Google. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!loginData.email) {
+      setErrors({ email: 'Please enter your email address first' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(loginData.email, {
+        redirectTo: `https://turuturustars.co.ke/auth/reset-password`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Password reset email sent',
+        description: 'Check your inbox for the password reset link',
+      });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send password reset email',
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // =========================================================================
-  // RENDER
-  // =========================================================================
-
   return (
-    <>
-      {/* Dark overlay background */}
-      <div
-        className="fixed inset-0 z-40"
-        style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          backdropFilter: 'blur(4px)',
-        }}
-      />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30 p-4">
+      <Card className="w-full max-w-md shadow-xl border-0">
+        <CardHeader className="space-y-1 text-center pb-6">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-primary" />
+          </div>
+          <CardTitle className="text-2xl font-bold">
+            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+          </CardTitle>
+          <CardDescription>
+            {mode === 'login' 
+              ? 'Sign in to your Turuturu Stars account' 
+              : 'Join the Turuturu Stars Community'}
+          </CardDescription>
+        </CardHeader>
 
-      {/* Modal container */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div
-          className="w-full max-w-md"
-          style={{
-            animation: 'slideUp 0.3s ease-out',
-          }}
-        >
-          <Card
-            className="border-0 shadow-2xl"
-            style={{
-              backgroundColor: COLORS.softWhite,
-              borderRadius: '16px',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Header */}
-            <CardHeader
-              className="pb-6"
-              style={{
-                background: `linear-gradient(135deg, ${COLORS.deepNavy} 0%, ${COLORS.darkBlue} 100%)`,
-                color: COLORS.softWhite,
-              }}
-            >
-              <CardTitle className="text-2xl font-bold">
-                {mode === 'login' ? 'Sign In' : 'Create Account'}
-              </CardTitle>
-              <CardDescription
-                className="mt-2"
-                style={{
-                  color: 'rgba(255, 255, 255, 0.9)',
-                }}
-              >
-                {mode === 'login'
-                  ? 'Welcome back to Turuturu Stars'
-                  : 'Join the Turuturu Stars community'}
-              </CardDescription>
-            </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Error message */}
+          {errors.submit && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              {errors.submit}
+            </div>
+          )}
 
-            <CardContent className="pt-6">
-              {/* Error message */}
-              {errors.submit && (
-                <div
-                  className="mb-4 p-3 rounded-lg flex items-start gap-3 border"
-                  style={{
-                    backgroundColor: '#FEE2E2',
-                    borderColor: COLORS.error,
-                    color: COLORS.richBlack,
-                  }}
-                >
-                  <AlertCircle
-                    className="h-5 w-5 flex-shrink-0 mt-0.5"
-                    style={{ color: COLORS.error }}
-                  />
-                  <p className="text-sm">{errors.submit}</p>
-                </div>
+          <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
+            {/* Email field */}
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={mode === 'login' ? loginData.email : signupData.email}
+                onChange={(e) => 
+                  mode === 'login' 
+                    ? setLoginData(prev => ({ ...prev, email: e.target.value }))
+                    : setSignupData(prev => ({ ...prev, email: e.target.value }))
+                }
+                className={errors.email ? 'border-destructive' : ''}
+                disabled={isLoading}
+              />
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email}</p>
               )}
+            </div>
 
-              {/* Form */}
-              <form
-                onSubmit={mode === 'login' ? handleLogin : handleSignup}
-                className="space-y-4"
-              >
-                {/* Email field */}
-                <div>
-                  <Label
-                    htmlFor="email"
-                    className="text-sm font-medium"
-                    style={{ color: COLORS.richBlack }}
-                  >
-                    Email Address
-                  </Label>
-                  <div className="relative mt-1.5">
-                    <Mail
-                      className="absolute left-3 top-3 h-5 w-5"
-                      style={{ color: COLORS.textSecondary }}
-                    />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      value={mode === 'login' ? loginData.email : signupData.email}
-                      onChange={(e) => {
-                        if (mode === 'login') {
-                          setLoginData({ ...loginData, email: e.target.value });
-                        } else {
-                          setSignupData({ ...signupData, email: e.target.value });
-                        }
-                        setErrors({ ...errors, email: '', submit: '' });
-                      }}
-                      disabled={isLoading}
-                      className="pl-10"
-                      style={{
-                        borderColor: errors.email ? COLORS.error : COLORS.border,
-                        borderRadius: '8px',
-                        padding: '10px 10px 10px 40px',
-                      }}
-                    />
-                  </div>
-                  {errors.email && (
-                    <p
-                      className="mt-1 text-sm"
-                      style={{ color: COLORS.error }}
-                    >
-                      {errors.email}
-                    </p>
-                  )}
-                </div>
-
-                {/* Password field */}
-                <div>
-                  <Label
-                    htmlFor="password"
-                    className="text-sm font-medium"
-                    style={{ color: COLORS.richBlack }}
-                  >
-                    Password
-                  </Label>
-                  <div className="relative mt-1.5">
-                    <Lock
-                      className="absolute left-3 top-3 h-5 w-5"
-                      style={{ color: COLORS.textSecondary }}
-                    />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={mode === 'login' ? loginData.password : signupData.password}
-                      onChange={(e) => {
-                        if (mode === 'login') {
-                          setLoginData({ ...loginData, password: e.target.value });
-                        } else {
-                          setSignupData({ ...signupData, password: e.target.value });
-                        }
-                        setErrors({ ...errors, password: '', submit: '' });
-                      }}
-                      disabled={isLoading}
-                      className="pl-10 pr-10"
-                      style={{
-                        borderColor: errors.password ? COLORS.error : COLORS.border,
-                        borderRadius: '8px',
-                        padding: '10px 40px 10px 40px',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3"
-                      style={{ color: COLORS.textSecondary }}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                  {errors.password && (
-                    <p
-                      className="mt-1 text-sm"
-                      style={{ color: COLORS.error }}
-                    >
-                      {errors.password}
-                    </p>
-                  )}
-                  {mode === 'login' && (
-                    <button
-                      type="button"
-                      className="mt-2 text-sm"
-                      style={{ color: COLORS.primary }}
-                      onClick={() => setMode('signup')}
-                    >
-                      Don't have an account? Sign up
-                    </button>
-                  )}
-                </div>
-
-                {/* Confirm password field (signup only) */}
-                {mode === 'signup' && (
-                  <div>
-                    <Label
-                      htmlFor="confirmPassword"
-                      className="text-sm font-medium"
-                      style={{ color: COLORS.richBlack }}
-                    >
-                      Confirm Password
-                    </Label>
-                    <div className="relative mt-1.5">
-                      <Lock
-                        className="absolute left-3 top-3 h-5 w-5"
-                        style={{ color: COLORS.textSecondary }}
-                      />
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={signupData.confirmPassword}
-                        onChange={(e) => {
-                          setSignupData({
-                            ...signupData,
-                            confirmPassword: e.target.value,
-                          });
-                          setErrors({ ...errors, confirmPassword: '', submit: '' });
-                        }}
-                        disabled={isLoading}
-                        className="pl-10 pr-10"
-                        style={{
-                          borderColor: errors.confirmPassword
-                            ? COLORS.error
-                            : COLORS.border,
-                          borderRadius: '8px',
-                          padding: '10px 40px 10px 40px',
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setShowConfirmPassword(!showConfirmPassword)
-                        }
-                        className="absolute right-3 top-3"
-                        style={{ color: COLORS.textSecondary }}
-                      >
-                        {showConfirmPassword ? (
-                          <EyeOff className="h-5 w-5" />
-                        ) : (
-                          <Eye className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                    {errors.confirmPassword && (
-                      <p
-                        className="mt-1 text-sm"
-                        style={{ color: COLORS.error }}
-                      >
-                        {errors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Turnstile captcha (signup only) */}
-                {mode === 'signup' && (
-                  <div className="space-y-2">
-                    <div
-                      ref={turnstileContainerRef}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        padding: '12px',
-                        borderRadius: '8px',
-                        backgroundColor: COLORS.lightGrayBg,
-                        border: `2px solid ${
-                          errors.captcha ? COLORS.error : COLORS.border
-                        }`,
-                      }}
-                    />
-                    {turnstile.error && (
-                      <p
-                        className="text-sm flex items-start gap-2"
-                        style={{ color: COLORS.error }}
-                      >
-                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        {turnstile.error}
-                      </p>
-                    )}
-                    {turnstile.token && turnstile.token !== 'unsupported' && (
-                      <p
-                        className="text-sm flex items-start gap-2"
-                        style={{ color: COLORS.success }}
-                      >
-                        <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        Verified
-                      </p>
-                    )}
-                    {errors.captcha && (
-                      <p
-                        className="text-sm"
-                        style={{ color: COLORS.error }}
-                      >
-                        {errors.captcha}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Submit button */}
-                <Button
-                  type="submit"
+            {/* Password field */}
+            <div className="space-y-2">
+              <Label htmlFor="password" className="flex items-center gap-2">
+                <Lock className="w-4 h-4" />
+                Password
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={mode === 'signup' ? 'Min 8 characters' : 'Enter your password'}
+                  value={mode === 'login' ? loginData.password : signupData.password}
+                  onChange={(e) =>
+                    mode === 'login'
+                      ? setLoginData(prev => ({ ...prev, password: e.target.value }))
+                      : setSignupData(prev => ({ ...prev, password: e.target.value }))
+                  }
+                  className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
                   disabled={isLoading}
-                  className="w-full mt-6 h-11 font-semibold"
-                  style={{
-                    backgroundColor: COLORS.primary,
-                    color: COLORS.deepNavy,
-                    borderRadius: '8px',
-                  }}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
-                    </>
-                  ) : mode === 'login' ? (
-                    'Sign In'
-                  ) : (
-                    'Create Account'
-                  )}
-                </Button>
-
-                {/* Divider */}
-                <div className="relative my-4">
-                  <div
-                    className="absolute inset-0 flex items-center"
-                    style={{ backgroundColor: 'transparent' }}
-                  >
-                    <div
-                      className="w-full"
-                      style={{ borderTop: `1px solid ${COLORS.border}` }}
-                    />
-                  </div>
-                  <div
-                    className="relative flex justify-center text-sm"
-                    style={{ backgroundColor: COLORS.softWhite }}
-                  >
-                    <span
-                      className="px-2"
-                      style={{ color: COLORS.textSecondary }}
-                    >
-                      or
-                    </span>
-                  </div>
-                </div>
-
-                {/* Google sign in button */}
-                <Button
+                />
+                <button
                   type="button"
-                  variant="outline"
-                  onClick={handleGoogleSignIn}
-                  disabled={isLoading}
-                  className="w-full h-11"
-                  style={{
-                    borderColor: COLORS.border,
-                    color: COLORS.richBlack,
-                    borderRadius: '8px',
-                  }}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  <svg
-                    className="mr-2 h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password}</p>
+              )}
+            </div>
+
+            {/* Confirm Password (signup only) */}
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirm your password"
+                    value={signupData.confirmPassword}
+                    onChange={(e) =>
+                      setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))
+                    }
+                    className={errors.confirmPassword ? 'border-destructive pr-10' : 'pr-10'}
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                  </svg>
-                  Continue with Google
-                </Button>
-
-                {/* Toggle mode link */}
-                {mode === 'signup' && (
-                  <p className="text-center text-sm mt-4">
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setMode('login')}
-                      style={{ color: COLORS.primary }}
-                      className="font-semibold hover:underline"
-                    >
-                      Sign in
-                    </button>
-                  </p>
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-sm text-destructive">{errors.confirmPassword}</p>
                 )}
-              </form>
+              </div>
+            )}
 
-              {/* Footer */}
-              <p
-                className="text-center text-xs mt-6"
-                style={{ color: COLORS.textSecondary }}
-              >
-                By signing up, you agree to our{' '}
-                <a
-                  href="/terms"
-                  style={{ color: COLORS.primary }}
-                  className="hover:underline"
+            {/* Forgot password link (login only) */}
+            {mode === 'login' && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  className="text-sm text-primary hover:underline"
+                  disabled={isLoading}
                 >
-                  Terms of Service
-                </a>{' '}
-                and{' '}
-                <a
-                  href="/privacy"
-                  style={{ color: COLORS.primary }}
-                  className="hover:underline"
-                >
-                  Privacy Policy
-                </a>
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
-      {/* Animation styles */}
-      <style>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+            {/* Submit button */}
+            <Button type="submit" disabled={isLoading} className="w-full">
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
+                </>
+              ) : mode === 'login' ? (
+                'Sign In'
+              ) : (
+                'Create Account'
+              )}
+            </Button>
 
-        /* Input focus states */
-        input:focus {
-          box-shadow: 0 0 0 3px rgba(0, 178, 227, 0.1) !important;
-        }
+            {/* Divider */}
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-card text-muted-foreground">or</span>
+              </div>
+            </div>
 
-        button:disabled {
-          opacity: 0.7;
-          cursor: not-allowed;
-        }
+            {/* Google sign in */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full"
+            >
+              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                <path
+                  fill="currentColor"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="currentColor"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+              Continue with Google
+            </Button>
 
-        button:not(:disabled):hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-      `}</style>
-    </>
+            {/* Toggle mode */}
+            <p className="text-center text-sm text-muted-foreground">
+              {mode === 'login' ? (
+                <>
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('signup')}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </>
+              ) : (
+                <>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => setMode('login')}
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Sign in
+                  </button>
+                </>
+              )}
+            </p>
+          </form>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-muted-foreground pt-4">
+            By signing up, you agree to our{' '}
+            <a href="/terms" className="text-primary hover:underline">Terms of Service</a>{' '}
+            and{' '}
+            <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
