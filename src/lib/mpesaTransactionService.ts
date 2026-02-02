@@ -3,12 +3,12 @@ import { queryTransactionStatus } from "./mpesa";
 
 export interface TransactionRecord {
   id: string;
-  checkout_request_id: string;
-  status: 'pending' | 'completed' | 'failed';
+  checkout_request_id: string | null;
+  status: string | null;
   amount: number;
   phone_number: string;
-  mpesa_receipt_number?: string;
-  contribution_id?: string;
+  mpesa_receipt_number?: string | null;
+  contribution_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,7 +19,6 @@ export interface TransactionRecord {
 export class MpesaTransactionService {
   private static readonly POLL_INTERVAL_MS = 2000;
   private static readonly MAX_POLL_ATTEMPTS = 30;
-  private static readonly CALLBACK_TIMEOUT_MS = 90000;
 
   /**
    * Get transaction status from database
@@ -28,7 +27,7 @@ export class MpesaTransactionService {
     try {
       const { data, error } = await supabase
         .from("mpesa_transactions")
-        .select("id, transaction_id, phone_number, amount, reference, status, created_at")
+        .select("id, checkout_request_id, phone_number, amount, status, mpesa_receipt_number, contribution_id, created_at, updated_at")
         .eq("checkout_request_id", checkoutRequestId)
         .single();
 
@@ -174,45 +173,6 @@ export class MpesaTransactionService {
       }
     } catch (error) {
       console.error("Error handling transaction timeout:", error);
-    }
-  }
-
-  /**
-   * Retry failed transaction
-   */
-  static async retryTransaction(
-    previousCheckoutId: string,
-    newPaymentParams: Record<string, unknown>
-  ): Promise<string | null> {
-    try {
-      const previousTx = await this.getTransactionStatus(previousCheckoutId);
-
-      if (!previousTx) {
-        throw new Error("Previous transaction not found");
-      }
-
-      const previousTime = new Date(previousTx.created_at).getTime();
-      const now = Date.now();
-      const timePassed = now - previousTime;
-
-      if (timePassed < 30000) {
-        throw new Error(
-          `Must wait at least 30 seconds between retry attempts (${Math.ceil((30000 - timePassed) / 1000)}s remaining)`
-        );
-      }
-
-      const insertData = {
-        ...newPaymentParams,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      await (supabase.from("mpesa_transactions") as any).insert(insertData);
-
-      return "Transaction retry initiated";
-    } catch (error) {
-      console.error("Error retrying transaction:", error);
-      throw error;
     }
   }
 

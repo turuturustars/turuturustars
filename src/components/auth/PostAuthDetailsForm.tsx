@@ -5,37 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, MapPin, Briefcase, Phone, User, CheckCircle2 } from 'lucide-react';
+import { Loader2, Phone, User, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
-
-const LOCATIONS = [
-  'Turuturu',
-  'Gatune',
-  'Mutoho',
-  'Githeru',
-  'Kahariro',
-  'Kiangige',
-  'Daboo',
-  'Githima',
-  'Nguku',
-  'Ngaru',
-  'Kiugu',
-  'Kairi',
-  'Other'
-] as const;
 
 const detailsSchema = z.object({
   fullName: z.string().min(2, 'Name must be at least 2 characters'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
   idNumber: z.string().min(6, 'Please enter a valid ID number'),
-  occupation: z.string().optional(),
-  location: z.string().min(1, 'Please select a location'),
-  otherLocation: z.string().optional(),
-}).refine((data) => data.location !== 'Other' || (data.otherLocation && data.otherLocation.length >= 2), {
-  message: "Please specify your location",
-  path: ["otherLocation"],
 });
 
 interface PostAuthDetailsFormProps {
@@ -53,9 +30,6 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
     fullName: '',
     phone: '',
     idNumber: '',
-    occupation: '',
-    location: '',
-    otherLocation: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
@@ -67,7 +41,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('full_name, phone, id_number')
           .eq('id', user.id)
           .single();
 
@@ -85,9 +59,6 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
             fullName: data.full_name || '',
             phone: data.phone || '',
             idNumber: data.id_number || '',
-            occupation: data.occupation || '',
-            location: data.location || '',
-            otherLocation: '',
           });
           setStep('form');
         } else {
@@ -137,24 +108,16 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
     setIsLoading(true);
 
     try {
-      const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
-
-      const { data, error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
-        'profiles',
-        {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
           id: user.id,
           full_name: formData.fullName,
           phone: formData.phone,
           id_number: formData.idNumber,
-          occupation: formData.occupation || null,
-          location: finalLocation,
           email: user.email,
           status: 'pending',
-        },
-        { onConflict: 'id' },
-        3,
-        300
-      );
+        }, { onConflict: 'id' });
 
       if (error) throw error;
 
@@ -232,7 +195,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background p-4">
-      <Card className="w-full max-w-2xl shadow-xl">
+      <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="space-y-2 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-primary/10 rounded-lg">
@@ -240,49 +203,28 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
             </div>
             <div>
               <CardTitle>Complete Your Profile</CardTitle>
-              <CardDescription>Help us get to know you better. This information helps us serve you better.</CardDescription>
+              <CardDescription>Help us get to know you better.</CardDescription>
             </div>
           </div>
         </CardHeader>
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information Section */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Personal Information</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fullName" className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Full Name
-                  </Label>
-                  <Input
-                    id="fullName"
-                    placeholder="Enter your full name"
-                    value={formData.fullName}
-                    onChange={(e) => handleChange('fullName', e.target.value)}
-                    className={errors.fullName ? 'border-red-500' : ''}
-                    disabled={isLoading}
-                  />
-                  {errors.fullName && <p className="text-xs text-red-500">{errors.fullName}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="idNumber" className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" />
-                    ID Number
-                  </Label>
-                  <Input
-                    id="idNumber"
-                    placeholder="Your ID number"
-                    value={formData.idNumber}
-                    onChange={(e) => handleChange('idNumber', e.target.value)}
-                    className={errors.idNumber ? 'border-red-500' : ''}
-                    disabled={isLoading}
-                  />
-                  {errors.idNumber && <p className="text-xs text-red-500">{errors.idNumber}</p>}
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Full Name
+                </Label>
+                <Input
+                  id="fullName"
+                  placeholder="Enter your full name"
+                  value={formData.fullName}
+                  onChange={(e) => handleChange('fullName', e.target.value)}
+                  className={errors.fullName ? 'border-destructive' : ''}
+                  disabled={isLoading}
+                />
+                {errors.fullName && <p className="text-xs text-destructive">{errors.fullName}</p>}
               </div>
 
               <div className="space-y-2">
@@ -295,74 +237,30 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
                   placeholder="+254 700 000 000"
                   value={formData.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                  className={errors.phone ? 'border-red-500' : ''}
+                  className={errors.phone ? 'border-destructive' : ''}
                   disabled={isLoading}
                   type="tel"
                 />
-                {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="idNumber" className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  ID Number
+                </Label>
+                <Input
+                  id="idNumber"
+                  placeholder="Your ID number"
+                  value={formData.idNumber}
+                  onChange={(e) => handleChange('idNumber', e.target.value)}
+                  className={errors.idNumber ? 'border-destructive' : ''}
+                  disabled={isLoading}
+                />
+                {errors.idNumber && <p className="text-xs text-destructive">{errors.idNumber}</p>}
               </div>
             </div>
 
-            {/* Additional Information Section */}
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Additional Information</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="occupation" className="flex items-center gap-2">
-                    <Briefcase className="w-4 h-4" />
-                    Occupation
-                  </Label>
-                  <Input
-                    id="occupation"
-                    placeholder="Your occupation (optional)"
-                    value={formData.occupation}
-                    onChange={(e) => handleChange('occupation', e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location" className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Location
-                  </Label>
-                  <Select value={formData.location} onValueChange={(value) => handleChange('location', value)} disabled={isLoading}>
-                    <SelectTrigger className={errors.location ? 'border-red-500' : ''}>
-                      <SelectValue placeholder="Select your location" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {LOCATIONS.map((loc) => (
-                        <SelectItem key={loc} value={loc}>
-                          {loc}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.location && <p className="text-xs text-red-500">{errors.location}</p>}
-                </div>
-              </div>
-
-              {formData.location === 'Other' && (
-                <div className="space-y-2">
-                  <Label htmlFor="otherLocation" className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Specify Location
-                  </Label>
-                  <Input
-                    id="otherLocation"
-                    placeholder="Please specify your location"
-                    value={formData.otherLocation}
-                    onChange={(e) => handleChange('otherLocation', e.target.value)}
-                    className={errors.otherLocation ? 'border-red-500' : ''}
-                    disabled={isLoading}
-                  />
-                  {errors.otherLocation && <p className="text-xs text-red-500">{errors.otherLocation}</p>}
-                </div>
-              )}
-            </div>
-
-            {/* Actions */}
             <div className="flex gap-3 pt-4">
               <Button
                 type="button"
