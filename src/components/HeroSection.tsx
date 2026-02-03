@@ -139,7 +139,7 @@ const HeroSection = () => {
         <div className="relative">
           <div className="hero-image-frame">
             <img
-                src={HERO_IMAGES[currentImageIndex]}
+              src={HERO_IMAGES[currentImageIndex]}
               alt="Turuturu Stars community moments"
               className="hero-image"
               loading="eager"
@@ -149,6 +149,7 @@ const HeroSection = () => {
             Community moments across Turuturu, Githima, Kigumo, and nearby areas.
           </div>
         </div>
+      </div>
       </div>
 
       {/* Reduce-motion fallback: static background image */}
