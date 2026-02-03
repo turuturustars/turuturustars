@@ -27,7 +27,6 @@ import { format } from 'date-fns';
 import {
   Search,
   Download,
-  Filter,
   Loader2,
   Eye,
   AlertCircle,
@@ -36,27 +35,29 @@ import {
 } from 'lucide-react';
 import { exportAsCSV } from '@/lib/exportUtils';
 
+// Interface matches actual database schema
 interface AuditLog {
   id: string;
   action_type: string;
   action_description: string;
   performed_by: string;
-  user_email?: string;
+  performed_by_name?: string | null;
+  performed_by_role?: string | null;
+  entity_type?: string;
+  entity_id?: string | null;
   created_at: string;
-  metadata?: any;
-  ip_address?: string;
-  status: 'success' | 'failed';
+  metadata?: Record<string, unknown> | null;
+  ip_address?: string | null;
 }
 
 const AuditLogViewer = () => {
   const { roles } = useAuth();
   const { toast } = useToast();
-  const { status: statusMessage, showSuccess } = useStatus();
+  const { status: statusMessage } = useStatus();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionTypeFilter, setActionTypeFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
   const [actionTypes, setActionTypes] = useState<string[]>([]);
 
@@ -73,7 +74,7 @@ const AuditLogViewer = () => {
 
   useEffect(() => {
     filterLogs();
-  }, [logs, searchTerm, actionTypeFilter, statusFilter]);
+  }, [logs, searchTerm, actionTypeFilter]);
 
   const fetchAuditLogs = async () => {
     try {
@@ -86,10 +87,24 @@ const AuditLogViewer = () => {
       if (error) throw error;
 
       if (data) {
-        setLogs(data as AuditLog[]);
+        // Map database rows to our interface
+        const mappedLogs: AuditLog[] = data.map((row) => ({
+          id: row.id,
+          action_type: row.action_type,
+          action_description: row.action_description,
+          performed_by: row.performed_by,
+          performed_by_name: row.performed_by_name,
+          performed_by_role: row.performed_by_role,
+          entity_type: row.entity_type,
+          entity_id: row.entity_id,
+          created_at: row.created_at,
+          metadata: row.metadata as Record<string, unknown> | null,
+          ip_address: row.ip_address,
+        }));
+        setLogs(mappedLogs);
 
         // Extract unique action types
-        const types = [...new Set((data as AuditLog[]).map((log) => log.action_type))];
+        const types = [...new Set(mappedLogs.map((log) => log.action_type))];
         setActionTypes(types);
       }
     } catch (error) {
@@ -114,18 +129,14 @@ const AuditLogViewer = () => {
         (log) =>
           log.action_description.toLowerCase().includes(term) ||
           log.performed_by.toLowerCase().includes(term) ||
-          log.action_type.toLowerCase().includes(term)
+          log.action_type.toLowerCase().includes(term) ||
+          log.performed_by_name?.toLowerCase().includes(term)
       );
     }
 
     // Action type filter
     if (actionTypeFilter !== 'all') {
       results = results.filter((log) => log.action_type === actionTypeFilter);
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      results = results.filter((log) => log.status === statusFilter);
     }
 
     setFilteredLogs(results);
@@ -136,8 +147,7 @@ const AuditLogViewer = () => {
       Date: format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
       'Action Type': log.action_type,
       'Description': log.action_description,
-      'Performed By': log.performed_by,
-      'Status': log.status,
+      'Performed By': log.performed_by_name || log.performed_by,
       'IP Address': log.ip_address || 'N/A',
     }));
 
@@ -157,14 +167,6 @@ const AuditLogViewer = () => {
     if (actionType.includes('delete')) return <AlertCircle className="w-4 h-4" />;
     if (actionType.includes('role')) return <Shield className="w-4 h-4" />;
     return <Eye className="w-4 h-4" />;
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, string> = {
-      success: 'active',
-      failed: 'missed'
-    };
-    return <StatusBadge status={statusMap[status] || status} />;
   };
 
   if (!isAdmin) {
@@ -195,7 +197,7 @@ const AuditLogViewer = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Events</CardTitle>
@@ -208,38 +210,12 @@ const AuditLogViewer = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Successful Actions</CardTitle>
+            <CardTitle className="text-sm font-medium">Filtered Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold text-green-600">
-              {logs.filter((l) => l.status === 'success').length}
-            </p>
+            <p className="text-2xl font-bold">{filteredLogs.length}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {logs.length > 0
-                ? Math.round(
-                    (logs.filter((l) => l.status === 'success').length / logs.length) * 100
-                  )
-                : 0}
-              %
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Failed Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold text-red-600">
-              {logs.filter((l) => l.status === 'failed').length}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {logs.length > 0
-                ? Math.round(
-                    (logs.filter((l) => l.status === 'failed').length / logs.length) * 100
-                  )
-                : 0}
-              %
+              {filteredLogs.length === logs.length ? 'Showing all' : 'Matching filters'}
             </p>
           </CardContent>
         </Card>
@@ -251,7 +227,7 @@ const AuditLogViewer = () => {
           <CardTitle className="text-lg">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -273,17 +249,6 @@ const AuditLogViewer = () => {
                     {type}
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -325,7 +290,6 @@ const AuditLogViewer = () => {
                     <TableHead>Description</TableHead>
                     <TableHead>Performed By</TableHead>
                     <TableHead>IP Address</TableHead>
-                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,11 +307,10 @@ const AuditLogViewer = () => {
                       <TableCell className="text-sm max-w-xs truncate">
                         {log.action_description}
                       </TableCell>
-                      <TableCell className="text-sm">{log.performed_by}</TableCell>
+                      <TableCell className="text-sm">{log.performed_by_name || log.performed_by}</TableCell>
                       <TableCell className="text-sm font-mono text-xs">
                         {log.ip_address || 'N/A'}
                       </TableCell>
-                      <TableCell>{getStatusBadge(log.status)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

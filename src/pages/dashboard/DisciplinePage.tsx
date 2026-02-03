@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,9 +82,10 @@ export default function DisciplinePage() {
 
   const fetchRecords = async () => {
     setIsLoading(true);
+    // Use correct column names from database schema
     const { data, error } = await supabase
       .from('discipline_records')
-      .select('id, member_id, violation_type, severity, description, status, created_at, due_date')
+      .select('id, member_id, incident_type, description, incident_date, fine_amount, fine_paid, paid_at, status, recorded_by, resolved_by, resolution_notes, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -93,17 +93,21 @@ export default function DisciplinePage() {
     } else {
       // Fetch member names separately
       const memberIds = [...new Set((data || []).map(r => r.member_id))];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name, membership_number')
-        .in('id', memberIds);
-      
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-      const recordsWithMembers = (data || []).map(r => ({
-        ...r,
-        member: profileMap.get(r.member_id) || { full_name: 'Unknown', membership_number: null }
-      }));
-      setRecords(recordsWithMembers as DisciplineRecord[]);
+      if (memberIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, membership_number')
+          .in('id', memberIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const recordsWithMembers = (data || []).map(r => ({
+          ...r,
+          member: profileMap.get(r.member_id) || { full_name: 'Unknown', membership_number: null }
+        }));
+        setRecords(recordsWithMembers as DisciplineRecord[]);
+      } else {
+        setRecords([]);
+      }
     }
     setIsLoading(false);
   };
@@ -197,7 +201,7 @@ export default function DisciplinePage() {
       pending: 'pending',
       resolved: 'active',
       appealed: 'pending',
-      dismissed: 'closed'
+      dismissed: 'dormant'
     };
     return <StatusBadge status={statusMap[status] || status} />;
   };
@@ -477,14 +481,18 @@ export default function DisciplinePage() {
         </TabsContent>
       </Tabs>
 
+      {/* Resolve Dialog */}
       <Dialog open={showResolveDialog} onOpenChange={setShowResolveDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Resolve Case</DialogTitle>
+            <DialogTitle>Resolve Discipline Case</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Resolving case for: <strong>{selectedRecord?.member?.full_name}</strong>
+              Member: {selectedRecord?.member?.full_name}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Incident: {selectedRecord?.incident_type}
             </p>
             <Textarea
               placeholder="Resolution notes..."
@@ -492,14 +500,14 @@ export default function DisciplinePage() {
               onChange={(e) => setResolutionNotes(e.target.value)}
             />
             <AccessibleButton 
-              ariaLabel={`Resolve case for ${selectedRecord?.member?.full_name}`}
+              ariaLabel="Confirm resolution"
               onClick={() => {
                 resolveRecord();
-                showSuccess('Case resolved successfully', 2000);
+                showSuccess('Case resolved', 1500);
               }} 
               className="w-full"
             >
-              Resolve Case
+              Confirm Resolution
             </AccessibleButton>
           </div>
         </DialogContent>
