@@ -131,7 +131,7 @@ const Header = () => {
                 <img
                   src={logo}
                   alt="Turuturu Stars Logo"
-                  className="h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 object-contain transform group-hover:scale-105 transition-all duration-300"
+                  className="h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 object-contain transform group-hover:scale-105 transition-all duration-300"
                 />
               </div>
               
