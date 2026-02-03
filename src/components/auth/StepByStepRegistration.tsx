@@ -404,26 +404,26 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-3 sm:px-6 py-8 sm:py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background px-3 sm:px-6 py-8 sm:py-12">
       <div className="w-full max-w-5xl space-y-6 card-stagger">
         {/* Progress Section */}
         <div className="space-y-3 progress-bar">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                 <Sparkles className="w-6 h-6 text-blue-500 engagement-icon flex-shrink-0" />
                 <span>Welcome to Turuturu Stars</span>
               </h1>
-              <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 mt-1">
+              <p className="text-sm md:text-base text-slate-600 mt-1">
                 Let's set up your profile step by step
               </p>
             </div>
             <div className="text-left md:text-right flex-shrink-0">
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              <p className="text-sm font-semibold text-blue-600 flex items-center gap-1">
                 <TrendingUp className="w-4 h-4" />
                 Step {currentStep + 1} of {totalSteps}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500">
                 {Math.round(progress)}% complete
               </p>
             </div>
@@ -451,7 +451,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     isActive
                       ? 'bg-primary text-primary-foreground border-primary'
                       : isCompleted
-                      ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                      ? 'bg-green-50 text-green-700 border-green-300'
                       : 'bg-background text-muted-foreground border-muted'
                   }`}
                   aria-current={isActive ? 'step' : undefined}
@@ -471,10 +471,10 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             const borderClass = isActive
               ? 'border-primary bg-primary/10'
               : isCompleted
-              ? 'border-green-500/50 bg-green-50/20 dark:bg-green-950/20'
+              ? 'border-green-500/50 bg-green-50/20'
               : 'border-muted hover:border-primary/50';
             const iconBgClass = isCompleted
-              ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'
+              ? 'bg-green-100 text-green-600'
               : isActive
               ? 'bg-primary/20 text-primary'
               : 'bg-muted text-muted-foreground';
@@ -529,26 +529,26 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         </div>
 
         {/* Main Card */}
-        <Card className="shadow-lg registration-card registration-step-content bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700">
-          <CardHeader className="space-y-2 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700">
+        <Card className="shadow-lg registration-card registration-step-content bg-white border-2 border-slate-200">
+          <CardHeader className="space-y-2 pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-slate-200">
             <div className="flex items-start gap-4">
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg mt-1 step-badge text-blue-600 dark:text-blue-400">
+              <div className="p-3 bg-blue-100 rounded-lg mt-1 step-badge text-blue-600">
                 {currentStepData.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-2xl md:text-3xl text-slate-900 dark:text-white break-words">
+                <CardTitle className="text-2xl md:text-3xl text-slate-900 break-words">
                   {currentStepData.title}
                 </CardTitle>
-                <CardDescription className="mt-1 text-slate-600 dark:text-slate-300">
+                <CardDescription className="mt-1 text-slate-600">
                   {currentStepData.description}
                 </CardDescription>
                 {currentStepData.required ? (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/40 px-3 py-2 rounded-md font-medium">
+                  <div className="flex items-center gap-2 mt-2 text-xs text-rose-700 bg-rose-100 px-3 py-2 rounded-md font-medium">
                     <AlertCircle className="w-3 h-3 flex-shrink-0" />
                     <span>Required step</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-3 py-2 rounded-md tooltip-animation font-medium">
+                  <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 bg-amber-100 px-3 py-2 rounded-md tooltip-animation font-medium">
                     <Clock className="w-3 h-3 flex-shrink-0" />
                     <span>Optional - You can skip this step</span>
                   </div>
@@ -557,13 +557,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6 pt-6 pb-8 px-4 sm:px-6 md:px-8">
+          <CardContent className="space-y-6 pt-6 pb-8 px-4 sm:px-6 md:px-8 bg-white">
 
             {/* Personal Info Step */}
             {currentStepData.id === 'personal-info' && (
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
+                  <Label htmlFor="fullName" className="flex items-center gap-2 text-slate-700 font-semibold text-sm md:text-base">
                     Full Name
                     <span className="text-red-500" aria-hidden="true">*</span>
                     <span className="sr-only">Required</span>
@@ -574,14 +574,14 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     value={formData.fullName}
                     onChange={(e) => handleChange('fullName', e.target.value)}
                     autoComplete="name"
-                    className={`registration-input transition-all border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
+                    className={`registration-input transition-all border-slate-300 text-slate-900 placeholder:text-slate-400 bg-white ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200'}`}
                     disabled={isSaving}
                   />
                   <p className="text-xs text-muted-foreground">
                     Use the name you want on your membership record.
                   </p>
                   {errors.fullName && (
-                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+                    <p className="text-xs text-red-600 flex items-center gap-1" role="alert">
                       <AlertCircle className="w-3 h-3" />
                       {errors.fullName}
                     </p>
@@ -590,7 +590,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="idNumber" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
+                    <Label htmlFor="idNumber" className="flex items-center gap-2 text-slate-700 font-semibold text-sm md:text-base">
                       ID Number
                       <span className="text-red-500" aria-hidden="true">*</span>
                       <span className="sr-only">Required</span>
@@ -602,14 +602,14 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       onChange={(e) => handleChange('idNumber', e.target.value)}
                       inputMode="numeric"
                       autoComplete="off"
-                      className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.idNumber ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
+                      className={`border-slate-300 text-slate-900 placeholder:text-slate-400 bg-white ${errors.idNumber ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200'}`}
                       disabled={isSaving}
                     />
                     <p className="text-xs text-muted-foreground">
                       Used for verification and membership records.
                     </p>
                     {errors.idNumber && (
-                      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
+                      <p className="text-xs text-red-600 flex items-center gap-1" role="alert">
                         <AlertCircle className="w-3 h-3" />
                         {errors.idNumber}
                       </p>
@@ -617,7 +617,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
+                    <Label htmlFor="phone" className="flex items-center gap-2 text-slate-700 font-semibold text-sm md:text-base">
                       Phone Number
                       <span className="text-red-500" aria-hidden="true">*</span>
                       <span className="sr-only">Required</span>
@@ -630,7 +630,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       onChange={(e) => handleChange('phone', e.target.value)}
                       inputMode="tel"
                       autoComplete="tel"
-                      className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
+                      className={`border-slate-300 text-slate-900 placeholder:text-slate-400 bg-white ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200'}`}
                       disabled={isSaving}
                     />
                     <p className="text-xs text-muted-foreground">
@@ -654,13 +654,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   </div>
                   <div id="turnstile-container" className="flex justify-center py-2" />
                   {turnstileError && (
-                    <p className="text-xs text-red-500 flex items-center gap-1 bg-red-50 dark:bg-red-950/30 px-3 py-2 rounded">
+                    <p className="text-xs text-red-500 flex items-center gap-1 bg-red-50 px-3 py-2 rounded">
                       <AlertCircle className="w-3 h-3" />
                       {turnstileError}
                     </p>
                   )}
                   {!turnstileError && turnstileToken && (
-                    <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 bg-green-50 dark:bg-green-950/30 px-3 py-2 rounded">
+                    <p className="text-xs text-green-600 flex items-center gap-1 bg-green-50 px-3 py-2 rounded">
                       <CheckCircle2 className="w-3 h-3" />
                       Security verification completed
                     </p>
@@ -682,7 +682,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     <span className="sr-only">Required</span>
                   </Label>
                   <Select value={formData.location} onValueChange={(value) => handleChange('location', value)} disabled={isSaving}>
-                    <SelectTrigger className={errors.location ? 'border-red-500 focus-visible:ring-red-500' : ''}>
+                    <SelectTrigger className={errors.location ? 'border-red-500 focus-visible:ring-red-500 bg-white' : 'bg-white'}>
                       <SelectValue placeholder="Select your location" />
                     </SelectTrigger>
                     <SelectContent>
@@ -716,7 +716,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       placeholder="Enter your location"
                       value={formData.otherLocation}
                       onChange={(e) => handleChange('otherLocation', e.target.value)}
-                      className={errors.otherLocation ? 'border-red-500 focus-visible:ring-red-500' : ''}
+                      className={errors.otherLocation ? 'border-red-500 focus-visible:ring-red-500 bg-white' : 'bg-white'}
                       disabled={isSaving}
                     />
                     {errors.otherLocation && (
@@ -737,14 +737,15 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   <Label htmlFor="occupation" className="flex items-center gap-2">
                     What's your occupation?
                   </Label>
-                    <Input
-                      id="occupation"
-                      placeholder="e.g., Teacher, Engineer, Farmer"
-                      value={formData.occupation}
-                      onChange={(e) => handleChange('occupation', e.target.value)}
-                      autoComplete="organization-title"
-                      disabled={isSaving}
-                    />
+                  <Input
+                    id="occupation"
+                    placeholder="e.g., Teacher, Engineer, Farmer"
+                    value={formData.occupation}
+                    onChange={(e) => handleChange('occupation', e.target.value)}
+                    autoComplete="organization-title"
+                    className="bg-white"
+                    disabled={isSaving}
+                  />
                   <p className="text-xs text-muted-foreground">
                     This helps us understand our community better
                   </p>
@@ -755,7 +756,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     Employment Status
                   </Label>
                   <Select value={formData.employmentStatus} onValueChange={(value) => handleChange('employmentStatus', value)} disabled={isSaving}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -768,7 +769,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   </Select>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
                   <Checkbox
                     id="isStudent"
                     checked={formData.isStudent}
@@ -825,7 +826,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     Highest Level of Education
                   </Label>
                   <Select value={formData.educationLevel} onValueChange={(value) => handleChange('educationLevel', value)} disabled={isSaving}>
-                    <SelectTrigger>
+                    <SelectTrigger className="bg-white">
                       <SelectValue placeholder="Select education level" />
                     </SelectTrigger>
                     <SelectContent>
@@ -855,7 +856,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     value={formData.additionalNotes}
                     onChange={(e) => handleChange('additionalNotes', e.target.value)}
                     disabled={isSaving}
-                    className="resize-none h-32"
+                    className="resize-none h-32 bg-white"
                   />
                   <p className="text-xs text-muted-foreground">
                     This is optional - you can leave it blank if you prefer
@@ -867,14 +868,14 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             {/* Review Step */}
             {currentStepData.id === 'review' && (
               <div className="space-y-6">
-                <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40">
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                <div className="p-4 rounded-lg border border-slate-200 bg-slate-50/70">
+                  <p className="text-sm text-slate-600">
                     Please review your details. Use the Back button to edit anything.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="p-4 rounded-lg border border-slate-200">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Personal</p>
                     <div className="mt-2 space-y-2 text-sm">
                       <div className="flex items-start justify-between gap-3">
@@ -896,7 +897,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <div className="p-4 rounded-lg border border-slate-200">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Optional Details</p>
                     <div className="mt-2 space-y-2 text-sm">
                       <div className="flex items-start justify-between gap-3">
@@ -925,8 +926,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20">
-                  <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                <div className="p-4 rounded-lg border border-emerald-200 bg-emerald-50/70">
+                  <p className="text-sm text-emerald-700">
                     When you submit, we’ll create your profile and send a verification email.
                   </p>
                 </div>
@@ -934,7 +935,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             )}
 
             {/* Navigation Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t sticky bottom-0 -mx-4 px-4 pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:bg-transparent sm:backdrop-blur-0">
+            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t sticky bottom-0 -mx-4 px-4 pb-4 bg-white/95 backdrop-blur-sm sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:bg-transparent sm:backdrop-blur-0">
               <Button
                 type="button"
                 variant="outline"
@@ -1001,7 +1002,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           </p>
           {currentStep === REGISTRATION_STEPS.length - 1 && (
             <div className="pt-2">
-              <p className="text-sm font-semibold text-green-600 dark:text-green-400 flex items-center justify-center gap-2">
+              <p className="text-sm font-semibold text-green-600 flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
                 Almost done! Review and submit to complete registration
               </p>
