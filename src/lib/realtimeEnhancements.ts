@@ -49,6 +49,11 @@ export interface OfflineQueueItem {
   retryCount: number;
 }
 
+// Valid table names from the database schema
+type ValidTableName = 'profiles' | 'contributions' | 'announcements' | 'notifications' | 
+  'meetings' | 'welfare_cases' | 'messages' | 'audit_logs' | 'discipline_records' | 
+  'mpesa_transactions' | 'votes' | 'voting_motions' | 'user_roles' | 'members';
+
 // ============================================================================
 // Change Detection and Diff Utility
 // ============================================================================
@@ -256,19 +261,22 @@ export function useOfflineQueue() {
       const item = queue[i];
       
       try {
+        // Type-safe table access
+        const tableName = item.table as ValidTableName;
+        
         // Execute operation
         if (item.operation === 'INSERT') {
-          await supabase.from(item.table).insert([item.data]);
+          await supabase.from(tableName).insert([item.data]);
         } else if (item.operation === 'UPDATE') {
           await supabase
-            .from(item.table)
+            .from(tableName)
             .update(item.data)
-            .eq('id', item.data.id);
+            .eq('id', item.data.id as string);
         } else if (item.operation === 'DELETE') {
           await supabase
-            .from(item.table)
+            .from(tableName)
             .delete()
-            .eq('id', item.data.id);
+            .eq('id', item.data.id as string);
         }
 
         // Remove from queue on success
@@ -344,7 +352,7 @@ export function useOfflineQueue() {
  * Apply local updates immediately, rollback on failure
  */
 export function useOptimisticUpdate<T extends { id: string }>(
-  table: string,
+  table: ValidTableName,
   onError?: (error: Error) => void
 ) {
   const [data, setData] = useState<T[]>([]);
@@ -369,7 +377,7 @@ export function useOptimisticUpdate<T extends { id: string }>(
       try {
         await supabase
           .from(table)
-          .update(updates)
+          .update(updates as Record<string, unknown>)
           .eq('id', id);
 
         // Success, clear pending
@@ -408,15 +416,15 @@ export function useOptimisticUpdate<T extends { id: string }>(
  * Batch multiple updates together for efficiency
  */
 export function useBatchUpdates(
-  table: string,
+  table: ValidTableName,
   debounceMs: number = 1000
 ) {
-  const batchRef = useRef<Map<string, Partial<any>>>(new Map());
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const batchRef = useRef<Map<string, Record<string, unknown>>>(new Map());
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const addToBatch = useCallback(
-    (id: string, updates: Partial<any>) => {
+    (id: string, updates: Record<string, unknown>) => {
       // Merge with existing updates for this id
       const existing = batchRef.current.get(id) || {};
       batchRef.current.set(id, { ...existing, ...updates });
@@ -431,11 +439,11 @@ export function useBatchUpdates(
 
         try {
           // Send all batched updates
-          for (const [id, updates] of batchRef.current.entries()) {
+          for (const [itemId, itemUpdates] of batchRef.current.entries()) {
             await supabase
               .from(table)
-              .update(updates)
-              .eq('id', id);
+              .update(itemUpdates)
+              .eq('id', itemId);
           }
 
           // Clear batch on success

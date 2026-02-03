@@ -215,11 +215,14 @@ export async function fetchAuditLogs(
   return data;
 }
 
+// Valid table names for count and batch operations
+type CountableTable = 'profiles' | 'contributions' | 'announcements' | 'meetings' | 'welfare_cases';
+
 /**
  * Count total records (for pagination)
  */
 export async function countRecords(
-  table: 'profiles' | 'contributions' | 'announcements' | 'meetings' | 'welfare_cases',
+  table: CountableTable,
   filters?: Record<string, unknown>
 ) {
   let query = supabase
@@ -229,7 +232,7 @@ export async function countRecords(
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        query = query.eq(key, value);
+        query = query.eq(key, value as string | number | boolean);
       }
     });
   }
@@ -243,7 +246,7 @@ export async function countRecords(
  * Batch fetch related records
  */
 export async function fetchBatch<T>(
-  table: 'profiles' | 'contributions' | 'announcements' | 'meetings',
+  table: CountableTable,
   ids: string[],
   columns: string = '*'
 ): Promise<T[]> {

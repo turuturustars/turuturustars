@@ -41,6 +41,7 @@ interface MeetingAttendance {
   attended: boolean;
   apology_sent: boolean;
   apology_reason: string | null;
+  marked_at: string | null;
   profiles?: {
     full_name: string;
     membership_number: string | null;
@@ -85,15 +86,16 @@ export default function MeetingsPage() {
 
   const fetchMeetings = async () => {
     setIsLoading(true);
+    // Use correct column names from database schema
     const { data, error } = await supabase
       .from('meetings')
-      .select('id, title, description, scheduled_date, location, status, created_at')
+      .select('id, title, meeting_type, scheduled_date, venue, agenda, status, created_by, created_at')
       .order('scheduled_date', { ascending: false });
 
     if (error) {
       toast.error('Failed to fetch meetings');
     } else {
-      setMeetings(data || []);
+      setMeetings((data || []) as Meeting[]);
     }
     setIsLoading(false);
   };
@@ -107,9 +109,10 @@ export default function MeetingsPage() {
   };
 
   const fetchAttendance = async (meetingId: string) => {
+    // Use correct column names from database schema
     const { data } = await supabase
       .from('meeting_attendance')
-      .select('id, meeting_id, member_id, status, attended_at')
+      .select('id, meeting_id, member_id, attended, apology_sent, apology_reason, marked_at')
       .eq('meeting_id', meetingId);
     
     if (data && data.length > 0) {
@@ -211,7 +214,7 @@ export default function MeetingsPage() {
     }
   };
 
-  const updateMeetingStatus = async (meetingId: string, status: string) => {
+  const updateMeetingStatus = async (meetingId: string, newStatus: string) => {
     // Find the meeting to get its details
     const meeting = meetings.find(m => m.id === meetingId);
     if (!meeting) {
@@ -221,7 +224,7 @@ export default function MeetingsPage() {
 
     const { error } = await supabase
       .from('meetings')
-      .update({ status })
+      .update({ status: newStatus })
       .eq('id', meetingId);
 
     if (error) {
@@ -230,7 +233,7 @@ export default function MeetingsPage() {
     }
 
     // Send cancellation notifications if status is changed to cancelled
-    if (status === 'cancelled') {
+    if (newStatus === 'cancelled') {
       const recipients = await getNotificationRecipients(meeting.meeting_type);
       await sendMeetingNotifications(
         {
@@ -267,15 +270,15 @@ export default function MeetingsPage() {
     return <Badge className={variants[type] || 'bg-gray-100'}>{type.replace('_', ' ').toUpperCase()}</Badge>;
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (meetingStatus: string) => {
     // Map meeting statuses to standard statuses
     const statusMap: Record<string, string> = {
       scheduled: 'pending',
       in_progress: 'active',
-      completed: 'closed',
-      cancelled: 'cancelled'
+      completed: 'active',
+      cancelled: 'dormant'
     };
-    return <StatusBadge status={statusMap[status] || status} />;
+    return <StatusBadge status={statusMap[meetingStatus] || meetingStatus} />;
   };
 
   const upcomingMeetings = meetings.filter(m => isFuture(new Date(m.scheduled_date)) && m.status !== 'cancelled');
@@ -476,32 +479,41 @@ export default function MeetingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pastMeetings.map(meeting => (
-                <TableRow key={meeting.id}>
-                  <TableCell className="font-medium">{meeting.title}</TableCell>
-                  <TableCell>{getMeetingTypeBadge(meeting.meeting_type)}</TableCell>
-                  <TableCell>{format(new Date(meeting.scheduled_date), 'PPP')}</TableCell>
-                  <TableCell>{meeting.venue || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(meeting.status)}</TableCell>
-                  {canManage && (
-                    <TableCell>
-                      <AccessibleButton 
-                        variant="ghost" 
-                        size="sm" 
-                        ariaLabel={`View attendance for meeting: ${meeting.title}`}
-                        onClick={() => openAttendanceDialog(meeting)}
-                      >
-                        View Attendance
-                      </AccessibleButton>
-                    </TableCell>
-                  )}
+              {pastMeetings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    No past meetings
+                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                pastMeetings.map(meeting => (
+                  <TableRow key={meeting.id}>
+                    <TableCell className="font-medium">{meeting.title}</TableCell>
+                    <TableCell>{getMeetingTypeBadge(meeting.meeting_type)}</TableCell>
+                    <TableCell>{format(new Date(meeting.scheduled_date), 'PP')}</TableCell>
+                    <TableCell>{meeting.venue || '-'}</TableCell>
+                    <TableCell>{getStatusBadge(meeting.status)}</TableCell>
+                    {canManage && (
+                      <TableCell>
+                        <AccessibleButton 
+                          variant="outline" 
+                          size="sm"
+                          ariaLabel={`View attendance for ${meeting.title}`}
+                          onClick={() => openAttendanceDialog(meeting)}
+                        >
+                          View Attendance
+                        </AccessibleButton>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TabsContent>
       </Tabs>
 
+      {/* Attendance Dialog */}
       <Dialog open={showAttendanceDialog} onOpenChange={setShowAttendanceDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -513,13 +525,10 @@ export default function MeetingsPage() {
                 <p className="text-muted-foreground mb-4">No attendance records yet</p>
                 {canManage && (
                   <AccessibleButton 
-                    ariaLabel="Initialize attendance list for all members"
-                    onClick={() => {
-                      selectedMeeting && initializeAttendance(selectedMeeting.id);
-                      showSuccess('Attendance list initialized', 2000);
-                    }}
+                    ariaLabel="Initialize attendance for all members"
+                    onClick={() => selectedMeeting && initializeAttendance(selectedMeeting.id)}
                   >
-                    Initialize Attendance List
+                    Initialize Attendance
                   </AccessibleButton>
                 )}
               </div>
@@ -529,7 +538,7 @@ export default function MeetingsPage() {
                   <TableRow>
                     <TableHead>Member</TableHead>
                     <TableHead>Membership #</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Attended</TableHead>
                     {canManage && <TableHead>Action</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -541,22 +550,17 @@ export default function MeetingsPage() {
                       <TableCell>
                         {record.attended ? (
                           <Badge className="bg-green-100 text-green-800">Present</Badge>
-                        ) : record.apology_sent ? (
-                          <Badge className="bg-yellow-100 text-yellow-800">Apology</Badge>
                         ) : (
                           <Badge className="bg-red-100 text-red-800">Absent</Badge>
                         )}
                       </TableCell>
                       {canManage && (
                         <TableCell>
-                          <AccessibleButton
-                            variant="ghost"
+                          <AccessibleButton 
+                            variant="outline" 
                             size="sm"
-                            ariaLabel={`Mark ${record.profiles?.full_name} as ${record.attended ? 'absent' : 'present'}`}
-                            onClick={() => {
-                              toggleAttendance(record.id, record.attended);
-                              showSuccess(`${record.profiles?.full_name} marked as ${!record.attended ? 'present' : 'absent'}`, 1500);
-                            }}
+                            ariaLabel={`Toggle attendance for ${record.profiles?.full_name}`}
+                            onClick={() => toggleAttendance(record.id, record.attended)}
                           >
                             {record.attended ? 'Mark Absent' : 'Mark Present'}
                           </AccessibleButton>
@@ -567,11 +571,6 @@ export default function MeetingsPage() {
                 </TableBody>
               </Table>
             )}
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Present: {attendance.filter(a => a.attended).length}</span>
-              <span>Absent: {attendance.filter(a => !a.attended && !a.apology_sent).length}</span>
-              <span>Apologies: {attendance.filter(a => a.apology_sent).length}</span>
-            </div>
           </div>
         </DialogContent>
       </Dialog>

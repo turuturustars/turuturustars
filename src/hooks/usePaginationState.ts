@@ -13,6 +13,7 @@ export interface UsePaginationStateReturn {
   goToPage: (page: number) => void;
   nextPage: () => void;
   previousPage: () => void;
+  prevPage: () => void; // Alias for previousPage
   setPageSize: (size: number) => void;
   updateTotal: (total: number) => void;
   getOffset: () => number;
@@ -48,6 +49,9 @@ export function usePaginationState(
     goToPage(page - 1);
   }, [page, goToPage]);
 
+  // Alias for previousPage
+  const prevPage = previousPage;
+
   const updatePageSize = useCallback((newSize: number) => {
     setPageSizeState(newSize);
     setPage(1); // Reset to first page
@@ -69,6 +73,7 @@ export function usePaginationState(
     goToPage,
     nextPage,
     previousPage,
+    prevPage,
     setPageSize: updatePageSize,
     updateTotal,
     getOffset,

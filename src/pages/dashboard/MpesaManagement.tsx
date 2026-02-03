@@ -32,12 +32,15 @@ interface MpesaTransaction {
   id: string;
   transaction_type: string;
   checkout_request_id: string | null;
+  merchant_request_id: string | null;
   mpesa_receipt_number: string | null;
   amount: number;
   phone_number: string;
   status: string;
+  result_code: number | null;
   result_desc: string | null;
   created_at: string;
+  updated_at: string;
   initiated_by: string;
   member_id: string | null;
 }
@@ -49,7 +52,7 @@ interface AuditLog {
   performed_by_name: string | null;
   performed_by_role: string | null;
   created_at: string;
-  metadata: any;
+  metadata: Record<string, unknown> | null;
 }
 
 const MpesaManagement = () => {
@@ -81,9 +84,10 @@ const MpesaManagement = () => {
   }, [user, canManageFinances]);
 
   const fetchTransactions = async () => {
+    // Use correct column names from database schema
     const { data, error } = await supabase
       .from('mpesa_transactions')
-      .select('id, transaction_id, phone_number, amount, reference, status, created_at, updated_at')
+      .select('id, transaction_type, checkout_request_id, merchant_request_id, mpesa_receipt_number, amount, phone_number, status, result_code, result_desc, created_at, updated_at, initiated_by, member_id')
       .order('created_at', { ascending: false })
       .limit(100);
     
@@ -96,12 +100,15 @@ const MpesaManagement = () => {
   const fetchAuditLogs = async () => {
     const { data, error } = await supabase
       .from('audit_logs')
-      .select('id, action, resource, status, user_id, created_at')
+      .select('id, action_type, action_description, performed_by_name, performed_by_role, created_at, metadata')
       .order('created_at', { ascending: false })
       .limit(50);
     
     if (!error && data) {
-      setAuditLogs(data);
+      setAuditLogs(data.map(log => ({
+        ...log,
+        metadata: log.metadata as Record<string, unknown> | null
+      })));
     }
   };
 
@@ -129,10 +136,11 @@ const MpesaManagement = () => {
       } else {
         throw new Error(result.ResponseDescription || 'STK Push failed');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -166,10 +174,11 @@ const MpesaManagement = () => {
       } else {
         throw new Error('Failed to generate QR code');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -185,10 +194,11 @@ const MpesaManagement = () => {
         description: result.ResultDesc || 'Transaction status checked',
       });
       fetchTransactions();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     }
@@ -203,10 +213,11 @@ const MpesaManagement = () => {
         description: 'M-Pesa callback URLs have been registered',
       });
       fetchAuditLogs();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
         title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       });
     } finally {
@@ -214,7 +225,7 @@ const MpesaManagement = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (txStatus: string) => {
     const iconMap: Record<string, React.ReactNode> = {
       completed: <CheckCircle className="w-3 h-3" />,
       failed: <XCircle className="w-3 h-3" />,
@@ -223,10 +234,10 @@ const MpesaManagement = () => {
     // Map transaction statuses to standard statuses
     const statusMap: Record<string, string> = {
       completed: 'active',
-      failed: 'missed',
+      failed: 'dormant',
       pending: 'pending'
     };
-    return <StatusBadge status={statusMap[status] || status} icon={iconMap[status]} />;
+    return <StatusBadge status={statusMap[txStatus] || txStatus} icon={iconMap[txStatus]} />;
   };
 
   // Calculate stats
@@ -485,35 +496,36 @@ const MpesaManagement = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((tx) => (
-                    <TableRow key={tx.id}>
-                      <TableCell>{format(new Date(tx.created_at), 'MMM d, HH:mm')}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{tx.transaction_type}</Badge>
-                      </TableCell>
-                      <TableCell>{tx.phone_number}</TableCell>
-                      <TableCell className="font-medium">KSh {Number(tx.amount).toLocaleString()}</TableCell>
-                      <TableCell>{tx.mpesa_receipt_number || '-'}</TableCell>
-                      <TableCell>{getStatusBadge(tx.status)}</TableCell>
-                      <TableCell className="text-right">
-                        {tx.status === 'pending' && tx.checkout_request_id && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCheckStatus(tx.checkout_request_id!)}
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {transactions.length === 0 && (
+                  {transactions.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                        No transactions yet
+                      <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        No transactions found
                       </TableCell>
                     </TableRow>
+                  ) : (
+                    transactions.map((tx) => (
+                      <TableRow key={tx.id}>
+                        <TableCell>{format(new Date(tx.created_at), 'MMM d, HH:mm')}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{tx.transaction_type}</Badge>
+                        </TableCell>
+                        <TableCell>{tx.phone_number}</TableCell>
+                        <TableCell className="font-medium">KSh {Number(tx.amount).toLocaleString()}</TableCell>
+                        <TableCell>{tx.mpesa_receipt_number || '-'}</TableCell>
+                        <TableCell>{getStatusBadge(tx.status)}</TableCell>
+                        <TableCell className="text-right">
+                          {tx.status === 'pending' && tx.checkout_request_id && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCheckStatus(tx.checkout_request_id!)}
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
@@ -523,40 +535,34 @@ const MpesaManagement = () => {
 
         <TabsContent value="audit">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Financial Audit Trail</CardTitle>
-            </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Timestamp</TableHead>
+                    <TableHead>Date</TableHead>
                     <TableHead>Action</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Performed By</TableHead>
-                    <TableHead>Role</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {auditLogs.map((log) => (
-                    <TableRow key={log.id}>
-                      <TableCell>{format(new Date(log.created_at), 'MMM d, HH:mm:ss')}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{log.action_type}</Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">{log.action_description}</TableCell>
-                      <TableCell>{log.performed_by_name || 'Unknown'}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{log.performed_by_role || 'N/A'}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {auditLogs.length === 0 && (
+                  {auditLogs.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No audit logs yet
+                      <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No audit logs found
                       </TableCell>
                     </TableRow>
+                  ) : (
+                    auditLogs.map((log) => (
+                      <TableRow key={log.id}>
+                        <TableCell>{format(new Date(log.created_at), 'MMM d, HH:mm')}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{log.action_type}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{log.action_description}</TableCell>
+                        <TableCell>{log.performed_by_name || '-'}</TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>

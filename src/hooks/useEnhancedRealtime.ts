@@ -42,7 +42,8 @@ export function useEnhancedRealtime<T extends { id: string }>(
         setIsLoading(true);
         const { data, error: fetchError } = await supabase.from(table).select('*');
         if (fetchError) throw fetchError;
-        setItems((data || []) as T[]);
+        // Cast through unknown to handle type mismatch
+        setItems((data || []) as unknown as T[]);
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
         setError(e);
