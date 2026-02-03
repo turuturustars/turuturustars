@@ -35,10 +35,10 @@ export function exportToCSV<T extends Record<string, any>>(
     .map((row) =>
       columns
         .map((col) => {
-          let value = row[col] ?? '';
+          let value: any = row[col] ?? '';
           // Format dates
-          if (value instanceof Date) {
-            value = value.toISOString().split('T')[0];
+          if (value && typeof value === 'object' && 'toISOString' in value) {
+            value = (value as Date).toISOString().split('T')[0];
           }
           return escapeCSV(String(value));
         })

@@ -58,16 +58,26 @@ export function useEnhancedRealtime<T extends { id: string }>(
 
   const update = useCallback(
     async (id: string, updates: Partial<T>) => {
-      const { error } = await supabase.from(table).update(updates as Record<string, unknown>).eq('id', id);
-      if (error) throw error;
+      try {
+        const { error } = await (supabase.from(table) as any).update(updates as any).eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Update error:', err);
+        throw err;
+      }
     },
     [table]
   );
 
   const insert = useCallback(
     async (data: Omit<T, 'id'>) => {
-      const { error } = await supabase.from(table).insert([data as Record<string, unknown>]);
-      if (error) throw error;
+      try {
+        const { error } = await (supabase.from(table) as any).insert([data as any]);
+        if (error) throw error;
+      } catch (err) {
+        console.error('Insert error:', err);
+        throw err;
+      }
     },
     [table]
   );

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
+import { UserRole } from '@/types/roles';
 import {
   Crown,
   Users,
@@ -96,7 +97,8 @@ const RolesPage = () => {
   ];
 
   const handleRoleNavigation = (role: Role) => {
-    if (roles.includes(role.id) || roles.includes('admin')) {
+    const roleId = role.id as UserRole;
+    if (roles.includes(roleId) || roles.includes('admin' as UserRole)) {
       navigate(role.path);
       showSuccess(`Navigating to ${role.title} dashboard`);
     }
@@ -104,7 +106,7 @@ const RolesPage = () => {
 
   return (
     <div className="space-y-6">
-      <AccessibleStatus />
+      <AccessibleStatus message="Select a role to view its dashboard" />
       
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-foreground">Role Dashboards</h1>
@@ -115,7 +117,8 @@ const RolesPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {availableRoles.map((role) => {
-          const hasAccess = roles.includes(role.id) || roles.includes('admin');
+          const roleId = role.id as UserRole;
+          const hasAccess = roles.includes(roleId) || roles.includes('admin' as UserRole);
 
           return (
             <Card

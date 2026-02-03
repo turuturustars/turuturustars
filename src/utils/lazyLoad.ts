@@ -8,11 +8,12 @@ export const lazyLoadComponent = (
   importFunc: () => Promise<{ default: React.ComponentType<any> }>,
   delayMs = 0
 ) => {
-  return lazy(() => 
-    new Promise(resolve => 
-      setTimeout(() => resolve(importFunc()), delayMs)
-    )
-  );
+  return lazy(async () => {
+    if (delayMs > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    return importFunc();
+  });
 };
 
 /**

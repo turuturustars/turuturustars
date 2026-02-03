@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
-import { Vote, Plus, CheckCircle, XCircle, MinusCircle, Loader2, Gavel, Eye, EyeOff } from 'lucide-react';
+import { Vote, Plus, CheckCircle, XCircle, MinusCircle, Loader2, Gavel, Eye, EyeOff, Lock } from 'lucide-react';
 import { hasPermission } from '@/lib/rolePermissions';
 
 interface VotingMotion {

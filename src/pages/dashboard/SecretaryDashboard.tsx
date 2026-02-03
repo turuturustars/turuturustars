@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Input } from '@/components/ui/input';
@@ -93,11 +94,11 @@ const SecretaryDashboard = () => {
   const fetchDocuments = async () => {
     const { data, error } = await supabase
       .from('documents')
-      .select('id, title, created_at, file_url, created_by')
+      .select('id, title, created_at, cloudinary_url, created_by')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
-      setDocuments(data);
+      setDocuments(data as any);
     }
     setIsLoading(false);
   };
@@ -105,11 +106,11 @@ const SecretaryDashboard = () => {
   const fetchMeetings = async () => {
     const { data, error } = await supabase
       .from('meeting_minutes')
-      .select('id, title, meeting_date, created_at, content')
+      .select('id, title, meeting_date, created_at, description')
       .order('meeting_date', { ascending: false });
     
     if (!error && data) {
-      setMeetings(data);
+      setMeetings(data as any);
     }
   };
 
@@ -591,7 +592,7 @@ const SecretaryDashboard = () => {
                       <TableCell>{getStatusBadge(meeting.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <AccessibleButton variant="ghost" size="sm" ariaLabel={`View document ${doc.title}`}>
+                          <AccessibleButton variant="ghost" size="sm" ariaLabel={`View document ${meeting.title}`}>
                             <Eye className="w-4 h-4" />
                           </AccessibleButton>
                           {meeting.status === 'draft' && (

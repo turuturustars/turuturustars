@@ -225,7 +225,7 @@ export async function countRecords(
   table: CountableTable,
   filters?: Record<string, unknown>
 ) {
-  let query = supabase
+  let query: any = supabase
     .from(table)
     .select('id', { count: 'exact', head: true });
 

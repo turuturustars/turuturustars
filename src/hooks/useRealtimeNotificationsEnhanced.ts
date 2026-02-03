@@ -256,6 +256,21 @@ export const useRealtimeNotificationsEnhanced = () => {
     }
   }, []);
 
+  // Delete all notifications
+  const deleteAllNotifications = useCallback(async () => {
+    if (!user?.id) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', user.id);
+
+    if (!error) {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [user?.id]);
+
   return {
     notifications,
     unreadCount,
@@ -263,6 +278,7 @@ export const useRealtimeNotificationsEnhanced = () => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
+    deleteAllNotifications,
     refresh: fetchNotifications,
   };
 };

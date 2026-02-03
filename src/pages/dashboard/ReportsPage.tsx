@@ -83,7 +83,7 @@ const ReportsPage = () => {
     try {
       const dateRange = getDateRange();
       
-      let membersQuery = supabase.from('profiles').select('id, full_name, joined_at, status');
+      let membersQuery = supabase.from('profiles').select('id, full_name, joined_at, status, is_student');
       let contributionsQuery = supabase.from('contributions').select('id, member_id, amount, contribution_type, created_at, status');
       let welfareQuery = supabase.from('welfare_cases').select('id, title, case_type, target_amount, collected_amount, status, created_at');
 
@@ -103,7 +103,7 @@ const ReportsPage = () => {
         membersQuery,
         contributionsQuery,
         welfareQuery,
-        supabase.from('profiles').select('id, full_name, status'), // Get all members for total count
+        supabase.from('profiles').select('id, full_name, status, is_student'), // Get all members for total count
       ]);
 
       if (membersRes.error) throw membersRes.error;

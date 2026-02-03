@@ -263,20 +263,21 @@ export function useOfflineQueue() {
       try {
         // Type-safe table access
         const tableName = item.table as ValidTableName;
+        const data = item.data as Record<string, unknown>;
         
         // Execute operation
         if (item.operation === 'INSERT') {
-          await supabase.from(tableName).insert([item.data]);
+          await supabase.from(tableName).insert([data]);
         } else if (item.operation === 'UPDATE') {
           await supabase
             .from(tableName)
-            .update(item.data)
-            .eq('id', item.data.id as string);
+            .update(data)
+            .eq('id', data.id as string);
         } else if (item.operation === 'DELETE') {
           await supabase
             .from(tableName)
             .delete()
-            .eq('id', item.data.id as string);
+            .eq('id', data.id as string);
         }
 
         // Remove from queue on success

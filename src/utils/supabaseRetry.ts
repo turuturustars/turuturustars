@@ -1,5 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
+type ValidTable = 'voting_motions_with_vote_breakdown' | 'voting_motions_with_vote_count' | string;
+
 /**
  * retryUpsert - attempt to upsert rows with retries and exponential backoff
  * @param table - table name
@@ -9,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
  * @param initialDelayMs - initial backoff in ms (default 300)
  */
 export async function retryUpsert(
-  table: string,
+  table: ValidTable,
   row: any,
   options: Record<string, unknown> = {},
   attempts = 3,

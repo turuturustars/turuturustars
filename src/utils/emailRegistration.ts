@@ -15,7 +15,8 @@ export async function sendVerificationEmail(email: string): Promise<{ success: b
   try {
     // The verification email is automatically sent by Supabase during signUp()
     // This function is for manual resend if needed
-    const { error } = await supabase.auth.resendEmailConfirmationMail(email);
+    const { error } = await (supabase.auth as any).resendEmailConfirmationMail?.(email) || 
+                             { error: { message: 'Resend not available in this Supabase version' } };
     
     if (error) {
       console.error('Email resend error:', error);
@@ -208,7 +209,8 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.auth.resendEmailConfirmationMail(email);
+    const { error } = await (supabase.auth as any).resendEmailConfirmationMail?.(email) || 
+                             { error: { message: 'Resend not available in this Supabase version' } };
 
     if (error) {
       console.error('Resend verification email error:', error);
