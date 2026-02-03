@@ -106,6 +106,14 @@ const REGISTRATION_STEPS: RegistrationStep[] = [
     required: false,
     questions: ['Additional Notes'],
   },
+  {
+    id: 'review',
+    title: 'Review & Confirm',
+    description: 'Make sure everything looks correct before submitting',
+    icon: <CheckCircle2 className="w-5 h-5" />,
+    required: true,
+    questions: ['Review Details'],
+  },
 ];
 
 interface FormData {
@@ -219,6 +227,16 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         break;
       case 'additional-info':
         // Optional step
+        break;
+      case 'review':
+        if (!formData.fullName.trim()) newErrors.fullName = 'Name is required';
+        if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
+        if (formData.phone.length < 10) newErrors.phone = 'Invalid phone number';
+        if (!formData.idNumber.trim()) newErrors.idNumber = 'ID number is required';
+        if (!formData.location) newErrors.location = 'Please select a location';
+        if (formData.location === 'Other' && !formData.otherLocation.trim()) {
+          newErrors.otherLocation = 'Please specify your location';
+        }
         break;
     }
 
@@ -381,11 +399,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   }
 
   const currentStepData = REGISTRATION_STEPS[currentStep];
-  const progress = ((currentStep + 1) / REGISTRATION_STEPS.length) * 100;
+  const totalSteps = REGISTRATION_STEPS.length;
+  const progress = ((currentStep + 1) / totalSteps) * 100;
+  const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-4 py-12">
-      <div className="w-full max-w-4xl space-y-6 card-stagger">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-3 sm:px-6 py-8 sm:py-12">
+      <div className="w-full max-w-5xl space-y-6 card-stagger">
         {/* Progress Section */}
         <div className="space-y-3 progress-bar">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -401,18 +421,50 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             <div className="text-left md:text-right flex-shrink-0">
               <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
                 <TrendingUp className="w-4 h-4" />
-                Step {currentStep + 1} of {REGISTRATION_STEPS.length}
+                Step {currentStep + 1} of {totalSteps}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {Math.round(progress)}% complete
               </p>
             </div>
           </div>
-          <Progress value={progress} className="h-2 progress-fill" />
+          <Progress value={progress} className="h-2 progress-fill" aria-label="Registration progress" />
+        </div>
+
+        {/* Mobile Step Chips */}
+        <div className="sm:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1">
+            {REGISTRATION_STEPS.map((step, index) => {
+              const isCompleted = index < currentStep;
+              const isActive = index === currentStep;
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => {
+                    if (index <= currentStep) {
+                      setCurrentStep(index);
+                      setErrors({});
+                    }
+                  }}
+                  className={`shrink-0 px-3 py-2 rounded-full text-xs font-semibold border transition-all ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : isCompleted
+                      ? 'bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700'
+                      : 'bg-background text-muted-foreground border-muted'
+                  }`}
+                  aria-current={isActive ? 'step' : undefined}
+                >
+                  {index + 1}. {step.title}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Steps Navigation */}
-        <div className="hidden md:grid grid-cols-6 gap-2 step-indicators">
+        <div className="hidden md:grid grid-cols-7 gap-2 step-indicators">
           {REGISTRATION_STEPS.map((step, index) => {
             const isCompleted = index < currentStep;
             const isActive = index === currentStep;
@@ -490,7 +542,12 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                 <CardDescription className="mt-1 text-slate-600 dark:text-slate-300">
                   {currentStepData.description}
                 </CardDescription>
-                {!currentStepData.required && (
+                {currentStepData.required ? (
+                  <div className="flex items-center gap-2 mt-2 text-xs text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-900/40 px-3 py-2 rounded-md font-medium">
+                    <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                    <span>Required step</span>
+                  </div>
+                ) : (
                   <div className="flex items-center gap-2 mt-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-3 py-2 rounded-md tooltip-animation font-medium">
                     <Clock className="w-3 h-3 flex-shrink-0" />
                     <span>Optional - You can skip this step</span>
@@ -500,7 +557,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             </div>
           </CardHeader>
 
-          <CardContent className="space-y-6 pt-6 pb-8 px-4 md:px-8">
+          <CardContent className="space-y-6 pt-6 pb-8 px-4 sm:px-6 md:px-8">
 
             {/* Personal Info Step */}
             {currentStepData.id === 'personal-info' && (
@@ -508,19 +565,23 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
                     Full Name
-                    {' '}
-                    <span className="text-red-500">*</span>
+                    <span className="text-red-500" aria-hidden="true">*</span>
+                    <span className="sr-only">Required</span>
                   </Label>
                   <Input
                     id="fullName"
                     placeholder="e.g., John Doe"
                     value={formData.fullName}
                     onChange={(e) => handleChange('fullName', e.target.value)}
+                    autoComplete="name"
                     className={`registration-input transition-all border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.fullName ? 'border-red-500 focus-visible:ring-red-500 field-error' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                     disabled={isSaving}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Use the name you want on your membership record.
+                  </p>
                   {errors.fullName && (
-                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
                       <AlertCircle className="w-3 h-3" />
                       {errors.fullName}
                     </p>
@@ -531,19 +592,24 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   <div className="space-y-2">
                     <Label htmlFor="idNumber" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
                       ID Number
-                      {' '}
-                      <span className="text-red-500">*</span>
+                      <span className="text-red-500" aria-hidden="true">*</span>
+                      <span className="sr-only">Required</span>
                     </Label>
                     <Input
                       id="idNumber"
                       placeholder="e.g., 12345678"
                       value={formData.idNumber}
                       onChange={(e) => handleChange('idNumber', e.target.value)}
+                      inputMode="numeric"
+                      autoComplete="off"
                       className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.idNumber ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                       disabled={isSaving}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Used for verification and membership records.
+                    </p>
                     {errors.idNumber && (
-                      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                      <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1" role="alert">
                         <AlertCircle className="w-3 h-3" />
                         {errors.idNumber}
                       </p>
@@ -553,8 +619,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   <div className="space-y-2">
                     <Label htmlFor="phone" className="flex items-center gap-2 text-slate-700 dark:text-slate-200 font-semibold text-sm md:text-base">
                       Phone Number
-                      {' '}
-                      <span className="text-red-500">*</span>
+                      <span className="text-red-500" aria-hidden="true">*</span>
+                      <span className="sr-only">Required</span>
                     </Label>
                     <Input
                       id="phone"
@@ -562,11 +628,16 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => handleChange('phone', e.target.value)}
+                      inputMode="tel"
+                      autoComplete="tel"
                       className={`border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ${errors.phone ? 'border-red-500 focus-visible:ring-red-500' : 'focus-visible:border-blue-500 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-900'}`}
                       disabled={isSaving}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      We’ll use this to contact you about membership updates.
+                    </p>
                     {errors.phone && (
-                      <p className="text-xs text-red-500 flex items-center gap-1">
+                      <p className="text-xs text-red-500 flex items-center gap-1" role="alert">
                         <AlertCircle className="w-3 h-3" />
                         {errors.phone}
                       </p>
@@ -607,8 +678,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                 <div className="space-y-2">
                   <Label htmlFor="location" className="flex items-center gap-2">
                     Where are you from?
-                    {' '}
-                    <span className="text-red-500">*</span>
+                    <span className="text-red-500" aria-hidden="true">*</span>
+                    <span className="sr-only">Required</span>
                   </Label>
                   <Select value={formData.location} onValueChange={(value) => handleChange('location', value)} disabled={isSaving}>
                     <SelectTrigger className={errors.location ? 'border-red-500 focus-visible:ring-red-500' : ''}>
@@ -622,8 +693,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Helps us connect you with nearby community activities.
+                  </p>
                   {errors.location && (
-                    <p className="text-xs text-red-500 flex items-center gap-1">
+                    <p className="text-xs text-red-500 flex items-center gap-1" role="alert">
                       <AlertCircle className="w-3 h-3" />
                       {errors.location}
                     </p>
@@ -634,8 +708,8 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   <div className="space-y-2">
                     <Label htmlFor="otherLocation" className="flex items-center gap-2">
                       Specify your location
-                      {' '}
-                      <span className="text-red-500">*</span>
+                      <span className="text-red-500" aria-hidden="true">*</span>
+                      <span className="sr-only">Required</span>
                     </Label>
                     <Input
                       id="otherLocation"
@@ -646,7 +720,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                       disabled={isSaving}
                     />
                     {errors.otherLocation && (
-                      <p className="text-xs text-red-500 flex items-center gap-1">
+                      <p className="text-xs text-red-500 flex items-center gap-1" role="alert">
                         <AlertCircle className="w-3 h-3" />
                         {errors.otherLocation}
                       </p>
@@ -663,13 +737,14 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   <Label htmlFor="occupation" className="flex items-center gap-2">
                     What's your occupation?
                   </Label>
-                  <Input
-                    id="occupation"
-                    placeholder="e.g., Teacher, Engineer, Farmer"
-                    value={formData.occupation}
-                    onChange={(e) => handleChange('occupation', e.target.value)}
-                    disabled={isSaving}
-                  />
+                    <Input
+                      id="occupation"
+                      placeholder="e.g., Teacher, Engineer, Farmer"
+                      value={formData.occupation}
+                      onChange={(e) => handleChange('occupation', e.target.value)}
+                      autoComplete="organization-title"
+                      disabled={isSaving}
+                    />
                   <p className="text-xs text-muted-foreground">
                     This helps us understand our community better
                   </p>
@@ -789,14 +864,83 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
               </div>
             )}
 
+            {/* Review Step */}
+            {currentStepData.id === 'review' && (
+              <div className="space-y-6">
+                <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/40">
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    Please review your details. Use the Back button to edit anything.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Personal</p>
+                    <div className="mt-2 space-y-2 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Full Name</span>
+                        <span className="font-medium text-right">{formData.fullName || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">ID Number</span>
+                        <span className="font-medium text-right">{formData.idNumber || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Phone</span>
+                        <span className="font-medium text-right">{formData.phone || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Location</span>
+                        <span className="font-medium text-right">{finalLocation || '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Optional Details</p>
+                    <div className="mt-2 space-y-2 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Occupation</span>
+                        <span className="font-medium text-right">{formData.occupation || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Employment</span>
+                        <span className="font-medium text-right">{formData.employmentStatus || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Student</span>
+                        <span className="font-medium text-right">{formData.isStudent ? 'Yes' : 'No'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Education</span>
+                        <span className="font-medium text-right">{formData.educationLevel || '—'}</span>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-muted-foreground">Interests</span>
+                        <span className="font-medium text-right">
+                          {formData.interests.length > 0 ? formData.interests.join(', ') : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                    When you submit, we’ll create your profile and send a verification email.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Navigation Buttons */}
-            <div className="flex gap-3 pt-6 border-t">
+            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t sticky bottom-0 -mx-4 px-4 pb-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm sm:static sm:mx-0 sm:px-0 sm:pb-0 sm:bg-transparent sm:backdrop-blur-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0 || isSaving}
-                className="flex-1"
+                className="flex-1 order-2 sm:order-none"
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
                 Back
@@ -808,7 +952,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   variant="ghost"
                   onClick={handleSkipStep}
                   disabled={isSaving}
-                  className="flex-1"
+                  className="flex-1 order-3 sm:order-none"
                 >
                   Skip
                 </Button>
@@ -818,7 +962,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSaving}
-                  className="flex-1"
+                  className="flex-1 order-1 sm:order-none"
                 >
                   {isSaving ? (
                     <>
@@ -837,7 +981,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
                   type="button"
                   onClick={handleNext}
                   disabled={isSaving}
-                  className="flex-1"
+                  className="flex-1 order-1 sm:order-none"
                 >
                   Next
                   <ChevronRight className="w-4 h-4 ml-2" />
@@ -853,7 +997,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
             Fields marked with <span className="text-red-500 font-bold">*</span> are required
           </p>
           <p className="text-xs text-muted-foreground">
-            ✨ You can update any information anytime in your dashboard settings
+            You can update any information anytime in your dashboard settings
           </p>
           {currentStep === REGISTRATION_STEPS.length - 1 && (
             <div className="pt-2">

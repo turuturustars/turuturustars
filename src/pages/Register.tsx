@@ -348,19 +348,29 @@ const Register = () => {
 
   // Not authenticated and no pending signup — let user start registration here
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
-      <div className="w-full max-w-lg bg-white shadow-lg rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-2">Start Registration</h2>
-        <p className="text-sm text-muted-foreground mb-4">You can either go to the Sign Up page or enter the email you used to create an account and continue filling your profile now.</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-muted/20 px-4 sm:px-6 py-10">
+      <div className="w-full max-w-xl bg-white shadow-xl rounded-2xl p-6 sm:p-8 border border-primary/10">
+        <h2 className="text-2xl font-semibold mb-2">Start Registration</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          Continue your registration here, or go to the Sign Up page to create an account.
+        </p>
 
-        <div className="space-y-3 mb-4">
-          <label className="block text-sm">Email you signed up with (or want to register)</label>
-          <input value={starterEmail} onChange={(e) => setStarterEmail(e.target.value)} className="w-full border px-3 py-2 rounded" placeholder="you@email.com" />
+        <div className="space-y-3 mb-6">
+          <label className="block text-sm font-medium">Email you signed up with</label>
+          <input
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={starterEmail}
+            onChange={(e) => setStarterEmail(e.target.value)}
+            className="w-full border border-border px-4 py-2.5 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+            placeholder="you@email.com"
+          />
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
-            className="px-4 py-2 bg-primary text-white rounded"
+            className="px-4 py-2.5 bg-primary text-white rounded-lg font-semibold"
             onClick={() => {
               // Save pending signup locally so Register page can continue as pending
               if (!starterEmail) return toast({ title: 'Email required', description: 'Please enter an email.', variant: 'destructive' });
@@ -372,9 +382,9 @@ const Register = () => {
             Continue here
           </button>
 
-          <button className="px-4 py-2 border rounded" onClick={() => navigate('/auth?mode=signup', { replace: true })}>Go to Sign Up</button>
+          <button className="px-4 py-2.5 border rounded-lg font-semibold" onClick={() => navigate('/auth?mode=signup', { replace: true })}>Go to Sign Up</button>
 
-          <button className="px-4 py-2 border rounded" onClick={() => navigate('/auth', { replace: true })}>Sign In</button>
+          <button className="px-4 py-2.5 border rounded-lg font-semibold" onClick={() => navigate('/auth', { replace: true })}>Sign In</button>
         </div>
       </div>
     </div>
