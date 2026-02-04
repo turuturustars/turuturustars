@@ -1,7 +1,7 @@
 {
-  "name": "Turuturu Stars CBO",
+  "name": "Turuturu Stars CBO - Community Organization Kenya",
   "short_name": "Turuturu Stars",
-  "description": "Community Based Organization - Manage contributions, welfare, and announcements",
+  "description": "Turuturu Stars CBO: Community empowerment, welfare, contributions, and community development in Muranga County Kenya",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,25 +10,25 @@
   "background_color": "#ffffff",
   "icons": [
     {
-      "src": "https://img.icons8.com/nolan/64/star.png",
+      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
       "sizes": "64x64",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://img.icons8.com/nolan/128/star.png",
+      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
       "sizes": "128x128",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://img.icons8.com/nolan/256/star.png",
+      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "https://img.icons8.com/nolan/512/star.png",
+      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -36,9 +36,16 @@
   ],
   "screenshots": [
     {
-      "src": "https://img.icons8.com/nolan/256/star.png",
-      "sizes": "256x256",
-      "type": "image/png"
+      "src": "https://scontent-mba2-1.xx.fbcdn.net/v/t39.30808-6/612499098_122099308893201166_2637006158142019891_n.jpg",
+      "sizes": "540x720",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "https://turuturustars.co.ke/assets/img/turuturustars_community_during_prize_giving_day-CA9maojf.jpg",
+      "sizes": "1280x720",
+      "type": "image/jpeg",
+      "form_factor": "wide"
     }
   ],
   "categories": ["productivity", "business", "lifestyle"],
