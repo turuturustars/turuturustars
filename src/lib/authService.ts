@@ -5,6 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { getEmailConfig } from '@/config/emailConfig';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 export interface AuthUser {
   id: string;
@@ -31,14 +32,17 @@ export interface SignInData {
  */
 export async function isEmailVerified(userId: string): Promise<boolean> {
   try {
-    const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
-    
-    if (error) {
-      console.warn('Failed to check email verification:', error);
+    const { data: { user }, error } = await supabase.auth.getUser();
+
+    if (error || !user) {
       return false;
     }
-    
-    return !!user?.email_confirmed_at;
+
+    if (userId && user.id !== userId) {
+      return false;
+    }
+
+    return !!user.email_confirmed_at;
   } catch (error) {
     console.error('Email verification check failed:', error);
     return false;
@@ -72,8 +76,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Sign up new user
  */
 export async function signUpUser(data: SignUpData) {
-  // Use production domain for redirects
-  const redirectUrl = 'https://turuturustars.co.ke/dashboard';
+  const redirectUrl = buildSiteUrl('/auth/confirm');
   
   const { data: authData, error } = await supabase.auth.signUp({
     email: data.email,
@@ -125,7 +128,7 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'twitter')
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: 'https://turuturustars.co.ke/dashboard',
+      redirectTo: buildSiteUrl('/auth/callback'),
     },
   });
 
@@ -144,7 +147,7 @@ export async function resendEmailConfirmation(email: string) {
     type: 'signup',
     email,
     options: {
-      emailRedirectTo: 'https://turuturustars.co.ke/dashboard',
+      emailRedirectTo: buildSiteUrl('/auth/confirm'),
     },
   });
 
@@ -160,7 +163,7 @@ export async function resendEmailConfirmation(email: string) {
  */
 export async function sendPasswordResetEmail(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: 'https://turuturustars.co.ke/reset-password',
+    redirectTo: buildSiteUrl('/auth/reset-password'),
   });
 
   if (error) {
@@ -288,8 +291,8 @@ export function validateEmail(email: string): { valid: boolean; error?: string }
 export function validatePassword(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  if (password.length < 6) {
-    errors.push('Password must be at least 6 characters');
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
   }
 
   if (!/[A-Z]/.test(password)) {

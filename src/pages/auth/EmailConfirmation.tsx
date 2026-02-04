@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 /**
  * Email Confirmation Page
@@ -26,7 +27,6 @@ const EmailConfirmation = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<'confirming' | 'success' | 'error'>('confirming');
   const [errorMessage, setErrorMessage] = useState('');
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -77,7 +77,7 @@ const EmailConfirmation = () => {
 
         // Redirect to dashboard on production domain
         setTimeout(() => {
-          window.location.href = 'https://turuturustars.co.ke/dashboard';
+          window.location.href = buildSiteUrl('/dashboard');
         }, 2500);
       } catch (error) {
         console.error('Email confirmation error:', error);
@@ -139,7 +139,7 @@ const EmailConfirmation = () => {
           {status === 'success' && (
             <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <p className="text-sm text-green-800 dark:text-green-300">
-                ✓ Email verified successfully! Redirecting you to your dashboard...
+                Email verified successfully! Redirecting you to your dashboard...
               </p>
             </div>
           )}
@@ -186,3 +186,4 @@ const EmailConfirmation = () => {
 };
 
 export default EmailConfirmation;
+

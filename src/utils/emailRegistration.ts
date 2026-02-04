@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 /**
  * Send verification email after user signup
@@ -61,7 +62,7 @@ export async function signupWithEmailVerification(
       password,
       options: {
         // Email confirmation link redirects to this URL
-        emailRedirectTo: `${globalThis.location.origin}/auth/confirm`,
+        emailRedirectTo: buildSiteUrl('/auth/confirm'),
         data: {
           // Store profile data in auth metadata for quick access
           full_name: profileData.fullName,
@@ -187,7 +188,7 @@ export async function verifyEmailAndCompleteProfile(
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${globalThis.location.origin}/auth/reset-password`,
+      redirectTo: buildSiteUrl('/auth/reset-password'),
     });
 
     if (error) {

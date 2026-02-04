@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -85,7 +86,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `https://turuturustars.co.ke/auth/callback`,
+          redirectTo: buildSiteUrl('/auth/callback'),
         },
       });
 

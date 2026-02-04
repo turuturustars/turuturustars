@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import Auth from '@/pages/Auth';
 import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
 import { waitForProfile } from '@/utils/waitForProfile';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 const AuthFlow = () => {
   const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'details-required'>('loading');
@@ -26,7 +27,7 @@ const AuthFlow = () => {
 
           if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
             // Profile is complete - redirect to dashboard
-            window.location.href = 'https://turuturustars.co.ke/dashboard';
+            window.location.href = buildSiteUrl('/dashboard');
           } else {
             // Profile is incomplete, need details
             setAuthState('details-required');
@@ -52,7 +53,7 @@ const AuthFlow = () => {
         const profile = await waitForProfile(session.user.id, 5, 400);
 
         if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
-          window.location.href = 'https://turuturustars.co.ke/dashboard';
+          window.location.href = buildSiteUrl('/dashboard');
         } else {
           setAuthState('details-required');
         }

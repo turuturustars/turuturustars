@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 /**
  * AuthCallback - Handles OAuth and email verification callbacks
@@ -14,6 +15,16 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            console.error('Code exchange error:', exchangeError);
+          }
+        }
+
         // Get session from URL hash (for OAuth callbacks)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
@@ -44,7 +55,7 @@ const AuthCallback = () => {
         // Redirect based on profile completion
         if (profile?.full_name && profile?.phone && profile?.id_number) {
           // Profile complete - go to dashboard
-          window.location.href = 'https://turuturustars.co.ke/dashboard';
+          window.location.href = buildSiteUrl('/dashboard');
         } else {
           // Profile incomplete - go to registration
           navigate('/register', { replace: true });

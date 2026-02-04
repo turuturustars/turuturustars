@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 interface ForgotPasswordProps {
   onBack: () => void;
@@ -32,7 +33,7 @@ const ForgotPassword = ({ onBack }: ForgotPasswordProps) => {
 
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${globalThis.location.origin}/reset-password`,
+        redirectTo: buildSiteUrl('/auth/reset-password'),
       });
 
       if (resetError) {

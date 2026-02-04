@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, AlertCircle, Mail, Lock } from 'lucide-react';
 import { z } from 'zod';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -183,7 +184,7 @@ const AuthenticationForm = ({
         email: signupData.email,
         password: signupData.password,
         options: {
-          emailRedirectTo: `https://turuturustars.co.ke/auth/callback`,
+          emailRedirectTo: buildSiteUrl('/auth/confirm'),
         },
       });
 
@@ -201,7 +202,16 @@ const AuthenticationForm = ({
           title: 'Check your email',
           description: 'We sent you a verification link. Please check your inbox and spam folder.',
         });
-        navigate('/auth/email-confirmation', { state: { email: signupData.email } });
+        try {
+          localStorage.setItem('pendingSignup', JSON.stringify({
+            email: signupData.email,
+            userId: data.user.id,
+            timestamp: new Date().toISOString(),
+          }));
+        } catch (e) {
+          console.warn('Could not save pending signup to localStorage');
+        }
+        navigate('/register', { replace: true });
       } else {
         navigate('/register', { replace: true });
       }
@@ -222,7 +232,7 @@ const AuthenticationForm = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `https://turuturustars.co.ke/auth/callback`,
+          redirectTo: buildSiteUrl('/auth/callback'),
         },
       });
 
@@ -246,7 +256,7 @@ const AuthenticationForm = ({
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(loginData.email, {
-        redirectTo: `https://turuturustars.co.ke/auth/reset-password`,
+        redirectTo: buildSiteUrl('/auth/reset-password'),
       });
 
       if (error) throw error;

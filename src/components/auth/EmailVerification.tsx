@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 interface EmailVerificationProps {
   email: string;
@@ -89,7 +90,7 @@ export const EmailVerification = ({
           type: 'signup',
           email,
           options: {
-            emailRedirectTo: `${globalThis.location?.origin}/profile-setup`,
+            emailRedirectTo: buildSiteUrl('/auth/confirm'),
           },
         });
 

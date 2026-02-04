@@ -155,6 +155,7 @@ const App = () => {
                   }
                 />
                 <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/confirm" element={<AuthCallback />} />
                 <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
                 
                 {/* ==================== PROTECTED DASHBOARD ROUTES ==================== */}

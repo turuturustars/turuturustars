@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Upload } from 'lucide-react';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { buildSiteUrl } from '@/utils/siteUrl';
 
 interface ProfileFormData {
   fullName: string;
@@ -175,7 +176,7 @@ const ProfileSetup = () => {
         type: 'signup',
         email: currentUser.email,
         options: {
-          emailRedirectTo: `${globalThis.location?.origin}/profile-setup`,
+          emailRedirectTo: buildSiteUrl('/auth/confirm'),
         },
       });
 
