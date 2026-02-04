@@ -75,7 +75,18 @@ const ScrollProgressIndicator = () => {
   }, []);
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Smooth scroll to absolute top with enhanced animation
+    document.documentElement.scrollTop = 0;
+    window.scrollTo({ 
+      top: 0, 
+      behavior: 'smooth',
+      left: 0
+    });
+    
+    // Fallback for older browsers
+    if (document.body.scrollTop !== undefined) {
+      document.body.scrollTop = 0;
+    }
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -224,19 +235,19 @@ const ScrollProgressIndicator = () => {
       {showScrollTop && (
         <button
           onClick={scrollToTop}
-          className="fixed bottom-6 right-4 sm:right-6 z-40 group transition-all duration-500 animate-fadeIn"
+          className="fixed bottom-6 right-4 sm:right-6 z-40 group transition-all duration-500 animate-fadeIn active:scale-95"
           aria-label="Scroll to top"
         >
           <div className="relative">
-            {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary to-blue-600 rounded-full blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
+            {/* Enhanced glow effect */}
+            <div className="absolute inset-0 bg-gradient-to-br from-primary via-blue-500 to-blue-600 rounded-full blur-lg opacity-60 group-hover:opacity-100 group-active:opacity-50 transition-opacity duration-300 animate-pulse"></div>
             
             {/* Button */}
-            <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-blue-600 text-white shadow-lg hover:shadow-xl transform group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-300">
-              <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce" />
+            <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-blue-600 text-white shadow-lg hover:shadow-2xl group-hover:shadow-primary/50 transform group-hover:scale-110 group-active:scale-95 group-hover:-translate-y-1 transition-all duration-300 border border-white/20">
+              <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce group-active:animate-none transition-all" />
             </div>
 
-            {/* Ripple effect on hover */}
+            {/* Enhanced ripple effect on hover */}
             <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-150 opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
           </div>
         </button>
