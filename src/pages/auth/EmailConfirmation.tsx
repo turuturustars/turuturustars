@@ -75,9 +75,9 @@ const EmailConfirmation = () => {
           description: 'Your email has been confirmed successfully.',
         });
 
-        // Redirect to dashboard or registration completion
+        // Redirect to dashboard on production domain
         setTimeout(() => {
-          navigate('/dashboard', { replace: true });
+          window.location.href = 'https://turuturustars.co.ke/dashboard';
         }, 2500);
       } catch (error) {
         console.error('Email confirmation error:', error);

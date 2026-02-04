@@ -2,6 +2,7 @@ project_id = "mkcgkfzltohxagqvsbqk"
 
 [auth]
 site_url = "https://turuturustars.co.ke"
+additional_redirect_urls = ["https://turuturustars.co.ke/auth/callback", "https://turuturustars.co.ke/dashboard", "https://turuturustars.co.ke/reset-password"]
 
 [functions.mpesa]
 verify_jwt = false

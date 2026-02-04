@@ -43,6 +43,8 @@ const AuthDiagnostics = lazy(() => import("./pages/AuthDiagnostics"));
 const EmailDiagnostics = lazy(() => import("./pages/EmailDiagnostics"));
 const ProfileSetup = lazy(() => import("./pages/ProfileSetup"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AuthCallback = lazy(() => import("./pages/auth/AuthCallback"));
+const EmailConfirmation = lazy(() => import("./pages/auth/EmailConfirmation"));
 const DashboardLayout = lazy(() => import("./layouts/DashboardLayout"));
 const DashboardHome = lazy(() => import("./pages/dashboard/DashboardHome"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -152,6 +154,8 @@ const App = () => {
                     </PublicRoute>
                   }
                 />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                <Route path="/auth/email-confirmation" element={<EmailConfirmation />} />
                 
                 {/* ==================== PROTECTED DASHBOARD ROUTES ==================== */}
                 <Route

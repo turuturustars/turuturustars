@@ -25,8 +25,8 @@ const AuthFlow = () => {
           const profile = await waitForProfile(session.user.id, 5, 400);
 
           if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
-            // Profile is complete
-            navigate('/dashboard', { replace: true });
+            // Profile is complete - redirect to dashboard
+            window.location.href = 'https://turuturustars.co.ke/dashboard';
           } else {
             // Profile is incomplete, need details
             setAuthState('details-required');
@@ -52,7 +52,7 @@ const AuthFlow = () => {
         const profile = await waitForProfile(session.user.id, 5, 400);
 
         if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
-          navigate('/dashboard', { replace: true });
+          window.location.href = 'https://turuturustars.co.ke/dashboard';
         } else {
           setAuthState('details-required');
         }

@@ -1,31 +1,20 @@
-import { defineConfig, ConfigEnv, UserConfigExport } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }: ConfigEnv): UserConfigExport => ({
+export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8081,
+    port: 8080,
   },
   build: {
-    // Optimize images during build
     assetsInlineLimit: 4096,
-    
-    // Smaller chunk size warning to catch bloated modules
     chunkSizeWarningLimit: 1000,
-    
-    // Disable code splitting to avoid circular dependency issues
-    commonjsOptions: {
-      transformMixedEsm: true,
-    },
-    
     rollupOptions: {
       output: {
-        // Single bundle initially to avoid initialization issues
         manualChunks: undefined,
-        
         assetFileNames: (assetInfo) => {
           const name = assetInfo.name || '';
           const extType = name.split('.').at(1) || '';

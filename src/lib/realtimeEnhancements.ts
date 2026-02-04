@@ -265,19 +265,15 @@ export function useOfflineQueue() {
         const tableName = item.table as ValidTableName;
         const data = item.data as Record<string, unknown>;
         
-        // Execute operation
+        // Execute operation with type assertion to bypass strict typing
+        const tableRef = supabase.from(tableName as 'profiles') as any;
+        
         if (item.operation === 'INSERT') {
-          await supabase.from(tableName).insert([data]);
+          await tableRef.insert([data]);
         } else if (item.operation === 'UPDATE') {
-          await supabase
-            .from(tableName)
-            .update(data)
-            .eq('id', data.id as string);
+          await tableRef.update(data).eq('id', data.id as string);
         } else if (item.operation === 'DELETE') {
-          await supabase
-            .from(tableName)
-            .delete()
-            .eq('id', data.id as string);
+          await tableRef.delete().eq('id', data.id as string);
         }
 
         // Remove from queue on success
