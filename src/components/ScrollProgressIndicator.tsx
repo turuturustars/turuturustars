@@ -126,7 +126,7 @@ const ScrollProgressIndicator = () => {
       {/* Scroll Progress Percentage - Enhanced design */}
       {progress > 5 && (
         <div 
-          className={`fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40 transition-all duration-500 ${
+          className={`fixed bottom-20 sm:bottom-6 left-4 sm:right-6 z-40 transition-all duration-500 ${
             isScrolling ? 'scale-110' : 'scale-100'
           }`}
         >
