@@ -8,6 +8,13 @@ export async function completeProfileViaBackend(email: string, profile?: Record<
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (requestId) headers['x-request-id'] = requestId;
+  const proxySecret = import.meta.env.VITE_CREATE_PROFILE_PROXY_SECRET;
+  if (proxySecret) {
+    headers['x-proxy-secret'] = proxySecret;
+  } else if (endpoint.includes('/api/create-profile-proxy')) {
+    // Avoid calling a secured proxy without credentials
+    return null;
+  }
 
   try {
     const res = await fetch(endpoint, {
