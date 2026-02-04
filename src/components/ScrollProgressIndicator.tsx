@@ -75,18 +75,12 @@ const ScrollProgressIndicator = () => {
   }, []);
 
   const scrollToTop = () => {
-    // Smooth scroll to absolute top with enhanced animation
-    document.documentElement.scrollTop = 0;
-    window.scrollTo({ 
-      top: 0, 
-      behavior: 'smooth',
-      left: 0
+    // Scroll to the top of the page with smooth behavior
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth'
     });
-    
-    // Fallback for older browsers
-    if (document.body.scrollTop !== undefined) {
-      document.body.scrollTop = 0;
-    }
   };
 
   const scrollToSection = (sectionId: string) => {
