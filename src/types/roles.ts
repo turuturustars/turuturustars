@@ -7,11 +7,12 @@ export type UserRole =
   | 'treasurer'
   | 'secretary'
   | 'chairperson'
-  | 'vice_chairperson'
+  | 'vice_chairman'
   | 'vice_secretary'
   | 'organizing_secretary'
   | 'committee_member'
   | 'patron'
+  | 'coordinator'
   | 'member';
 
 export interface RoleInfo {
@@ -24,13 +25,14 @@ export interface RoleInfo {
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   admin: 100,
   chairperson: 90,
-  vice_chairperson: 80,
+  vice_chairman: 80,
   treasurer: 70,
   secretary: 60,
   vice_secretary: 50,
   organizing_secretary: 40,
   committee_member: 30,
   patron: 20,
+  coordinator: 20,
   member: 10,
 };
 

@@ -5,13 +5,14 @@
 export type UserRole = 
   | 'admin' 
   | 'chairperson' 
-  | 'vice_chairperson'
+  | 'vice_chairman'
   | 'secretary' 
   | 'vice_secretary'
   | 'treasurer' 
   | 'organizing_secretary'
   | 'committee_member'
   | 'patron'
+  | 'coordinator'
   | 'member';
 
 export type PermissionKey = 
@@ -56,13 +57,14 @@ export type PermissionKey =
 export const roleHierarchy: Record<UserRole, UserRole[]> = {
   'admin': [],
   'chairperson': ['committee_member', 'member'],
-  'vice_chairperson': ['chairperson', 'committee_member', 'member'],
+  'vice_chairman': ['chairperson', 'committee_member', 'member'],
   'secretary': ['committee_member', 'member'],
   'vice_secretary': ['secretary', 'committee_member', 'member'],
   'treasurer': ['committee_member', 'member'],
   'organizing_secretary': ['committee_member', 'member'],
   'committee_member': ['member'],
   'patron': ['member'],
+  'coordinator': ['committee_member', 'member'],
   'member': [],
 };
 
@@ -126,7 +128,7 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'refund_welfare',
     'record_welfare_payment',
   ],
-  'vice_chairperson': [
+  'vice_chairman': [
     'view_member_registry',
     'manage_members',
     'create_meetings',
@@ -220,6 +222,15 @@ export const rolePermissions: Record<UserRole, PermissionKey[]> = {
     'create_welfare',
     'manage_welfare',
   ],
+  'coordinator': [
+    'raise_issues',
+    'view_announcements',
+    'view_chat',
+    'send_chat_messages',
+    'view_my_contributions',
+    'cast_vote',
+    'view_voting_results',
+  ],
   'member': [
     'view_announcements',
     'view_chat',
@@ -252,7 +263,7 @@ export const roleFeatures: Record<UserRole, string[]> = {
     'announcements',
     'community',
   ],
-  'vice_chairperson': [
+  'vice_chairman': [
     'dashboard',
     'members',
     'meetings',
@@ -294,6 +305,11 @@ export const roleFeatures: Record<UserRole, string[]> = {
     'reports',
     'community',
   ],
+  'coordinator': [
+    'dashboard',
+    'community',
+    'announcements',
+  ],
   'member': [
     'dashboard',
     'community',
@@ -313,12 +329,12 @@ export function hasRole(userRoles: UserRole[], role: UserRole): boolean {
 }
 
 export function isOfficial(userRoles: UserRole[]): boolean {
-  const officialRoles: UserRole[] = ['admin', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer', 'organizing_secretary', 'committee_member'];
+  const officialRoles: UserRole[] = ['admin', 'chairperson', 'vice_chairman', 'secretary', 'vice_secretary', 'treasurer', 'organizing_secretary', 'committee_member', 'coordinator', 'patron'];
   return userRoles.some(role => officialRoles.includes(role));
 }
 
 export function isManagementCommittee(userRoles: UserRole[]): boolean {
-  const mcRoles: UserRole[] = ['admin', 'chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'treasurer'];
+  const mcRoles: UserRole[] = ['admin', 'chairperson', 'vice_chairman', 'secretary', 'vice_secretary', 'treasurer'];
   return userRoles.some(role => mcRoles.includes(role));
 }
 
@@ -327,13 +343,14 @@ export function getPrimaryRole(userRoles: UserRole[]): UserRole {
   const priority: UserRole[] = [
     'admin',
     'chairperson',
-    'vice_chairperson',
+    'vice_chairman',
     'secretary',
     'vice_secretary',
     'treasurer',
     'organizing_secretary',
     'committee_member',
     'patron',
+    'coordinator',
     'member',
   ];
   

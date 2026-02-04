@@ -36,7 +36,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const { profile, roles, isOfficial, signOut, isLoading } = useAuth();
   const userRoles = roles.map(r => r.role);
   const primaryRole = getPrimaryRole(userRoles);
-  const isUserOfficial = userRoles.some(r => ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairperson', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron'].includes(r));
+  const isUserOfficial = userRoles.some(r => ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairman', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron', 'coordinator'].includes(r));
   
   const [expandedRole, setExpandedRole] = useState<string | null>(primaryRole);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
@@ -71,7 +71,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell },
       ];
     }
-    if (hasRole(userRoles, 'vice_chairperson')) {
+    if (hasRole(userRoles, 'vice_chairman')) {
       return [
         { label: 'Vice Chairman', href: `/dashboard/roles/vice-chairperson`, icon: Star },
         { label: 'Members', href: '/dashboard/members', icon: Users },

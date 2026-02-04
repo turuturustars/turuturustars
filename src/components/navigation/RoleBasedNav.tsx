@@ -17,7 +17,7 @@ import {
   CreditCard,
 } from 'lucide-react';
 
-type AppRole = 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'vice_chairperson' | 'vice_secretary' | 'organizing_secretary' | 'committee_member' | 'patron' | 'member';
+type AppRole = 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'vice_chairman' | 'vice_secretary' | 'organizing_secretary' | 'committee_member' | 'patron' | 'coordinator' | 'member';
 
 interface NavItem {
   title: string;
@@ -42,7 +42,7 @@ const RoleBasedNav = () => {
       title: 'Members',
       href: '/dashboard/members',
       icon: <Users className="w-4 h-4" />,
-      roles: ['chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'admin'],
+      roles: ['chairperson', 'vice_chairman', 'secretary', 'vice_secretary', 'admin'],
     },
     {
       title: 'Payments',
@@ -60,7 +60,7 @@ const RoleBasedNav = () => {
       title: 'Meetings',
       href: '/dashboard/meetings',
       icon: <Calendar className="w-4 h-4" />,
-      roles: ['chairperson', 'vice_chairperson', 'secretary', 'vice_secretary', 'organizing_secretary', 'admin'],
+      roles: ['chairperson', 'vice_chairman', 'secretary', 'vice_secretary', 'organizing_secretary', 'admin'],
     },
     {
       title: 'Secretary Tasks',
@@ -72,7 +72,7 @@ const RoleBasedNav = () => {
       title: 'Announcements',
       href: '/dashboard/announcements',
       icon: <Bell className="w-4 h-4" />,
-      roles: ['chairperson', 'vice_chairperson', 'admin'],
+      roles: ['chairperson', 'vice_chairman', 'admin'],
     },
     {
       title: 'Discipline',
@@ -89,7 +89,7 @@ const RoleBasedNav = () => {
       title: 'Community',
       href: '/dashboard/community',
       icon: <MessageSquare className="w-4 h-4" />,
-      roles: ['chairperson', 'vice_chairperson', 'committee_member', 'admin'],
+      roles: ['chairperson', 'vice_chairman', 'committee_member', 'admin'],
     },
     {
       title: 'Approvals',

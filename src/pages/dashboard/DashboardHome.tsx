@@ -87,7 +87,7 @@ const DashboardHome = () => {
 
     const roleDashboards: Record<string, string> = {
       'chairperson': '/dashboard/roles/chairperson',
-      'vice_chairperson': '/dashboard/roles/vice-chairperson',
+      'vice_chairman': '/dashboard/roles/vice-chairperson',
       'secretary': '/dashboard/roles/secretary',
       'vice_secretary': '/dashboard/roles/vice-secretary',
       'treasurer': '/dashboard/roles/treasurer',
