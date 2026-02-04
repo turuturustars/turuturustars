@@ -72,6 +72,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Sign up new user
  */
 export async function signUpUser(data: SignUpData) {
+  // Use production domain for redirects
+  const redirectUrl = 'https://turuturustars.co.ke/dashboard';
+  
   const { data: authData, error } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
@@ -79,9 +82,8 @@ export async function signUpUser(data: SignUpData) {
       data: {
         full_name: data.fullName,
         phone: data.phone,
-        location: data.location,
       },
-      emailRedirectTo: `${globalThis.location?.origin}/profile-setup`,
+      emailRedirectTo: redirectUrl,
     },
   });
 
@@ -123,7 +125,7 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'twitter')
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${globalThis.location?.origin}/auth/callback?provider=${provider}`,
+      redirectTo: 'https://turuturustars.co.ke/dashboard',
     },
   });
 
@@ -142,7 +144,7 @@ export async function resendEmailConfirmation(email: string) {
     type: 'signup',
     email,
     options: {
-      emailRedirectTo: `${globalThis.location?.origin}/profile-setup`,
+      emailRedirectTo: 'https://turuturustars.co.ke/dashboard',
     },
   });
 
@@ -158,7 +160,7 @@ export async function resendEmailConfirmation(email: string) {
  */
 export async function sendPasswordResetEmail(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${globalThis.location?.origin}/auth/reset-password`,
+    redirectTo: 'https://turuturustars.co.ke/reset-password',
   });
 
   if (error) {

@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
-import { UserRole } from '@/types/roles';
+
+type UserRole = string;
 import {
   Crown,
   Users,
@@ -97,8 +98,8 @@ const RolesPage = () => {
   ];
 
   const handleRoleNavigation = (role: Role) => {
-    const roleId = role.id as UserRole;
-    if (roles.includes(roleId) || roles.includes('admin' as UserRole)) {
+    const userRolesList = roles.map(r => r.role);
+    if (userRolesList.includes(role.id as any) || userRolesList.includes('admin')) {
       navigate(role.path);
       showSuccess(`Navigating to ${role.title} dashboard`);
     }
@@ -116,9 +117,9 @@ const RolesPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {availableRoles.map((role) => {
-          const roleId = role.id as UserRole;
-          const hasAccess = roles.includes(roleId) || roles.includes('admin' as UserRole);
+      {availableRoles.map((role) => {
+          const userRolesList = roles.map(r => r.role);
+          const hasAccess = userRolesList.includes(role.id as any) || userRolesList.includes('admin');
 
           return (
             <Card
@@ -166,15 +167,15 @@ const RolesPage = () => {
       </div>
 
       {roles.length === 0 && (
-        <Card className="border-amber-200 bg-amber-50 dark:bg-amber-950/50">
+        <Card className="border-warning bg-warning/10">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <Shield className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+              <Shield className="w-8 h-8 text-warning" />
               <div>
-                <p className="font-semibold text-amber-900 dark:text-amber-100">
+                <p className="font-semibold text-foreground">
                   No Roles Assigned
                 </p>
-                <p className="text-sm text-amber-800 dark:text-amber-200">
+                <p className="text-sm text-muted-foreground">
                   Contact an administrator to assign a role to your account
                 </p>
               </div>
