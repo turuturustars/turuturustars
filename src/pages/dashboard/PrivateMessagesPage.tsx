@@ -199,14 +199,55 @@ export default function PrivateMessagesPage() {
   const showConversationView = selectedConversationId !== null;
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col md:flex-row gap-4">
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl border-2 border-primary/10 bg-gradient-to-br from-primary/5 via-purple-50/40 to-transparent p-5 shadow-sm">
+        <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-purple-200/30 blur-2xl" />
+        <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+              <MessageCircle className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Messages</h1>
+              <p className="text-sm text-muted-foreground">Private conversations with members</p>
+            </div>
+          </div>
+          {isNotificationsSupported() && (
+            <AccessibleButton
+              size="sm"
+              variant={notificationsEnabled ? 'default' : 'outline'}
+              onClick={() => {
+                handleToggleNotifications();
+                showSuccess(notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled', 2000);
+              }}
+              className="h-9 gap-2"
+              ariaLabel={notificationsEnabled ? 'Disable message notifications' : 'Enable message notifications'}
+            >
+              {notificationsEnabled ? (
+                <>
+                  <Bell className="h-4 w-4" />
+                  Notifications On
+                </>
+              ) : (
+                <>
+                  <BellOff className="h-4 w-4" />
+                  Notifications Off
+                </>
+              )}
+            </AccessibleButton>
+          )}
+        </div>
+      </div>
+
+      <div className="h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4">
       <AccessibleStatus 
         message={status.message} 
         type={status.type} 
         isVisible={status.isVisible} 
       />
       {/* Conversations List */}
-      <Card className={`md:w-80 lg:w-96 flex flex-col ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
+      <Card className={`md:w-80 lg:w-96 flex flex-col border-2 shadow-sm ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
@@ -214,24 +255,6 @@ export default function PrivateMessagesPage() {
               Messages
             </CardTitle>
             <div className="flex items-center gap-1">
-              {isNotificationsSupported() && (
-                <AccessibleButton
-                  size="sm"
-                  variant={notificationsEnabled ? 'default' : 'outline'}
-                  onClick={() => {
-                    handleToggleNotifications();
-                    showSuccess(notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled', 2000);
-                  }}
-                  className="h-8 w-8 p-0"
-                  ariaLabel={notificationsEnabled ? 'Disable message notifications' : 'Enable message notifications'}
-                >
-                  {notificationsEnabled ? (
-                    <Bell className="h-4 w-4" />
-                  ) : (
-                    <BellOff className="h-4 w-4" />
-                  )}
-                </AccessibleButton>
-              )}
               <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
                 <DialogTrigger asChild>
                   <AccessibleButton size="sm" variant="outline" ariaLabel="Start a new conversation">
@@ -332,7 +355,7 @@ export default function PrivateMessagesPage() {
       </Card>
 
       {/* Conversation View */}
-      <Card className={`flex-1 flex flex-col ${showConversationView ? 'flex' : 'hidden md:flex'}`}>
+      <Card className={`flex-1 flex flex-col border-2 shadow-sm ${showConversationView ? 'flex' : 'hidden md:flex'}`}>
         {selectedConversation ? (
           <>
             {/* Header */}

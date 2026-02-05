@@ -233,6 +233,12 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Admin Overview</h2>
+          <p className="text-xs text-muted-foreground">Live totals across the organization</p>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
