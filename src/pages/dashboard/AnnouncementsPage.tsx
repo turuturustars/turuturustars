@@ -131,7 +131,14 @@ const AnnouncementsPage = () => {
 
     const channel = supabase
       .channel('announcements-page')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, (payload) => {
+        const newAnnouncement = payload.new as Announcement;
+        if (newAnnouncement?.published_at) {
+          toast({
+            title: '📢 New announcement',
+            description: newAnnouncement.title,
+          });
+        }
         fetchAnnouncements();
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' }, () => {
