@@ -72,6 +72,7 @@ const ReportsPage = lazy(() => import("./pages/dashboard/ReportsPage"));
 const TreasurerDashboard = lazy(() => import("./pages/dashboard/TreasurerDashboard"));
 const SecretaryDashboard = lazy(() => import("./pages/dashboard/SecretaryDashboard"));
 const MpesaManagement = lazy(() => import("./pages/dashboard/MpesaManagement"));
+const MembershipFeesPage = lazy(() => import("./pages/dashboard/MembershipFeesPage"));
 const MeetingsPage = lazy(() => import("./pages/dashboard/MeetingsPage"));
 const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
 const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
@@ -199,6 +200,7 @@ const App = () => {
                     <Route path="all-contributions" element={<AllContributionsPage />} />
                     <Route path="treasurer-dashboard" element={<TreasurerDashboard />} />
                     <Route path="mpesa" element={<MpesaManagement />} />
+                    <Route path="membership-fees" element={<MembershipFeesPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>
 

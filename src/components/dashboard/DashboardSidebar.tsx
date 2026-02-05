@@ -54,6 +54,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const memberLinks = [
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
+    { label: 'Membership Fees', href: '/dashboard/finance/membership-fees', icon: PiggyBank, badge: null },
     { label: 'Welfare Cases', href: '/dashboard/members/welfare', icon: HandHeart, badge: null },
     { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell, badge: 'new' },
     { label: 'Voting', href: '/dashboard/governance/voting', icon: Vote, badge: null },

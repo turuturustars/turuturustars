@@ -328,7 +328,7 @@ const DashboardHome = () => {
               className="bg-amber-600 hover:bg-amber-700 text-white"
               ariaLabel="Pay membership fee"
             >
-              <Link to="/dashboard/finance/mpesa">Pay Membership Fee</Link>
+              <Link to="/dashboard/finance/membership-fees">Pay Membership Fee</Link>
             </AccessibleButton>
           </div>
         </div>
