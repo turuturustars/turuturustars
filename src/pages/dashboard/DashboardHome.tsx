@@ -38,6 +38,11 @@ interface DashboardStats {
   unreadNotifications: number;
 }
 
+interface PendingMembershipFee {
+  amount: number;
+  due_date: string | null;
+}
+
 const DashboardHome = () => {
   const navigate = useNavigate();
   const { profile, isOfficial, roles } = useAuth();
@@ -53,6 +58,7 @@ const DashboardHome = () => {
   const [greeting, setGreeting] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [currentTime, setCurrentTime] = useState('');
+  const [pendingMembershipFee, setPendingMembershipFee] = useState<PendingMembershipFee | null>(null);
 
   // Dynamic greeting with day, time, and name
   useEffect(() => {
@@ -117,6 +123,14 @@ const DashboardHome = () => {
         supabase.from('contributions').select('status, amount').eq('member_id', profile.id),
         supabase.from('welfare_cases').select('id').eq('status', 'active'),
         supabase.from('notifications').select('id').eq('user_id', profile.id).eq('read', false),
+        supabase
+          .from('contributions')
+          .select('amount, due_date')
+          .eq('member_id', profile.id)
+          .eq('contribution_type', 'membership_fee')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1),
       ]);
 
       const timeoutPromise = new Promise<'timeout'>((resolve) => {
@@ -130,7 +144,7 @@ const DashboardHome = () => {
         return;
       }
 
-      const [contributionsRes, welfareCasesRes, notificationsRes] = result;
+      const [contributionsRes, welfareCasesRes, notificationsRes, membershipFeeRes] = result;
 
       if (contributionsRes.error || welfareCasesRes.error || notificationsRes.error) {
         console.error('Dashboard data errors:', {
@@ -138,6 +152,15 @@ const DashboardHome = () => {
           welfareCases: welfareCasesRes.error,
           notifications: notificationsRes.error,
         });
+      }
+
+      if (membershipFeeRes?.data && membershipFeeRes.data.length > 0) {
+        setPendingMembershipFee({
+          amount: Number(membershipFeeRes.data[0].amount),
+          due_date: membershipFeeRes.data[0].due_date || null,
+        });
+      } else {
+        setPendingMembershipFee(null);
       }
 
       const totalPaid = contributionsRes.data
@@ -283,6 +306,33 @@ const DashboardHome = () => {
         type={status.type} 
         isVisible={status.isVisible} 
       />
+
+      {pendingMembershipFee && (
+        <div className="relative overflow-hidden rounded-xl border-2 border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 px-4 py-4 sm:px-6 shadow-sm">
+          <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-amber-200/40 blur-2xl" />
+          <div className="absolute bottom-0 left-10 h-20 w-20 rounded-full bg-orange-200/30 blur-2xl" />
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-amber-700">Membership Fee</p>
+              <h3 className="text-lg font-semibold text-amber-900">
+                KES {pendingMembershipFee.amount.toLocaleString()} due
+              </h3>
+              <p className="text-xs text-amber-700">
+                {pendingMembershipFee.due_date
+                  ? `Due by ${new Date(pendingMembershipFee.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : 'Due now'}
+              </p>
+            </div>
+            <AccessibleButton
+              asChild
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              ariaLabel="Pay membership fee"
+            >
+              <Link to="/dashboard/finance/mpesa">Pay Membership Fee</Link>
+            </AccessibleButton>
+          </div>
+        </div>
+      )}
       {/* Welcome Header - Compact & Responsive */}
       <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8 lg:py-5 shadow-lg hover:shadow-xl transition-shadow duration-300">
         {/* Animated background elements */}
