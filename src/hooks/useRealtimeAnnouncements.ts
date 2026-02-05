@@ -50,8 +50,13 @@ export const useRealtimeAnnouncements = () => {
         (payload) => {
           const newAnnouncement = payload.new as Announcement;
           if (newAnnouncement.published) {
-            setAnnouncements(prev => [newAnnouncement, ...prev]);
-            
+            setAnnouncements(prev => {
+              if (prev.some(a => a.id === newAnnouncement.id)) {
+                return prev;
+              }
+              return [newAnnouncement, ...prev];
+            });
+
             toast({
               title: '📢 New Announcement',
               description: newAnnouncement.title,
