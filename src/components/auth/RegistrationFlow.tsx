@@ -357,7 +357,7 @@ const LOCATIONS = [
               </Button>
               <div className="text-xs text-center text-muted-foreground space-y-2">
                 <p>
-                  Didnâ€™t receive email? Check spam, or resend above.
+                  Didn’t receive email? Check spam, or resend above.
                 </p>
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
                   <AlertCircle className="w-3 h-3" />
@@ -437,7 +437,7 @@ const LOCATIONS = [
                    : 'bg-muted text-muted-foreground'
                }`}
              >
-               {index < currentStep ? 'âœ“' : index + 1}
+               {index < currentStep ? '?' : index + 1}
              </div>
            ))}
          </div>
@@ -516,7 +516,7 @@ const LOCATIONS = [
                      <Input
                        id="password"
                        type={showPassword ? 'text' : 'password'}
-                       placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                       placeholder="••••••••"
                        value={formData.password}
                        onChange={(e) => handleChange('password', e.target.value)}
                        className={`pl-10 pr-10 ${errors.password ? 'border-destructive' : ''}`}
@@ -539,7 +539,7 @@ const LOCATIONS = [
                      <Input
                        id="confirmPassword"
                        type={showConfirmPassword ? 'text' : 'password'}
-                       placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+                       placeholder="••••••••"
                        value={formData.confirmPassword}
                        onChange={(e) => handleChange('confirmPassword', e.target.value)}
                        className={`pl-10 pr-10 ${errors.confirmPassword ? 'border-destructive' : ''}`}
@@ -744,7 +744,6 @@ const LOCATIONS = [
              </div>
            </CardContent>
          </Card>
-       </div>
        </div>
      </div>
    );
