@@ -238,6 +238,13 @@ const DashboardHome = () => {
       description: 'Add to your savings'
     },
     { 
+      label: 'Membership Fees', 
+      path: '/dashboard/finance/membership-fees', 
+      icon: Activity,
+      color: 'from-amber-500 to-orange-500',
+      description: 'Track and renew'
+    },
+    { 
       label: 'View Welfare Cases', 
       path: '/dashboard/members/welfare', 
       icon: HandHeart,
@@ -412,6 +419,12 @@ const DashboardHome = () => {
       </div>
 
       {/* Stats Grid */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">At a Glance</h2>
+          <p className="text-xs text-muted-foreground">Your latest activity and totals</p>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
         {statCards.map((stat, idx) => {
           const Icon = stat.icon;
