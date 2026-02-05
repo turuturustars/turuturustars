@@ -9,7 +9,7 @@ import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin, ShieldCheck, IdCard } from 'lucide-react';
 import ProfilePhotoUpload from '@/components/dashboard/ProfilePhotoUpload';
 
 // Location options
@@ -112,19 +112,28 @@ const ProfilePage = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-4xl">
       <AccessibleStatus 
         message={status.message} 
         type={status.type} 
         isVisible={status.isVisible} 
       />
-      <div>
-        <h2 className="text-2xl font-serif font-bold text-foreground">My Profile</h2>
-        <p className="text-muted-foreground">Manage your personal information</p>
+      <div className="relative overflow-hidden rounded-2xl border-2 border-primary/10 bg-gradient-to-br from-primary/5 via-purple-50/40 to-transparent p-6 shadow-sm">
+        <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+        <div className="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-purple-200/30 blur-2xl" />
+        <div className="relative flex items-center gap-3">
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+            <User className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">My Profile</h2>
+            <p className="text-sm text-muted-foreground">Manage your personal information</p>
+          </div>
+        </div>
       </div>
 
       {/* Profile Header Card */}
-      <Card>
+      <Card className="border-2 shadow-sm">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <ProfilePhotoUpload
@@ -139,7 +148,7 @@ const ProfilePage = () => {
               <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-2">
                 <div>
                   <h3 className="text-xl font-semibold text-foreground">{profile?.full_name}</h3>
-                  <p className="text-muted-foreground font-mono">{profile?.membership_number}</p>
+                  <p className="text-muted-foreground font-mono">{profile?.membership_number || 'Pending ID'}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-center">
                   <Badge className={getStatusColor(profile?.status)}>
@@ -173,7 +182,7 @@ const ProfilePage = () => {
       </Card>
 
       {/* Personal Information */}
-      <Card>
+      <Card className="border-2 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Personal Information</CardTitle>
@@ -332,16 +341,19 @@ const ProfilePage = () => {
       </Card>
 
       {/* Membership Status */}
-      <Card>
+      <Card className="border-2 shadow-sm">
         <CardHeader>
           <CardTitle>Membership Status</CardTitle>
           <CardDescription>Your current membership standing</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-4 rounded-lg bg-accent/50">
-              <p className="text-sm text-muted-foreground">Registration Fee</p>
-              <div className="flex items-center gap-2 mt-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-xl bg-accent/40 border border-border/60">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <ShieldCheck className="w-4 h-4" />
+                Registration Fee
+              </div>
+              <div className="flex items-center gap-2 mt-2">
                 {profile?.registration_fee_paid ? (
                   <Badge className="bg-green-100 text-green-800">Paid</Badge>
                 ) : (
@@ -349,10 +361,22 @@ const ProfilePage = () => {
                 )}
               </div>
             </div>
-            <div className="p-4 rounded-lg bg-accent/50">
-              <p className="text-sm text-muted-foreground">Membership Type</p>
-              <p className="font-medium mt-1">
+            <div className="p-4 rounded-xl bg-accent/40 border border-border/60">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <IdCard className="w-4 h-4" />
+                Membership Type
+              </div>
+              <p className="font-medium mt-2">
                 {profile?.is_student ? 'Student Member' : 'Full Member'}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-accent/40 border border-border/60">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Calendar className="w-4 h-4" />
+                Joined
+              </div>
+              <p className="font-medium mt-2">
+                {profile?.joined_at ? new Date(profile.joined_at).toLocaleDateString() : 'N/A'}
               </p>
             </div>
           </div>
