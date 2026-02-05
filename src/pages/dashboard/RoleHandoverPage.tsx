@@ -471,7 +471,41 @@ export default function RoleHandoverPage() {
         <TabsContent value="history">
           <Card>
             <CardContent className="pt-6">
-              <Table>
+              <div className="space-y-3 lg:hidden">
+                {completedHandovers.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No handover history
+                  </div>
+                ) : (
+                  completedHandovers.map((handover) => (
+                    <Card key={handover.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{handover.original_user?.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Acting: {handover.acting_user?.full_name || '-'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge className="bg-primary/10 text-primary">
+                              {ROLE_LABELS[handover.role] || handover.role}
+                            </Badge>
+                            <div className="mt-1">{getStatusBadge(handover)}</div>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(handover.start_date), 'PP')} - {handover.end_date ? format(new Date(handover.end_date), 'PP') : 'N/A'}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Original</TableHead>
@@ -502,7 +536,8 @@ export default function RoleHandoverPage() {
                     ))
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

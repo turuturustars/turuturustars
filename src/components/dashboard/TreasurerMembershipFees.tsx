@@ -331,8 +331,72 @@ const TreasurerMembershipFees = () => {
               <p>No membership fees found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              <div className="space-y-3 lg:hidden">
+                {filteredContributions.map((contribution) => (
+                  <Card key={contribution.id} className="border border-border/60">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">
+                            {contribution.profiles?.full_name || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {contribution.profiles?.email || '-'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">KES {contribution.amount}</p>
+                          <div className="mt-1">
+                            <Badge className={getStatusColor(contribution.status)}>
+                              {getStatusIcon(contribution.status)}
+                              <span className="ml-1 capitalize">{contribution.status}</span>
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Due Date</p>
+                          <p>
+                            {contribution.due_date
+                              ? format(new Date(contribution.due_date), 'dd MMM yyyy')
+                              : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Paid Date</p>
+                          <p>
+                            {contribution.paid_at
+                              ? format(new Date(contribution.paid_at), 'dd MMM yyyy')
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {contribution.status !== 'paid' && (
+                        <div className="pt-2 border-t">
+                          <Button
+                            onClick={() => {
+                              setSelectedContribution(contribution);
+                              setIsPaymentDialogOpen(true);
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                          >
+                            Record Payment
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
@@ -389,8 +453,9 @@ const TreasurerMembershipFees = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
