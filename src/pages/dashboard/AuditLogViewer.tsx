@@ -281,8 +281,43 @@ const AuditLogViewer = () => {
               No logs found matching your filters
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              <div className="space-y-3 lg:hidden">
+                {filteredLogs.map((log) => (
+                  <Card key={log.id} className="border border-border/60">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">
+                            {format(new Date(log.created_at), 'MMM dd, yyyy HH:mm:ss')}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {log.performed_by_name || log.performed_by}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-1 text-xs font-medium">
+                            {getActionIcon(log.action_type)}
+                            <span>{log.action_type}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground">
+                        {log.action_description}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-2 border-t">
+                        <span className="text-muted-foreground">IP Address</span>
+                        <span className="font-mono">{log.ip_address || 'N/A'}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Date & Time</TableHead>
@@ -314,8 +349,9 @@ const AuditLogViewer = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

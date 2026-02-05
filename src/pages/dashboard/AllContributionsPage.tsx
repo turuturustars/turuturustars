@@ -460,7 +460,51 @@ const AllContributionsPage = () => {
           <CardTitle>Contributions ({filteredContributions.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="space-y-3 lg:hidden">
+            {filteredContributions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No contributions found</p>
+            ) : (
+              filteredContributions.map((contribution) => (
+                <Card key={contribution.id} className="border border-border/60">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">
+                          {contribution.member?.full_name || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {contribution.member?.membership_number || '-'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold">KSh {contribution.amount.toLocaleString()}</p>
+                        <div className="mt-1">
+                          <StatusBadge status={contribution.status} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Type</p>
+                        <p className="capitalize">{contribution.contribution_type}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Date</p>
+                        <p>{format(new Date(contribution.created_at), 'MMM dd, yyyy')}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground">Reference</p>
+                        <p className="font-mono truncate">{contribution.reference_number || '-'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <div className="hidden lg:block overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>

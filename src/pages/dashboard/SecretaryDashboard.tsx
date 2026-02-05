@@ -411,8 +411,87 @@ const SecretaryDashboard = () => {
           </div>
 
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-4 lg:p-0">
+              <div className="space-y-3 lg:hidden">
+                {documents.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No documents uploaded yet
+                  </div>
+                ) : (
+                  documents.map((doc) => (
+                    <Card key={doc.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{doc.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
+                          </div>
+                          <div className="text-right">
+                            {doc.is_public ? (
+                              <Badge className="bg-green-500">Public</Badge>
+                            ) : (
+                              <Badge variant="secondary">Private</Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Type</p>
+                            <Badge variant="outline">{doc.document_type}</Badge>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Size</p>
+                            <p>{formatFileSize(doc.file_size)}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-muted-foreground">Date</p>
+                            <p>{format(new Date(doc.created_at), 'MMM d, yyyy')}</p>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => window.open(doc.cloudinary_url, '_blank')}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              const link = document.createElement('a');
+                              link.href = doc.cloudinary_url;
+                              link.download = doc.file_name;
+                              link.click();
+                            }}
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Title</TableHead>
@@ -484,7 +563,8 @@ const SecretaryDashboard = () => {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -568,8 +648,63 @@ const SecretaryDashboard = () => {
           </div>
 
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-4 lg:p-0">
+              <div className="space-y-3 lg:hidden">
+                {meetings.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No meeting minutes recorded yet
+                  </div>
+                ) : (
+                  meetings.map((meeting) => (
+                    <Card key={meeting.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{meeting.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(meeting.meeting_date), 'MMM d, yyyy')}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline">{meeting.meeting_type}</Badge>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Status</span>
+                          {getStatusBadge(meeting.status)}
+                        </div>
+
+                        <div className="pt-2 border-t flex gap-2">
+                          <AccessibleButton
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            ariaLabel={`View document ${meeting.title}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </AccessibleButton>
+                          {meeting.status === 'draft' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleApproveMeeting(meeting.id)}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1 text-green-500" />
+                              Approve
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Title</TableHead>
@@ -616,7 +751,8 @@ const SecretaryDashboard = () => {
                     </TableRow>
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
