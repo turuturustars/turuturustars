@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,7 @@ const AnnouncementsList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: announcements, isLoading, error } = useQuery({
     queryKey: ['announcements'],
@@ -54,6 +55,20 @@ const AnnouncementsList = () => {
       return data as Announcement[];
     },
   });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('public-announcements-list')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        // Rely on cache invalidation to refresh list
+        queryClient.invalidateQueries({ queryKey: ['announcements'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const filtered = announcements?.filter((ann) => {
     const matchesSearch = ann.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
