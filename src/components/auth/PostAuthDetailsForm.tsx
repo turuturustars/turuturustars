@@ -155,7 +155,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
 
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20">
+      <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background to-muted/20">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
@@ -171,7 +171,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
 
   if (step === 'complete') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
+      <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background to-muted/20 p-4">
         <Card className="w-full max-w-md border-2 border-green-200 dark:border-green-900">
           <CardContent className="pt-6 flex flex-col items-center text-center gap-6">
             <div className="relative">
@@ -194,7 +194,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background p-4">
+    <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background px-4 py-6">
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader className="space-y-2 pb-4">
           <div className="flex items-center gap-3">
@@ -298,3 +298,5 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
 };
 
 export default PostAuthDetailsForm;
+
+

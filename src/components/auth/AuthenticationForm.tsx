@@ -270,7 +270,7 @@ const AuthenticationForm = ({
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30 p-4">
+    <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background to-muted/30 px-4 py-6">
       <Card className="w-full max-w-md shadow-xl border-0">
         <CardHeader className="space-y-1 text-center pb-6">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
@@ -492,3 +492,4 @@ const AuthenticationForm = ({
 };
 
 export default AuthenticationForm;
+

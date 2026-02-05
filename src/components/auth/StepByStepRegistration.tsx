@@ -390,7 +390,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/20">
+      <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background to-muted/20">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
@@ -410,7 +410,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background px-3 sm:px-6 py-8 sm:py-12 flex-col">
+    <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background px-3 sm:px-6 py-6 sm:py-12 flex-col">
       {/* Navigation Header */}
       <div className="w-full max-w-5xl mb-6 flex items-center justify-between">
         <button
@@ -1043,3 +1043,5 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 };
 
 export default StepByStepRegistration;
+
+

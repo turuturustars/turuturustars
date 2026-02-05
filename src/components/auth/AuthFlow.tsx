@@ -69,7 +69,7 @@ const AuthFlow = () => {
 
   if (authState === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background flex-col">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background flex-col">
         {/* Navigation Header */}
         <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
           <a 
@@ -103,3 +103,4 @@ const AuthFlow = () => {
 };
 
 export default AuthFlow;
+

@@ -243,7 +243,7 @@ const LOCATIONS = [
    // Email verification success screen
    if (emailSent) {
      return (
-       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4 flex-col">
+       <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 px-4 py-6 sm:p-6 flex-col">
          {/* Navigation Header */}
          <div className="w-full max-w-lg mb-6 flex items-center justify-between">
            <a 
@@ -343,7 +343,7 @@ const LOCATIONS = [
    }
  
    return (
-     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-muted/20 p-4 sm:p-6 flex-col">
+     <div className="min-h-[100dvh] flex items-start sm:items-center justify-center bg-gradient-to-br from-background via-primary/5 to-muted/20 px-4 py-6 sm:p-6 flex-col">
        {/* Navigation Header */}
        <div className="w-full max-w-2xl mb-6 flex items-center justify-between">
          <a 
@@ -721,5 +721,7 @@ const LOCATIONS = [
  };
  
  export default RegistrationFlow;
+
+
 
 

@@ -142,7 +142,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex flex-col">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-background via-secondary to-accent flex flex-col">
       {/* Header Navigation */}
       {!isForgotPassword && (
         <div className="flex items-center justify-between p-4 sm:p-6 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -331,3 +331,4 @@ const Auth = () => {
 };
 
 export default Auth;
+
