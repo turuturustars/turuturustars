@@ -13,6 +13,7 @@ import { exportAsCSV } from '@/lib/exportUtils';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { sendAnnouncementNotification } from '@/lib/notificationService';
 
 interface Announcement {
   id: string;
@@ -124,9 +125,26 @@ const AnnouncementsPage = () => {
     }
   };
 
-  // Load announcements on mount
+  // Load announcements on mount + realtime updates
   useEffect(() => {
     fetchAnnouncements();
+
+    const channel = supabase
+      .channel('announcements-page')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => {
+        fetchAnnouncements();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' }, () => {
+        fetchAnnouncements();
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'announcements' }, () => {
+        fetchAnnouncements();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleCreateAnnouncement = async () => {
@@ -142,6 +160,10 @@ const AnnouncementsPage = () => {
     try {
       const announcementsTable = supabase.from('announcements' as 'announcements') as any;
       
+      if (!user?.id) {
+        throw new Error('You must be signed in to manage announcements.');
+      }
+
       if (isEditingId) {
         // Update existing announcement
         const { error } = await announcementsTable
@@ -157,7 +179,7 @@ const AnnouncementsPage = () => {
         setSuccess('Announcement updated successfully!');
       } else {
         // Create new announcement
-        const { error } = await announcementsTable
+        const { data: createdAnnouncement, error } = await announcementsTable
           .insert({
             title: formData.title,
             content: formData.content,
@@ -170,6 +192,15 @@ const AnnouncementsPage = () => {
           .single();
 
         if (error) throw error;
+
+        // Broadcast notifications for new announcements
+        if (createdAnnouncement?.id) {
+          await sendAnnouncementNotification(
+            createdAnnouncement.id,
+            createdAnnouncement.title,
+            createdAnnouncement.content
+          );
+        }
 
         setSuccess('Announcement created successfully!');
       }

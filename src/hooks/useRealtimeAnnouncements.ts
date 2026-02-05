@@ -27,7 +27,9 @@ export const useRealtimeAnnouncements = () => {
         .order('published_at', { ascending: false })
         .limit(10);
 
-      if (!error && data) {
+      if (error) {
+        console.error('Error fetching announcements:', error);
+      } else if (data) {
         setAnnouncements(data as Announcement[]);
       }
       setIsLoading(false);
