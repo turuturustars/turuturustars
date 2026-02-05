@@ -151,6 +151,22 @@ const ChatInput = ({ onSend }: any) => {
   );
 };
 
+const ChatHighlights = () => (
+  <div className="px-3 sm:px-4 py-2 border-b border-border/30 bg-gradient-to-r from-muted/40 via-card/60 to-muted/40">
+    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+      <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 font-semibold">
+        Live community
+      </span>
+      <span className="rounded-full border border-border/60 px-2.5 py-1">
+        Reactions enabled
+      </span>
+      <span className="rounded-full border border-border/60 px-2.5 py-1">
+        Typing indicators
+      </span>
+    </div>
+  </div>
+);
+
 // Main Component
 export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth();
@@ -289,6 +305,8 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
           </div>
         )}
       </div>
+
+      <ChatHighlights />
 
       {/* Chat Messages with Custom Scrollbar */}
       <div className="flex-1 overflow-hidden relative">
