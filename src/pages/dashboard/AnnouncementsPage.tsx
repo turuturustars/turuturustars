@@ -13,6 +13,7 @@ import { exportAsCSV } from '@/lib/exportUtils';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
 
 interface Announcement {
@@ -36,6 +37,7 @@ const AnnouncementsPage = () => {
   const [isEditingId, setIsEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [newestAnnouncementId, setNewestAnnouncementId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
@@ -138,6 +140,8 @@ const AnnouncementsPage = () => {
             title: '📢 New announcement',
             description: newAnnouncement.title,
           });
+          setNewestAnnouncementId(newAnnouncement.id);
+          setTimeout(() => setNewestAnnouncementId(null), 5000);
         }
         fetchAnnouncements();
       })
@@ -472,7 +476,12 @@ const AnnouncementsPage = () => {
             ) : (
               <>
                 {paginatedAnnouncements.map((announcement) => (
-            <Card key={announcement.id}>
+            <Card
+              key={announcement.id}
+              className={cn(
+                newestAnnouncementId === announcement.id && 'ring-2 ring-primary/40 shadow-md'
+              )}
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
