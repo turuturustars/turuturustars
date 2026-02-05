@@ -128,26 +128,55 @@ const LoadingSkeleton = () => (
 
 // Empty State
 const EmptyState = () => (
-  <div className="flex-1 flex items-center justify-center px-6">
-    <div className="text-center space-y-4 max-w-sm animate-in fade-in zoom-in-95 duration-500">
+  <div className="flex-1 flex items-center justify-center px-4 sm:px-6">
+    <div className="w-full max-w-md text-center space-y-5 animate-in fade-in zoom-in-95 duration-500">
       <div className="relative mx-auto w-20 h-20">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-purple-500/20 rounded-full animate-pulse" />
         <div className="relative w-full h-full rounded-full bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-xl">
           <MessageCircle className="w-10 h-10 text-primary-foreground" />
         </div>
       </div>
-      <div className="space-y-2">
-        <h3 className="font-bold text-lg bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-          Start the conversation
+
+      <div className="space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[11px] font-semibold uppercase tracking-wide">
+          Community Chat
+        </div>
+        <h3 className="font-bold text-lg sm:text-xl bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          Be the first to say hello
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Be the first to send a message and connect with the community. ✨
+          Share updates, ask questions, or welcome new members. Your first message sets the tone.
         </p>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3 text-xs">
+        <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-2 backdrop-blur-sm">
+          <div className="font-semibold text-foreground">Introduce yourself</div>
+          <div className="text-muted-foreground">Name, role, and interest.</div>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-2 backdrop-blur-sm">
+          <div className="font-semibold text-foreground">Ask a question</div>
+          <div className="text-muted-foreground">Get help fast.</div>
+        </div>
+        <div className="rounded-xl border border-border/60 bg-card/60 px-3 py-2 backdrop-blur-sm">
+          <div className="font-semibold text-foreground">Share an update</div>
+          <div className="text-muted-foreground">Keep everyone aligned.</div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {['Introduce yourself', 'Share a win', 'Post a question'].map((label) => (
+          <span
+            key={label}
+            className="rounded-full border border-border/50 bg-muted/50 px-3 py-1 text-[11px] font-medium text-muted-foreground"
+          >
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   </div>
 );
-
 export default function ChatWindowEnhanced({ 
   messages, 
   meId, 
