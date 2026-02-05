@@ -65,12 +65,12 @@ const DashboardLayout = () => {
   // Close mobile sidebar on route change
   useEffect(() => {
     setMobileOpen(false);
-  }, [navigate]);
+  }, [location.pathname]);
 
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background">
         <div className="flex flex-col items-center gap-6 px-4">
           {/* Animated logo/spinner container */}
           <div className="relative">
@@ -100,7 +100,7 @@ const DashboardLayout = () => {
   if (!user) return null;
 
   return (
-    <div className="relative flex min-h-screen bg-gradient-to-br from-background to-muted/20">
+    <div className="relative flex min-h-[100dvh] bg-gradient-to-br from-background to-muted/20">
       {/* Offline Notice */}
       {showOfflineNotice && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-yellow-950 px-4 py-2 text-center text-sm font-medium shadow-lg animate-in slide-in-from-top duration-300">
@@ -143,12 +143,12 @@ const DashboardLayout = () => {
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
-        <header className="sticky top-0 z-30 border-b border-border/50 bg-background/95 backdrop-blur-lg shadow-sm">
+        <div className="relative z-30">
           <DashboardHeader onMenuToggle={() => setMobileOpen(true)} />
-        </header>
+        </div>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1">
           <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-6 lg:px-8 lg:py-8">
             {/* Content wrapper with subtle animations */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -162,8 +162,8 @@ const DashboardLayout = () => {
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <span>© {new Date().getFullYear()} Turuturu Stars</span>
-                <span className="hidden sm:inline">•</span>
+                <span>(c) {new Date().getFullYear()} Turuturu Stars</span>
+                <span className="hidden sm:inline">|</span>
                 <span className="hidden sm:inline">All rights reserved</span>
               </div>
               
@@ -179,11 +179,11 @@ const DashboardLayout = () => {
                     <span className="font-medium">Offline</span>
                   </div>
                 )}
-                <span>•</span>
+                <span>|</span>
                 <button className="hover:text-foreground transition-colors">
                   Privacy Policy
                 </button>
-                <span>•</span>
+                <span>|</span>
                 <button className="hover:text-foreground transition-colors">
                   Terms
                 </button>
