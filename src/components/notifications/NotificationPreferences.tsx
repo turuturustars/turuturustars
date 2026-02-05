@@ -19,9 +19,11 @@ import {
   FileCheck,
   Megaphone,
   Info,
+  MessageSquare,
+  CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { cn } from '@/lib/utils';
 
 interface NotificationPreferencesState {
@@ -30,13 +32,24 @@ interface NotificationPreferencesState {
   enableWelfare: boolean;
   enableMeetings: boolean;
   enableApprovals: boolean;
+  enableMessages: boolean;
+  enableTransactions: boolean;
   emailNotifications: boolean;
   soundNotifications: boolean;
   pushNotifications: boolean;
 }
 
 interface NotificationType {
-  key: keyof Pick<NotificationPreferencesState, 'enableAnnouncements' | 'enableContributions' | 'enableWelfare' | 'enableMeetings' | 'enableApprovals'>;
+  key: keyof Pick<
+    NotificationPreferencesState,
+    | 'enableAnnouncements'
+    | 'enableContributions'
+    | 'enableWelfare'
+    | 'enableMeetings'
+    | 'enableApprovals'
+    | 'enableMessages'
+    | 'enableTransactions'
+  >;
   title: string;
   description: string;
   icon: any;
@@ -54,9 +67,7 @@ interface DeliveryMethod {
 
 const NotificationPreferences = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const { preferences: storedPreferences, isLoading, isSaving, savePreferences } = useNotificationPreferences(user?.id);
   const [hasChanges, setHasChanges] = useState(false);
 
   const [preferences, setPreferences] = useState<NotificationPreferencesState>({
@@ -65,6 +76,8 @@ const NotificationPreferences = () => {
     enableWelfare: true,
     enableMeetings: true,
     enableApprovals: true,
+    enableMessages: true,
+    enableTransactions: true,
     emailNotifications: true,
     soundNotifications: true,
     pushNotifications: true,
@@ -76,35 +89,32 @@ const NotificationPreferences = () => {
     enableWelfare: true,
     enableMeetings: true,
     enableApprovals: true,
+    enableMessages: true,
+    enableTransactions: true,
     emailNotifications: true,
     soundNotifications: true,
     pushNotifications: true,
   });
 
   useEffect(() => {
-    const loadPreferences = () => {
-      if (user?.id) {
-        try {
-          const savedPrefs = localStorage.getItem(`notification_prefs_${user.id}`);
-          if (savedPrefs) {
-            const parsed = JSON.parse(savedPrefs);
-            setPreferences(parsed);
-            setOriginalPreferences(parsed);
-          }
-        } catch (e) {
-          console.error('Could not parse saved preferences:', e);
-          toast({
-            title: 'Error',
-            description: 'Failed to load saved preferences',
-            variant: 'destructive',
-          });
-        }
-      }
-      setIsLoading(false);
+    if (!storedPreferences) return;
+
+    const mapped: NotificationPreferencesState = {
+      enableAnnouncements: storedPreferences.enable_announcements,
+      enableContributions: storedPreferences.enable_contributions,
+      enableWelfare: storedPreferences.enable_welfare,
+      enableMeetings: storedPreferences.enable_meetings,
+      enableApprovals: storedPreferences.enable_approvals,
+      enableMessages: storedPreferences.enable_messages,
+      enableTransactions: storedPreferences.enable_transactions,
+      emailNotifications: storedPreferences.email,
+      soundNotifications: storedPreferences.sound,
+      pushNotifications: storedPreferences.push,
     };
 
-    loadPreferences();
-  }, [user?.id, toast]);
+    setPreferences(mapped);
+    setOriginalPreferences(mapped);
+  }, [storedPreferences]);
 
   useEffect(() => {
     const changed = JSON.stringify(preferences) !== JSON.stringify(originalPreferences);
@@ -119,26 +129,24 @@ const NotificationPreferences = () => {
   };
 
   const handleSave = async () => {
-    setIsSaving(true);
     try {
-      if (user?.id) {
-        localStorage.setItem(`notification_prefs_${user.id}`, JSON.stringify(preferences));
-        setOriginalPreferences(preferences);
-        setHasChanges(false);
-        toast({
-          title: 'Success',
-          description: 'Your notification preferences have been saved',
-        });
-      }
+      await savePreferences({
+        in_app: true,
+        email: preferences.emailNotifications,
+        sound: preferences.soundNotifications,
+        push: preferences.pushNotifications,
+        enable_announcements: preferences.enableAnnouncements,
+        enable_contributions: preferences.enableContributions,
+        enable_welfare: preferences.enableWelfare,
+        enable_meetings: preferences.enableMeetings,
+        enable_approvals: preferences.enableApprovals,
+        enable_messages: preferences.enableMessages,
+        enable_transactions: preferences.enableTransactions,
+      });
+      setOriginalPreferences(preferences);
+      setHasChanges(false);
     } catch (error) {
       console.error('Error saving preferences:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to save preferences. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -187,6 +195,22 @@ const NotificationPreferences = () => {
       icon: FileCheck,
       color: 'text-yellow-700 dark:text-yellow-300',
       bgColor: 'bg-yellow-50 dark:bg-yellow-950/50',
+    },
+    {
+      key: 'enableMessages',
+      title: 'Messages',
+      description: 'Direct messages and member conversations',
+      icon: MessageSquare,
+      color: 'text-indigo-700 dark:text-indigo-300',
+      bgColor: 'bg-indigo-50 dark:bg-indigo-950/50',
+    },
+    {
+      key: 'enableTransactions',
+      title: 'Transactions',
+      description: 'Payment status updates and transaction alerts',
+      icon: CreditCard,
+      color: 'text-emerald-700 dark:text-emerald-300',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-950/50',
     },
   ];
 
@@ -247,7 +271,7 @@ const NotificationPreferences = () => {
             variant="secondary" 
             className="bg-primary/20 text-primary border-primary/30 px-4 py-1.5"
           >
-            {enabledCount} of 5 enabled
+            {enabledCount} of {notificationTypes.length} enabled
           </Badge>
         </div>
       </div>

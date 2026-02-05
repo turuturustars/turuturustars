@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, CheckCheck, Trash2, DollarSign, HandHeart, Megaphone, UserCheck, Settings } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, DollarSign, HandHeart, Megaphone, UserCheck, Settings, Calendar, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -41,6 +41,25 @@ const NotificationBell = () => {
           color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200/50 dark:border-amber-500/20',
           icon: UserCheck,
           label: 'Approval'
+        };
+      case 'meeting':
+        return {
+          color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400 border-orange-200/50 dark:border-orange-500/20',
+          icon: Calendar,
+          label: 'Meeting'
+        };
+      case 'message':
+      case 'private_message':
+        return {
+          color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400 border-indigo-200/50 dark:border-indigo-500/20',
+          icon: MessageSquare,
+          label: 'Message'
+        };
+      case 'transaction':
+        return {
+          color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-500/20',
+          icon: CreditCard,
+          label: 'Transaction'
         };
       default:
         return {

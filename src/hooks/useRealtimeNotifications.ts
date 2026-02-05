@@ -1,21 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useToast } from './use-toast';
+import { useNotificationPreferences } from './useNotificationPreferences';
 
 interface Notification {
   id: string;
+  user_id?: string;
   title: string;
   message: string;
   type: string;
   read: boolean;
+  action_url?: string | null;
   created_at: string;
 }
 
 export const useRealtimeNotifications = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { delivery, isTypeEnabled } = useNotificationPreferences(user?.id);
+  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -25,14 +27,13 @@ export const useRealtimeNotifications = () => {
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, type, read, created_at')
+        .select('id, user_id, title, message, type, read, action_url, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (!error && data) {
-        setNotifications(data as Notification[]);
-        setUnreadCount(data.filter(n => !n.read).length);
+        setAllNotifications(data as Notification[]);
       }
     };
 
@@ -51,14 +52,7 @@ export const useRealtimeNotifications = () => {
         },
         (payload) => {
           const newNotification = payload.new as Notification;
-          setNotifications(prev => [newNotification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          // Show toast for new notification
-          toast({
-            title: newNotification.title,
-            description: newNotification.message,
-          });
+          setAllNotifications(prev => [newNotification, ...prev]);
         }
       )
       .on(
@@ -71,16 +65,7 @@ export const useRealtimeNotifications = () => {
         },
         (payload) => {
           const updatedNotification = payload.new as Notification;
-          const oldNotification = payload.old as { read?: boolean };
-          setNotifications(prev =>
-            prev.map(n => n.id === updatedNotification.id ? updatedNotification : n)
-          );
-          setUnreadCount(prev => {
-            const wasUnread = !oldNotification?.read;
-            const isNowRead = updatedNotification.read;
-            if (wasUnread && isNowRead) return Math.max(0, prev - 1);
-            return prev;
-          });
+          setAllNotifications(prev => prev.map(n => n.id === updatedNotification.id ? updatedNotification : n));
         }
       )
       .subscribe();
@@ -88,7 +73,17 @@ export const useRealtimeNotifications = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, toast]);
+  }, [user?.id]);
+
+  const notifications = useMemo(() => {
+    if (!(delivery.inApp ?? true)) return [];
+    return allNotifications.filter(notification => isTypeEnabled(notification.type));
+  }, [allNotifications, delivery.inApp, isTypeEnabled]);
+
+  useEffect(() => {
+    const unread = notifications.filter(n => !n.read).length;
+    setUnreadCount(unread);
+  }, [notifications]);
 
   const markAsRead = async (notificationId: string) => {
     const { error } = await supabase
@@ -97,10 +92,9 @@ export const useRealtimeNotifications = () => {
       .eq('id', notificationId);
 
     if (!error) {
-      setNotifications(prev =>
+      setAllNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
     }
   };
 
@@ -114,8 +108,7 @@ export const useRealtimeNotifications = () => {
       .eq('read', false);
 
     if (!error) {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
+      setAllNotifications(prev => prev.map(n => ({ ...n, read: true })));
     }
   };
 

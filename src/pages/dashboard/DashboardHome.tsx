@@ -113,11 +113,24 @@ const DashboardHome = () => {
     }
 
     try {
-      const [contributionsRes, welfareCasesRes, notificationsRes] = await Promise.all([
+      const fetchPromise = Promise.all([
         supabase.from('contributions').select('status, amount').eq('member_id', profile.id),
         supabase.from('welfare_cases').select('id').eq('status', 'active'),
         supabase.from('notifications').select('id').eq('user_id', profile.id).eq('read', false),
       ]);
+
+      const timeoutPromise = new Promise<'timeout'>((resolve) => {
+        setTimeout(() => resolve('timeout'), 4500);
+      });
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (result === 'timeout') {
+        setIsLoading(false);
+        return;
+      }
+
+      const [contributionsRes, welfareCasesRes, notificationsRes] = result;
 
       if (contributionsRes.error || welfareCasesRes.error || notificationsRes.error) {
         console.error('Dashboard data errors:', {

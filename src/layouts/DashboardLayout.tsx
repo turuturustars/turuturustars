@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import NotificationToastListener from '@/components/notifications/NotificationToastListener';
 import { Loader2, Wifi, WifiOff } from 'lucide-react';
 
 const Sidebar = memo(DashboardSidebar);
@@ -142,6 +143,7 @@ const DashboardLayout = () => {
 
       {/* Main Content Area */}
       <div className="flex flex-1 flex-col min-w-0">
+        <NotificationToastListener />
         {/* Header */}
         <div className="relative z-30">
           <DashboardHeader onMenuToggle={() => setMobileOpen(true)} />

@@ -1,17 +1,14 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
-import { useToast } from './use-toast';
-
-// Import notification sound
-import notificationSound from '@/assets/audios/notification-sound-effect-372475.mp3';
+import { useNotificationPreferences } from './useNotificationPreferences';
 
 export interface Notification {
   id: string;
   user_id: string;
   title: string;
   message: string;
-  type: 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system';
+  type: 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system' | 'message' | 'transaction' | 'private_message';
   read: boolean;
   action_url?: string;
   sent_via?: string[];
@@ -32,23 +29,10 @@ interface RawNotification {
   updated_at?: string;
 }
 
-// Play notification sound
-const playNotificationSound = () => {
-  try {
-    const audio = new Audio(notificationSound);
-    audio.volume = 0.5;
-    audio.play().catch(() => {
-      // Ignore autoplay errors
-    });
-  } catch {
-    // Ignore errors
-  }
-};
-
 export const useRealtimeNotificationsEnhanced = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { delivery, isTypeEnabled } = useNotificationPreferences(user?.id);
+  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -67,18 +51,8 @@ export const useRealtimeNotificationsEnhanced = () => {
       created_at: data.created_at as string,
       updated_at: (data.updated_at as string) || new Date().toISOString(),
     };
-    setNotifications(prev => [newNotification, ...prev]);
-    setUnreadCount(prev => prev + 1);
-
-    // Show toast notification
-    toast({
-      title: newNotification.title,
-      description: newNotification.message,
-    });
-
-    // Play notification sound
-    playNotificationSound();
-  }, [toast]);
+    setAllNotifications(prev => [newNotification, ...prev]);
+  }, []);
 
   // Handler for UPDATE events
   const handleUpdateNotification = useCallback((payload: { new: Record<string, unknown> }) => {
@@ -95,32 +69,13 @@ export const useRealtimeNotificationsEnhanced = () => {
       created_at: data.created_at as string,
       updated_at: (data.updated_at as string) || new Date().toISOString(),
     };
-    setNotifications(prev => {
-      const wasUnread = prev.find(n => n.id === updatedNotification.id)?.read === false;
-      const isNowUnread = !updatedNotification.read;
-
-      const updated = prev.map(n => n.id === updatedNotification.id ? updatedNotification : n);
-
-      if (wasUnread && !isNowUnread) {
-        setUnreadCount(current => Math.max(0, current - 1));
-      } else if (!wasUnread && isNowUnread) {
-        setUnreadCount(current => current + 1);
-      }
-
-      return updated;
-    });
+    setAllNotifications(prev => prev.map(n => n.id === updatedNotification.id ? updatedNotification : n));
   }, []);
 
   // Handler for DELETE events
   const handleDeleteNotification = useCallback((payload: { old: { id: string } }) => {
     const deletedNotificationId = payload.old.id;
-    setNotifications(prev => {
-      const wasUnread = prev.find(n => n.id === deletedNotificationId)?.read === false;
-      if (wasUnread) {
-        setUnreadCount(current => Math.max(0, current - 1));
-      }
-      return prev.filter(n => n.id !== deletedNotificationId);
-    });
+    setAllNotifications(prev => prev.filter(n => n.id !== deletedNotificationId));
   }, []);
 
   // Fetch initial notifications
@@ -153,8 +108,7 @@ export const useRealtimeNotificationsEnhanced = () => {
         };
         return notification;
       });
-      setNotifications(typedData);
-      setUnreadCount(typedData.filter(n => !n.read).length);
+      setAllNotifications(typedData);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     } finally {
@@ -207,6 +161,16 @@ export const useRealtimeNotificationsEnhanced = () => {
     };
   }, [user?.id, fetchNotifications, handleInsertNotification, handleUpdateNotification, handleDeleteNotification]);
 
+  const notifications = useMemo(() => {
+    if (!(delivery.inApp ?? true)) return [];
+    return allNotifications.filter(notification => isTypeEnabled(notification.type));
+  }, [allNotifications, delivery.inApp, isTypeEnabled]);
+
+  useEffect(() => {
+    const unread = notifications.filter(n => !n.read).length;
+    setUnreadCount(unread);
+  }, [notifications]);
+
   // Mark notification as read
   const markAsRead = useCallback(async (notificationId: string) => {
     const { error } = await supabase
@@ -215,10 +179,9 @@ export const useRealtimeNotificationsEnhanced = () => {
       .eq('id', notificationId);
 
     if (!error) {
-      setNotifications(prev =>
+      setAllNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
-      setUnreadCount(prev => Math.max(0, prev - 1));
     }
   }, []);
 
@@ -233,8 +196,7 @@ export const useRealtimeNotificationsEnhanced = () => {
       .eq('read', false);
 
     if (!error) {
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-      setUnreadCount(0);
+      setAllNotifications(prev => prev.map(n => ({ ...n, read: true })));
     }
   }, [user?.id]);
 
@@ -246,13 +208,7 @@ export const useRealtimeNotificationsEnhanced = () => {
       .eq('id', notificationId);
 
     if (!error) {
-      setNotifications(prev => {
-        const notification = prev.find(n => n.id === notificationId);
-        if (notification && !notification.read) {
-          setUnreadCount(current => Math.max(0, current - 1));
-        }
-        return prev.filter(n => n.id !== notificationId);
-      });
+      setAllNotifications(prev => prev.filter(n => n.id !== notificationId));
     }
   }, []);
 
@@ -266,8 +222,7 @@ export const useRealtimeNotificationsEnhanced = () => {
       .eq('user_id', user.id);
 
     if (!error) {
-      setNotifications([]);
-      setUnreadCount(0);
+      setAllNotifications([]);
     }
   }, [user?.id]);
 

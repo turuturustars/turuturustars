@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
 import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
+import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,6 +34,7 @@ export default function PrivateMessagesPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const { preferences: notificationPreferences } = useNotificationPreferences(user?.id);
 
   const { 
     conversations, 
@@ -55,7 +57,7 @@ export default function PrivateMessagesPage() {
     user?.id,
     selectedConversationId || undefined,
     {
-      enabled: true,
+      enabled: (notificationPreferences?.enable_messages ?? true) && (notificationPreferences?.push ?? true),
       onNotificationClick: (conversationId) => {
         setSelectedConversationId(conversationId);
       },

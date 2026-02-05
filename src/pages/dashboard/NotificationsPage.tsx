@@ -64,6 +64,11 @@ const NotificationsPage = () => {
         return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       case 'meeting':
         return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      case 'message':
+      case 'private_message':
+        return 'bg-violet-100 text-violet-800 border-violet-300';
+      case 'transaction':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
       case 'system':
         return 'bg-gray-100 text-gray-800 border-gray-300';
       default:
@@ -73,12 +78,15 @@ const NotificationsPage = () => {
 
   const getTypeIcon = (type: string) => {
     const icons: Record<string, string> = {
-      announcement: '📢',
-      contribution: '💰',
-      welfare: '❤️',
-      approval: '✓',
-      meeting: '📅',
-      system: '⚙️',
+      announcement: 'ANN',
+      contribution: 'KES',
+      welfare: 'WEL',
+      approval: 'OK',
+      meeting: 'MTG',
+      message: 'MSG',
+      private_message: 'MSG',
+      transaction: 'TXN',
+      system: 'SYS',
     };
     return icons[type] || '📌';
   };
@@ -157,6 +165,8 @@ const NotificationsPage = () => {
             <SelectItem value="welfare">Welfare</SelectItem>
             <SelectItem value="approval">Approvals</SelectItem>
             <SelectItem value="meeting">Meetings</SelectItem>
+            <SelectItem value="message">Messages</SelectItem>
+            <SelectItem value="transaction">Transactions</SelectItem>
             <SelectItem value="system">System</SelectItem>
           </SelectContent>
         </Select>

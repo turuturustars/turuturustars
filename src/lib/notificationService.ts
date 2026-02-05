@@ -1,6 +1,15 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type NotificationType = 'announcement' | 'contribution' | 'welfare' | 'approval' | 'meeting' | 'system' | 'private_message';
+export type NotificationType =
+  | 'announcement'
+  | 'contribution'
+  | 'welfare'
+  | 'approval'
+  | 'meeting'
+  | 'system'
+  | 'private_message'
+  | 'message'
+  | 'transaction';
 
 export interface SendNotificationParams {
   userId: string;
