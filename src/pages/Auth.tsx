@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ChevronLeft, Home } from 'lucide-react';
 import { z } from 'zod';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
@@ -152,21 +152,54 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex items-center justify-center p-4">
-      {isForgotPassword ? (
-        <ForgotPassword onBack={() => setIsForgotPassword(false)} />
-      ) : (
-        <Card className="w-full max-w-md shadow-hero">
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary to-accent flex flex-col">
+      {/* Header Navigation */}
+      {!isForgotPassword && (
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+            title="Return to home page"
+            aria-label="Go to home page"
+          >
+            <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            Back
+          </button>
+          <a 
+            href="/" 
+            className="inline-flex items-center gap-2 font-semibold text-foreground hover:text-primary hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            title="Go to home page"
+            aria-label="Return to home page"
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </a>
+        </div>
+      )}
+      
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        {isForgotPassword ? (
+          <ForgotPassword onBack={() => setIsForgotPassword(false)} />
+        ) : (
+          <Card className="w-full max-w-md shadow-hero">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <img 
-                src={turuturuLogo}
-                alt="Turuturu Stars Logo"
-                className="h-16 w-auto object-contain"
-                loading="eager"
-                width="64"
-                height="64"
-              />
+              <a 
+                href="/" 
+                className="inline-block p-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                title="Go to home page"
+                aria-label="Turuturu Stars home"
+              >
+                <img 
+                  src={turuturuLogo}
+                  alt="Turuturu Stars Logo"
+                  className="h-16 w-auto object-contain"
+                  loading="eager"
+                  width="64"
+                  height="64"
+                />
+              </a>
             </div>
             <div>
               <CardTitle className="heading-display text-2xl">
@@ -286,26 +319,23 @@ const Auth = () => {
               Continue with Google
             </Button>
 
-            <div className="mt-6 text-center space-y-3">
+            <div className="mt-6 text-center space-y-2">
               <p className="text-sm text-muted-foreground">
-                Don't have an account?
+                New here?
               </p>
-              <Button
+              <button
                 type="button"
-                variant="outline"
-                className="w-full"
                 onClick={() => navigate('/register', { replace: true })}
+                className="text-primary text-sm font-semibold hover:underline"
                 disabled={isLoading}
               >
-                Create an Account
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Join Turuturu Stars Community to access member benefits.
-              </p>
+                Create your account
+              </button>
             </div>
           </CardContent>
-        </Card>
-      )}
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

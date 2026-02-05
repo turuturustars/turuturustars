@@ -324,9 +324,15 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           email: user.email,
           location: finalLocation,
           occupation: formData.occupation || null,
+          employment_status: formData.employmentStatus || null,
+          interests: formData.interests.length > 0 ? formData.interests : null,
+          education_level: formData.educationLevel || null,
+          additional_notes: formData.additionalNotes || null,
           is_student: formData.isStudent,
           status: 'pending', // Pending email verification
           email_verified_at: null, // Will be set after email confirmation
+          registration_progress: 100,
+          registration_completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'id' },
@@ -404,7 +410,29 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background px-3 sm:px-6 py-8 sm:py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-blue-50/50 to-background px-3 sm:px-6 py-8 sm:py-12 flex-col">
+      {/* Navigation Header */}
+      <div className="w-full max-w-5xl mb-6 flex items-center justify-between">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+          title="Go back"
+          aria-label="Go back to previous page"
+        >
+          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          Back
+        </button>
+        <a 
+          href="/" 
+          className="inline-flex items-center gap-2 font-semibold text-foreground hover:text-primary hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          title="Go to home page"
+          aria-label="Return to home page"
+        >
+          <Home className="w-4 h-4" />
+          <span className="hidden sm:inline">Home</span>
+        </a>
+      </div>
+
       <div className="w-full max-w-5xl space-y-6 card-stagger">
         {/* Progress Section */}
         <div className="space-y-3 progress-bar">

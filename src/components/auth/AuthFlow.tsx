@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Home, ChevronLeft } from 'lucide-react';
 import Auth from '@/pages/Auth';
 import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
 import { waitForProfile } from '@/utils/waitForProfile';
@@ -68,7 +68,19 @@ const AuthFlow = () => {
 
   if (authState === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background flex-col">
+        {/* Navigation Header */}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+          <a 
+            href="/" 
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-card transition-all"
+            title="Go to home page"
+          >
+            <Home className="w-4 h-4" />
+            <span className="hidden sm:inline">Home</span>
+          </a>
+        </div>
+
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
