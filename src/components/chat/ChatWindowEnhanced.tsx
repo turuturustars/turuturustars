@@ -188,6 +188,8 @@ export default function ChatWindowEnhanced({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
+  const [lastSeenMessageId, setLastSeenMessageId] = useState<string | null>(null);
+  const [isNearBottom, setIsNearBottom] = useState(true);
 
   const scrollToBottom = useCallback((smooth = true) => {
     bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
@@ -205,8 +207,23 @@ export default function ChatWindowEnhanced({
     const element = e.currentTarget;
     const threshold = 100;
     const isNearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < threshold;
+    setIsNearBottom(isNearBottom);
     setShowScrollButton(!isNearBottom);
+    if (isNearBottom && messages.length > 0) {
+      setLastSeenMessageId(messages[messages.length - 1].id);
+    }
   };
+
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (!lastSeenMessageId) {
+      setLastSeenMessageId(messages[messages.length - 1].id);
+      return;
+    }
+    if (isNearBottom) {
+      setLastSeenMessageId(messages[messages.length - 1].id);
+    }
+  }, [messages.length, isNearBottom, lastSeenMessageId, messages]);
 
   if (isLoading) {
     return <LoadingSkeleton />;
@@ -225,6 +242,11 @@ export default function ChatWindowEnhanced({
     }
     groupedMessages[dateKey].push(msg);
   });
+
+  const messageIndex = new Map(messages.map((m, i) => [m.id, i]));
+  const lastSeenIndex = lastSeenMessageId
+    ? messageIndex.get(lastSeenMessageId) ?? messages.length - 1
+    : messages.length - 1;
 
   return (
     <div className="flex-1 relative overflow-hidden flex flex-col">
@@ -252,18 +274,30 @@ export default function ChatWindowEnhanced({
                 const isNextSameSender = nextMsg?.sender_id === m.sender_id;
                 const isOwnMessage = m.sender_id === meId;
                 const senderName = m.sender_profile?.full_name || 'Member';
-                
+                const globalIndex = messageIndex.get(m.id) ?? -1;
+                const isUnread = showScrollButton && globalIndex > lastSeenIndex;
+                const showUnreadDivider = showScrollButton && globalIndex === lastSeenIndex + 1;
+
                 const showAvatar = !isNextSameSender;
                 const showName = !isOwnMessage && !isSameSender;
                 const marginTop = !isSameSender ? 'mt-4' : 'mt-0.5';
 
                 return (
-                  <div
-                    key={m.id}
-                    className={`flex items-end gap-2 sm:gap-2.5 ${isOwnMessage ? 'justify-end' : 'justify-start'} group ${marginTop} animate-in fade-in slide-in-from-bottom-1 duration-300`}
-                    onMouseEnter={() => setHoveredMessageId(m.id)}
-                    onMouseLeave={() => setHoveredMessageId(null)}
-                  >
+                  <div key={m.id}>
+                    {showUnreadDivider && (
+                      <div className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-primary/30" />
+                        <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full">
+                          New messages
+                        </span>
+                        <div className="flex-1 h-px bg-primary/30" />
+                      </div>
+                    )}
+                    <div
+                      className={`flex items-end gap-2 sm:gap-2.5 ${isOwnMessage ? 'justify-end' : 'justify-start'} group ${marginTop} animate-in fade-in slide-in-from-bottom-1 duration-300`}
+                      onMouseEnter={() => setHoveredMessageId(m.id)}
+                      onMouseLeave={() => setHoveredMessageId(null)}
+                    >
                     {/* Left Avatar */}
                     {!isOwnMessage && (
                       <div className="shrink-0 self-end mb-0.5">
@@ -300,7 +334,7 @@ export default function ChatWindowEnhanced({
                             isOwnMessage
                               ? 'bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-br-sm shadow-lg hover:shadow-xl'
                               : 'bg-muted/90 text-foreground rounded-bl-sm border border-border/40 hover:border-border shadow-sm hover:shadow-md backdrop-blur-sm'
-                          }`}
+                          } ${isUnread ? 'ring-1 ring-primary/30 bg-primary/5' : ''}`}
                         >
                           <p className="text-[13px] sm:text-sm leading-relaxed whitespace-pre-wrap">
                             {m.content}
@@ -368,6 +402,7 @@ export default function ChatWindowEnhanced({
                         )}
                       </div>
                     )}
+                    </div>
                   </div>
                 );
               })}
