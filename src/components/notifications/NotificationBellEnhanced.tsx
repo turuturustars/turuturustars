@@ -23,6 +23,7 @@ interface Notification {
   read: boolean | null;
   sent_via: string[] | null;
   created_at: string | null;
+  action_url?: string | null;
 }
 
 const NotificationBellEnhanced = () => {
@@ -231,6 +232,14 @@ const NotificationBellEnhanced = () => {
                     'p-4 hover:bg-accent transition-colors cursor-pointer border-l-4',
                     notification.read ? 'border-l-transparent' : 'border-l-primary bg-primary/5'
                   )}
+                  onClick={() => {
+                    if (!notification.read) {
+                      markAsReadMutation.mutate(notification.id);
+                    }
+                    if (notification.action_url) {
+                      window.location.href = notification.action_url;
+                    }
+                  }}
                 >
                   <div className="flex gap-3">
                     {/* Type Icon */}
@@ -268,7 +277,10 @@ const NotificationBellEnhanced = () => {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => markAsReadMutation.mutate(notification.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            markAsReadMutation.mutate(notification.id);
+                          }}
                           disabled={markAsReadMutation.isPending}
                           className="h-8 w-8 p-0"
                         >
