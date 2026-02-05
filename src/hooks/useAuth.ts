@@ -44,7 +44,8 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+      setIsLoading(false);
+
       if (session?.user) {
         setTimeout(() => {
           fetchProfile(session.user.id);
@@ -53,19 +54,17 @@ export function useAuth() {
       } else {
         setProfile(null);
         setRoles([]);
-        setIsLoading(false);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+      setIsLoading(false);
+
       if (session?.user) {
         fetchProfile(session.user.id);
         fetchRoles(session.user.id);
-      } else {
-        setIsLoading(false);
       }
     });
 

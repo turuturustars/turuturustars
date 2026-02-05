@@ -70,7 +70,7 @@ const ProfileSetup = () => {
             description: 'Please sign up first to create a profile.',
             variant: 'destructive',
           });
-          navigate('/auth?mode=signup', { replace: true });
+          navigate('/register', { replace: true });
           return;
         }
 
