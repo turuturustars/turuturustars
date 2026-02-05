@@ -397,8 +397,64 @@ const ContributionsPage = () => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              <div className="space-y-3 lg:hidden">
+                {paginatedContributions.map((contribution) => (
+                  <Card key={contribution.id} className="border border-border/60">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">
+                            {contribution.contribution_type.replace('_', ' ')}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(contribution.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold">KES {contribution.amount.toLocaleString()}</p>
+                          <div className="mt-1">
+                            <StatusBadge 
+                              status={contribution.status} 
+                              icon={
+                                contribution.status === 'paid' ? <CheckCircle2 className="w-3 h-3" /> :
+                                contribution.status === 'pending' ? <Clock className="w-3 h-3" /> :
+                                <Clock className="w-3 h-3" />
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Reference</p>
+                          <p className="font-mono truncate">{contribution.reference_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Status</p>
+                          <p className="capitalize">{contribution.status}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t">
+                        {contribution.status !== 'paid' ? (
+                          <PayWithMpesa
+                            contributionId={contribution.id}
+                            defaultAmount={contribution.amount}
+                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
+                          />
+                        ) : (
+                          <span className="text-sm text-green-600">Paid</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -448,7 +504,9 @@ const ContributionsPage = () => {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
+
               {/* Pagination Controls */}
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
@@ -478,7 +536,7 @@ const ContributionsPage = () => {
                   </AccessibleButton>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </CardContent>
       </Card>

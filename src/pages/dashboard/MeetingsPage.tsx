@@ -467,49 +467,102 @@ export default function MeetingsPage() {
         </TabsContent>
 
         <TabsContent value="past">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Meeting</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Venue</TableHead>
-                <TableHead>Status</TableHead>
-                {canManage && <TableHead>Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pastMeetings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    No past meetings
-                  </TableCell>
-                </TableRow>
-              ) : (
-                pastMeetings.map(meeting => (
-                  <TableRow key={meeting.id}>
-                    <TableCell className="font-medium">{meeting.title}</TableCell>
-                    <TableCell>{getMeetingTypeBadge(meeting.meeting_type)}</TableCell>
-                    <TableCell>{format(new Date(meeting.scheduled_date), 'PP')}</TableCell>
-                    <TableCell>{meeting.venue || '-'}</TableCell>
-                    <TableCell>{getStatusBadge(meeting.status)}</TableCell>
+          <div className="space-y-3 lg:hidden">
+            {pastMeetings.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No past meetings
+              </div>
+            ) : (
+              pastMeetings.map((meeting) => (
+                <Card key={meeting.id}>
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold truncate">{meeting.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(meeting.scheduled_date), 'PP')}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        {getMeetingTypeBadge(meeting.meeting_type)}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Venue</p>
+                        <p className="truncate">{meeting.venue || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Status</p>
+                        {getStatusBadge(meeting.status)}
+                      </div>
+                    </div>
+
                     {canManage && (
-                      <TableCell>
+                      <div className="pt-2 border-t">
                         <AccessibleButton 
                           variant="outline" 
                           size="sm"
+                          className="w-full"
                           ariaLabel={`View attendance for ${meeting.title}`}
                           onClick={() => openAttendanceDialog(meeting)}
                         >
                           View Attendance
                         </AccessibleButton>
-                      </TableCell>
+                      </div>
                     )}
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          <div className="hidden lg:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Meeting</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Venue</TableHead>
+                  <TableHead>Status</TableHead>
+                  {canManage && <TableHead>Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pastMeetings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      No past meetings
+                    </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  pastMeetings.map(meeting => (
+                    <TableRow key={meeting.id}>
+                      <TableCell className="font-medium">{meeting.title}</TableCell>
+                      <TableCell>{getMeetingTypeBadge(meeting.meeting_type)}</TableCell>
+                      <TableCell>{format(new Date(meeting.scheduled_date), 'PP')}</TableCell>
+                      <TableCell>{meeting.venue || '-'}</TableCell>
+                      <TableCell>{getStatusBadge(meeting.status)}</TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <AccessibleButton 
+                            variant="outline" 
+                            size="sm"
+                            ariaLabel={`View attendance for ${meeting.title}`}
+                            onClick={() => openAttendanceDialog(meeting)}
+                          >
+                            View Attendance
+                          </AccessibleButton>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </TabsContent>
       </Tabs>
 
