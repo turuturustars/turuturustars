@@ -144,6 +144,7 @@ const AnnouncementsPage = () => {
           setTimeout(() => setNewestAnnouncementId(null), 5000);
         }
         fetchAnnouncements();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'announcements' }, () => {
         fetchAnnouncements();
