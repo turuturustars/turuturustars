@@ -384,11 +384,12 @@ export default function ChatWindowEnhanced({
       {/* Scroll to Bottom Button */}
       <button
         onClick={() => scrollToBottom(true)}
-        className={`absolute bottom-4 right-4 z-10 w-10 h-10 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center ${
+        className={`absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300 px-3 py-2 ${
           showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
       >
-        <ChevronDown className="w-5 h-5" />
+        <span className="text-[11px] font-semibold">New messages</span>
+        <ChevronDown className="w-4 h-4" />
       </button>
 
       {/* Bottom Gradient */}
