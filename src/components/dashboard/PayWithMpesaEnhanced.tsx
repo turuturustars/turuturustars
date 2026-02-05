@@ -259,7 +259,7 @@ const PayWithMpesa = ({
                 Close
               </Button>
               <Button
-                onClick={() => window.location.href = '/dashboard/payments'}
+                onClick={() => window.location.href = '/dashboard/finance/mpesa'}
                 className="flex-1 gap-2"
               >
                 <TrendingUp className="w-4 h-4" />

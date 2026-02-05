@@ -78,6 +78,7 @@ const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
 const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
 const RoleHandoverPage = lazy(() => import("./pages/dashboard/RoleHandoverPage"));
 const PrivateMessagesPage = lazy(() => import("./pages/dashboard/PrivateMessagesPage"));
+const NotificationsPage = lazy(() => import("./pages/dashboard/NotificationsPage"));
 
 // QueryClient configuration with better defaults
 const queryClient = new QueryClient({
@@ -224,6 +225,7 @@ const App = () => {
                   <Route path="communication">
                     <Route path="announcements" element={<AnnouncementsPage />} />
                     <Route path="messages" element={<PrivateMessagesPage />} />
+                    <Route path="notifications" element={<NotificationsPage />} />
                   </Route>
 
                   {/* Admin functions */}
@@ -248,6 +250,9 @@ const App = () => {
                   <Route path="role-handover" element={<Navigate to="/dashboard/governance/handover" replace />} />
                   <Route path="secretary" element={<Navigate to="/dashboard/governance/secretary-dashboard" replace />} />
                   <Route path="announcements" element={<Navigate to="/dashboard/communication/announcements" replace />} />
+                  <Route path="notifications" element={<Navigate to="/dashboard/communication/notifications" replace />} />
+                  <Route path="community" element={<Navigate to="/dashboard/communication/messages" replace />} />
+                  <Route path="chat" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="approvals" element={<Navigate to="/dashboard/admin-panel/approvals" replace />} />
                 </Route>
 

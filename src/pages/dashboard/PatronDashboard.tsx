@@ -24,7 +24,7 @@ const PatronDashboard = () => {
       title: 'Association Reports',
       description: 'View key metrics and reports',
       icon: <BarChart3 className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
@@ -38,14 +38,14 @@ const PatronDashboard = () => {
       title: 'Key Insights',
       description: 'Association performance',
       icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-purple-100 dark:bg-purple-900/30',
     },
     {
       title: 'Announcements',
       description: 'Stay informed',
       icon: <FileText className="w-5 h-5" />,
-      path: '/dashboard/announcements',
+      path: '/dashboard/communication/announcements',
       color: 'bg-amber-100 dark:bg-amber-900/30',
     },
   ];
@@ -159,7 +159,7 @@ const PatronDashboard = () => {
         </CardHeader>
         <CardContent>
           <button
-            onClick={() => navigate('/dashboard/chat')}
+            onClick={() => navigate('/dashboard/communication/messages')}
             aria-label="Open private chat with management committee"
             className="text-primary hover:underline text-sm"
           >
@@ -172,3 +172,4 @@ const PatronDashboard = () => {
 };
 
 export default PatronDashboard;
+

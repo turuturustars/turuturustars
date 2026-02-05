@@ -26,28 +26,28 @@ const SecretaryDashboard = () => {
       title: 'Meeting Notices',
       description: 'Issue notices and invitations',
       icon: <Mail className="w-5 h-5" />,
-      path: '/dashboard/secretary',
+      path: '/dashboard/governance/secretary-dashboard',
       color: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       title: 'Record Minutes',
       description: 'Upload and archive meeting minutes',
       icon: <FileText className="w-5 h-5" />,
-      path: '/dashboard/secretary',
+      path: '/dashboard/governance/secretary-dashboard',
       color: 'bg-green-100 dark:bg-green-900/30',
     },
     {
       title: 'Correspondence',
       description: 'Manage official communications',
       icon: <MessageSquare className="w-5 h-5" />,
-      path: '/dashboard/secretary',
+      path: '/dashboard/governance/secretary-dashboard',
       color: 'bg-purple-100 dark:bg-purple-900/30',
     },
     {
       title: 'Records Archive',
       description: 'View and search archived records',
       icon: <Archive className="w-5 h-5" />,
-      path: '/dashboard/secretary',
+      path: '/dashboard/governance/secretary-dashboard',
       color: 'bg-amber-100 dark:bg-amber-900/30',
     },
   ];
@@ -148,3 +148,4 @@ const SecretaryDashboard = () => {
 };
 
 export default SecretaryDashboard;
+

@@ -150,7 +150,7 @@ const AdminDashboard = () => {
       items: [
         { label: 'All Members', path: '/dashboard/members', icon: Users, badge: '156' },
         { label: 'Role Management', path: '/dashboard/roles', icon: Shield, badge: null },
-        { label: 'Pending Approvals', path: '/dashboard/approvals', icon: CheckCircle2, badge: '3' },
+        { label: 'Pending Approvals', path: '/dashboard/admin-panel/approvals', icon: CheckCircle2, badge: '3' },
       ],
       gradient: 'from-blue-500 to-cyan-500',
       bgGradient: 'from-blue-50 to-cyan-50 dark:from-blue-950/50 dark:to-cyan-950/50',
@@ -160,9 +160,9 @@ const AdminDashboard = () => {
       description: 'Oversee all payments, transactions, and finances',
       icon: DollarSign,
       items: [
-        { label: 'Payment Tracking', path: '/dashboard/mpesa-management', icon: DollarSign, badge: null },
-        { label: 'Financial Reports', path: '/dashboard/reports', icon: BarChart3, badge: null },
-        { label: 'All Contributions', path: '/dashboard/all-contributions', icon: TrendingUp, badge: 'KES 2.4M' },
+        { label: 'Payment Tracking', path: '/dashboard/finance/mpesa', icon: DollarSign, badge: null },
+        { label: 'Financial Reports', path: '/dashboard/finance/reports', icon: BarChart3, badge: null },
+        { label: 'All Contributions', path: '/dashboard/finance/all-contributions', icon: TrendingUp, badge: 'KES 2.4M' },
       ],
       gradient: 'from-green-500 to-emerald-500',
       bgGradient: 'from-green-50 to-emerald-50 dark:from-green-950/50 dark:to-emerald-950/50',
@@ -172,9 +172,9 @@ const AdminDashboard = () => {
       description: 'Manage meetings, discipline cases, and documentation',
       icon: Settings,
       items: [
-        { label: 'Meetings', path: '/dashboard/meetings', icon: Calendar, badge: '2 upcoming' },
-        { label: 'Discipline Cases', path: '/dashboard/discipline', icon: Gavel, badge: '1 active' },
-        { label: 'Secretary Tasks', path: '/dashboard/secretary', icon: Mail, badge: null },
+        { label: 'Meetings', path: '/dashboard/governance/meetings', icon: Calendar, badge: '2 upcoming' },
+        { label: 'Discipline Cases', path: '/dashboard/members/discipline', icon: Gavel, badge: '1 active' },
+        { label: 'Secretary Tasks', path: '/dashboard/governance/secretary-dashboard', icon: Mail, badge: null },
       ],
       gradient: 'from-purple-500 to-pink-500',
       bgGradient: 'from-purple-50 to-pink-50 dark:from-purple-950/50 dark:to-pink-950/50',
@@ -184,9 +184,9 @@ const AdminDashboard = () => {
       description: 'Send announcements and manage all communications',
       icon: MessageSquare,
       items: [
-        { label: 'Announcements', path: '/dashboard/announcements', icon: Bell, badge: null },
-        { label: 'Direct Messages', path: '/dashboard/chat', icon: MessageSquare, badge: '12' },
-        { label: 'Notifications Center', path: '/dashboard/notifications', icon: Bell, badge: '45' },
+        { label: 'Announcements', path: '/dashboard/communication/announcements', icon: Bell, badge: null },
+        { label: 'Direct Messages', path: '/dashboard/communication/messages', icon: MessageSquare, badge: '12' },
+        { label: 'Notifications Center', path: '/dashboard/communication/notifications', icon: Bell, badge: '45' },
       ],
       gradient: 'from-amber-500 to-orange-500',
       bgGradient: 'from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50',
@@ -359,7 +359,7 @@ const AdminDashboard = () => {
               variant="outline" 
               className="justify-start gap-2 h-auto py-3" 
               onClick={() => {
-                navigate('/dashboard/announcements');
+                navigate('/dashboard/communication/announcements');
                 showSuccess('Navigating to announcements', 1500);
               }}
               ariaLabel="Create new announcement"
@@ -371,7 +371,7 @@ const AdminDashboard = () => {
               variant="outline" 
               className="justify-start gap-2 h-auto py-3" 
               onClick={() => {
-                navigate('/dashboard/reports');
+                navigate('/dashboard/finance/reports');
                 showSuccess('Navigating to reports', 1500);
               }}
               ariaLabel="Generate new financial or membership report"
@@ -383,8 +383,8 @@ const AdminDashboard = () => {
               variant="outline" 
               className="justify-start gap-2 h-auto py-3" 
               onClick={() => {
-                navigate('/dashboard/settings');
-                showSuccess('Navigating to system settings', 1500);
+                navigate('/dashboard/roles/admin');
+                showSuccess('Navigating to admin settings', 1500);
               }}
               ariaLabel="Access system settings and configuration"
             >

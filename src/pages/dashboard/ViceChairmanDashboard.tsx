@@ -26,7 +26,7 @@ const ViceChairmanDashboard = () => {
       title: 'Convene Meetings',
       description: 'Schedule association & committee meetings',
       icon: <Calendar className="w-5 h-5" />,
-      path: '/dashboard/meetings',
+      path: '/dashboard/governance/meetings',
       color: 'bg-blue-100 dark:bg-blue-900/30',
       responsibility: 'Convene and preside over meetings in chairman\'s absence',
     },
@@ -34,7 +34,7 @@ const ViceChairmanDashboard = () => {
       title: 'Preside Meetings',
       description: 'Chair association meetings & AGM',
       icon: <Award className="w-5 h-5" />,
-      path: '/dashboard/meetings',
+      path: '/dashboard/governance/meetings',
       color: 'bg-amber-100 dark:bg-amber-900/30',
       responsibility: 'Preside over all meetings of the association',
     },
@@ -42,7 +42,7 @@ const ViceChairmanDashboard = () => {
       title: 'Send Announcements',
       description: 'Broadcast messages to members',
       icon: <Bell className="w-5 h-5" />,
-      path: '/dashboard/announcements',
+      path: '/dashboard/communication/announcements',
       color: 'bg-purple-100 dark:bg-purple-900/30',
       responsibility: 'Communicate with membership',
     },
@@ -58,7 +58,7 @@ const ViceChairmanDashboard = () => {
       title: 'Community Management',
       description: 'Manage associations and partnerships',
       icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/community',
+      path: '/dashboard/communication/messages',
       color: 'bg-cyan-100 dark:bg-cyan-900/30',
       responsibility: 'Lead community initiatives',
     },
@@ -66,7 +66,7 @@ const ViceChairmanDashboard = () => {
       title: 'Reports & Voting',
       description: 'Review reports and manage voting',
       icon: <CheckCircle className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-pink-100 dark:bg-pink-900/30',
       responsibility: 'Approve reports and manage voting',
     },
@@ -260,3 +260,4 @@ const ViceChairmanDashboard = () => {
 };
 
 export default ViceChairmanDashboard;
+

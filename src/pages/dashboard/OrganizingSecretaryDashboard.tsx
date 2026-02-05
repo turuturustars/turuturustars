@@ -27,7 +27,7 @@ const OrganizingSecretaryDashboard = () => {
       title: 'Manage Meetings',
       description: 'Organize venues & schedule meetings',
       icon: <Calendar className="w-5 h-5" />,
-      path: '/dashboard/meetings',
+      path: '/dashboard/governance/meetings',
       color: 'bg-blue-100 dark:bg-blue-900/30',
       responsibility: 'a) Organize venue of meetings and b) Ensure meeting items are available',
     },
@@ -35,7 +35,7 @@ const OrganizingSecretaryDashboard = () => {
       title: 'Record Misconduct',
       description: 'Document discipline incidents',
       icon: <FileText className="w-5 h-5" />,
-      path: '/dashboard/discipline',
+      path: '/dashboard/members/discipline',
       color: 'bg-red-100 dark:bg-red-900/30',
       responsibility: 'c) Keep records of any misconduct',
     },
@@ -43,7 +43,7 @@ const OrganizingSecretaryDashboard = () => {
       title: 'Manage Fines',
       description: 'Track and collect penalties',
       icon: <DollarSign className="w-5 h-5" />,
-      path: '/dashboard/discipline',
+      path: '/dashboard/members/discipline',
       color: 'bg-orange-100 dark:bg-orange-900/30',
       responsibility: 'd) Collect fines and penalties',
     },
@@ -51,7 +51,7 @@ const OrganizingSecretaryDashboard = () => {
       title: 'Discipline Records',
       description: 'View all incident reports',
       icon: <Gavel className="w-5 h-5" />,
-      path: '/dashboard/discipline',
+      path: '/dashboard/members/discipline',
       color: 'bg-purple-100 dark:bg-purple-900/30',
       responsibility: 'Be the discipline master',
     },
@@ -67,7 +67,7 @@ const OrganizingSecretaryDashboard = () => {
       title: 'Reports',
       description: 'View fines & incident reports',
       icon: <CheckCircle className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-cyan-100 dark:bg-cyan-900/30',
       responsibility: 'Generate reports on disciplinary actions',
     },
@@ -219,3 +219,4 @@ const OrganizingSecretaryDashboard = () => {
 };
 
 export default OrganizingSecretaryDashboard;
+

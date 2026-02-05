@@ -25,28 +25,28 @@ const TreasurerRole = () => {
       title: 'Payment Tracking',
       description: 'View M-Pesa transactions',
       icon: <DollarSign className="w-5 h-5" />,
-      path: '/dashboard/mpesa-management',
+      path: '/dashboard/finance/mpesa',
       color: 'bg-green-100 dark:bg-green-900/30',
     },
     {
       title: 'Financial Reports',
       description: 'View and export reports',
       icon: <BarChart3 className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-blue-100 dark:bg-blue-900/30',
     },
     {
       title: 'Contributions',
       description: 'View all member contributions',
       icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/all-contributions',
+      path: '/dashboard/finance/all-contributions',
       color: 'bg-purple-100 dark:bg-purple-900/30',
     },
     {
       title: 'Export Data',
       description: 'Download financial statements',
       icon: <Download className="w-5 h-5" />,
-      path: '/dashboard/reports',
+      path: '/dashboard/finance/reports',
       color: 'bg-amber-100 dark:bg-amber-900/30',
     },
   ];
@@ -156,3 +156,4 @@ const TreasurerRole = () => {
 };
 
 export default TreasurerRole;
+

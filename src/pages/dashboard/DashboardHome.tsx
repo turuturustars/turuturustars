@@ -225,21 +225,21 @@ const DashboardHome = () => {
       color: 'text-purple-600 dark:text-purple-400',
       bgColor: 'bg-purple-50 dark:bg-purple-950/50',
       gradient: 'from-purple-500 to-pink-500',
-      action: { label: 'View All', path: '/dashboard/communication/messages' }
+      action: { label: 'View All', path: '/dashboard/communication/notifications' }
     },
   ];
 
   const quickActions = [
     { 
       label: 'Make Contribution', 
-      path: '/dashboard/contributions', 
+      path: '/dashboard/finance/contributions', 
       icon: DollarSign,
       color: 'from-green-500 to-emerald-500',
       description: 'Add to your savings'
     },
     { 
       label: 'View Welfare Cases', 
-      path: '/dashboard/welfare', 
+      path: '/dashboard/members/welfare', 
       icon: HandHeart,
       color: 'from-blue-500 to-cyan-500',
       description: 'Support members'
@@ -253,7 +253,7 @@ const DashboardHome = () => {
     },
     { 
       label: 'View Meetings', 
-      path: '/dashboard/meetings', 
+      path: '/dashboard/governance/meetings', 
       icon: Calendar,
       color: 'from-amber-500 to-orange-500',
       description: 'Upcoming events'
@@ -559,7 +559,7 @@ const DashboardHome = () => {
                 <CardTitle className="text-lg">Latest Announcements</CardTitle>
               </div>
               <AccessibleButton variant="ghost" size="sm" asChild ariaLabel="View all announcements">
-                <Link to="/dashboard/announcements">
+                <Link to="/dashboard/communication/announcements">
                   View All
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Link>
