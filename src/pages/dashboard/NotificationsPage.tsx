@@ -21,6 +21,14 @@ import {
   CheckCheck,
   Search,
   Filter,
+  Megaphone,
+  DollarSign,
+  Heart,
+  CheckCircle2,
+  Calendar,
+  MessageSquare,
+  CreditCard,
+  Settings2,
 } from 'lucide-react';
 import { useRealtimeNotificationsEnhanced } from '@/hooks/useRealtimeNotificationsEnhanced';
 import { cn } from '@/lib/utils';
@@ -52,43 +60,61 @@ const NotificationsPage = () => {
     return matchesSearch && matchesType && matchesRead;
   });
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'announcement':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'contribution':
-        return 'bg-green-100 text-green-800 border-green-300';
-      case 'welfare':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'approval':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'meeting':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-      case 'message':
-      case 'private_message':
-        return 'bg-violet-100 text-violet-800 border-violet-300';
-      case 'transaction':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      case 'system':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    const icons: Record<string, string> = {
-      announcement: 'ANN',
-      contribution: 'KES',
-      welfare: 'WEL',
-      approval: 'OK',
-      meeting: 'MTG',
-      message: 'MSG',
-      private_message: 'MSG',
-      transaction: 'TXN',
-      system: 'SYS',
-    };
-    return icons[type] || '📌';
+  const typeConfig: Record<string, { label: string; icon: typeof Bell; badge: string; chip: string }> = {
+    announcement: {
+      label: 'Announcement',
+      icon: Megaphone,
+      badge: 'bg-purple-100 text-purple-800 border-purple-200',
+      chip: 'bg-purple-500/10 text-purple-700 dark:text-purple-300',
+    },
+    contribution: {
+      label: 'Contribution',
+      icon: DollarSign,
+      badge: 'bg-green-100 text-green-800 border-green-200',
+      chip: 'bg-green-500/10 text-green-700 dark:text-green-300',
+    },
+    welfare: {
+      label: 'Welfare',
+      icon: Heart,
+      badge: 'bg-blue-100 text-blue-800 border-blue-200',
+      chip: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    },
+    approval: {
+      label: 'Approval',
+      icon: CheckCircle2,
+      badge: 'bg-amber-100 text-amber-800 border-amber-200',
+      chip: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    },
+    meeting: {
+      label: 'Meeting',
+      icon: Calendar,
+      badge: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      chip: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+    },
+    message: {
+      label: 'Message',
+      icon: MessageSquare,
+      badge: 'bg-violet-100 text-violet-800 border-violet-200',
+      chip: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
+    },
+    private_message: {
+      label: 'Message',
+      icon: MessageSquare,
+      badge: 'bg-violet-100 text-violet-800 border-violet-200',
+      chip: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
+    },
+    transaction: {
+      label: 'Transaction',
+      icon: CreditCard,
+      badge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      chip: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    },
+    system: {
+      label: 'System',
+      icon: Settings2,
+      badge: 'bg-slate-100 text-slate-800 border-slate-200',
+      chip: 'bg-slate-500/10 text-slate-700 dark:text-slate-300',
+    },
   };
 
   const formatDate = (dateString: string) => {
@@ -118,14 +144,14 @@ const NotificationsPage = () => {
         isVisible={status.isVisible}
       />
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-3 rounded-lg bg-blue-100">
-            <Bell className="w-6 h-6 text-blue-600" />
+          <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/20">
+            <Bell className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-2xl font-bold text-foreground">Notifications</h2>
+            <p className="text-sm text-muted-foreground">
               {unreadCount > 0
                 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}`
                 : 'All caught up!'}
@@ -142,49 +168,53 @@ const NotificationsPage = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            placeholder="Search notifications..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <Card className="border-2 shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search notifications..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
 
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-40">
-            <Filter className="w-4 h-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="announcement">Announcements</SelectItem>
-            <SelectItem value="contribution">Contributions</SelectItem>
-            <SelectItem value="welfare">Welfare</SelectItem>
-            <SelectItem value="approval">Approvals</SelectItem>
-            <SelectItem value="meeting">Meetings</SelectItem>
-            <SelectItem value="message">Messages</SelectItem>
-            <SelectItem value="transaction">Transactions</SelectItem>
-            <SelectItem value="system">System</SelectItem>
-          </SelectContent>
-        </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-40">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="announcement">Announcements</SelectItem>
+                <SelectItem value="contribution">Contributions</SelectItem>
+                <SelectItem value="welfare">Welfare</SelectItem>
+                <SelectItem value="approval">Approvals</SelectItem>
+                <SelectItem value="meeting">Meetings</SelectItem>
+                <SelectItem value="message">Messages</SelectItem>
+                <SelectItem value="transaction">Transactions</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
 
-        <Select value={readFilter} onValueChange={(value: any) => setReadFilter(value)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Notifications</SelectItem>
-            <SelectItem value="unread">Unread</SelectItem>
-            <SelectItem value="read">Read</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+            <Select value={readFilter} onValueChange={(value: any) => setReadFilter(value)}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Notifications</SelectItem>
+                <SelectItem value="unread">Unread</SelectItem>
+                <SelectItem value="read">Read</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Results Count */}
-      <div className="text-sm text-gray-500">
+      <div className="text-sm text-muted-foreground">
         {filtered.length} {filtered.length === 1 ? 'notification' : 'notifications'} found
       </div>
 
@@ -192,9 +222,9 @@ const NotificationsPage = () => {
       {filtered.length === 0 && (
         <Card className="border-dashed border-2">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Bell className="w-12 h-12 text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No notifications found</p>
-            <p className="text-sm text-gray-400">Try adjusting your filters</p>
+            <Bell className="w-12 h-12 text-muted-foreground/40 mb-3" />
+            <p className="text-muted-foreground font-medium">No notifications found</p>
+            <p className="text-sm text-muted-foreground/70">Try adjusting your filters</p>
           </CardContent>
         </Card>
       )}
@@ -215,9 +245,9 @@ const NotificationsPage = () => {
                   return [date, n];
                 })
               )
-            ).map(([dateGroup, firstNotification]) => (
+            ).map(([dateGroup]) => (
               <div key={dateGroup}>
-                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3 px-1">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3 px-1">
                   {dateGroup}
                 </h3>
 
@@ -237,16 +267,32 @@ const NotificationsPage = () => {
                         className={cn(
                           'overflow-hidden transition-all border-l-4',
                           notification.read
-                            ? 'border-l-gray-200 bg-white hover:bg-gray-50'
-                            : 'border-l-blue-500 bg-blue-50/50 hover:bg-blue-50'
+                            ? 'border-l-transparent bg-card hover:bg-accent/30'
+                            : 'border-l-primary bg-primary/5 hover:bg-primary/10'
                         )}
                       >
-                        <CardContent className="p-4">
+                        <CardContent
+                          className={cn(
+                            'p-4',
+                            notification.action_url && 'cursor-pointer'
+                          )}
+                          onClick={() => {
+                            if (notification.action_url) {
+                              window.location.href = notification.action_url;
+                            }
+                          }}
+                        >
                           <div className="flex items-start gap-4">
                             {/* Icon */}
-                            <span className="text-2xl flex-shrink-0 mt-1">
-                              {getTypeIcon(notification.type)}
-                            </span>
+                            {(() => {
+                              const config = typeConfig[notification.type] ?? typeConfig.system;
+                              const Icon = config.icon;
+                              return (
+                                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center border', config.badge)}>
+                                  <Icon className="w-5 h-5" />
+                                </div>
+                              );
+                            })()}
 
                             {/* Content */}
                             <div className="flex-1 min-w-0">
@@ -255,7 +301,7 @@ const NotificationsPage = () => {
                                   <h4
                                     className={cn(
                                       'font-semibold line-clamp-1',
-                                      notification.read ? 'text-gray-700' : 'text-gray-900'
+                                      notification.read ? 'text-muted-foreground' : 'text-foreground'
                                     )}
                                   >
                                     {notification.title}
@@ -263,14 +309,14 @@ const NotificationsPage = () => {
                                   <p
                                     className={cn(
                                       'text-sm line-clamp-2 mt-1',
-                                      notification.read ? 'text-gray-500' : 'text-gray-700'
+                                      notification.read ? 'text-muted-foreground' : 'text-foreground/80'
                                     )}
                                   >
                                     {notification.message}
                                   </p>
                                 </div>
                                 {!notification.read && (
-                                  <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-600 mt-2" />
+                                  <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary mt-2" />
                                 )}
                               </div>
 
@@ -280,12 +326,12 @@ const NotificationsPage = () => {
                                   <Badge
                                     className={cn(
                                       'border text-xs font-medium',
-                                      getTypeColor(notification.type)
+                                      (typeConfig[notification.type] ?? typeConfig.system).chip
                                     )}
                                   >
-                                    {notification.type}
+                                    {(typeConfig[notification.type] ?? typeConfig.system).label}
                                   </Badge>
-                                  <span className="text-xs text-gray-500">
+                                  <span className="text-xs text-muted-foreground">
                                     {formatDate(notification.created_at)}
                                   </span>
                                 </div>
@@ -296,7 +342,8 @@ const NotificationsPage = () => {
                                     <AccessibleButton
                                       size="sm"
                                       variant="ghost"
-                                      onClick={() => {
+                                      onClick={(event) => {
+                                        event.stopPropagation();
                                         markAsRead(notification.id);
                                         showSuccess('Marked as read', 2000);
                                       }}
@@ -309,7 +356,8 @@ const NotificationsPage = () => {
                                   <AccessibleButton
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => {
+                                    onClick={(event) => {
+                                      event.stopPropagation();
                                       deleteNotification(notification.id);
                                       showSuccess('Notification deleted', 2000);
                                     }}
