@@ -260,7 +260,7 @@ const MembershipFeeManagement = () => {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[640px] text-sm">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 px-2 font-semibold">Type</th>
