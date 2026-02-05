@@ -131,7 +131,7 @@ export const useRealtimeNotificationsEnhanced = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, type, read, sent_via, created_at, updated_at')
+        .select('id, user_id, title, message, type, read, sent_via, action_url, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
