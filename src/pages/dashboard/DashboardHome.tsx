@@ -107,7 +107,10 @@ const DashboardHome = () => {
   }, [profile?.id]);
 
   const fetchDashboardData = async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const [contributionsRes, welfareCasesRes, notificationsRes] = await Promise.all([
@@ -115,6 +118,14 @@ const DashboardHome = () => {
         supabase.from('welfare_cases').select('id').eq('status', 'active'),
         supabase.from('notifications').select('id').eq('user_id', profile.id).eq('read', false),
       ]);
+
+      if (contributionsRes.error || welfareCasesRes.error || notificationsRes.error) {
+        console.error('Dashboard data errors:', {
+          contributions: contributionsRes.error,
+          welfareCases: welfareCasesRes.error,
+          notifications: notificationsRes.error,
+        });
+      }
 
       const totalPaid = contributionsRes.data
         ?.filter((c) => c.status === 'paid')
