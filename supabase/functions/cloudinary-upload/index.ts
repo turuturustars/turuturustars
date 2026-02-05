@@ -7,10 +7,10 @@ const corsHeaders = {
 };
 
 const CLOUDINARY_CLOUD_NAME = "dbl1leamn";
-const CLOUDINARY_API_KEY = Deno.env.get("CLOUDINARY_API_KEY")!;
-const CLOUDINARY_API_SECRET = Deno.env.get("CLOUDINARY_API_SECRET")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const CLOUDINARY_API_KEY = Deno.env.get("CLOUDINARY_API_KEY");
+const CLOUDINARY_API_SECRET = Deno.env.get("CLOUDINARY_API_SECRET");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
 async function generateSignature(params: Record<string, string>): Promise<string> {
   const sortedParams = Object.keys(params)
@@ -33,18 +33,31 @@ serve(async (req) => {
   }
 
   try {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+      return new Response(
+        JSON.stringify({ error: "Missing server configuration for uploads" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const authHeader = req.headers.get("authorization");
     
     if (!authHeader) {
-      throw new Error("No authorization header");
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      throw new Error("Unauthorized");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const formData = await req.formData();
@@ -53,7 +66,10 @@ serve(async (req) => {
     const resourceType = formData.get("resource_type") as string || "auto";
     
     if (!file) {
-      throw new Error("No file provided");
+      return new Response(
+        JSON.stringify({ error: "No file provided" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -82,11 +98,13 @@ serve(async (req) => {
         body: uploadData,
       }
     );
-    
+
     const result = await response.json();
-    
-    if (result.error) {
-      throw new Error(result.error.message);
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({ error: result?.error?.message || "Cloudinary upload failed" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(
