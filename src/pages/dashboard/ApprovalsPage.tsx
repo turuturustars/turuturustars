@@ -209,7 +209,89 @@ const ApprovalsPage = () => {
               <CardTitle>Pending Member Approvals</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="space-y-3 lg:hidden">
+                {pendingMembers.map((member) => (
+                  <Card key={member.id} className="border border-border/60">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                          <span className="text-sm font-medium">
+                            {member.full_name.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold truncate">{member.full_name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                        </div>
+                        <div className="ml-auto">
+                          <Badge
+                            className={
+                              member.registration_fee_paid
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }
+                          >
+                            {member.registration_fee_paid ? 'Paid' : 'Unpaid'}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-muted-foreground">Membership #</p>
+                          <p className="font-mono">{member.membership_number || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Joined</p>
+                          <p>{member.joined_at ? format(new Date(member.joined_at), 'MMM dd, yyyy') : '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Phone</p>
+                          <p>{member.phone || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Student</p>
+                          {member.is_student ? (
+                            <Badge variant="outline" className="text-[10px]">Student</Badge>
+                          ) : (
+                            <p>-</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="pt-2 border-t flex gap-2">
+                        <Button
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => approveMember(member.id)}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="flex-1"
+                          onClick={() => {
+                            setSelectedMember(member);
+                            setShowRejectDialog(true);
+                          }}
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Reject
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+                {pendingMembers.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">
+                    No pending approvals
+                  </p>
+                )}
+              </div>
+
+              <div className="hidden lg:block overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
