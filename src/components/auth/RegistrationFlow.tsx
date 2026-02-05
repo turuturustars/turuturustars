@@ -1,55 +1,59 @@
- import { useState } from 'react';
- import { useNavigate } from 'react-router-dom';
- import { supabase } from '@/integrations/supabase/client';
- import { Button } from '@/components/ui/button';
- import { Input } from '@/components/ui/input';
- import { Label } from '@/components/ui/label';
- import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
- import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
- import { useToast } from '@/hooks/use-toast';
- import { Progress } from '@/components/ui/progress';
- import turuturuLogo from '@/assets/turuturustarslogo.png';
- import {
-   Loader2,
-   Eye,
-   EyeOff,
-   User,
-   Mail,
-   Phone,
-   MapPin,
-   Lock,
-   CheckCircle2,
-   ChevronRight,
-   ChevronLeft,
-   Sparkles,
- } from 'lucide-react';
- 
- const LOCATIONS = [
-   'Turuturu',
-   'Gatune',
-   'Mutoho',
-   'Githeru',
-   'Kahariro',
-   'Kiangige',
-   'Daboo',
-   'Githima',
-   'Nguku',
-   'Ngaru',
-   'Kiugu',
-   'Kairi',
-   'Other',
- ] as const;
- 
- interface FormData {
-   email: string;
-   password: string;
-   confirmPassword: string;
-   fullName: string;
-   phone: string;
-   idNumber: string;
-   location: string;
-   otherLocation: string;
- }
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
+import turuturuLogo from '@/assets/turuturustarslogo.png';
+import {
+  Loader2,
+  Eye,
+  EyeOff,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Lock,
+  CheckCircle2,
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  Home,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react';
+import { buildSiteUrl } from '@/utils/siteUrl';
+
+interface FormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  fullName: string;
+  phone: string;
+  idNumber: string;
+  location: string;
+  otherLocation: string;
+}
+
+const LOCATIONS = [
+  'Turuturu',
+  'Gatune',
+  'Mutoho',
+  'Githeru',
+  'Kahariro',
+  'Kiangige',
+  'Daboo',
+  'Githima',
+  'Nguku',
+  'Ngaru',
+  'Kiugu',
+  'Kairi',
+  'Other',
+] as const;
  
  const STEPS = [
    { id: 'account', title: 'Create Account', icon: Mail },
@@ -61,9 +65,10 @@
  const RegistrationFlow = () => {
    const [currentStep, setCurrentStep] = useState(0);
    const [isLoading, setIsLoading] = useState(false);
-   const [showPassword, setShowPassword] = useState(false);
-   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-   const [emailSent, setEmailSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
    const [formData, setFormData] = useState<FormData>({
      email: '',
      password: '',
@@ -151,88 +156,145 @@
      }
    };
  
-   const handleSubmit = async () => {
-     if (!validateStep(currentStep)) return;
- 
-     setIsLoading(true);
- 
-     try {
-       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
- 
-       // Sign up using Supabase Auth directly (simpler and more reliable)
-       const { data, error } = await supabase.auth.signUp({
-         email: formData.email,
-         password: formData.password,
-         options: {
-           emailRedirectTo: 'https://turuturustars.co.ke/auth/callback',
-           data: {
-             full_name: formData.fullName,
-             phone: formData.phone,
-             id_number: formData.idNumber,
-             location: finalLocation,
-           },
-         },
-       });
- 
-       if (error) {
-         console.error('Signup error:', error);
-         
-         if (error.message.includes('already registered')) {
-           toast({
-             title: 'Account Exists',
-             description: 'An account with this email already exists. Please sign in.',
-             variant: 'destructive',
-           });
-           return;
-         }
-         
-         toast({
-           title: 'Registration Failed',
-           description: error.message,
-           variant: 'destructive',
-         });
-         return;
-       }
- 
-       if (data.user) {
-         // Store pending signup for recovery
-         try {
-           localStorage.setItem(
-             'pendingSignup',
-             JSON.stringify({
-               email: formData.email,
-               userId: data.user.id,
-               timestamp: new Date().toISOString(),
-             })
-           );
-         } catch (e) {
-           console.warn('Could not save pending signup');
-         }
- 
-         setEmailSent(true);
-         toast({
-           title: '🎉 Account Created!',
-           description: 'Check your email for the verification link.',
-         });
-       }
-     } catch (error) {
-       console.error('Registration error:', error);
-       toast({
-         title: 'Error',
-         description: 'An unexpected error occurred. Please try again.',
-         variant: 'destructive',
-       });
-     } finally {
-       setIsLoading(false);
-     }
-   };
- 
-   const progress = ((currentStep + 1) / STEPS.length) * 100;
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) return;
+
+    setIsLoading(true);
+
+    try {
+      const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
+
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: {
+          email: formData.email,
+          password: formData.password,
+          fullName: formData.fullName,
+          phone: formData.phone,
+          idNumber: formData.idNumber,
+          location: finalLocation,
+          redirectTo: buildSiteUrl('/auth/callback'),
+        },
+      });
+
+      if (error || !data?.success) {
+        const errorMessage = data?.error || error?.message || 'Registration failed';
+        const normalized = errorMessage.toLowerCase();
+
+        if (normalized.includes('already exists') || normalized.includes('already registered')) {
+          toast({
+            title: 'Account Exists',
+            description: 'An account with this email already exists. Please sign in.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        toast({
+          title: 'Registration Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (data?.userId) {
+        try {
+          localStorage.setItem(
+            'pendingSignup',
+            JSON.stringify({
+              email: formData.email,
+              userId: data.userId,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        } catch (e) {
+          console.warn('Could not save pending signup');
+        }
+      }
+
+      setEmailSent(true);
+      toast({
+        title: 'Account Created!',
+        description: 'Check your email for the verification link.',
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendEmail = async () => {
+    if (!formData.email) return;
+    setResendLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-verification-email', {
+        body: {
+          email: formData.email,
+          resend: true,
+          redirectTo: buildSiteUrl('/auth/callback'),
+        },
+      });
+
+      if (error || !data?.success) {
+        const errorMessage = data?.error || error?.message || 'Failed to resend email';
+        toast({
+          title: 'Resend Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Verification Email Sent',
+        description: 'Please check your inbox (and spam folder).',
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to resend email';
+      toast({
+        title: 'Resend Failed',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
+  const progress = ((currentStep + 1) / STEPS.length) * 100;
  
    // Email verification success screen
    if (emailSent) {
      return (
-       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
+       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4 flex-col">
+         {/* Navigation Header */}
+         <div className="w-full max-w-lg mb-6 flex items-center justify-between">
+           <a 
+             href="/" 
+             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+             title="Go to home page"
+             aria-label="Return to home page"
+           >
+             <ChevronLeft className="w-4 h-4" />
+             Back
+           </a>
+           <a 
+             href="/" 
+             className="inline-flex items-center gap-2 font-semibold text-foreground hover:text-primary hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+             title="Return to home page"
+             aria-label="Return to home page"
+           >
+             <Home className="w-4 h-4" />
+             <span className="hidden sm:inline">Home</span>
+           </a>
+         </div>
+         
          <Card className="w-full max-w-lg shadow-2xl">
            <CardHeader className="text-center">
              <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-full flex items-center justify-center animate-bounce">
@@ -266,24 +328,43 @@
                </div>
              </div>
  
-             <div className="flex flex-col gap-2">
-               <Button
-                 variant="outline"
-                 onClick={() => navigate('/auth')}
-                 className="w-full"
-               >
-                 Go to Sign In
-               </Button>
-               <p className="text-xs text-center text-muted-foreground">
-                 Didn't receive email? Check spam or{' '}
-                 <button
-                   onClick={() => setEmailSent(false)}
-                   className="text-primary hover:underline"
-                 >
-                   try again
-                 </button>
-               </p>
-             </div>
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/auth')}
+                className="w-full"
+              >
+                Go to Sign In
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleResendEmail}
+                disabled={resendLoading}
+                className="w-full"
+              >
+                {resendLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Resending...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Resend verification email
+                  </>
+                )}
+              </Button>
+              <div className="text-xs text-center text-muted-foreground space-y-2">
+                <p>
+                  Didn’t receive email? Check spam, or resend above.
+                </p>
+                <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                  <AlertCircle className="w-3 h-3" />
+                  <span>Use the same email you registered with.</span>
+                </div>
+              </div>
+            </div>
            </CardContent>
          </Card>
        </div>
@@ -291,16 +372,45 @@
    }
  
    return (
-     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-muted/20 p-4 sm:p-6">
+     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-muted/20 p-4 sm:p-6 flex-col">
+       {/* Navigation Header */}
+       <div className="w-full max-w-2xl mb-6 flex items-center justify-between">
+         <a 
+           href="/" 
+           className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+           title="Go to home page"
+           aria-label="Return to home page"
+         >
+           <ChevronLeft className="w-4 h-4" />
+           Back
+         </a>
+         <a 
+           href="/" 
+           className="inline-flex items-center gap-2 font-semibold text-foreground hover:text-primary hover:bg-muted/50 px-3 py-2 rounded-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+           title="Return to home page"
+           aria-label="Return to home page"
+         >
+           <Home className="w-4 h-4" />
+           <span className="hidden sm:inline">Home</span>
+         </a>
+       </div>
+       
        <div className="w-full max-w-2xl space-y-6">
          {/* Header */}
          <div className="text-center space-y-2">
            <div className="flex justify-center mb-4">
-             <img
-               src={turuturuLogo}
-               alt="Turuturu Stars"
-               className="h-14 w-auto"
-             />
+             <a 
+               href="/" 
+               className="inline-block p-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+               title="Go to home page"
+               aria-label="Turuturu Stars home"
+             >
+               <img
+                 src={turuturuLogo}
+                 alt="Turuturu Stars"
+                 className="h-14 w-auto"
+               />
+             </a>
            </div>
            <h1 className="text-2xl sm:text-3xl font-bold flex items-center justify-center gap-2">
              <Sparkles className="w-6 h-6 text-primary" />
@@ -634,6 +744,7 @@
              </div>
            </CardContent>
          </Card>
+       </div>
        </div>
      </div>
    );
