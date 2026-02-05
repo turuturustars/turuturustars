@@ -78,12 +78,13 @@ const ChatWindow = ({ messages, meId, isLoading }: any) => (
 const ChatInput = ({ onSend }: any) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const suggestions = ['Introduce yourself', 'Ask a question', 'Share an update'];
 
   const handleSend = async () => {
     if (!text.trim() || isSending) return;
     setIsSending(true);
     try {
-      await onSend(text);
+      await onSend(text.trim());
       setText('');
     } catch (error) {
       console.error('Error sending message:', error);
@@ -94,21 +95,50 @@ const ChatInput = ({ onSend }: any) => {
 
   return (
     <div className="border-t border-border/50 bg-card/95 backdrop-blur-sm p-3 sm:p-4">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-          placeholder="Type your message..."
-          disabled={isSending}
-          className="flex-1 px-4 py-2.5 rounded-full bg-muted border border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 text-sm disabled:opacity-50"
-        />
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {suggestions.map((label) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setText(label)}
+            className="rounded-full border border-border/60 bg-muted/60 px-3 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-primary/10 transition-all duration-200"
+          >
+            {label}
+          </button>
+        ))}
+        {text.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setText('')}
+            className="rounded-full border border-border/60 bg-card/60 px-3 py-1 text-[11px] font-medium text-muted-foreground hover:text-destructive hover:border-destructive/40 hover:bg-destructive/10 transition-all duration-200"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      <div className="flex gap-2 items-end">
+        <div className="flex-1">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+            placeholder="Type your message..."
+            disabled={isSending}
+            rows={2}
+            maxLength={500}
+            className="w-full px-4 py-2.5 rounded-2xl bg-muted border border-border/50 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 outline-none transition-all duration-200 text-sm disabled:opacity-50 resize-none"
+          />
+          <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Press Enter to send, Shift+Enter for new line</span>
+            <span>{text.length}/500</span>
+          </div>
+        </div>
         <Button
           onClick={handleSend}
           disabled={!text.trim() || isSending}
           variant="primary"
-          className="rounded-full px-6 shadow-md hover:shadow-lg active:scale-95"
+          className="rounded-full px-6 shadow-md hover:shadow-lg active:scale-95 h-11"
         >
           {isSending ? (
             <Circle className="w-4 h-4 animate-spin" />
