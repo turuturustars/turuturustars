@@ -203,6 +203,7 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
   const { messages, isLoading, typingUsers, onlineUsers, sendMessage, toggleReaction } = useRealtimeChat('global');
   const [showOnlineUsers, setShowOnlineUsers] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const onlineCountLabel = onlineUsers.length === 1 ? '1 online' : `${onlineUsers.length} online`;
 
   return (
     <aside
@@ -242,13 +243,15 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
                 </span>
                 <Sparkles className="w-4 h-4 text-primary/60 animate-pulse" />
               </div>
-              <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+              <div className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 flex-wrap">
                 <div className="flex -space-x-1">
                   {[...Array(3)].map((_, i) => (
                     <div key={i} className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 border-2 border-card" />
                   ))}
                 </div>
-                <span>{onlineUsers.length} online now</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-muted/70 border border-border/60 px-2 py-0.5">
+                  {onlineCountLabel}
+                </span>
               </div>
             </div>
           </div>
