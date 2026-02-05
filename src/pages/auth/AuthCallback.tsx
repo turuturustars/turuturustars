@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { isProfileComplete } from '@/utils/profileCompletion';
 
 /**
  * AuthCallback - Handles OAuth and email verification callbacks
@@ -53,7 +54,7 @@ const AuthCallback = () => {
         }
 
         // Redirect based on profile completion
-        if (profile?.full_name && profile?.phone && profile?.id_number) {
+        if (isProfileComplete(profile as any)) {
           // Profile complete - go to dashboard
           window.location.href = buildSiteUrl('/dashboard');
         } else {

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { resendVerificationEmail } from '@/lib/authService';
 
 interface EmailVerificationProps {
   email: string;
@@ -85,18 +86,7 @@ export const EmailVerification = ({
       if (onResendEmail) {
         await onResendEmail();
       } else {
-        // Default: resend via Supabase
-        const { error } = await supabase.auth.resend({
-          type: 'signup',
-          email,
-          options: {
-            emailRedirectTo: buildSiteUrl('/auth/confirm'),
-          },
-        });
-
-        if (error) {
-          throw new Error(error.message);
-        }
+        await resendVerificationEmail(email, buildSiteUrl('/auth/callback'));
       }
 
       toast({

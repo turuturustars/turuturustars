@@ -87,9 +87,9 @@ interface SignUpRequest {
      }
      
      // Validate password length
-    if (!resend && password && password.length < 6) {
+    if (!resend && password && password.length < 8) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Password must be at least 6 characters' }),
+        JSON.stringify({ success: false, error: 'Password must be at least 8 characters' }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }

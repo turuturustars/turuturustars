@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { registerWithEmail, resendVerificationEmail } from '@/lib/authService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -106,8 +106,8 @@ const LOCATIONS = [
          }
          if (!formData.password) {
            newErrors.password = 'Password is required';
-         } else if (formData.password.length < 6) {
-           newErrors.password = 'Password must be at least 6 characters';
+         } else if (formData.password.length < 8) {
+           newErrors.password = 'Password must be at least 8 characters';
          }
          if (formData.password !== formData.confirmPassword) {
            newErrors.confirmPassword = 'Passwords do not match';
@@ -164,46 +164,23 @@ const LOCATIONS = [
     try {
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
 
-      const { data, error } = await supabase.functions.invoke('send-verification-email', {
-        body: {
-          email: formData.email,
-          password: formData.password,
-          fullName: formData.fullName,
-          phone: formData.phone,
-          idNumber: formData.idNumber,
-          location: finalLocation,
-          redirectTo: buildSiteUrl('/auth/callback'),
-        },
+      const response = await registerWithEmail({
+        email: formData.email,
+        password: formData.password,
+        fullName: formData.fullName,
+        phone: formData.phone,
+        idNumber: formData.idNumber,
+        location: finalLocation,
+        redirectTo: buildSiteUrl('/auth/callback'),
       });
 
-      if (error || !data?.success) {
-        const errorMessage = data?.error || error?.message || 'Registration failed';
-        const normalized = errorMessage.toLowerCase();
-
-        if (normalized.includes('already exists') || normalized.includes('already registered')) {
-          toast({
-            title: 'Account Exists',
-            description: 'An account with this email already exists. Please sign in.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        toast({
-          title: 'Registration Failed',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (data?.userId) {
+      if (response.userId) {
         try {
           localStorage.setItem(
             'pendingSignup',
             JSON.stringify({
               email: formData.email,
-              userId: data.userId,
+              userId: response.userId,
               timestamp: new Date().toISOString(),
             })
           );
@@ -219,11 +196,22 @@ const LOCATIONS = [
       });
     } catch (error) {
       console.error('Registration error:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
-        variant: 'destructive',
-      });
+      const message = error instanceof Error ? error.message : 'Registration failed';
+      const normalized = message.toLowerCase();
+
+      if (normalized.includes('already exists') || normalized.includes('already registered')) {
+        toast({
+          title: 'Account Exists',
+          description: 'An account with this email already exists. Please sign in.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Registration Failed',
+          description: message,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -233,24 +221,7 @@ const LOCATIONS = [
     if (!formData.email) return;
     setResendLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-verification-email', {
-        body: {
-          email: formData.email,
-          resend: true,
-          redirectTo: buildSiteUrl('/auth/callback'),
-        },
-      });
-
-      if (error || !data?.success) {
-        const errorMessage = data?.error || error?.message || 'Failed to resend email';
-        toast({
-          title: 'Resend Failed',
-          description: errorMessage,
-          variant: 'destructive',
-        });
-        return;
-      }
-
+      await resendVerificationEmail(formData.email, buildSiteUrl('/auth/callback'));
       toast({
         title: 'Verification Email Sent',
         description: 'Please check your inbox (and spam folder).',
@@ -750,3 +721,5 @@ const LOCATIONS = [
  };
  
  export default RegistrationFlow;
+
+

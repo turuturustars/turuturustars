@@ -48,7 +48,7 @@ export function useAuth() {
 
       if (session?.user) {
         setTimeout(() => {
-          fetchProfile(session.user.id);
+          fetchProfileWithRetry(session.user.id);
           fetchRoles(session.user.id);
         }, 0);
       } else {
@@ -63,7 +63,7 @@ export function useAuth() {
       setIsLoading(false);
 
       if (session?.user) {
-        fetchProfile(session.user.id);
+        fetchProfileWithRetry(session.user.id);
         fetchRoles(session.user.id);
       }
     });
@@ -71,7 +71,7 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -97,8 +97,21 @@ export function useAuth() {
         occupation: (rawData.occupation as string | null) || null,
       };
       setProfile(profileData);
+      return true;
     }
     setIsLoading(false);
+    return false;
+  };
+
+  
+  const fetchProfileWithRetry = async (userId: string, attempts: number = 4, delayMs: number = 400) => {
+    for (let i = 0; i < attempts; i++) {
+      const found = await fetchProfile(userId);
+      if (found) return;
+      if (i < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
   };
 
   const fetchRoles = async (userId: string) => {
@@ -141,3 +154,5 @@ export function useAuth() {
     signOut,
   };
 }
+
+

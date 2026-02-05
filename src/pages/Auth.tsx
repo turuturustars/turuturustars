@@ -12,6 +12,7 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 import ForgotPassword from '@/components/ForgotPassword';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { signInUser } from '@/lib/authService';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -117,27 +118,16 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      await signInUser({
         email: formData.email,
         password: formData.password,
       });
 
-      if (error) {
-        toast({
-          title: 'Login Failed',
-          description: error.message,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      if (data.user) {
-        toast({
-          title: 'Login Successful',
-          description: 'Welcome back!',
-        });
-        navigate('/dashboard', { replace: true });
-      }
+      toast({
+        title: 'Login Successful',
+        description: 'Welcome back!',
+      });
+      navigate('/dashboard', { replace: true });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'An unexpected error occurred';
       console.error('Login error:', error);

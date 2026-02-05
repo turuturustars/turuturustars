@@ -7,6 +7,11 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import {
+  registerWithEmail,
+  resendVerificationEmail as resendVerificationViaEdge,
+  sendPasswordResetEmail as sendPasswordResetViaAuthService,
+} from '@/lib/authService';
 
 /**
  * Send verification email after user signup
@@ -14,16 +19,7 @@ import { buildSiteUrl } from '@/utils/siteUrl';
  */
 export async function sendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // The verification email is automatically sent by Supabase during signUp()
-    // This function is for manual resend if needed
-    const { error } = await (supabase.auth as any).resendEmailConfirmationMail?.(email) || 
-                             { error: { message: 'Resend not available in this Supabase version' } };
-    
-    if (error) {
-      console.error('Email resend error:', error);
-      return { success: false, error: error.message };
-    }
-
+    await resendVerificationViaEdge(email, buildSiteUrl('/auth/callback'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';
@@ -56,40 +52,21 @@ export async function signupWithEmailVerification(
   message?: string;
 }> {
   try {
-    // Step 1: Create auth account
-    const { data, error: signupError } = await supabase.auth.signUp({
+    const response = await registerWithEmail({
       email,
       password,
-      options: {
-        // Email confirmation link redirects to this URL
-        emailRedirectTo: buildSiteUrl('/auth/confirm'),
-        data: {
-          // Store profile data in auth metadata for quick access
-          full_name: profileData.fullName,
-          phone: profileData.phone,
-          id_number: profileData.idNumber,
-          location: profileData.location,
-        },
-      },
+      fullName: profileData.fullName,
+      phone: profileData.phone,
+      idNumber: profileData.idNumber,
+      location: profileData.location,
+      redirectTo: buildSiteUrl('/auth/callback'),
     });
-
-    if (signupError) {
-      console.error('Signup error:', signupError);
-      return { success: false, error: signupError.message };
-    }
-
-    if (!data.user) {
-      return { success: false, error: 'Failed to create account' };
-    }
-
-    // Step 2: Verification email is automatically sent by Supabase
-    console.log('Verification email sent to:', email);
 
     // Step 3: Store pending signup info in localStorage for recovery
     try {
       localStorage.setItem('pendingSignup', JSON.stringify({
         email,
-        userId: data.user.id,
+        userId: response.userId,
         timestamp: new Date().toISOString(),
       }));
     } catch (e) {
@@ -98,7 +75,7 @@ export async function signupWithEmailVerification(
 
     return {
       success: true,
-      userId: data.user.id,
+      userId: response.userId,
       message: 'Account created! Check your email to verify your account.',
     };
   } catch (error) {
@@ -187,14 +164,7 @@ export async function verifyEmailAndCompleteProfile(
  */
 export async function sendPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: buildSiteUrl('/auth/reset-password'),
-    });
-
-    if (error) {
-      console.error('Password reset error:', error);
-      return { success: false, error: error.message };
-    }
+    await sendPasswordResetViaAuthService(email);
 
     return { success: true };
   } catch (error) {
@@ -210,15 +180,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await (supabase.auth as any).resendEmailConfirmationMail?.(email) || 
-                             { error: { message: 'Resend not available in this Supabase version' } };
-
-    if (error) {
-      console.error('Resend verification email error:', error);
-      return { success: false, error: error.message };
-    }
-
-    console.log('Verification email resent to:', email);
+    await resendVerificationViaEdge(email, buildSiteUrl('/auth/callback'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';

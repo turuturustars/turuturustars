@@ -9,6 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Eye, EyeOff, AlertCircle, Mail, Lock } from 'lucide-react';
 import { z } from 'zod';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { isProfileComplete } from '@/utils/profileCompletion';
+import { registerWithEmail, signInUser } from '@/lib/authService';
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -124,21 +126,10 @@ const AuthenticationForm = ({
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      await signInUser({
         email: loginData.email,
         password: loginData.password,
       });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setErrors({ submit: 'Invalid email or password' });
-        } else if (error.message.includes('Email not confirmed')) {
-          setErrors({ submit: 'Please check your email to confirm your account' });
-        } else {
-          setErrors({ submit: error.message || 'Login failed. Please try again.' });
-        }
-        return;
-      }
 
       toast({
         title: 'Success',
@@ -153,7 +144,7 @@ const AuthenticationForm = ({
           .eq('id', session.user.id)
           .single();
 
-        if (profile?.full_name && profile?.phone && profile?.id_number) {
+        if (isProfileComplete(profile as any)) {
           navigate('/dashboard', { replace: true });
         } else {
           navigate('/register', { replace: true });
@@ -165,7 +156,14 @@ const AuthenticationForm = ({
       }
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ submit: 'An unexpected error occurred. Please try again.' });
+      const message = error instanceof Error ? error.message : 'Login failed. Please try again.';
+      if (message.toLowerCase().includes('invalid login credentials')) {
+        setErrors({ submit: 'Invalid email or password' });
+      } else if (message.toLowerCase().includes('email not confirmed')) {
+        setErrors({ submit: 'Please check your email to confirm your account' });
+      } else {
+        setErrors({ submit: message });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -180,48 +178,42 @@ const AuthenticationForm = ({
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const response = await registerWithEmail({
         email: signupData.email,
         password: signupData.password,
-        options: {
-          emailRedirectTo: buildSiteUrl('/auth/confirm'),
-        },
+        redirectTo: buildSiteUrl('/auth/callback'),
       });
 
-      if (error) {
-        if (error.message.includes('User already registered')) {
-          setErrors({ submit: 'An account with this email already exists' });
-        } else {
-          setErrors({ submit: error.message || 'Signup failed. Please try again.' });
-        }
-        return;
-      }
+      toast({
+        title: 'Check your email',
+        description: 'We sent you a verification link. Please check your inbox and spam folder.',
+      });
 
-      if (data.user && !data.user.email_confirmed_at) {
-        toast({
-          title: 'Check your email',
-          description: 'We sent you a verification link. Please check your inbox and spam folder.',
-        });
+      if (response.userId) {
         try {
           localStorage.setItem('pendingSignup', JSON.stringify({
             email: signupData.email,
-            userId: data.user.id,
+            userId: response.userId,
             timestamp: new Date().toISOString(),
           }));
         } catch (e) {
           console.warn('Could not save pending signup to localStorage');
         }
-        navigate('/register', { replace: true });
-      } else {
-        navigate('/register', { replace: true });
       }
+
+      navigate('/register', { replace: true });
 
       if (onSuccess) {
         onSuccess();
       }
     } catch (error) {
       console.error('Signup error:', error);
-      setErrors({ submit: 'An unexpected error occurred. Please try again.' });
+      const message = error instanceof Error ? error.message : 'Signup failed. Please try again.';
+      if (message.toLowerCase().includes('already exists') || message.toLowerCase().includes('already registered')) {
+        setErrors({ submit: 'An account with this email already exists' });
+      } else {
+        setErrors({ submit: message });
+      }
     } finally {
       setIsLoading(false);
     }

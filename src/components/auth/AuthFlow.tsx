@@ -6,6 +6,7 @@ import Auth from '@/pages/Auth';
 import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
 import { waitForProfile } from '@/utils/waitForProfile';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { isProfileComplete } from '@/utils/profileCompletion';
 
 const AuthFlow = () => {
   const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'details-required'>('loading');
@@ -25,7 +26,7 @@ const AuthFlow = () => {
           // Attempt to read profile; wait briefly for trigger-created profiles
           const profile = await waitForProfile(session.user.id, 5, 400);
 
-          if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
+          if (isProfileComplete(profile as any)) {
             // Profile is complete - redirect to dashboard
             window.location.href = buildSiteUrl('/dashboard');
           } else {
@@ -52,7 +53,7 @@ const AuthFlow = () => {
         // Check profile completion (wait briefly for DB trigger if needed)
         const profile = await waitForProfile(session.user.id, 5, 400);
 
-        if (profile && (profile as any).full_name && (profile as any).phone && (profile as any).id_number) {
+        if (isProfileComplete(profile as any)) {
           window.location.href = buildSiteUrl('/dashboard');
         } else {
           setAuthState('details-required');

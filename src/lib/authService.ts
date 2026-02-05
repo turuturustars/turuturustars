@@ -20,6 +20,14 @@ export interface SignUpData {
   fullName?: string;
   phone?: string;
   location?: string;
+  idNumber?: string;
+  occupation?: string;
+  employmentStatus?: string;
+  interests?: string[];
+  educationLevel?: string;
+  additionalNotes?: string;
+  isStudent?: boolean;
+  redirectTo?: string;
 }
 
 export interface SignInData {
@@ -76,29 +84,62 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Sign up new user
  */
 export async function signUpUser(data: SignUpData) {
-  const redirectUrl = buildSiteUrl('/auth/confirm');
-  
-  const { data: authData, error } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-    options: {
-      data: {
-        full_name: data.fullName,
-        phone: data.phone,
-      },
-      emailRedirectTo: redirectUrl,
+  return registerWithEmail(data);
+}
+
+/**
+ * Register user via edge function (consistent email + membership handling)
+ */
+export async function registerWithEmail(data: SignUpData) {
+  const redirectUrl = data.redirectTo || buildSiteUrl('/auth/callback');
+
+  const { data: response, error } = await supabase.functions.invoke('send-verification-email', {
+    body: {
+      email: data.email,
+      password: data.password,
+      fullName: data.fullName,
+      phone: data.phone,
+      idNumber: data.idNumber,
+      location: data.location,
+      occupation: data.occupation,
+      employmentStatus: data.employmentStatus,
+      interests: data.interests,
+      educationLevel: data.educationLevel,
+      additionalNotes: data.additionalNotes,
+      isStudent: data.isStudent,
+      redirectTo: redirectUrl,
     },
   });
 
-  if (error) {
-    throw new Error(error.message);
+  if (error || !response?.success) {
+    throw new Error(response?.error || error?.message || 'Registration failed');
   }
 
   return {
     success: true,
-    user: authData.user,
-    requiresEmailVerification: !authData.user?.email_confirmed_at,
+    userId: response.userId as string | undefined,
+    email: response.email as string | undefined,
+    requiresEmailVerification: true,
   };
+}
+
+/**
+ * Resend verification email via edge function
+ */
+export async function resendVerificationEmail(email: string, redirectTo?: string) {
+  const { data: response, error } = await supabase.functions.invoke('send-verification-email', {
+    body: {
+      email,
+      resend: true,
+      redirectTo: redirectTo || buildSiteUrl('/auth/callback'),
+    },
+  });
+
+  if (error || !response?.success) {
+    throw new Error(response?.error || error?.message || 'Failed to resend email');
+  }
+
+  return { success: true, message: 'Verification email resent' };
 }
 
 /**
@@ -143,19 +184,7 @@ export async function signInWithOAuth(provider: 'google' | 'github' | 'twitter')
  * Resend email confirmation
  */
 export async function resendEmailConfirmation(email: string) {
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email,
-    options: {
-      emailRedirectTo: buildSiteUrl('/auth/confirm'),
-    },
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  return { success: true, message: 'Confirmation email sent' };
+  return resendVerificationEmail(email);
 }
 
 /**
@@ -317,9 +346,11 @@ export default {
   isEmailVerified,
   getCurrentUser,
   signUpUser,
+  registerWithEmail,
   signInUser,
   signInWithOAuth,
   resendEmailConfirmation,
+  resendVerificationEmail,
   sendPasswordResetEmail,
   resetPassword,
   signOutUser,
