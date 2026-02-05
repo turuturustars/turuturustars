@@ -167,6 +167,36 @@ const ChatHighlights = () => (
   </div>
 );
 
+const StarterPrompt = () => (
+  <div className="px-3 sm:px-4 py-3 border-b border-border/30 bg-card/70">
+    <div className="rounded-2xl border border-border/60 bg-gradient-to-br from-primary/5 via-card to-card/80 p-3 sm:p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold uppercase">
+          Tip
+        </div>
+        <div className="space-y-2">
+          <div className="text-sm font-semibold text-foreground">
+            Start strong with a quick intro
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Try: "Hello, I am [name], I handle [role], and I am excited about [topic]."
+          </div>
+          <div className="flex flex-wrap gap-2 text-[11px]">
+            {['Introduce yourself', 'Ask for help', 'Share a win'].map((label) => (
+              <span
+                key={label}
+                className="rounded-full border border-border/60 bg-muted/60 px-2.5 py-1 text-muted-foreground"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 // Main Component
 export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
   const { user } = useAuth();
@@ -307,6 +337,7 @@ export default function ChatSidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       <ChatHighlights />
+      <StarterPrompt />
 
       {/* Chat Messages with Custom Scrollbar */}
       <div className="flex-1 overflow-hidden relative">
