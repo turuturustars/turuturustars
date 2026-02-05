@@ -162,6 +162,9 @@ const NotificationBell = () => {
                       if (!notification.read) {
                         markAsRead(notification.id);
                       }
+                      if (notification.action_url) {
+                        window.location.href = notification.action_url;
+                      }
                     }}
                     style={{
                       animationDelay: `${index * 50}ms`
