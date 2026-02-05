@@ -482,8 +482,61 @@ const MpesaManagement = () => {
 
         <TabsContent value="transactions">
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-4 lg:p-0">
+              <div className="space-y-3 lg:hidden">
+                {transactions.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No transactions found
+                  </p>
+                ) : (
+                  transactions.map((tx) => (
+                    <Card key={tx.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">
+                              {format(new Date(tx.created_at), 'MMM d, HH:mm')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{tx.phone_number}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold">KSh {Number(tx.amount).toLocaleString()}</p>
+                            <div className="mt-1">{getStatusBadge(tx.status)}</div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Type</p>
+                            <Badge variant="outline">{tx.transaction_type}</Badge>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Receipt</p>
+                            <p className="font-mono truncate">{tx.mpesa_receipt_number || '-'}</p>
+                          </div>
+                        </div>
+
+                        {tx.status === 'pending' && tx.checkout_request_id && (
+                          <div className="pt-2 border-t">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => handleCheckStatus(tx.checkout_request_id!)}
+                            >
+                              <RefreshCw className="w-4 h-4 mr-2" />
+                              Check Status
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -528,15 +581,44 @@ const MpesaManagement = () => {
                     ))
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="audit">
           <Card>
-            <CardContent className="p-0">
-              <Table>
+            <CardContent className="p-4 lg:p-0">
+              <div className="space-y-3 lg:hidden">
+                {auditLogs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No audit logs found
+                  </p>
+                ) : (
+                  auditLogs.map((log) => (
+                    <Card key={log.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">
+                              {format(new Date(log.created_at), 'MMM d, HH:mm')}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{log.performed_by_name || '-'}</p>
+                          </div>
+                          <Badge variant="outline">{log.action_type}</Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {log.action_description}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Date</TableHead>
@@ -565,7 +647,8 @@ const MpesaManagement = () => {
                     ))
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

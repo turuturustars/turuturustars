@@ -355,7 +355,97 @@ export default function DisciplinePage() {
         <TabsContent value="pending">
           <Card>
             <CardContent className="pt-6">
-              <Table>
+              <div className="space-y-3 lg:hidden">
+                {pendingRecords.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No pending cases
+                  </p>
+                ) : (
+                  pendingRecords.map((record) => (
+                    <Card key={record.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{record.member?.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {record.incident_type}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {getStatusBadge(record.status)}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(record.incident_date), 'PP')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Fine</p>
+                            <p>KES {Number(record.fine_amount).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Fine Status</p>
+                            {record.fine_paid ? (
+                              <Badge className="bg-green-100 text-green-800">Paid</Badge>
+                            ) : record.fine_amount > 0 ? (
+                              <Badge className="bg-red-100 text-red-800">Unpaid</Badge>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-800">N/A</Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {canManage && (
+                          <div className="pt-2 border-t space-y-2">
+                            {!record.fine_paid && record.fine_amount > 0 && (
+                              <AccessibleButton 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full"
+                                ariaLabel={`Mark ${record.member?.full_name}'s fine as paid`}
+                                onClick={() => {
+                                  markFinePaid(record.id);
+                                  showSuccess('Fine marked as paid');
+                                }}
+                              >
+                                Mark Paid
+                              </AccessibleButton>
+                            )}
+                            <AccessibleButton 
+                              variant="outline" 
+                              size="sm" 
+                              className="w-full"
+                              ariaLabel={`Resolve case for ${record.member?.full_name}`}
+                              onClick={() => {
+                                setSelectedRecord(record);
+                                setShowResolveDialog(true);
+                              }}
+                            >
+                              Resolve
+                            </AccessibleButton>
+                            <AccessibleButton 
+                              variant="ghost" 
+                              size="sm" 
+                              className="w-full"
+                              ariaLabel={`Dismiss case for ${record.member?.full_name}`}
+                              onClick={() => {
+                                dismissRecord(record.id);
+                                showSuccess('Case dismissed', 1500);
+                              }}
+                            >
+                              Dismiss
+                            </AccessibleButton>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
@@ -436,7 +526,8 @@ export default function DisciplinePage() {
                     ))
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -444,7 +535,48 @@ export default function DisciplinePage() {
         <TabsContent value="resolved">
           <Card>
             <CardContent className="pt-6">
-              <Table>
+              <div className="space-y-3 lg:hidden">
+                {resolvedRecords.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No resolved cases
+                  </p>
+                ) : (
+                  resolvedRecords.map((record) => (
+                    <Card key={record.id} className="border border-border/60">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{record.member?.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {record.incident_type}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {getStatusBadge(record.status)}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(record.incident_date), 'PP')}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p className="text-muted-foreground">Fine</p>
+                            <p>KES {Number(record.fine_amount).toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Resolution</p>
+                            <p className="truncate">{record.resolution_notes || '-'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden lg:block">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Member</TableHead>
@@ -475,7 +607,8 @@ export default function DisciplinePage() {
                     ))
                   )}
                 </TableBody>
-              </Table>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
