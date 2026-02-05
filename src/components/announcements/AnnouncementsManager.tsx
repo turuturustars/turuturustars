@@ -27,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { hasRole } from '@/lib/rolePermissions';
+import { sendAnnouncementNotification } from '@/lib/notificationService';
 import { cn } from '@/lib/utils';
 
 type PriorityType = 'urgent' | 'high' | 'normal' | 'low';
@@ -98,14 +99,22 @@ const AnnouncementsManager = () => {
 
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('announcements')
           .insert({
             ...announcementData,
             created_by: profile?.id,
-          });
+          })
+          .select();
 
         if (error) throw error;
+
+        if (data && data.length > 0) {
+          const created = data[0] as Announcement;
+          if (created.published) {
+            await sendAnnouncementNotification(created.id, created.title, created.content);
+          }
+        }
       }
     },
     onSuccess: () => {
@@ -391,3 +400,4 @@ const AnnouncementsManager = () => {
 };
 
 export default AnnouncementsManager;
+
