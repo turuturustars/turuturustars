@@ -43,7 +43,7 @@ const PostAuthDetailsForm = ({ onComplete, user }: PostAuthDetailsFormProps) => 
           .from('profiles')
           .select('full_name, phone, id_number')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error && error.code !== 'PGRST116') throw error;
 

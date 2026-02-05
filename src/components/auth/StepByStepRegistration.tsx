@@ -171,7 +171,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (data?.full_name && data?.phone && data?.id_number) {
           navigate('/dashboard', { replace: true });

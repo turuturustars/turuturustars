@@ -47,7 +47,7 @@ const AuthCallback = () => {
           .from('profiles')
           .select('full_name, phone, id_number')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError && profileError.code !== 'PGRST116') {
           console.error('Profile fetch error:', profileError);

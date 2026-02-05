@@ -117,7 +117,7 @@ export default function AuthDiagnostics() {
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (error && error.code === 'PGRST116') {
           updateResult('current-profile', 'warning', 'Profile not found', 'User needs to complete registration');

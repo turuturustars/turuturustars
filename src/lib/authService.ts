@@ -92,6 +92,12 @@ export async function signUpUser(data: SignUpData) {
  */
 export async function registerWithEmail(data: SignUpData) {
   const redirectUrl = data.redirectTo || buildSiteUrl('/auth/callback');
+  if (!data.email) {
+    throw new Error('Email is required');
+  }
+  if (!data.password || data.password.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
 
   const { data: response, error } = await supabase.functions.invoke('send-verification-email', {
     body: {

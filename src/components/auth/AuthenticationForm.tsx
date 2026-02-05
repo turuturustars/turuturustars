@@ -142,7 +142,7 @@ const AuthenticationForm = ({
           .from('profiles')
           .select('full_name, phone, id_number')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (isProfileComplete(profile as any)) {
           navigate('/dashboard', { replace: true });
