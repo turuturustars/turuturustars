@@ -70,18 +70,46 @@ const ProfilePhotoUpload = ({
         // Continue with original file if processing fails
       }
 
-      // Upload to Cloudinary
-      const result = await uploadToCloudinary(processedFile, 'turuturu-stars/avatars', 'image');
+      // Upload to Cloudinary with fallback to Supabase Storage
+      let photoValue: string | null = null;
+
+      try {
+        const result = await uploadToCloudinary(processedFile, 'turuturu-stars/avatars', 'image');
+        photoValue = result.public_id;
+      } catch (cloudinaryError) {
+        console.warn('Cloudinary upload failed, falling back to Supabase Storage:', cloudinaryError);
+
+        const fileExt = processedFile.name.split('.').pop() || 'jpg';
+        const filePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
+
+        const { error: uploadError } = await supabase
+          .storage
+          .from('avatars')
+          .upload(filePath, processedFile, { upsert: true });
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        photoValue = publicUrlData?.publicUrl || null;
+      }
 
       // Update profile in database
       const { error } = await supabase
         .from('profiles')
-        .update({ photo_url: result.public_id })
+        .update({ photo_url: photoValue })
         .eq('id', userId);
 
       if (error) throw error;
 
-      onPhotoUpdate(result.public_id);
+      if (photoValue) {
+        onPhotoUpdate(photoValue);
+      }
       setUploadSuccess(true);
       
       toast({

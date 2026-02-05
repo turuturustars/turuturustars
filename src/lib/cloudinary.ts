@@ -84,6 +84,10 @@ export function getAvatarUrl(publicId: string | null, size: number = 100): strin
   if (!publicId) {
     return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/c_fill,w_${size},h_${size},q_auto,f_auto/v1/default-avatar`;
   }
+
+  if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
+    return publicId;
+  }
   
   return getCloudinaryUrl(publicId, {
     width: size,
