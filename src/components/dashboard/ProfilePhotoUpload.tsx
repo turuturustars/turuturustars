@@ -97,6 +97,11 @@ const ProfilePhotoUpload = ({
           .getPublicUrl(filePath);
 
         photoValue = publicUrlData?.publicUrl || null;
+
+        toast({
+          title: 'Stored in Supabase',
+          description: 'Cloudinary was unavailable, so we saved your photo to Supabase Storage.',
+        });
       }
 
       // Update profile in database
