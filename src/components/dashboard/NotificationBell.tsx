@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 const NotificationBell = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
   const [isOpen, setIsOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -65,6 +66,10 @@ const NotificationBell = () => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const filteredNotifications = filter === 'unread'
+    ? notifications.filter((notification) => !notification.read)
+    : notifications;
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -92,11 +97,11 @@ const NotificationBell = () => {
       
       <PopoverContent 
         align="end" 
-        className="w-[calc(100vw-2rem)] sm:w-96 p-0 border-border/50 shadow-2xl bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-xl"
+        className="w-[calc(100vw-2rem)] sm:w-[420px] p-0 border-border/50 shadow-2xl bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-xl"
         sideOffset={8}
       >
         {/* Header */}
-        <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-accent/30 to-transparent">
+        <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-r from-accent/40 via-accent/20 to-transparent">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
           <div className="relative flex items-center justify-between p-4">
             <div className="flex items-center gap-2">
@@ -105,11 +110,9 @@ const NotificationBell = () => {
               </div>
               <div>
                 <h4 className="font-bold text-base">Notifications</h4>
-                {unreadCount > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {unreadCount} unread
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                </p>
               </div>
             </div>
             {unreadCount > 0 && (
@@ -129,9 +132,38 @@ const NotificationBell = () => {
           </div>
         </div>
 
+        {/* Filter Bar */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-gradient-to-r from-transparent via-accent/10 to-transparent">
+          <button
+            className={cn(
+              'text-xs font-semibold px-3 py-1.5 rounded-full transition-all',
+              filter === 'all'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+            )}
+            onClick={() => setFilter('all')}
+          >
+            All
+          </button>
+          <button
+            className={cn(
+              'text-xs font-semibold px-3 py-1.5 rounded-full transition-all',
+              filter === 'unread'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+            )}
+            onClick={() => setFilter('unread')}
+          >
+            Unread
+          </button>
+          <span className="ml-auto text-[11px] text-muted-foreground">
+            {filteredNotifications.length} {filteredNotifications.length === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+
         {/* Notifications List */}
-        <ScrollArea className="h-[320px] sm:h-[400px]">
-          {notifications.length === 0 ? (
+        <ScrollArea className="h-[320px] sm:h-[420px]">
+          {filteredNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-[280px] sm:h-[360px] p-8 text-center">
               <div className="relative mb-4">
                 <div className="absolute inset-0 bg-primary/10 rounded-full blur-2xl" />
@@ -139,14 +171,18 @@ const NotificationBell = () => {
                   <Bell className="w-8 h-8 text-muted-foreground/50" />
                 </div>
               </div>
-              <h3 className="font-semibold text-base mb-1">All caught up!</h3>
+              <h3 className="font-semibold text-base mb-1">
+                {filter === 'unread' ? 'No unread alerts' : 'All caught up!'}
+              </h3>
               <p className="text-muted-foreground text-sm max-w-[200px]">
-                You have no notifications at the moment
+                {filter === 'unread'
+                  ? 'You are up to date'
+                  : 'You have no notifications at the moment'}
               </p>
             </div>
           ) : (
             <div className="divide-y divide-border/30">
-              {notifications.map((notification, index) => {
+              {filteredNotifications.map((notification, index) => {
                 const typeConfig = getTypeConfig(notification.type);
                 const Icon = typeConfig.icon;
                 
