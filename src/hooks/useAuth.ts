@@ -41,6 +41,13 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+    const loadingTimeout = window.setTimeout(() => {
+      if (isMounted) {
+        setIsLoading(false);
+      }
+    }, 4000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -57,18 +64,30 @@ export function useAuth() {
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setIsLoading(false);
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error('Error fetching session:', error);
+        }
+        setSession(session);
+        setUser(session?.user ?? null);
+        setIsLoading(false);
 
-      if (session?.user) {
-        fetchProfileWithRetry(session.user.id);
-        fetchRoles(session.user.id);
-      }
-    });
+        if (session?.user) {
+          fetchProfileWithRetry(session.user.id);
+          fetchRoles(session.user.id);
+        }
+      })
+      .catch((error) => {
+        console.error('Unexpected error fetching session:', error);
+        setIsLoading(false);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      window.clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProfile = async (userId: string): Promise<boolean> => {
@@ -97,6 +116,7 @@ export function useAuth() {
         occupation: (rawData.occupation as string | null) || null,
       };
       setProfile(profileData);
+      setIsLoading(false);
       return true;
     }
     setIsLoading(false);
