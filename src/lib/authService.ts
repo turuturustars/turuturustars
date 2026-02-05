@@ -35,6 +35,31 @@ export interface SignInData {
   password: string;
 }
 
+function extractFunctionError(error: unknown, response?: any): string | undefined {
+  if (response?.error) {
+    return response.error as string;
+  }
+
+  const anyError = error as any;
+  const contextBody = anyError?.context?.body || anyError?.context?.response?.body;
+  if (contextBody) {
+    try {
+      const parsed = typeof contextBody === 'string' ? JSON.parse(contextBody) : contextBody;
+      if (parsed?.error) {
+        return parsed.error as string;
+      }
+    } catch {
+      // fall through to error message
+    }
+  }
+
+  if (anyError?.message) {
+    return String(anyError.message);
+  }
+
+  return undefined;
+}
+
 /**
  * Check if user's email is verified
  */
@@ -118,7 +143,8 @@ export async function registerWithEmail(data: SignUpData) {
   });
 
   if (error || !response?.success) {
-    throw new Error(response?.error || error?.message || 'Registration failed');
+    const message = extractFunctionError(error, response) || 'Registration failed';
+    throw new Error(message);
   }
 
   return {
@@ -142,7 +168,8 @@ export async function resendVerificationEmail(email: string, redirectTo?: string
   });
 
   if (error || !response?.success) {
-    throw new Error(response?.error || error?.message || 'Failed to resend email');
+    const message = extractFunctionError(error, response) || 'Failed to resend email';
+    throw new Error(message);
   }
 
   return { success: true, message: 'Verification email resent' };
