@@ -241,13 +241,13 @@ export default function PrivateMessagesPage() {
       </div>
 
       <div className="h-[calc(100vh-12rem)] flex flex-col md:flex-row gap-4">
-      <AccessibleStatus 
-        message={status.message} 
-        type={status.type} 
-        isVisible={status.isVisible} 
-      />
-      {/* Conversations List */}
-      <Card className={`md:w-80 lg:w-96 flex flex-col border-2 shadow-sm ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
+        <AccessibleStatus 
+          message={status.message} 
+          type={status.type} 
+          isVisible={status.isVisible} 
+        />
+        {/* Conversations List */}
+        <Card className={`md:w-80 lg:w-96 flex flex-col border-2 shadow-sm ${showConversationView ? 'hidden md:flex' : 'flex'}`}>
         <CardHeader className="pb-3 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2">
@@ -262,56 +262,56 @@ export default function PrivateMessagesPage() {
                     New
                   </AccessibleButton>
                 </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Start New Conversation
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search members..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Start New Conversation
+                    </DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search members..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <ScrollArea className="h-64">
+                      {loadingMembers ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {filteredMembers.map((member) => (
+                            <button
+                              key={member.id}
+                              onClick={() => handleStartConversation(member.id)}
+                              className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
+                            >
+                              <OptimizedAvatarImage
+                                photoUrl={member.photo_url}
+                                fallback={member.full_name.charAt(0).toUpperCase()}
+                                size={40}
+                                className="h-10 w-10"
+                              />
+                              <span className="font-medium">{member.full_name}</span>
+                            </button>
+                          ))}
+                          {filteredMembers.length === 0 && !loadingMembers && (
+                            <p className="text-center text-muted-foreground py-8">
+                              No members found
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </ScrollArea>
                   </div>
-                  <ScrollArea className="h-64">
-                    {loadingMembers ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {filteredMembers.map((member) => (
-                          <button
-                            key={member.id}
-                            onClick={() => handleStartConversation(member.id)}
-                            className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
-                          >
-                            <OptimizedAvatarImage
-                              photoUrl={member.photo_url}
-                              fallback={member.full_name.charAt(0).toUpperCase()}
-                              size={40}
-                              className="h-10 w-10"
-                            />
-                            <span className="font-medium">{member.full_name}</span>
-                          </button>
-                        ))}
-                        {filteredMembers.length === 0 && !loadingMembers && (
-                          <p className="text-center text-muted-foreground py-8">
-                            No members found
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </ScrollArea>
-                </div>
-              </DialogContent>
-            </Dialog>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
           <div className="relative mt-2">
@@ -547,6 +547,7 @@ export default function PrivateMessagesPage() {
       </Card>
       </div>
     </div>
+  </div>
   );
 }
 
