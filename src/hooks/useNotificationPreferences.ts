@@ -83,7 +83,7 @@ export function useNotificationPreferences(userId?: string) {
       };
       const { data: created, error: insertError } = await (supabase
         .from('notification_preferences' as never) as any)
-        .insert(insertPayload)
+        .upsert(insertPayload, { onConflict: 'user_id' })
         .select('*')
         .single();
 

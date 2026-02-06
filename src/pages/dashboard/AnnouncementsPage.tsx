@@ -207,13 +207,17 @@ const AnnouncementsPage = () => {
 
         if (error) throw error;
 
-        // Broadcast notifications for new announcements
+        // Broadcast notifications for new announcements (non-blocking)
         if (createdAnnouncement?.id) {
-          await sendAnnouncementNotification(
-            createdAnnouncement.id,
-            createdAnnouncement.title,
-            createdAnnouncement.content
-          );
+          try {
+            await sendAnnouncementNotification(
+              createdAnnouncement.id,
+              createdAnnouncement.title,
+              createdAnnouncement.content
+            );
+          } catch (notifyError) {
+            logError(notifyError, 'AnnouncementsPage.sendAnnouncementNotification', 'warn');
+          }
         }
 
         setSuccess('Announcement created successfully!');
@@ -227,8 +231,13 @@ const AnnouncementsPage = () => {
       await fetchAnnouncements();
     } catch (error) {
       const errorMsg = getErrorMessage(error);
+      const details = (error as { details?: string; hint?: string })?.details
+        || (error as { hint?: string })?.hint;
+      const extendedMessage = details && details !== errorMsg
+        ? `${errorMsg} (${details})`
+        : errorMsg;
       logError(error, 'AnnouncementsPage.handleCreateAnnouncement');
-      setError(errorMsg);
+      setError(extendedMessage);
     } finally {
       setIsSaving(false);
     }

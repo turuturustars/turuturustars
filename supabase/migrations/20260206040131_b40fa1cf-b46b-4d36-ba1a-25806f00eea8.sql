@@ -1,5 +1,5 @@
 -- Create jobs table for storing scraped job listings
-CREATE TABLE public.jobs (
+CREATE TABLE IF NOT EXISTS public.jobs (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
   organization TEXT NOT NULL,
@@ -24,35 +24,39 @@ CREATE TABLE public.jobs (
 );
 
 -- Create indexes for common queries
-CREATE INDEX idx_jobs_status ON public.jobs(status);
-CREATE INDEX idx_jobs_deadline ON public.jobs(deadline);
-CREATE INDEX idx_jobs_county ON public.jobs(county);
-CREATE INDEX idx_jobs_job_type ON public.jobs(job_type);
-CREATE INDEX idx_jobs_is_priority ON public.jobs(is_priority_location);
-CREATE INDEX idx_jobs_source_name ON public.jobs(source_name);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON public.jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_deadline ON public.jobs(deadline);
+CREATE INDEX IF NOT EXISTS idx_jobs_county ON public.jobs(county);
+CREATE INDEX IF NOT EXISTS idx_jobs_job_type ON public.jobs(job_type);
+CREATE INDEX IF NOT EXISTS idx_jobs_is_priority ON public.jobs(is_priority_location);
+CREATE INDEX IF NOT EXISTS idx_jobs_source_name ON public.jobs(source_name);
 
 -- Enable RLS
-ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS public.jobs ENABLE ROW LEVEL SECURITY;
 
 -- Public read access for approved jobs with valid deadlines
+DROP POLICY IF EXISTS "Anyone can view approved jobs" ON public.jobs;
 CREATE POLICY "Anyone can view approved jobs"
 ON public.jobs
 FOR SELECT
 USING (status = 'approved' AND (deadline IS NULL OR deadline >= CURRENT_DATE));
 
 -- Admins can manage all jobs
+DROP POLICY IF EXISTS "Admins can manage all jobs" ON public.jobs;
 CREATE POLICY "Admins can manage all jobs"
 ON public.jobs
 FOR ALL
 USING (public.has_role(auth.uid(), 'admin'));
 
 -- Add trigger for updated_at
+DROP TRIGGER IF EXISTS update_jobs_updated_at ON public.jobs;
 CREATE TRIGGER update_jobs_updated_at
 BEFORE UPDATE ON public.jobs
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at();
 
 -- Function to delete expired jobs (deadline passed by more than 7 days)
+DROP FUNCTION IF EXISTS public.delete_expired_jobs();
 CREATE OR REPLACE FUNCTION public.delete_expired_jobs()
 RETURNS INTEGER
 LANGUAGE plpgsql

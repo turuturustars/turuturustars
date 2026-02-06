@@ -90,6 +90,72 @@ export function useAuth() {
     };
   }, []);
 
+  const generateMembershipNumber = async (): Promise<string | null> => {
+    try {
+      const { data, error } = await (supabase as any).rpc('generate_membership_number');
+      if (error) {
+        console.warn('Failed to generate membership number:', error);
+        return null;
+      }
+      if (typeof data === 'string' && data.trim()) {
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to generate membership number:', error);
+      return null;
+    }
+  };
+
+  const ensureProfileFromAuth = async (authUser: User) => {
+    const metadata = (authUser.user_metadata || {}) as Record<string, unknown>;
+    const fullName = String(metadata.full_name || '').trim() || 'Member';
+    const phone = String(metadata.phone || '').trim();
+    const idNumber = String(metadata.id_number || '').trim();
+    const location = String(metadata.location || '').trim();
+    const occupation = String(metadata.occupation || '').trim();
+
+    const membershipNumber = await generateMembershipNumber();
+
+    const payload: Record<string, unknown> = {
+      id: authUser.id,
+      full_name: fullName,
+      phone: phone || null,
+      email: authUser.email || null,
+      id_number: idNumber || null,
+      location: location || null,
+      occupation: occupation || null,
+      status: 'pending',
+      updated_at: new Date().toISOString(),
+    };
+
+    if (membershipNumber) {
+      payload.membership_number = membershipNumber;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      console.warn('Failed to ensure profile exists:', error);
+    }
+  };
+
+  const backfillMembershipNumber = async (userId: string) => {
+    const membershipNumber = await generateMembershipNumber();
+    if (!membershipNumber) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ membership_number: membershipNumber, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .is('membership_number', null);
+
+    if (error) {
+      console.warn('Failed to backfill membership number:', error);
+    }
+  };
+
   const fetchProfile = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase
       .from('profiles')
@@ -117,6 +183,9 @@ export function useAuth() {
       };
       setProfile(profileData);
       setIsLoading(false);
+      if (!profileData.membership_number) {
+        backfillMembershipNumber(userId);
+      }
       return true;
     }
     setIsLoading(false);
@@ -125,9 +194,13 @@ export function useAuth() {
 
   
   const fetchProfileWithRetry = async (userId: string, attempts: number = 4, delayMs: number = 400) => {
+    const authUser = session?.user || user;
     for (let i = 0; i < attempts; i++) {
       const found = await fetchProfile(userId);
       if (found) return;
+      if (i === 0 && authUser) {
+        await ensureProfileFromAuth(authUser);
+      }
       if (i < attempts - 1) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
