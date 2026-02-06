@@ -27,3 +27,6 @@ verify_jwt = false
  
  [functions.create-profile]
  verify_jwt = false
+
+[functions.jobs-ingest]
+verify_jwt = false
