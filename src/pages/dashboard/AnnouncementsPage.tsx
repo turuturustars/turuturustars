@@ -15,6 +15,7 @@ import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
+import { useToast } from '@/hooks/use-toast';
 
 interface Announcement {
   id: string;
@@ -29,6 +30,7 @@ interface Announcement {
 }
 
 const AnnouncementsPage = () => {
+  const { toast } = useToast();
   const { user, roles } = useAuth();
   const { status, showSuccess } = useStatus();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);

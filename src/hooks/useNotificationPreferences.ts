@@ -58,8 +58,8 @@ export function useNotificationPreferences(userId?: string) {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('notification_preferences')
+    const { data, error } = await (supabase
+      .from('notification_preferences' as never) as any)
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
@@ -81,8 +81,8 @@ export function useNotificationPreferences(userId?: string) {
         user_id: userId,
         ...DEFAULT_PREFERENCES,
       };
-      const { data: created, error: insertError } = await supabase
-        .from('notification_preferences')
+      const { data: created, error: insertError } = await (supabase
+        .from('notification_preferences' as never) as any)
         .insert(insertPayload)
         .select('*')
         .single();
@@ -121,8 +121,8 @@ export function useNotificationPreferences(userId?: string) {
         ...updates,
       };
 
-      const { data, error } = await supabase
-        .from('notification_preferences')
+      const { data, error } = await (supabase
+        .from('notification_preferences' as never) as any)
         .upsert(payload)
         .select('*')
         .single();

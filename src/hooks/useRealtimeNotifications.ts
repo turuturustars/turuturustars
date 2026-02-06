@@ -27,13 +27,13 @@ export const useRealtimeNotifications = () => {
     const fetchNotifications = async () => {
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, type, read, action_url, created_at')
+        .select('id, user_id, title, message, type, read, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (!error && data) {
-        setAllNotifications(data as Notification[]);
+        setAllNotifications((data as unknown[]).map((n: any) => ({ ...n, action_url: null })) as Notification[]);
       }
     };
 
