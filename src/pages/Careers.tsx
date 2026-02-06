@@ -7,14 +7,16 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 
 const Careers = () => {
   usePageMeta({
-    title: 'Careers - Join Turuturu Stars CBO Team',
-    description: 'Explore career opportunities at Turuturu Stars. Join our team and make a difference in the community.',
+    title: 'Community Jobs - Turuturu Stars',
+    description: 'Explore verified job listings from government and trusted job sites, with Murang’a and casual jobs prioritized.',
     keywords: [
       'careers',
       'jobs',
       'employment',
       'opportunities',
-      'join us',
+      'community jobs',
+      'Murang’a jobs',
+      'casual jobs',
       'Turuturu Stars'
     ],
     ogImage: 'https://img.icons8.com/nolan/256/star.png',
@@ -24,7 +26,7 @@ const Careers = () => {
 
   const organizationData = {
     name: 'Turuturu Stars CBO',
-    description: 'Community Based Organization - Careers',
+    description: 'Community jobs board with verified listings from external sources.',
     url: 'https://turuturustars.co.ke/careers',
   };
 
