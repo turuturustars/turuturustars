@@ -97,6 +97,18 @@ const ScrollProgressIndicator = () => {
     }
   };
 
+  const scrollToProgress = (clientY: number, track: HTMLDivElement) => {
+    const rect = track.getBoundingClientRect();
+    const clamped = Math.min(Math.max(clientY - rect.top, 0), rect.height);
+    const ratio = rect.height ? clamped / rect.height : 0;
+    const { scrollHeight, clientHeight } = document.documentElement;
+    const maxScroll = scrollHeight - clientHeight;
+    window.scrollTo({
+      top: maxScroll * ratio,
+      behavior: 'smooth'
+    });
+  };
+
   return (
     <>
       {/* Top Progress Bar - Multi-layered with glow */}
@@ -128,123 +140,51 @@ const ScrollProgressIndicator = () => {
         )}
       </div>
 
-      {/* Scroll Progress Percentage - Enhanced design */}
-      {progress > 5 && (
-        <div 
-          className={`fixed bottom-20 sm:bottom-6 left-4 sm:right-6 z-40 transition-all duration-500 ${
-            isScrolling ? 'scale-110' : 'scale-100'
+      {/* Left-edge Scroll Indicator (minimal, always left) */}
+      {progress > 2 && (
+        <div
+          className={`fixed left-2 sm:left-3 top-1/2 -translate-y-1/2 z-40 transition-all duration-300 ${
+            isScrolling ? 'opacity-100' : 'opacity-70'
           }`}
+          aria-hidden={false}
         >
-          <button
-            onClick={progress >= 95 ? scrollToTop : undefined}
-            disabled={progress < 95}
-            className="w-full h-full"
-            aria-label={progress >= 95 ? "Scroll to top" : "Scroll progress indicator"}
-          >
-            <div className={`relative group cursor-${progress >= 95 ? 'pointer' : 'default'}`}>
-              {/* Enhanced glow effect - more intense at 95% */}
-              <div className={`absolute inset-0 rounded-full blur-xl transition-all duration-300 ${
-                progress >= 95 
-                  ? 'bg-gradient-to-br from-primary/50 to-blue-500/50 opacity-100' 
-                  : 'bg-gradient-to-br from-primary/30 to-blue-500/30 opacity-0 group-hover:opacity-100'
-              }`}></div>
-              
-              {/* Main container */}
-              <div className={`relative flex items-center gap-2 rounded-full backdrop-blur-xl border shadow-lg hover:shadow-xl transition-all duration-300 pl-3 pr-3 py-2 sm:pl-4 sm:pr-4 sm:py-2.5 ${
-                progress >= 95
-                  ? 'bg-gradient-to-r from-primary to-blue-600 border-primary shadow-xl shadow-primary/40 scale-105'
-                  : 'bg-white/90 border-gray-200/50'
-              }`}>
-                {/* Circular progress ring */}
-                <svg className={`w-8 h-8 sm:w-10 sm:h-10 -rotate-90 transition-all duration-300 ${
-                  progress >= 95 ? 'drop-shadow-lg' : ''
-                }`} viewBox="0 0 36 36">
-                  {/* Background circle */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    className={progress >= 95 ? 'text-white/30' : 'text-gray-200'}
-                  />
-                  {/* Progress circle */}
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.5"
-                    fill="none"
-                    stroke={progress >= 95 ? '#ffffff' : 'url(#progressGradient)'}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeDasharray={`${progress}, 100`}
-                    className="transition-all duration-300"
-                  />
-                  <defs>
-                    <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="100%" stopColor="#1d4ed8" />
-                    </linearGradient>
-                  </defs>
-                  {/* Percentage text */}
-                  <text
-                    x="18"
-                    y="18"
-                    textAnchor="middle"
-                    dy="0.3em"
-                    className={`text-[8px] sm:text-[9px] font-bold transition-all duration-300 ${
-                      progress >= 95 ? 'fill-white' : 'fill-primary'
-                    }`}
-                  >
-                    {Math.round(progress)}
-                  </text>
-                </svg>
-                
-                {/* Percentage label - hidden on very small screens */}
-                <span className={`hidden sm:inline-block text-xs font-semibold transition-all duration-300 ${
-                  progress >= 95 
-                    ? 'text-white' 
-                    : 'bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent'
-                }`}>
-                  {Math.round(progress)}%
-                </span>
+          <div className="relative flex flex-col items-center gap-2">
+            {/* Scroll to top button */}
+            {showScrollTop && (
+              <button
+                onClick={scrollToTop}
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 border border-gray-200/60 shadow-sm hover:shadow-md transition-all duration-200 flex items-center justify-center text-primary"
+                aria-label="Scroll to top"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            )}
 
-                {/* Top arrow indicator when at 95% */}
-                {progress >= 95 && (
-                  <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-bounce ml-1" />
-                )}
-              </div>
-
-              {/* Ripple effect on hover at 95% */}
-              {progress >= 95 && (
-                <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-150 opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
-              )}
-            </div>
-          </button>
-        </div>
-      )}
-
-      {/* Scroll to Top Button */}
-      {showScrollTop && (
-        <button
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-4 sm:right-6 z-40 group transition-all duration-500 animate-fadeIn active:scale-95"
-          aria-label="Scroll to top"
-        >
-          <div className="relative">
-            {/* Enhanced glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-br from-primary via-blue-500 to-blue-600 rounded-full blur-lg opacity-60 group-hover:opacity-100 group-active:opacity-50 transition-opacity duration-300 animate-pulse"></div>
-            
-            {/* Button */}
-            <div className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-primary to-blue-600 text-white shadow-lg hover:shadow-2xl group-hover:shadow-primary/50 transform group-hover:scale-110 group-active:scale-95 group-hover:-translate-y-1 transition-all duration-300 border border-white/20">
-              <ChevronUp className="w-5 h-5 sm:w-6 sm:h-6 animate-bounce group-active:animate-none transition-all" />
+            {/* Progress track */}
+            <div
+              className="relative h-28 sm:h-32 w-1.5 sm:w-2 rounded-full bg-gray-200/70 overflow-hidden hover:w-2.5 sm:hover:w-3 transition-all duration-200"
+              onClick={(event) => scrollToProgress(event.clientY, event.currentTarget)}
+              role="button"
+              tabIndex={0}
+              aria-label="Scroll position"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  scrollToTop();
+                }
+              }}
+            >
+              <div
+                className="absolute bottom-0 left-0 w-full rounded-full bg-gradient-to-b from-primary to-blue-600 transition-all duration-200"
+                style={{ height: `${progress}%` }}
+              />
             </div>
 
-            {/* Enhanced ripple effect on hover */}
-            <div className="absolute inset-0 rounded-full bg-white/20 scale-0 group-hover:scale-150 opacity-0 group-hover:opacity-100 transition-all duration-500"></div>
+            {/* Small percentage label */}
+            <span className="hidden sm:block text-[10px] font-semibold text-gray-600">
+              {Math.round(progress)}%
+            </span>
           </div>
-        </button>
+        </div>
       )}
 
       {/* Section Navigation - Desktop & Tablet */}
