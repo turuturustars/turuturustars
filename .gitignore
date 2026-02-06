@@ -41,3 +41,5 @@ supabase/.env.local
 
 # OS files
 Thumbs.db
+\# Supabase CLI temp
+supabase/.temp/
