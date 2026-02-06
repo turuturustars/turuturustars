@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
@@ -69,6 +70,7 @@ const LOCATIONS = [
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
    const [formData, setFormData] = useState<FormData>({
      email: '',
      password: '',
@@ -160,6 +162,7 @@ const LOCATIONS = [
     if (!validateStep(currentStep)) return;
 
     setIsLoading(true);
+    setErrorMessage(null);
 
     try {
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
@@ -200,12 +203,14 @@ const LOCATIONS = [
       const normalized = message.toLowerCase();
 
       if (normalized.includes('already exists') || normalized.includes('already registered')) {
+        setErrorMessage('An account with this email already exists. Please sign in or reset your password.');
         toast({
           title: 'Account Exists',
           description: 'An account with this email already exists. Please sign in.',
           variant: 'destructive',
         });
       } else {
+        setErrorMessage(message);
         toast({
           title: 'Registration Failed',
           description: message,
@@ -220,6 +225,7 @@ const LOCATIONS = [
   const handleResendEmail = async () => {
     if (!formData.email) return;
     setResendLoading(true);
+    setErrorMessage(null);
     try {
       await resendVerificationEmail(formData.email, buildSiteUrl('/auth/callback'));
       toast({
@@ -228,6 +234,7 @@ const LOCATIONS = [
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to resend email';
+      setErrorMessage(errorMessage);
       toast({
         title: 'Resend Failed',
         description: errorMessage,
@@ -278,6 +285,17 @@ const LOCATIONS = [
              </CardDescription>
            </CardHeader>
            <CardContent className="space-y-6">
+             {errorMessage && (
+               <Alert variant="destructive">
+                 <AlertTitle>We couldn’t complete your request</AlertTitle>
+                 <AlertDescription>
+                   <p>{errorMessage}</p>
+                   <p className="mt-2 text-xs">
+                     Please check your details, then try again. If this keeps happening, contact support.
+                   </p>
+                 </AlertDescription>
+               </Alert>
+             )}
              <div className="bg-muted/50 rounded-xl p-4 space-y-3">
                <div className="flex items-start gap-3">
                  <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
@@ -461,6 +479,17 @@ const LOCATIONS = [
              </CardDescription>
            </CardHeader>
            <CardContent className="space-y-4">
+             {errorMessage && (
+               <Alert variant="destructive">
+                 <AlertTitle>We couldn’t create your account</AlertTitle>
+                 <AlertDescription>
+                   <p>{errorMessage}</p>
+                   <p className="mt-2 text-xs">
+                     Check your email and password, then try again. If you already registered, sign in instead.
+                   </p>
+                 </AlertDescription>
+               </Alert>
+             )}
              {/* Step 0: Account */}
              {currentStep === 0 && (
                <>
@@ -721,6 +750,7 @@ const LOCATIONS = [
  };
  
  export default RegistrationFlow;
+
 
 
 
