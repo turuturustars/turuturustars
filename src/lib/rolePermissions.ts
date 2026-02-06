@@ -55,7 +55,18 @@ export type PermissionKey =
 
 // Role hierarchy for permission inheritance
 export const roleHierarchy: Record<UserRole, UserRole[]> = {
-  'admin': [],
+  'admin': [
+    'chairperson',
+    'vice_chairman',
+    'secretary',
+    'vice_secretary',
+    'treasurer',
+    'organizing_secretary',
+    'committee_member',
+    'patron',
+    'coordinator',
+    'member',
+  ],
   'chairperson': ['committee_member', 'member'],
   'vice_chairman': ['chairperson', 'committee_member', 'member'],
   'secretary': ['committee_member', 'member'],

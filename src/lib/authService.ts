@@ -35,31 +35,6 @@ export interface SignInData {
   password: string;
 }
 
-function extractFunctionError(error: unknown, response?: any): string | undefined {
-  if (response?.error) {
-    return response.error as string;
-  }
-
-  const anyError = error as any;
-  const contextBody = anyError?.context?.body || anyError?.context?.response?.body;
-  if (contextBody) {
-    try {
-      const parsed = typeof contextBody === 'string' ? JSON.parse(contextBody) : contextBody;
-      if (parsed?.error) {
-        return parsed.error as string;
-      }
-    } catch {
-      // fall through to error message
-    }
-  }
-
-  if (anyError?.message) {
-    return String(anyError.message);
-  }
-
-  return undefined;
-}
-
 /**
  * Check if user's email is verified
  */
@@ -116,7 +91,7 @@ export async function signUpUser(data: SignUpData) {
  * Register user via edge function (consistent email + membership handling)
  */
 export async function registerWithEmail(data: SignUpData) {
-  const redirectUrl = data.redirectTo || buildSiteUrl('/auth/callback');
+  const redirectUrl = data.redirectTo || buildSiteUrl('/auth/confirm');
   if (!data.email) {
     throw new Error('Email is required');
   }
@@ -124,34 +99,35 @@ export async function registerWithEmail(data: SignUpData) {
     throw new Error('Password must be at least 8 characters');
   }
 
-  const { data: response, error } = await supabase.functions.invoke('send-verification-email', {
-    body: {
-      email: data.email,
-      password: data.password,
-      fullName: data.fullName,
-      phone: data.phone,
-      idNumber: data.idNumber,
-      location: data.location,
-      occupation: data.occupation,
-      employmentStatus: data.employmentStatus,
-      interests: data.interests,
-      educationLevel: data.educationLevel,
-      additionalNotes: data.additionalNotes,
-      isStudent: data.isStudent,
-      redirectTo: redirectUrl,
+  const { data: response, error } = await supabase.auth.signUp({
+    email: data.email,
+    password: data.password,
+    options: {
+      emailRedirectTo: redirectUrl,
+      data: {
+        full_name: data.fullName,
+        phone: data.phone,
+        id_number: data.idNumber,
+        location: data.location,
+        occupation: data.occupation,
+        employment_status: data.employmentStatus,
+        interests: data.interests,
+        education_level: data.educationLevel,
+        additional_notes: data.additionalNotes,
+        is_student: data.isStudent,
+      },
     },
   });
 
-  if (error || !response?.success) {
-    const message = extractFunctionError(error, response) || 'Registration failed';
-    throw new Error(message);
+  if (error) {
+    throw new Error(error.message);
   }
 
   return {
     success: true,
-    userId: response.userId as string | undefined,
-    email: response.email as string | undefined,
-    requiresEmailVerification: true,
+    userId: response.user?.id,
+    email: response.user?.email ?? data.email,
+    requiresEmailVerification: !response.session,
   };
 }
 
@@ -159,17 +135,16 @@ export async function registerWithEmail(data: SignUpData) {
  * Resend verification email via edge function
  */
 export async function resendVerificationEmail(email: string, redirectTo?: string) {
-  const { data: response, error } = await supabase.functions.invoke('send-verification-email', {
-    body: {
-      email,
-      resend: true,
-      redirectTo: redirectTo || buildSiteUrl('/auth/callback'),
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: redirectTo || buildSiteUrl('/auth/confirm'),
     },
   });
 
-  if (error || !response?.success) {
-    const message = extractFunctionError(error, response) || 'Failed to resend email';
-    throw new Error(message);
+  if (error) {
+    throw new Error(error.message);
   }
 
   return { success: true, message: 'Verification email resent' };

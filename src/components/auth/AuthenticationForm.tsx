@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -181,7 +181,7 @@ const AuthenticationForm = ({
       const response = await registerWithEmail({
         email: signupData.email,
         password: signupData.password,
-        redirectTo: buildSiteUrl('/auth/callback'),
+        redirectTo: buildSiteUrl('/auth/confirm'),
       });
 
       toast({
@@ -224,9 +224,7 @@ const AuthenticationForm = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: buildSiteUrl('/auth/callback'),
-        },
-      });
+          redirectTo: buildSiteUrl('/auth/callback'),\n        },\n      });
 
       if (error) throw error;
     } catch (error) {
@@ -492,4 +490,6 @@ const AuthenticationForm = ({
 };
 
 export default AuthenticationForm;
+
+
 

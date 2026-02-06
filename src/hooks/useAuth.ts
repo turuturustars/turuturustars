@@ -219,7 +219,7 @@ export function useAuth() {
   };
 
   const hasRole = (role: string) => {
-    return roles.some((r) => r.role === role);
+    return roles.some((r) => r.role === role || r.role === 'admin');
   };
 
   const isOfficial = () => {

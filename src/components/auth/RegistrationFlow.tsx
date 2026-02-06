@@ -1,4 +1,4 @@
-import { useState } from 'react';
+ï»¿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { registerWithEmail, resendVerificationEmail } from '@/lib/authService';
 import { Button } from '@/components/ui/button';
@@ -174,7 +174,7 @@ const LOCATIONS = [
         phone: formData.phone,
         idNumber: formData.idNumber,
         location: finalLocation,
-        redirectTo: buildSiteUrl('/auth/callback'),
+        redirectTo: buildSiteUrl('/auth/confirm'),
       });
 
       if (response.userId) {
@@ -227,7 +227,7 @@ const LOCATIONS = [
     setResendLoading(true);
     setErrorMessage(null);
     try {
-      await resendVerificationEmail(formData.email, buildSiteUrl('/auth/callback'));
+      await resendVerificationEmail(formData.email, buildSiteUrl('/auth/confirm'));
       toast({
         title: 'Verification Email Sent',
         description: 'Please check your inbox (and spam folder).',
@@ -287,7 +287,7 @@ const LOCATIONS = [
            <CardContent className="space-y-6">
              {errorMessage && (
                <Alert variant="destructive">
-                 <AlertTitle>We couldn’t complete your request</AlertTitle>
+                 <AlertTitle>We couldnâ€™t complete your request</AlertTitle>
                  <AlertDescription>
                    <p>{errorMessage}</p>
                    <p className="mt-2 text-xs">
@@ -346,7 +346,7 @@ const LOCATIONS = [
               </Button>
               <div className="text-xs text-center text-muted-foreground space-y-2">
                 <p>
-                  Didn’t receive email? Check spam, or resend above.
+                  Didnâ€™t receive email? Check spam, or resend above.
                 </p>
                 <div className="flex items-center justify-center gap-1 text-muted-foreground">
                   <AlertCircle className="w-3 h-3" />
@@ -481,7 +481,7 @@ const LOCATIONS = [
            <CardContent className="space-y-4">
              {errorMessage && (
                <Alert variant="destructive">
-                 <AlertTitle>We couldn’t create your account</AlertTitle>
+                 <AlertTitle>We couldnâ€™t create your account</AlertTitle>
                  <AlertDescription>
                    <p>{errorMessage}</p>
                    <p className="mt-2 text-xs">
@@ -516,7 +516,7 @@ const LOCATIONS = [
                      <Input
                        id="password"
                        type={showPassword ? 'text' : 'password'}
-                       placeholder="••••••••"
+                       placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                        value={formData.password}
                        onChange={(e) => handleChange('password', e.target.value)}
                        className={`pl-10 pr-10 ${errors.password ? 'border-destructive' : ''}`}
@@ -539,7 +539,7 @@ const LOCATIONS = [
                      <Input
                        id="confirmPassword"
                        type={showConfirmPassword ? 'text' : 'password'}
-                       placeholder="••••••••"
+                       placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                        value={formData.confirmPassword}
                        onChange={(e) => handleChange('confirmPassword', e.target.value)}
                        className={`pl-10 pr-10 ${errors.confirmPassword ? 'border-destructive' : ''}`}
@@ -750,6 +750,7 @@ const LOCATIONS = [
  };
  
  export default RegistrationFlow;
+
 
 
 

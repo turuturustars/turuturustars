@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import {
   registerWithEmail,
-  resendVerificationEmail as resendVerificationViaEdge,
+  resendVerificationEmail as resendVerificationEmailFromAuth,
   sendPasswordResetEmail as sendPasswordResetViaAuthService,
 } from '@/lib/authService';
 
@@ -19,7 +19,7 @@ import {
  */
 export async function sendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await resendVerificationViaEdge(email, buildSiteUrl('/auth/callback'));
+    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/confirm'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';
@@ -59,7 +59,7 @@ export async function signupWithEmailVerification(
       phone: profileData.phone,
       idNumber: profileData.idNumber,
       location: profileData.location,
-      redirectTo: buildSiteUrl('/auth/callback'),
+      redirectTo: buildSiteUrl('/auth/confirm'),
     });
 
     // Step 3: Store pending signup info in localStorage for recovery
@@ -180,7 +180,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await resendVerificationViaEdge(email, buildSiteUrl('/auth/callback'));
+    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/confirm'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';

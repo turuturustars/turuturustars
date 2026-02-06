@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { isProfileComplete } from '@/utils/profileCompletion';
 
 /**
  * Email Confirmation Page
@@ -75,9 +76,24 @@ const EmailConfirmation = () => {
           description: 'Your email has been confirmed successfully.',
         });
 
-        // Redirect to dashboard on production domain
+        // Decide next step based on profile completeness
+        let nextPath = '/dashboard';
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, phone, id_number')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!isProfileComplete(profile as any)) {
+            nextPath = '/register';
+          }
+        } catch (profileCheckError) {
+          console.warn('Email confirmation profile check failed:', profileCheckError);
+        }
+
         setTimeout(() => {
-          window.location.href = buildSiteUrl('/dashboard');
+          window.location.href = buildSiteUrl(nextPath);
         }, 2500);
       } catch (error) {
         console.error('Email confirmation error:', error);

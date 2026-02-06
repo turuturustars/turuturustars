@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { getPrimaryRole } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,6 +11,7 @@ import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
 import WelfareParticipationChart from '@/components/dashboard/WelfareParticipationChart';
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
+import { buildSiteUrl } from '@/utils/siteUrl';
 import { 
   DollarSign, 
   HandHeart, 
@@ -47,6 +49,7 @@ const DashboardHome = () => {
   const navigate = useNavigate();
   const { profile, isOfficial, roles } = useAuth();
   const { status, showSuccess } = useStatus();
+  const { toast } = useToast();
   const { announcements } = useRealtimeAnnouncements();
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
@@ -59,6 +62,9 @@ const DashboardHome = () => {
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [currentTime, setCurrentTime] = useState('');
   const [pendingMembershipFee, setPendingMembershipFee] = useState<PendingMembershipFee | null>(null);
+  const [emailVerified, setEmailVerified] = useState<boolean | null>(null);
+  const [emailAddress, setEmailAddress] = useState<string | null>(null);
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
 
   // Dynamic greeting with day, time, and name
   useEffect(() => {
@@ -111,6 +117,62 @@ const DashboardHome = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [profile?.id]);
+
+  useEffect(() => {
+    const checkEmailVerification = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+          setEmailVerified(null);
+          return;
+        }
+        setEmailVerified(!!user.email_confirmed_at);
+        setEmailAddress(user.email ?? null);
+      } catch (error) {
+        console.error('Failed to check email verification:', error);
+        setEmailVerified(null);
+      }
+    };
+
+    checkEmailVerification();
+  }, []);
+
+  const handleResendVerification = async () => {
+    if (!emailAddress) return;
+    setIsResendingEmail(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: emailAddress,
+        options: {
+          emailRedirectTo: buildSiteUrl('/auth/confirm'),
+        },
+      });
+
+      if (error) {
+        toast({
+          title: 'Failed to resend email',
+          description: error.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Verification email sent',
+        description: 'Check your inbox and spam folder.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to resend email';
+      toast({
+        title: 'Failed to resend email',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!profile?.id) {
@@ -313,6 +375,34 @@ const DashboardHome = () => {
         type={status.type} 
         isVisible={status.isVisible} 
       />
+
+      {emailVerified === false && (
+        <div className="relative overflow-hidden rounded-xl border-2 border-amber-200/80 bg-amber-50 px-4 py-4 sm:px-6 shadow-sm">
+          <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-amber-200/40 blur-2xl" />
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-amber-800">
+                <AlertCircle className="w-4 h-4" />
+                <p className="text-xs font-semibold uppercase tracking-wide">Email Verification Required</p>
+              </div>
+              <p className="text-sm text-amber-900">
+                Please confirm your email to unlock full access.
+              </p>
+              {emailAddress && (
+                <p className="text-xs text-amber-700">Sent to {emailAddress}</p>
+              )}
+            </div>
+            <AccessibleButton
+              onClick={handleResendVerification}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              ariaLabel="Resend verification email"
+              disabled={isResendingEmail}
+            >
+              {isResendingEmail ? 'Sending...' : 'Resend Email'}
+            </AccessibleButton>
+          </div>
+        </div>
+      )}
 
       {pendingMembershipFee && (
         <div className="relative overflow-hidden rounded-xl border-2 border-amber-200/70 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 px-4 py-4 sm:px-6 shadow-sm">

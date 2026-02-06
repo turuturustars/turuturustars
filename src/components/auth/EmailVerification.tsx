@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Email Verification Component
  * Handles email verification status checking and resend functionality
  */
@@ -86,7 +86,7 @@ export const EmailVerification = ({
       if (onResendEmail) {
         await onResendEmail();
       } else {
-        await resendVerificationEmail(email, buildSiteUrl('/auth/callback'));
+        await resendVerificationEmail(email, buildSiteUrl('/auth/confirm'));
       }
 
       toast({
@@ -169,3 +169,4 @@ export const EmailVerification = ({
 };
 
 export default EmailVerification;
+
