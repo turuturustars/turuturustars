@@ -82,14 +82,18 @@ const CareersSection = () => {
       setLoading(true);
       setErrorMessage(null);
 
-      const { data, error } = await (supabase.from('jobs' as never) as any)
+      const { data, error } = await supabase
+        .from('jobs')
         .select(
           'id,title,organization,location,county,job_type,deadline,posted_at,source_name,source_url,apply_url,excerpt,is_government,is_priority_location'
         )
+        .eq('status', 'approved')
+        .gte('deadline', new Date().toISOString().split('T')[0])
         .order('deadline', { ascending: true })
         .limit(250);
 
       if (error) {
+        console.error('Error loading jobs:', error);
         setErrorMessage('Unable to load jobs right now. Please try again soon.');
         setLoading(false);
         return;
