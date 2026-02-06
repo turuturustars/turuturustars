@@ -27,7 +27,7 @@ type JobPayload = {
   location: string;
   county: string;
   job_type?: JobType;
-  deadline: string;
+  deadline?: string | null;
   posted_at?: string;
   source_name: string;
   source_url: string;
@@ -36,6 +36,8 @@ type JobPayload = {
   external_id?: string | null;
   is_government?: boolean;
   is_priority_location?: boolean;
+  status?: "pending" | "approved" | "rejected";
+  rejected_reason?: string | null;
 };
 
 const normalizeJobType = (value?: string): JobType => {
@@ -99,16 +101,20 @@ serve(async (req) => {
         const county = normalizeText(job.county, "Kenya");
         const sourceName = normalizeText(job.source_name);
         const sourceUrl = normalizeText(job.source_url);
-        const deadline = normalizeText(job.deadline);
+        const deadline = normalizeText(job.deadline ?? null, null as unknown as string) || null;
         const postedAt = normalizeText(job.posted_at ?? nowIso);
         if (!title || !organization || !sourceName || !sourceUrl || !deadline) {
-          return null;
+          if (!title || !organization || !sourceName || !sourceUrl) {
+            return null;
+          }
         }
 
         const priority =
           job.is_priority_location ??
           isMuranga(county) ||
           isMuranga(location);
+
+        const status = job.status ?? (deadline ? "approved" : "pending");
 
         return {
           title,
@@ -125,6 +131,8 @@ serve(async (req) => {
           external_id: normalizeText(job.external_id ?? null, null as unknown as string) || null,
           is_government: Boolean(job.is_government),
           is_priority_location: Boolean(priority),
+          status,
+          rejected_reason: normalizeText(job.rejected_reason ?? null, null as unknown as string) || null,
         };
       })
       .filter(Boolean) as Array<Record<string, unknown>>;
