@@ -430,42 +430,57 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
-      {/* Welcome Header - Compact & Responsive */}
-      <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary via-purple-500 to-pink-500 px-4 py-3.5 sm:px-6 sm:py-4 lg:px-8 lg:py-5 shadow-lg hover:shadow-xl transition-shadow duration-300">
+      {/* Welcome Header - Responsive */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-7 shadow-[0_22px_70px_-35px_rgba(14,116,144,0.75)] transition-shadow duration-300">
         {/* Animated background elements */}
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 right-0 w-32 sm:w-48 h-32 sm:h-48 bg-white/10 rounded-full blur-2xl" />
-          <div className="absolute bottom-0 left-0 w-24 sm:w-40 h-24 sm:h-40 bg-purple-300/10 rounded-full blur-2xl" />
+        <div className="absolute inset-0 opacity-45">
+          <div className="absolute -top-8 -right-10 h-52 w-52 rounded-full bg-white/15 blur-3xl" />
+          <div className="absolute -bottom-14 left-8 h-48 w-48 rounded-full bg-cyan-200/25 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.18),transparent_50%)]" />
         </div>
         
-        <div className="relative">
-          {/* Top row: Badge + Time */}
-          <div className="flex items-center justify-between gap-2 mb-2.5">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white/90 animate-pulse" />
-              <Badge className="bg-white/25 backdrop-blur-sm text-white border-white/40 text-xs sm:text-sm px-2.5 sm:px-3 py-0.5">
+        <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          {/* Left: Greeting */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white/95 backdrop-blur-sm">
+                <Sparkles className="h-4 w-4 animate-pulse" />
                 Dashboard
-              </Badge>
+              </div>
+              <div className="hidden sm:flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" />
+                Member Portal
+              </div>
             </div>
-            <span className="text-xs sm:text-sm text-white/85 font-medium">
-              {currentTime}
-            </span>
-          </div>
-          
-          {/* Main greeting - Inline layout */}
-          <div className="flex flex-col xs:flex-row xs:items-baseline xs:gap-2">
-            <h1 className="text-xl xs:text-2xl sm:text-3xl font-bold text-white leading-tight">
-              Happy {dayOfWeek}!
-            </h1>
-            <p className="text-xs xs:text-sm text-white/80 mt-0.5 xs:mt-0">
-              Welcome back, <span className="font-semibold text-white">{profile?.full_name?.split(' ')[0] || 'Member'}</span>
+            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2">
+              <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-semibold text-white leading-tight drop-shadow-sm">
+                Happy {dayOfWeek}!
+              </h1>
+              <p className="text-sm sm:text-base text-white/90">
+                Welcome back,{" "}
+                <span className="font-semibold text-white break-words">
+                  {profile?.full_name?.split(' ')[0] || 'Member'}
+                </span>
+              </p>
+            </div>
+            <p className="text-xs sm:text-sm text-white/80">
+              Active member of Turuturu Stars CBO
             </p>
           </div>
-          
-          {/* Subtitle */}
-          <p className="text-xs xs:text-sm text-white/75 mt-1 sm:mt-1.5">
-            Active member of Turuturu Stars CBO
-          </p>
+
+          {/* Right: Time + Date */}
+          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/15 px-4 py-3 text-white/95 backdrop-blur-md lg:justify-end lg:px-5">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.3em] text-white/60">Local Time</p>
+              <p className="text-lg sm:text-xl font-semibold text-white">{currentTime}</p>
+            </div>
+            <div className="hidden sm:block border-l border-white/20 pl-3">
+              <p className="text-xs text-white/75">Today</p>
+              <p className="text-sm font-medium text-white">
+                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

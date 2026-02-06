@@ -101,7 +101,7 @@ const DashboardLayout = () => {
   if (!user) return null;
 
   return (
-    <div className="relative flex min-h-[100dvh] bg-gradient-to-br from-background to-muted/20">
+    <div className="dashboard-theme relative flex min-h-[100dvh] bg-gradient-to-br from-background via-section-accent/40 to-section-light">
       {/* Offline Notice */}
       {showOfflineNotice && (
         <div className="fixed top-0 left-0 right-0 z-50 bg-yellow-500 text-yellow-950 px-4 py-2 text-center text-sm font-medium shadow-lg animate-in slide-in-from-top duration-300">

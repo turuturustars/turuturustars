@@ -126,6 +126,40 @@
     --warning: 38 92% 60%;
     --info: 199 89% 55%;
   }
+
+  /* Dashboard theme overrides (scoped) */
+  .dashboard-theme {
+    --background: 198 100% 96%;
+    --foreground: 214 45% 18%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 214 45% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 214 45% 18%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 199 60% 94%;
+    --secondary-foreground: 214 45% 18%;
+
+    --muted: 200 25% 90%;
+    --muted-foreground: 214 25% 35%;
+
+    --accent: 196 70% 88%;
+    --accent-foreground: 214 45% 18%;
+
+    --border: 200 30% 86%;
+    --input: 200 30% 86%;
+    --ring: 199 89% 48%;
+
+    --section-light: 0 0% 100%;
+    --section-accent: 198 80% 92%;
+
+    --primary-hover: 199 89% 44%;
+    --primary-light: 199 89% 92%;
+  }
 }
 
 @layer base {
