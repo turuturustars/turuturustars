@@ -545,6 +545,7 @@ export default function PrivateMessagesPage() {
           </div>
         )}
       </Card>
+      </div>
     </div>
   );
 }

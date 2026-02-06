@@ -286,6 +286,72 @@ export type Database = {
         }
         Relationships: []
       }
+      jobs: {
+        Row: {
+          apply_url: string | null
+          county: string
+          created_at: string
+          deadline: string | null
+          excerpt: string | null
+          external_id: string | null
+          id: string
+          is_government: boolean
+          is_priority_location: boolean
+          job_type: string
+          location: string
+          organization: string
+          posted_at: string
+          rejected_reason: string | null
+          source_name: string
+          source_url: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          apply_url?: string | null
+          county?: string
+          created_at?: string
+          deadline?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          is_government?: boolean
+          is_priority_location?: boolean
+          job_type?: string
+          location?: string
+          organization: string
+          posted_at?: string
+          rejected_reason?: string | null
+          source_name: string
+          source_url: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          apply_url?: string | null
+          county?: string
+          created_at?: string
+          deadline?: string | null
+          excerpt?: string | null
+          external_id?: string | null
+          id?: string
+          is_government?: boolean
+          is_priority_location?: boolean
+          job_type?: string
+          location?: string
+          organization?: string
+          posted_at?: string
+          rejected_reason?: string | null
+          source_name?: string
+          source_url?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meeting_attendance: {
         Row: {
           apology_reason: string | null
@@ -1089,6 +1155,7 @@ export type Database = {
       }
     }
     Functions: {
+      delete_expired_jobs: { Args: never; Returns: number }
       generate_membership_number: { Args: never; Returns: string }
       has_role: {
         Args: {

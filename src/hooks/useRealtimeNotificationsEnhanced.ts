@@ -86,25 +86,26 @@ export const useRealtimeNotificationsEnhanced = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, type, read, sent_via, action_url, created_at, updated_at')
+        .select('id, user_id, title, message, type, read, sent_via, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
 
-      const typedData = ((data || []) as RawNotification[]).map((n) => {
+      const typedData = ((data || []) as unknown[]).map((n: any) => {
+        const rawN = n as RawNotification;
         const notification: Notification = {
-          id: n.id,
-          user_id: n.user_id,
-          title: n.title,
-          message: n.message,
-          type: (n.type || 'system') as Notification['type'],
-          read: n.read || false,
-          action_url: n.action_url,
-          sent_via: n.sent_via || [],
-          created_at: n.created_at,
-          updated_at: n.updated_at || new Date().toISOString()
+          id: rawN.id,
+          user_id: rawN.user_id,
+          title: rawN.title,
+          message: rawN.message,
+          type: (rawN.type || 'system') as Notification['type'],
+          read: rawN.read || false,
+          action_url: rawN.action_url,
+          sent_via: rawN.sent_via || [],
+          created_at: rawN.created_at,
+          updated_at: rawN.updated_at || new Date().toISOString()
         };
         return notification;
       });
