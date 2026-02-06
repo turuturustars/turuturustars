@@ -67,6 +67,7 @@ const ProfilePage = lazy(() => import("./pages/dashboard/ProfilePage"));
 const AnnouncementsPage = lazy(() => import("./pages/dashboard/AnnouncementsPage"));
 const MembersPage = lazy(() => import("./pages/dashboard/MembersPage"));
 const ApprovalsPage = lazy(() => import("./pages/dashboard/ApprovalsPage"));
+const JobsModerationPage = lazy(() => import("./pages/dashboard/JobsModerationPage"));
 const AllContributionsPage = lazy(() => import("./pages/dashboard/AllContributionsPage"));
 const ReportsPage = lazy(() => import("./pages/dashboard/ReportsPage"));
 const TreasurerDashboard = lazy(() => import("./pages/dashboard/TreasurerDashboard"));
@@ -231,6 +232,7 @@ const App = () => {
                   {/* Admin functions */}
                   <Route path="admin-panel">
                     <Route path="approvals" element={<ApprovalsPage />} />
+                    <Route path="jobs" element={<JobsModerationPage />} />
                   </Route>
 
                   {/* User profile */}
@@ -254,6 +256,7 @@ const App = () => {
                   <Route path="community" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="chat" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="approvals" element={<Navigate to="/dashboard/admin-panel/approvals" replace />} />
+                  <Route path="jobs" element={<Navigate to="/dashboard/admin-panel/jobs" replace />} />
                 </Route>
 
                 {/* ==================== ERROR PAGES ==================== */}

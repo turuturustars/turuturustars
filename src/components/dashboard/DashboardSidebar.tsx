@@ -122,6 +122,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: FileText },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
       ];
     }
     return [];
