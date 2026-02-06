@@ -111,8 +111,7 @@ serve(async (req) => {
 
         const priority =
           job.is_priority_location ??
-          isMuranga(county) ||
-          isMuranga(location);
+          (isMuranga(county) || isMuranga(location));
 
         const status = job.status ?? (deadline ? "approved" : "pending");
 
