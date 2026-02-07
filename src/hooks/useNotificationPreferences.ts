@@ -49,6 +49,18 @@ export function useNotificationPreferences(userId?: string) {
   const [preferences, setPreferences] = useState<NotificationPreferencesRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  // Track whether table exists to avoid repeated failed requests
+  const [tableAvailable, setTableAvailable] = useState(true);
+
+  const fallbackPrefs = useCallback(
+    (uid: string): NotificationPreferencesRecord => ({
+      user_id: uid,
+      ...DEFAULT_PREFERENCES,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+    []
+  );
 
   const loadPreferences = useCallback(async () => {
     if (!userId) {
@@ -57,53 +69,55 @@ export function useNotificationPreferences(userId?: string) {
       return;
     }
 
-    setIsLoading(true);
-    const { data, error } = await (supabase
-      .from('notification_preferences' as never) as any)
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error loading notification preferences:', error);
-      setPreferences({
-        user_id: userId,
-        ...DEFAULT_PREFERENCES,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
+    if (!tableAvailable) {
+      setPreferences(fallbackPrefs(userId));
       setIsLoading(false);
       return;
     }
 
-    if (!data) {
-      const insertPayload = {
-        user_id: userId,
-        ...DEFAULT_PREFERENCES,
-      };
-      const { data: created, error: insertError } = await (supabase
+    setIsLoading(true);
+    try {
+      const { data, error } = await (supabase
         .from('notification_preferences' as never) as any)
-        .upsert(insertPayload, { onConflict: 'user_id' })
         .select('*')
-        .single();
+        .eq('user_id', userId)
+        .maybeSingle();
 
-      if (insertError) {
-        console.error('Error creating notification preferences:', insertError);
-        setPreferences({
-          user_id: userId,
-          ...DEFAULT_PREFERENCES,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      } else {
-        setPreferences(created as NotificationPreferencesRecord);
+      if (error) {
+        // If it's a relation/table not found error, mark table as unavailable
+        if (error.code === '42P01' || error.message?.includes('relation') || error.code === 'PGRST204') {
+          setTableAvailable(false);
+        }
+        console.warn('Notification preferences not available:', error.message);
+        setPreferences(fallbackPrefs(userId));
+        setIsLoading(false);
+        return;
       }
-    } else {
-      setPreferences(data as NotificationPreferencesRecord);
+
+      if (!data) {
+        // Try to create default preferences
+        const { data: created, error: insertError } = await (supabase
+          .from('notification_preferences' as never) as any)
+          .upsert({ user_id: userId, ...DEFAULT_PREFERENCES }, { onConflict: 'user_id' })
+          .select('*')
+          .maybeSingle();
+
+        if (insertError) {
+          console.warn('Could not create notification preferences:', insertError.message);
+          setPreferences(fallbackPrefs(userId));
+        } else {
+          setPreferences((created as NotificationPreferencesRecord) ?? fallbackPrefs(userId));
+        }
+      } else {
+        setPreferences(data as NotificationPreferencesRecord);
+      }
+    } catch (e) {
+      console.warn('Notification preferences load error:', e);
+      setPreferences(fallbackPrefs(userId));
     }
 
     setIsLoading(false);
-  }, [userId]);
+  }, [userId, tableAvailable, fallbackPrefs]);
 
   useEffect(() => {
     loadPreferences();
@@ -111,7 +125,7 @@ export function useNotificationPreferences(userId?: string) {
 
   const savePreferences = useCallback(
     async (updates: Partial<NotificationPreferencesRecord>) => {
-      if (!userId) return;
+      if (!userId || !tableAvailable) return;
 
       setIsSaving(true);
       const payload = {
@@ -121,31 +135,35 @@ export function useNotificationPreferences(userId?: string) {
         ...updates,
       };
 
-      const { data, error } = await (supabase
-        .from('notification_preferences' as never) as any)
-        .upsert(payload)
-        .select('*')
-        .single();
+      try {
+        const { data, error } = await (supabase
+          .from('notification_preferences' as never) as any)
+          .upsert(payload, { onConflict: 'user_id' })
+          .select('*')
+          .maybeSingle();
 
-      if (error) {
-        console.error('Error saving notification preferences:', error);
+        if (error) {
+          console.warn('Error saving notification preferences:', error.message);
+          toast({
+            title: 'Error',
+            description: 'Failed to save notification preferences',
+            variant: 'destructive',
+          });
+          setIsSaving(false);
+          return;
+        }
+
+        setPreferences((data as NotificationPreferencesRecord) ?? { ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
         toast({
-          title: 'Error',
-          description: 'Failed to save notification preferences',
-          variant: 'destructive',
+          title: 'Preferences updated',
+          description: 'Your notification settings have been saved',
         });
-        setIsSaving(false);
-        return;
+      } catch (e) {
+        console.warn('Save preferences error:', e);
       }
-
-      setPreferences(data as NotificationPreferencesRecord);
       setIsSaving(false);
-      toast({
-        title: 'Preferences updated',
-        description: 'Your notification settings have been saved',
-      });
     },
-    [preferences, toast, userId]
+    [preferences, toast, userId, tableAvailable]
   );
 
   const isTypeEnabled = useCallback(
