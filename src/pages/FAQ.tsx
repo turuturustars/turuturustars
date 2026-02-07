@@ -48,7 +48,7 @@ const FAQ = () => {
       category: 'Contributions',
       question: 'How do I set up my contribution?',
       answer:
-        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. You can pay via M-Pesa or bank transfer.',
+        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. Payments are processed securely via Pesapal.',
     },
     {
       category: 'Contributions',
@@ -60,7 +60,7 @@ const FAQ = () => {
       category: 'Contributions',
       question: 'What payment methods do you accept?',
       answer:
-        'We currently accept M-Pesa payments and bank transfers. Simply select your preferred method during contribution setup.',
+        'We accept payments via Pesapal. You will choose your preferred method during checkout.',
     },
     {
       category: 'Welfare',
@@ -90,7 +90,7 @@ const FAQ = () => {
       category: 'Technical',
       question: 'Why is my payment failing?',
       answer:
-        'Check that you have sufficient balance in your M-Pesa account. Ensure your phone number and M-Pesa PIN are correct. If issues persist, contact our support team.',
+        'Check that your payment method has sufficient balance and try again. If issues persist, contact our support team.',
     },
     {
       category: 'Technical',

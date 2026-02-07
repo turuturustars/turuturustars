@@ -26,7 +26,7 @@ import {
   useStatus,
   AccessibleStatus,
 } from '@/components/accessible';
-import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
+import PayWithPesapal from '@/components/dashboard/PayWithPesapal';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -303,7 +303,7 @@ const ContributionsPage = () => {
               </div>
               <AccessibleFormField
                 label="Payment Reference"
-                placeholder="M-Pesa confirmation code"
+                placeholder="Transaction reference"
                 value={newContribution.reference_number}
                 onChange={(e) => {
                   setNewContribution({ ...newContribution, reference_number: e.target.value });
@@ -439,10 +439,10 @@ const ContributionsPage = () => {
 
                       <div className="pt-2 border-t">
                         {contribution.status !== 'paid' ? (
-                          <PayWithMpesa
+                          <PayWithPesapal
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} with Pesapal for contribution ${contribution.id}`}>Pay with Pesapal</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -492,10 +492,10 @@ const ContributionsPage = () => {
                       </TableCell>
                       <TableCell>
                         {contribution.status !== 'paid' ? (
-                          <PayWithMpesa
+                          <PayWithPesapal
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} with Pesapal for contribution ${contribution.id}`}>Pay with Pesapal</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -613,7 +613,7 @@ const ContributionsPage = () => {
 
                       {/* Pay Button */}
                       <div className="flex justify-end">
-                        <PayWithMpesa
+                        <PayWithPesapal
                           contributionId={contribution.id}
                           defaultAmount={contribution.amount}
                           trigger={
@@ -639,7 +639,7 @@ const ContributionsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Payment handled by PayWithMpesa component */}
+      {/* Payment handled by PayWithPesapal component */}
     </div>
   );
 };

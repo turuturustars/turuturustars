@@ -25,6 +25,8 @@ const PageLoader = () => (
 // Lazy-loaded components
 const Index = lazy(() => import("./pages/Index"));
 const Home = lazy(() => import("./pages/Home"));
+const Donate = lazy(() => import("./pages/Donate"));
+const PesapalCallback = lazy(() => import("./pages/PesapalCallback"));
 const About = lazy(() => import("./pages/About"));
 const Pillars = lazy(() => import("./pages/Pillars"));
 const Careers = lazy(() => import("./pages/Careers"));
@@ -72,7 +74,7 @@ const AllContributionsPage = lazy(() => import("./pages/dashboard/AllContributio
 const ReportsPage = lazy(() => import("./pages/dashboard/ReportsPage"));
 const TreasurerDashboard = lazy(() => import("./pages/dashboard/TreasurerDashboard"));
 const SecretaryDashboard = lazy(() => import("./pages/dashboard/SecretaryDashboard"));
-const MpesaManagement = lazy(() => import("./pages/dashboard/MpesaManagement"));
+const PaymentsManagement = lazy(() => import("./pages/dashboard/PaymentsManagement"));
 const MembershipFeesPage = lazy(() => import("./pages/dashboard/MembershipFeesPage"));
 const MeetingsPage = lazy(() => import("./pages/dashboard/MeetingsPage"));
 const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
@@ -118,6 +120,8 @@ const App = () => {
                 {/* Landing Pages */}
                 <Route path="/" element={<Index />} />
                 <Route path="/home" element={<Home />} />
+                <Route path="/donate" element={<Donate />} />
+                <Route path="/payment/pesapal/callback" element={<PesapalCallback />} />
                 
                 {/* Information Pages */}
                 <Route path="/about" element={<About />} />
@@ -201,7 +205,7 @@ const App = () => {
                     <Route path="contributions" element={<ContributionsPage />} />
                     <Route path="all-contributions" element={<AllContributionsPage />} />
                     <Route path="treasurer-dashboard" element={<TreasurerDashboard />} />
-                    <Route path="mpesa" element={<MpesaManagement />} />
+                    <Route path="mpesa" element={<PaymentsManagement />} />
                     <Route path="membership-fees" element={<MembershipFeesPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>

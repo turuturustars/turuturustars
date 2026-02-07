@@ -1,6 +1,7 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import './HeroSection.css';
 
 // Community images for background animation
@@ -120,6 +121,18 @@ const HeroSection = () => {
             >
               Join the community
               <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="border-white/70 text-white hover:text-[#0A3D62] hover:bg-white/90 px-8 py-6 w-full sm:w-auto"
+            >
+              <Link to="/donate">
+                Donate
+                <HeartHandshake className="ml-2 h-5 w-5" />
+              </Link>
             </Button>
 
             <button

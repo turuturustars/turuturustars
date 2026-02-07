@@ -22,7 +22,7 @@ const HowItWorks = () => {
       'contribution levels',
       'payment system Kenya',
       'welfare request process',
-      'M-Pesa contributions',
+      'Pesapal contributions',
       'community engagement',
       'Muranga community process',
       'Turuturu membership',
@@ -44,7 +44,7 @@ const HowItWorks = () => {
     {
       number: 2,
       title: 'Contribution Setup',
-      description: 'Choose your contribution level and frequency. Set up automated payments through M-Pesa or other available methods.',
+      description: 'Choose your contribution level and frequency. Pay securely through Pesapal.',
       icon: DollarSign,
     },
     {
@@ -143,7 +143,7 @@ const HowItWorks = () => {
                   <ul className="space-y-2 text-sm">
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-primary" />
-                      <span>Automated payments via M-Pesa</span>
+                      <span>Payments via Pesapal checkout</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-primary" />

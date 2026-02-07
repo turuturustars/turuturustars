@@ -319,7 +319,7 @@ const AllContributionsPage = () => {
               <div className="space-y-2">
                 <Label>Reference Number</Label>
                 <Input
-                  placeholder="M-PESA code, etc."
+                  placeholder="Transaction reference, etc."
                   value={newContribution.reference_number}
                   onChange={(e) =>
                     setNewContribution((prev) => ({ ...prev, reference_number: e.target.value }))

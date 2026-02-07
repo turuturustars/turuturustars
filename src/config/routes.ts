@@ -30,6 +30,8 @@ export const PUBLIC_ROUTES = {
   HELP: '/help',
   FAQ: '/faq',
   SUPPORT: '/support',
+  DONATE: '/donate',
+  PESAPAL_CALLBACK: '/payment/pesapal/callback',
   REGISTER: '/register',
   AUTH: '/auth',
   LANDING_HOME: '/home',
@@ -145,7 +147,7 @@ export const DASHBOARD_MENU: RouteConfig[] = [
       },
       {
         path: FINANCE_ROUTES.MPESA,
-        label: 'M-Pesa Management',
+        label: 'Payments (Pesapal)',
         icon: 'CreditCard',
       },
       {
@@ -255,7 +257,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   contributions: 'Contributions',
   'all-contributions': 'All Contributions',
   'treasurer-dashboard': 'Treasurer Dashboard',
-  mpesa: 'M-Pesa Management',
+  mpesa: 'Payments (Pesapal)',
   reports: 'Reports',
 
   // Members
@@ -304,6 +306,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   help: 'Help Center',
   faq: 'FAQ',
   support: 'Support',
+  donate: 'Donate',
   register: 'Register',
   auth: 'Authentication',
 };

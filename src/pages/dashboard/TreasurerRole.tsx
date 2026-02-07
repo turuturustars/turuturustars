@@ -23,7 +23,7 @@ const TreasurerRole = () => {
   const quickActions = [
     {
       title: 'Payment Tracking',
-      description: 'View M-Pesa transactions',
+      description: 'View Pesapal transactions',
       icon: <DollarSign className="w-5 h-5" />,
       path: '/dashboard/finance/mpesa',
       color: 'bg-green-100 dark:bg-green-900/30',

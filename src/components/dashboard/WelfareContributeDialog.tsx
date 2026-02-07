@@ -1,21 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useEffect, useMemo, useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
+import { submitPesapalOrder, getPesapalTransactionStatus } from '@/lib/pesapal';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
-import {
-  Smartphone,
-  Heart,
-  CheckCircle,
-  AlertCircle,
-  Loader2,
-  Info,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
+import { Heart, AlertCircle, Loader2, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -38,38 +29,22 @@ const WelfareContributeDialog = ({
 }: WelfareContributeDialogProps) => {
   const { profile, user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [email, setEmail] = useState(profile?.email || '');
   const [phone, setPhone] = useState(profile?.phone || '');
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-  const [showPhone, setShowPhone] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
-  const [referenceId, setReferenceId] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
-  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [orderTrackingId, setOrderTrackingId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    const timeout = pollingRef.current;
-    return () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    };
-  }, []);
-
-  const validatePhone = (value: string): string | null => {
-    if (!value.trim()) return 'Phone number is required';
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.length < 10) return 'Phone number must be at least 10 digits';
-    if (cleaned.length > 13) return 'Phone number is too long';
-    const phoneRegex = /^(254|0)?7\d{8}$/;
-    if (!phoneRegex.exec(cleaned)) {
-      return 'Invalid Kenyan phone number format';
-    }
-    return null;
-  };
+  const [firstName, lastName] = useMemo(() => {
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length <= 1) return [parts[0] || '', ''];
+    return [parts[0], parts.slice(1).join(' ')];
+  }, [fullName]);
 
   const validateAmount = (value: string): string | null => {
     if (!value.trim()) return 'Amount is required';
@@ -81,20 +56,8 @@ const WelfareContributeDialog = ({
     return null;
   };
 
-  const phoneError = touched.phone ? validatePhone(phone) : null;
   const amountError = touched.amount ? validateAmount(amount) : null;
-  const isValid = !phoneError && !amountError && phone.trim() && amount.trim();
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    const newValue = value.replace(/[^\d+\s]/g, '');
-    setPhone(newValue);
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { value } = e.target;
-    setAmount(value);
-  };
+  const isValid = !amountError && amount.trim() && fullName.trim() && email.trim();
 
   const handleBlur = (field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -112,14 +75,10 @@ const WelfareContributeDialog = ({
     }
 
     setIsProcessing(true);
-    setPaymentStep('processing');
-    setStatusMessage('Initializing M-Pesa payment...');
 
     try {
-      const formattedPhone = formatPhoneNumber(phone);
       const numAmount = Math.round(Number.parseFloat(amount));
 
-      // First, create a contribution record
       const { data: contributionData, error: contributionError } = await supabase
         .from('contributions')
         .insert({
@@ -130,102 +89,80 @@ const WelfareContributeDialog = ({
           contribution_type: 'welfare',
           status: 'pending',
         })
-        .select()
+        .select('id')
         .single();
 
-      if (contributionError) throw contributionError;
+      if (contributionError || !contributionData) throw contributionError;
 
-      const contributionId = contributionData.id;
-
-      // Initiate STK Push for M-Pesa payment
-      const response = await initiateSTKPush({
-        phoneNumber: formattedPhone,
+      const callbackUrl = `${window.location.origin}/payment/pesapal/callback`;
+      const result = await submitPesapalOrder({
         amount: numAmount,
-        accountReference: `WF-${welfareCaseId.slice(0, 8)}-${Date.now()}`,
-        transactionDesc: `Welfare: ${welfareCaseTitle}`,
-        contributionId,
+        currency: 'KES',
+        description: `Welfare: ${welfareCaseTitle}`,
+        callbackUrl,
+        contributionId: contributionData.id,
+        billingAddress: {
+          email_address: email.trim(),
+          phone_number: phone.trim() || undefined,
+          first_name: firstName || fullName.trim(),
+          last_name: lastName,
+        },
       });
 
-      if (response.ResponseCode === '0') {
-        setReferenceId(contributionId);
-        setStatusMessage('Please complete the M-Pesa payment on your phone...');
-        
-        // Poll for payment status
-        let pollCount = 0;
-        const maxPolls = 60; // 60 polls * 5 seconds = 5 minutes
-
-        const pollPaymentStatus = async () => {
-          try {
-            const { data, error } = await supabase
-              .from('contributions')
-              .select('status')
-              .eq('id', contributionId)
-              .single();
-
-            if (error) throw error;
-
-            const status = (data as { status?: string | null })?.status;
-            if (status === 'completed') {
-              clearTimeout(pollingRef.current as ReturnType<typeof setTimeout>);
-              setPaymentStep('success');
-              setStatusMessage('Contribution recorded successfully!');
-              toast.success('Thank you for your contribution!');
-              
-              setTimeout(() => {
-                setOpen(false);
-                onContributionSuccess?.();
-                resetForm();
-              }, 2000);
-            } else if (status === 'failed') {
-              clearTimeout(pollingRef.current as ReturnType<typeof setTimeout>);
-              setStatusMessage('Payment failed. Please try again.');
-              toast.error('Payment failed. Please try again.');
-              setPaymentStep('form');
-            } else if (pollCount < maxPolls) {
-              pollCount++;
-              pollingRef.current = setTimeout(pollPaymentStatus, 5000);
-            } else {
-              clearTimeout(pollingRef.current as ReturnType<typeof setTimeout>);
-              setStatusMessage('Payment verification timed out. Please check your M-Pesa messages.');
-              toast.error('Payment verification timed out');
-              setPaymentStep('form');
-            }
-          } catch (error) {
-            console.error('Error polling payment status:', error);
-            clearTimeout(pollingRef.current as ReturnType<typeof setTimeout>);
-          }
-        };
-
-        pollPaymentStatus();
-      } else {
-        throw new Error(response.ResponseDescription || 'Failed to initiate M-Pesa payment');
-      }
+      toast.success('Pesapal checkout ready');
+      setCheckoutUrl(result.redirect_url);
+      setOrderTrackingId(result.order_tracking_id);
     } catch (error) {
-      console.error('Error processing contribution:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to process contribution';
       toast.error(errorMessage);
-      setStatusMessage(errorMessage);
-      setPaymentStep('form');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const resetForm = () => {
-    setAmount('');
-    setNotes('');
-    setPhone(profile?.phone || '');
-    setShowPhone(false);
-    setTouched({});
-    setPaymentStep('form');
-    setReferenceId('');
-    setStatusMessage('');
+  const handleCheckStatus = async () => {
+    if (!orderTrackingId) return;
+    try {
+      const data = await getPesapalTransactionStatus(orderTrackingId);
+      const description = (data?.payment_status_description || '').toLowerCase();
+      if (description.includes('completed')) {
+        toast.success('Payment confirmed. Thank you!');
+        setOpen(false);
+        setCheckoutUrl(null);
+        setOrderTrackingId(null);
+        onContributionSuccess?.();
+        return true;
+      } else if (description.includes('failed')) {
+        toast.error('Payment failed or was cancelled.');
+        return true;
+      } else {
+        toast.message('Payment is still pending confirmation.');
+        return false;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check payment status';
+      toast.error(message);
+      return false;
+    }
   };
 
-  const handleDialogClose = () => {
-    setOpen(false);
-    resetForm();
-  };
+  useEffect(() => {
+    if (!orderTrackingId || !checkoutUrl || !open) return;
+    let attempts = 0;
+    setIsPolling(true);
+    const interval = setInterval(async () => {
+      attempts += 1;
+      const resolved = await handleCheckStatus();
+      if (resolved || attempts >= 20) {
+        setIsPolling(false);
+        clearInterval(interval);
+      }
+    }, 7000);
+    return () => {
+      clearInterval(interval);
+      setIsPolling(false);
+    };
+  }, [orderTrackingId, checkoutUrl, open]);
 
   const remainingAmount = targetAmount ? Math.max(0, targetAmount - collectedAmount) : null;
 
@@ -249,171 +186,165 @@ const WelfareContributeDialog = ({
             <Heart className="w-5 h-5 text-red-500" />
             Contribute to {welfareCaseTitle}
           </DialogTitle>
+          <DialogDescription>
+            Complete your welfare contribution securely through Pesapal.
+          </DialogDescription>
         </DialogHeader>
 
-        {paymentStep === 'form' && (
-          <div className="space-y-4">
-            {/* Progress Information */}
-            {targetAmount && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-sm">
-                    <p className="text-blue-900 font-medium">
-                      Remaining: KES {remainingAmount?.toLocaleString()}
-                    </p>
-                    <p className="text-blue-700 text-xs mt-1">
-                      {collectedAmount > 0 && (
-                        <>KES {collectedAmount.toLocaleString()} collected so far</>
-                      )}
-                    </p>
-                  </div>
+        <div className="space-y-4">
+          {checkoutUrl ? (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                Complete payment in the secure Pesapal checkout below.
+              </div>
+              <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/10">
+                <iframe
+                  title="Pesapal Welfare Checkout"
+                  src={checkoutUrl}
+                  className="w-full h-[520px] bg-white"
+                  allow="payment *"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" onClick={handleCheckStatus}>
+                  {isPolling ? 'Checking payment status...' : 'I completed payment'}
+                </Button>
+                <a
+                  href={checkoutUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-primary hover:underline text-center"
+                >
+                  Open checkout in a new tab
+                </a>
+              </div>
+            </div>
+          ) : (
+          {targetAmount && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="text-blue-900 font-medium">
+                    Remaining: KES {remainingAmount?.toLocaleString()}
+                  </p>
+                  <p className="text-blue-700 text-xs mt-1">
+                    {collectedAmount > 0 && (
+                      <>KES {collectedAmount.toLocaleString()} collected so far</>
+                    )}
+                  </p>
                 </div>
               </div>
-            )}
-
-            {/* Phone Number Field */}
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm font-medium">
-                Phone Number *
-              </Label>
-              <div className="relative">
-                <Input
-                  id="phone"
-                  type={showPhone ? 'text' : 'password'}
-                  placeholder="+254712345678 or 0712345678"
-                  value={phone}
-                  onChange={handlePhoneChange}
-                  onBlur={() => handleBlur('phone')}
-                  className={cn(
-                    'pr-10',
-                    touched.phone && phoneError && 'border-red-500 focus:ring-red-500'
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPhone(!showPhone)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPhone ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-              {phoneError && touched.phone && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {phoneError}
-                </p>
-              )}
             </div>
+          )}
 
-            {/* Amount Field */}
-            <div className="space-y-2">
-              <Label htmlFor="amount" className="text-sm font-medium">
-                Amount (KES) *
-              </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  KES
-                </span>
-                <Input
-                  id="amount"
-                  type="number"
-                  placeholder="Enter amount"
-                  value={amount}
-                  onChange={handleAmountChange}
-                  onBlur={() => handleBlur('amount')}
-                  className={cn(
-                    'pl-12',
-                    touched.amount && amountError && 'border-red-500 focus:ring-red-500'
-                  )}
-                />
-              </div>
-              {amountError && touched.amount && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  {amountError}
-                </p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="fullName" className="text-sm font-medium">
+              Full Name *
+            </Label>
+            <Input
+              id="fullName"
+              placeholder="Your name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              onBlur={() => handleBlur('fullName')}
+              className={cn(touched.fullName && !fullName.trim() && 'border-red-500 focus:ring-red-500')}
+            />
+          </div>
 
-            {/* Notes Field */}
-            <div className="space-y-2">
-              <Label htmlFor="notes" className="text-sm font-medium">
-                Notes (Optional)
-              </Label>
-              <textarea
-                id="notes"
-                placeholder="Add a message of support..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-16 text-sm"
+          <div className="space-y-2">
+            <Label htmlFor="email" className="text-sm font-medium">
+              Email *
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={() => handleBlur('email')}
+              className={cn(touched.email && !email.trim() && 'border-red-500 focus:ring-red-500')}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone" className="text-sm font-medium">
+              Phone Number
+            </Label>
+            <Input
+              id="phone"
+              type="text"
+              placeholder="07XXXXXXXX"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="amount" className="text-sm font-medium">
+              Amount (KES) *
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                KES
+              </span>
+              <Input
+                id="amount"
+                type="text"
+                placeholder="Enter amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+                onBlur={() => handleBlur('amount')}
+                className={cn(
+                  'pl-12',
+                  touched.amount && amountError && 'border-red-500 focus:ring-red-500'
+                )}
               />
             </div>
-
-            {/* Payment Info */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Smartphone className="w-4 h-4 text-gray-600 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-gray-600">
-                  You'll receive an M-Pesa prompt on your phone. Enter your M-Pesa PIN to complete the payment.
-                </p>
-              </div>
-            </div>
-
-            {/* Contribute Button */}
-            <Button
-              onClick={handleContribute}
-              disabled={!isValid || isProcessing}
-              className="w-full gap-2 bg-red-600 hover:bg-red-700"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Heart className="w-4 h-4" />
-                  Contribute Now
-                </>
-              )}
-            </Button>
+            {amountError && touched.amount && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" />
+                {amountError}
+              </p>
+            )}
           </div>
-        )}
 
-        {paymentStep === 'processing' && (
-          <div className="space-y-4 py-6">
-            <div className="flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-            <p className="text-center text-sm font-medium">{statusMessage}</p>
-            <p className="text-center text-xs text-muted-foreground">
-              This may take a few moments. Please wait...
-            </p>
+          <div className="space-y-2">
+            <Label htmlFor="notes" className="text-sm font-medium">
+              Notes (Optional)
+            </Label>
+            <textarea
+              id="notes"
+              placeholder="Add a message of support..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-16 text-sm"
+            />
           </div>
-        )}
 
-        {paymentStep === 'success' && (
-          <div className="space-y-4 py-6">
-            <div className="flex justify-center">
-              <CheckCircle className="w-12 h-12 text-green-500" />
-            </div>
-            <p className="text-center font-medium">{statusMessage}</p>
-            <p className="text-center text-sm text-muted-foreground">
-              Reference ID: {referenceId}
-            </p>
-            <Button
-              onClick={handleDialogClose}
-              className="w-full"
-            >
-              Close
-            </Button>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
+            You will be redirected to Pesapal to complete payment.
           </div>
-        )}
+
+          <Button
+            onClick={handleContribute}
+            disabled={!isValid || isProcessing}
+            className="w-full gap-2 bg-red-600 hover:bg-red-700"
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Heart className="w-4 h-4" />
+                Contribute Now
+              </>
+            )}
+          </Button>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

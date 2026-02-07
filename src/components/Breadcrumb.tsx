@@ -24,7 +24,7 @@ const ROUTE_LABELS: Record<string, string> = {
   discipline: 'Discipline',
   voting: 'Voting',
   reports: 'Reports',
-  'mpesa-management': 'M-Pesa',
+  'mpesa-management': 'Payments',
   roles: 'Roles',
   chairperson: 'Chairperson',
   'vice-chairperson': 'Vice Chairperson',
@@ -37,6 +37,7 @@ const ROUTE_LABELS: Record<string, string> = {
   communication: 'Communication',
   governance: 'Governance',
   'welfare-management': 'Welfare Management',
+  mpesa: 'Payments (Pesapal)',
 };
 
 export function Breadcrumb({ items }: BreadcrumbProps) {

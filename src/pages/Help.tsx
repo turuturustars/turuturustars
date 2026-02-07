@@ -24,7 +24,7 @@ const Help = () => {
       topics: [
         'Creating your account',
         'Verifying your identity',
-        'Setting up M-Pesa payments',
+        'Setting up Pesapal payments',
         'Understanding membership levels',
       ],
     },
@@ -179,7 +179,7 @@ const Help = () => {
                 </li>
                 <li className="flex gap-3">
                   <span className="text-blue-600 font-bold">•</span>
-                  <span>Make sure your M-Pesa account has sufficient balance before due dates</span>
+                  <span>Make sure your payment method has sufficient balance before due dates</span>
                 </li>
                 <li className="flex gap-3">
                   <span className="text-blue-600 font-bold">•</span>

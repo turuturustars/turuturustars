@@ -46,6 +46,7 @@ const Header = () => {
     { label: 'Pillars', href: '/pillars', icon: '🏛️' },
     { label: 'Leadership', href: '/leadership', icon: '👥' },
     { label: 'Careers', href: '/careers', icon: '💼' },
+    { label: 'Donate', href: '/donate', icon: '$' },
     { label: 'Register', href: '/register', icon: '📝' },
   ];
 
