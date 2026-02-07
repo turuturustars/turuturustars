@@ -209,110 +209,112 @@ const PayWithPesapal = ({
               </div>
             </div>
           ) : (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
-            <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-700">
-              You will be redirected to Pesapal to complete payment securely.
-            </p>
-          </div>
+            <>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
+                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-700">
+                  You will be redirected to Pesapal to complete payment securely.
+                </p>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input
-              id="fullName"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className={cn(errors.fullName && 'border-red-500')}
-              placeholder="Your name"
-            />
-            {errors.fullName && (
-              <p className="text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {errors.fullName}
-              </p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className={cn(errors.fullName && 'border-red-500')}
+                  placeholder="Your name"
+                />
+                {errors.fullName && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.fullName}
+                  </p>
+                )}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className={cn(errors.email && 'border-red-500')}
-              placeholder="name@example.com"
-            />
-            {errors.email && (
-              <p className="text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {errors.email}
-              </p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={cn(errors.email && 'border-red-500')}
+                  placeholder="name@example.com"
+                />
+                {errors.email && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.email}
+                  </p>
+                )}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              className={cn(errors.phone && 'border-red-500')}
-              placeholder="07XXXXXXXX"
-            />
-            {errors.phone && (
-              <p className="text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {errors.phone}
-              </p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className={cn(errors.phone && 'border-red-500')}
+                  placeholder="07XXXXXXXX"
+                />
+                {errors.phone && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.phone}
+                  </p>
+                )}
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="amount">Amount (KES)</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-                KES
-              </span>
-              <Input
-                id="amount"
-                type="text"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
-                className={cn('pl-12', errors.amount && 'border-red-500')}
-                placeholder="1000"
-              />
-            </div>
-            {errors.amount && (
-              <p className="text-xs text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {errors.amount}
-              </p>
-            )}
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount (KES)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+                    KES
+                  </span>
+                  <Input
+                    id="amount"
+                    type="text"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+                    className={cn('pl-12', errors.amount && 'border-red-500')}
+                    placeholder="1000"
+                  />
+                </div>
+                {errors.amount && (
+                  <p className="text-xs text-red-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {errors.amount}
+                  </p>
+                )}
+              </div>
 
-          {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-3">
-              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{errors.submit}</p>
-            </div>
-          )}
+              {errors.submit && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-3">
+                  <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700">{errors.submit}</p>
+                </div>
+              )}
 
-          <AccessibleButton
-            onClick={handlePay}
-            disabled={isProcessing}
-            isLoading={isProcessing}
-            loadingText="Redirecting..."
-            ariaLabel="Proceed to Pesapal"
-            className="w-full gap-2"
-          >
-            {!isProcessing && (
-              <>
-                <DollarSign className="w-4 h-4" />
-                Continue to Pesapal
-              </>
-            )}
-          </AccessibleButton>
+              <AccessibleButton
+                onClick={handlePay}
+                disabled={isProcessing}
+                isLoading={isProcessing}
+                loadingText="Redirecting..."
+                ariaLabel="Proceed to Pesapal"
+                className="w-full gap-2"
+              >
+                {!isProcessing && (
+                  <>
+                    <DollarSign className="w-4 h-4" />
+                    Continue to Pesapal
+                  </>
+                )}
+              </AccessibleButton>
+            </>
           )}
         </div>
       </DialogContent>

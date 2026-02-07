@@ -67,7 +67,7 @@ const PaymentsManagement = () => {
   }, [user, canManageFinances]);
 
   const fetchTransactions = async () => {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('pesapal_transactions')
       .select('id, order_tracking_id, merchant_reference, amount, currency, status, payment_method, confirmation_code, created_at, updated_at, member_id')
       .order('created_at', { ascending: false })

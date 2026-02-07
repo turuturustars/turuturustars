@@ -66,7 +66,7 @@ const Donate = () => {
 
     setIsSubmitting(true);
     try {
-      const { data: donation, error } = await supabase
+      const { data: donation, error } = await (supabase as any)
         .from('donations')
         .insert({
           donor_name: form.fullName.trim(),
