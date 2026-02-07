@@ -433,17 +433,18 @@ const DashboardHome = () => {
       {/* Welcome Header - Responsive */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-7 shadow-[0_22px_70px_-35px_rgba(14,116,144,0.75)] transition-shadow duration-300">
         {/* Animated background elements */}
-        <div className="absolute inset-0 opacity-45">
-          <div className="absolute -top-8 -right-10 h-52 w-52 rounded-full bg-white/15 blur-3xl" />
-          <div className="absolute -bottom-14 left-8 h-48 w-48 rounded-full bg-cyan-200/25 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.22),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.18),transparent_50%)]" />
+        <div className="absolute inset-0 opacity-50">
+          <div className="absolute -top-8 -right-10 h-56 w-56 rounded-full bg-white/20 blur-3xl" />
+          <div className="absolute -bottom-16 left-6 h-52 w-52 rounded-full bg-cyan-200/30 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.25),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.2),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_35%,rgba(255,255,255,0.06))]" />
         </div>
-        
-        <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+
+        <div className="relative grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
           {/* Left: Greeting */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white/95 backdrop-blur-sm">
+              <div className="flex items-center gap-2 rounded-full bg-white/25 px-3 py-1 text-xs font-semibold text-white/95 backdrop-blur-sm">
                 <Sparkles className="h-4 w-4 animate-pulse" />
                 Dashboard
               </div>
@@ -452,20 +453,29 @@ const DashboardHome = () => {
                 Member Portal
               </div>
             </div>
-            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2">
+            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
               <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-semibold text-white leading-tight drop-shadow-sm">
-                Happy {dayOfWeek}!
-              </h1>
-              <p className="text-sm sm:text-base text-white/90">
-                Welcome back,{" "}
-                <span className="font-semibold text-white break-words">
+                Good Morning,{" "}
+                <span className="text-white/95">
                   {profile?.full_name?.split(' ')[0] || 'Member'}
                 </span>
+              </h1>
+              <p className="text-sm sm:text-base text-white/85">
+                Happy {dayOfWeek}!
               </p>
             </div>
             <p className="text-xs sm:text-sm text-white/80">
               Active member of Turuturu Stars CBO
             </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-white/85">
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" />
+                Membership: {profile?.status ? profile.status.charAt(0).toUpperCase() + profile.status.slice(1) : 'Pending'}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
+                Contribution streak ready
+              </span>
+            </div>
           </div>
 
           {/* Right: Time + Date */}
