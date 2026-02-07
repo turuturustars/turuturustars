@@ -220,129 +220,131 @@ const WelfareContributeDialog = ({
               </div>
             </div>
           ) : (
-          {targetAmount && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-sm">
-                  <p className="text-blue-900 font-medium">
-                    Remaining: KES {remainingAmount?.toLocaleString()}
-                  </p>
-                  <p className="text-blue-700 text-xs mt-1">
-                    {collectedAmount > 0 && (
-                      <>KES {collectedAmount.toLocaleString()} collected so far</>
-                    )}
-                  </p>
+            <>
+              {targetAmount && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="text-blue-900 font-medium">
+                        Remaining: KES {remainingAmount?.toLocaleString()}
+                      </p>
+                      <p className="text-blue-700 text-xs mt-1">
+                        {collectedAmount > 0 && (
+                          <>KES {collectedAmount.toLocaleString()} collected so far</>
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-sm font-medium">
+                  Full Name *
+                </Label>
+                <Input
+                  id="fullName"
+                  placeholder="Your name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => handleBlur('fullName')}
+                  className={cn(touched.fullName && !fullName.trim() && 'border-red-500 focus:ring-red-500')}
+                />
               </div>
-            </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-sm font-medium">
-              Full Name *
-            </Label>
-            <Input
-              id="fullName"
-              placeholder="Your name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              onBlur={() => handleBlur('fullName')}
-              className={cn(touched.fullName && !fullName.trim() && 'border-red-500 focus:ring-red-500')}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium">
+                  Email *
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => handleBlur('email')}
+                  className={cn(touched.email && !email.trim() && 'border-red-500 focus:ring-red-500')}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">
-              Email *
-            </Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onBlur={() => handleBlur('email')}
-              className={cn(touched.email && !email.trim() && 'border-red-500 focus:ring-red-500')}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-sm font-medium">
+                  Phone Number
+                </Label>
+                <Input
+                  id="phone"
+                  type="text"
+                  placeholder="07XXXXXXXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone" className="text-sm font-medium">
-              Phone Number
-            </Label>
-            <Input
-              id="phone"
-              type="text"
-              placeholder="07XXXXXXXX"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="amount" className="text-sm font-medium">
-              Amount (KES) *
-            </Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                KES
-              </span>
-              <Input
-                id="amount"
-                type="text"
-                placeholder="Enter amount"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
-                onBlur={() => handleBlur('amount')}
-                className={cn(
-                  'pl-12',
-                  touched.amount && amountError && 'border-red-500 focus:ring-red-500'
+              <div className="space-y-2">
+                <Label htmlFor="amount" className="text-sm font-medium">
+                  Amount (KES) *
+                </Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    KES
+                  </span>
+                  <Input
+                    id="amount"
+                    type="text"
+                    placeholder="Enter amount"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^\d]/g, ''))}
+                    onBlur={() => handleBlur('amount')}
+                    className={cn(
+                      'pl-12',
+                      touched.amount && amountError && 'border-red-500 focus:ring-red-500'
+                    )}
+                  />
+                </div>
+                {amountError && touched.amount && (
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    {amountError}
+                  </p>
                 )}
-              />
-            </div>
-            {amountError && touched.amount && (
-              <p className="text-sm text-red-500 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                {amountError}
-              </p>
-            )}
-          </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes" className="text-sm font-medium">
-              Notes (Optional)
-            </Label>
-            <textarea
-              id="notes"
-              placeholder="Add a message of support..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-16 text-sm"
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes" className="text-sm font-medium">
+                  Notes (Optional)
+                </Label>
+                <textarea
+                  id="notes"
+                  placeholder="Add a message of support..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-16 text-sm"
+                />
+              </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
-            You will be redirected to Pesapal to complete payment.
-          </div>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
+                You will be redirected to Pesapal to complete payment.
+              </div>
 
-          <Button
-            onClick={handleContribute}
-            disabled={!isValid || isProcessing}
-            className="w-full gap-2 bg-red-600 hover:bg-red-700"
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Heart className="w-4 h-4" />
-                Contribute Now
-              </>
-            )}
-          </Button>
+              <Button
+                onClick={handleContribute}
+                disabled={!isValid || isProcessing}
+                className="w-full gap-2 bg-red-600 hover:bg-red-700"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Heart className="w-4 h-4" />
+                    Contribute Now
+                  </>
+                )}
+              </Button>
+            </>
           )}
         </div>
       </DialogContent>

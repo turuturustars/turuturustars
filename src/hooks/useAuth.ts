@@ -135,7 +135,7 @@ export function useAuth() {
 
     const { error } = await supabase
       .from('profiles')
-      .upsert(payload, { onConflict: 'id' });
+      .upsert(payload as any, { onConflict: 'id' });
 
     if (error) {
       console.warn('Failed to ensure profile exists:', error);

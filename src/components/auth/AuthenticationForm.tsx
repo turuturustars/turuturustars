@@ -224,7 +224,9 @@ const AuthenticationForm = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: buildSiteUrl('/auth/callback'),\n        },\n      });
+          redirectTo: buildSiteUrl('/auth/callback'),
+        },
+      });
 
       if (error) throw error;
     } catch (error) {
