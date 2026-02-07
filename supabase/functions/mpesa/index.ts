@@ -148,7 +148,7 @@ serve(async (req) => {
           throw new Error("Amount must be at least KES 1");
         }
         
-        const callbackUrl = `https://oxfkntgntgsebxbpfeyh.supabase.co/functions/v1/mpesa-callback`;
+        const callbackUrl = `https://mkcgkfzltohxagqvsbqk.functions.supabase.co/functions/v1/mpesa-callback`;
         
         const stkPayload = {
           BusinessShortCode: MPESA_SHORTCODE,
