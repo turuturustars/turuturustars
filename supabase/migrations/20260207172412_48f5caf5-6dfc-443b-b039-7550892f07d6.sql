@@ -10,6 +10,17 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS registration_progress INTEGER DEFAULT 0;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS registration_completed_at TIMESTAMPTZ;
 
+-- Ensure set_updated_at trigger function exists (used by notification_preferences trigger)
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
 -- 2. Create notification_preferences table
 CREATE TABLE IF NOT EXISTS public.notification_preferences (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -48,6 +59,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- 4. Add updated_at trigger on notification_preferences
+DROP TRIGGER IF EXISTS update_notification_preferences_updated_at ON public.notification_preferences;
 CREATE TRIGGER update_notification_preferences_updated_at
   BEFORE UPDATE ON public.notification_preferences
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
