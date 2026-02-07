@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { isProfileComplete } from '@/utils/profileCompletion';
+import { waitForProfile } from '@/utils/waitForProfile';
 
 /**
  * AuthCallback - Handles OAuth and email verification callbacks
@@ -42,24 +43,16 @@ const AuthCallback = () => {
           return;
         }
 
-        // Check if profile is complete
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('full_name, phone, id_number')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Profile fetch error:', profileError);
-        }
+        // Wait for profile to be created by trigger (with retries)
+        const profile = await waitForProfile(session.user.id, 6, 500);
 
         // Redirect based on profile completion
         if (isProfileComplete(profile as any)) {
           // Profile complete - go to dashboard
           window.location.href = buildSiteUrl('/dashboard');
         } else {
-          // Profile incomplete - go to registration
-          navigate('/register', { replace: true });
+          // Profile incomplete - go to registration to fill details
+          navigate('/auth', { replace: true });
         }
       } catch (err) {
         console.error('Callback error:', err);

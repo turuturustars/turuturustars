@@ -720,6 +720,57 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          email: boolean
+          enable_announcements: boolean
+          enable_approvals: boolean
+          enable_contributions: boolean
+          enable_meetings: boolean
+          enable_messages: boolean
+          enable_transactions: boolean
+          enable_welfare: boolean
+          in_app: boolean
+          push: boolean
+          sound: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: boolean
+          enable_announcements?: boolean
+          enable_approvals?: boolean
+          enable_contributions?: boolean
+          enable_meetings?: boolean
+          enable_messages?: boolean
+          enable_transactions?: boolean
+          enable_welfare?: boolean
+          in_app?: boolean
+          push?: boolean
+          sound?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: boolean
+          enable_announcements?: boolean
+          enable_approvals?: boolean
+          enable_contributions?: boolean
+          enable_meetings?: boolean
+          enable_messages?: boolean
+          enable_transactions?: boolean
+          enable_welfare?: boolean
+          in_app?: boolean
+          push?: boolean
+          sound?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string | null
@@ -820,50 +871,77 @@ export type Database = {
       }
       profiles: {
         Row: {
+          additional_notes: string | null
           consecutive_absences: number | null
           created_at: string | null
+          education_level: string | null
           email: string | null
+          email_verified_at: string | null
+          employment_status: string | null
           full_name: string
           id: string
           id_number: string | null
+          interests: string[] | null
           is_student: boolean | null
           joined_at: string | null
+          location: string | null
           membership_number: string | null
+          occupation: string | null
           phone: string
           photo_url: string | null
+          registration_completed_at: string | null
           registration_fee_paid: boolean | null
+          registration_progress: number | null
           status: Database["public"]["Enums"]["member_status"] | null
           updated_at: string | null
         }
         Insert: {
+          additional_notes?: string | null
           consecutive_absences?: number | null
           created_at?: string | null
+          education_level?: string | null
           email?: string | null
+          email_verified_at?: string | null
+          employment_status?: string | null
           full_name: string
           id: string
           id_number?: string | null
+          interests?: string[] | null
           is_student?: boolean | null
           joined_at?: string | null
+          location?: string | null
           membership_number?: string | null
+          occupation?: string | null
           phone: string
           photo_url?: string | null
+          registration_completed_at?: string | null
           registration_fee_paid?: boolean | null
+          registration_progress?: number | null
           status?: Database["public"]["Enums"]["member_status"] | null
           updated_at?: string | null
         }
         Update: {
+          additional_notes?: string | null
           consecutive_absences?: number | null
           created_at?: string | null
+          education_level?: string | null
           email?: string | null
+          email_verified_at?: string | null
+          employment_status?: string | null
           full_name?: string
           id?: string
           id_number?: string | null
+          interests?: string[] | null
           is_student?: boolean | null
           joined_at?: string | null
+          location?: string | null
           membership_number?: string | null
+          occupation?: string | null
           phone?: string
           photo_url?: string | null
+          registration_completed_at?: string | null
           registration_fee_paid?: boolean | null
+          registration_progress?: number | null
           status?: Database["public"]["Enums"]["member_status"] | null
           updated_at?: string | null
         }

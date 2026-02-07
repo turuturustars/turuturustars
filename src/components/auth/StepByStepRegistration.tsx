@@ -355,16 +355,14 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
       resetCaptcha();
 
-      // Note: Email verification is handled by Supabase automatically
-      // User will receive a confirmation email at user.email
       toast({
-        title: 'Account Created!',
-        description: 'Check your email to verify your account and complete registration.',
+        title: 'Profile Saved!',
+        description: 'Your profile has been set up successfully. Redirecting to dashboard...',
       });
 
-      // Redirect to check email page
+      // Redirect to dashboard after successful profile completion
       setTimeout(() => {
-        navigate('/register', { replace: true });
+        navigate('/dashboard', { replace: true });
       }, 1500);
     } catch (error) {
       console.error('Error during signup:', error);
