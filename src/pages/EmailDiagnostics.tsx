@@ -17,6 +17,21 @@ export default function EmailDiagnostics() {
   const [isRunning, setIsRunning] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const getProjectRef = () => {
+    const direct = import.meta.env.VITE_PROJECT_ID;
+    if (direct) return direct;
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    if (!url) return null;
+    try {
+      const host = new URL(url).hostname;
+      return host.split('.')[0] || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const projectRef = getProjectRef();
   const { toast } = useToast();
 
   const addResult = (result: DiagnosticResult) => {
@@ -310,7 +325,7 @@ export default function EmailDiagnostics() {
                 <p className="font-semibold text-sm mb-2">✅ Step 1: Verify Email Confirmation Enabled</p>
                 <p className="text-xs text-muted-foreground mb-3">Go to Supabase Dashboard → Authentication → Providers. Make sure "Email" provider has "Confirm email" toggle ON.</p>
                 <a 
-                  href="https://supabase.com/dashboard/project/mkcgkfzltohxagqvsbqk/auth/providers" 
+                  href={projectRef ? `https://supabase.com/dashboard/project/${projectRef}/auth/providers` : 'https://supabase.com/dashboard'} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-xs text-primary hover:underline"
@@ -323,7 +338,7 @@ export default function EmailDiagnostics() {
                 <p className="font-semibold text-sm mb-2">✅ Step 2: Check Email Templates</p>
                 <p className="text-xs text-muted-foreground mb-3">Go to Authentication → Email Templates. You should see templates for: Confirm signup, Invite user, Magic link, Change email, Reset password</p>
                 <a 
-                  href="https://supabase.com/dashboard/project/mkcgkfzltohxagqvsbqk/auth/email" 
+                  href={projectRef ? `https://supabase.com/dashboard/project/${projectRef}/auth/email` : 'https://supabase.com/dashboard'} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-xs text-primary hover:underline"
