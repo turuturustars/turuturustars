@@ -16,6 +16,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Use sandbox for testing, production for live
 const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
 
+const getFunctionsBaseUrl = () => {
+  const host = new URL(SUPABASE_URL).hostname;
+  const ref = host.split(".")[0];
+  return `https://${ref}.functions.supabase.co`;
+};
+
 // Log loaded credentials (without exposing full secrets)
 const logInitialization = () => {
   const timestamp = new Date().toISOString();
@@ -148,7 +154,7 @@ serve(async (req) => {
           throw new Error("Amount must be at least KES 1");
         }
         
-        const callbackUrl = `https://mkcgkfzltohxagqvsbqk.functions.supabase.co/functions/v1/mpesa-callback`;
+        const callbackUrl = `${getFunctionsBaseUrl()}/functions/v1/mpesa-callback`;
         
         const stkPayload = {
           BusinessShortCode: MPESA_SHORTCODE,
