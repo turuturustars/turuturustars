@@ -25,6 +25,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { markMembershipFeePaid } from '@/lib/membershipFee';
 
 interface PaymentObligation {
   id: string;
@@ -213,6 +214,9 @@ const PaymentDashboard = () => {
         .eq('id', selectedObligation.id);
 
       if (updateError) throw updateError;
+      if (selectedObligation.contribution_type === 'membership_fee') {
+        await markMembershipFeePaid(selectedObligation.member_id);
+      }
 
       // Generate receipt
       const receipt: PaymentReceipt = {

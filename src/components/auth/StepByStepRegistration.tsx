@@ -297,6 +297,110 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     }));
   };
 
+  const ensureMembershipNumber = async (): Promise<string | null> => {
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('membership_number')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (existingError) {
+        console.warn('Failed to read membership number:', existingError);
+      }
+
+      if (existing?.membership_number) {
+        return existing.membership_number as string;
+      }
+
+      const { data: generated, error: generateError } = await (supabase as any).rpc('generate_membership_number');
+      if (generateError || !generated) {
+        console.warn('Failed to generate membership number:', generateError);
+        return null;
+      }
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ membership_number: generated, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .is('membership_number', null);
+
+      if (updateError) {
+        console.warn('Failed to save membership number:', updateError);
+      }
+
+      return generated as string;
+    } catch (error) {
+      console.warn('Membership number error:', error);
+      return null;
+    }
+  };
+
+  const getMembershipFeeAmount = async (): Promise<number> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('membership_fee_amount')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Failed to read membership fee amount:', error);
+        return 200;
+      }
+
+      const amount = Number((data as Record<string, unknown> | null)?.membership_fee_amount);
+      if (Number.isFinite(amount) && amount > 0) {
+        return amount;
+      }
+
+      return 200;
+    } catch (error) {
+      console.warn('Membership fee amount error:', error);
+      return 200;
+    }
+  };
+
+  const ensureInitialMembershipFee = async () => {
+    try {
+      const { data: existingFees, error: feeError } = await supabase
+        .from('contributions')
+        .select('id')
+        .eq('member_id', user.id)
+        .eq('contribution_type', 'membership_fee')
+        .limit(1);
+
+      if (feeError) {
+        console.warn('Failed to check membership fees:', feeError);
+        return;
+      }
+
+      if (existingFees && existingFees.length > 0) {
+        return;
+      }
+
+      const amount = await getMembershipFeeAmount();
+
+      const { error: insertError } = await supabase
+        .from('contributions')
+        .insert({
+          member_id: user.id,
+          contribution_type: 'membership_fee',
+          amount,
+          status: 'pending',
+          due_date: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        console.warn('Failed to create membership fee record:', insertError);
+      }
+    } catch (error) {
+      console.warn('Membership fee setup error:', error);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!validateStep(REGISTRATION_STEPS[currentStep].id)) {
       toast({
@@ -341,6 +445,11 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
       );
 
       if (error) throw error;
+
+      await Promise.all([
+        ensureMembershipNumber(),
+        ensureInitialMembershipFee(),
+      ]);
 
       // Store pending signup info in localStorage for recovery
       try {

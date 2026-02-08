@@ -11,6 +11,8 @@ interface Profile {
   status: 'active' | 'dormant' | 'pending' | 'suspended';
   is_student: boolean;
   registration_fee_paid: boolean;
+  membership_fee_amount: number | null;
+  membership_fee_paid: boolean;
   photo_url: string | null;
   id_number: string | null;
   joined_at: string;
@@ -175,6 +177,8 @@ export function useAuth() {
         status: (rawData.status as Profile['status']) || 'pending',
         is_student: (rawData.is_student as boolean) || false,
         registration_fee_paid: (rawData.registration_fee_paid as boolean) || false,
+        membership_fee_amount: (rawData.membership_fee_amount as number | null) ?? null,
+        membership_fee_paid: (rawData.membership_fee_paid as boolean) || false,
         photo_url: rawData.photo_url as string | null,
         id_number: rawData.id_number as string | null,
         joined_at: (rawData.joined_at as string) || (rawData.created_at as string),
@@ -186,10 +190,49 @@ export function useAuth() {
       if (!profileData.membership_number) {
         backfillMembershipNumber(userId);
       }
+      if (!profileData.registration_fee_paid) {
+        reconcileRegistrationFeePaid(userId);
+      }
       return true;
     }
     setIsLoading(false);
     return false;
+  };
+
+  const reconcileRegistrationFeePaid = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('contributions')
+        .select('id')
+        .eq('member_id', userId)
+        .eq('contribution_type', 'membership_fee')
+        .eq('status', 'paid')
+        .limit(1);
+
+      if (error) {
+        console.warn('Failed to check registration fee status:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            registration_fee_paid: true,
+            membership_fee_paid: true,
+            membership_fee_paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', userId)
+          .eq('registration_fee_paid', false);
+
+        if (updateError) {
+          console.warn('Failed to update registration fee status:', updateError);
+        }
+      }
+    } catch (error) {
+      console.warn('Registration fee reconciliation error:', error);
+    }
   };
 
   

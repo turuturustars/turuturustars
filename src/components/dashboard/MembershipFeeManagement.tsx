@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
+import { markMembershipFeePaid } from '@/lib/membershipFee';
 
 interface MemberContribution {
   id: string;
@@ -85,6 +86,9 @@ const MembershipFeeManagement = () => {
         .eq('id', selectedContribution.id);
 
       if (error) throw error;
+      if (selectedContribution.contribution_type === 'membership_fee' && profile?.id) {
+        await markMembershipFeePaid(profile.id);
+      }
 
       toast({
         title: 'Payment Recorded',
@@ -159,6 +163,12 @@ const MembershipFeeManagement = () => {
   }
 
   const pendingContribution = contributions.find((c) => c.status === 'pending');
+  const membershipFeeAmount = (() => {
+    if (pendingContribution?.amount) return pendingContribution.amount;
+    const profileAmount = Number(profile?.membership_fee_amount);
+    if (Number.isFinite(profileAmount) && profileAmount > 0) return profileAmount;
+    return 200;
+  })();
   const totalPaid = contributions
     .filter((c) => c.status === 'paid')
     .reduce((sum, c) => sum + c.amount, 0);
@@ -172,7 +182,7 @@ const MembershipFeeManagement = () => {
             <CardTitle className="text-sm font-medium">Membership Fee</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">KES 200</div>
+            <div className="text-2xl font-bold">KES {membershipFeeAmount}</div>
             <p className="text-xs text-muted-foreground mt-1">Annual fee per member</p>
           </CardContent>
         </Card>

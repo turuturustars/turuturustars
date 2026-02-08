@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { markMembershipFeePaid } from '@/lib/membershipFee';
 import {
   DollarSign,
   TrendingUp,
@@ -113,6 +114,10 @@ const TreasurerDashboard = () => {
         .eq('id', contributionId);
 
       if (error) throw error;
+      const target = contributions.find((c) => c.id === contributionId);
+      if (target?.contribution_type === 'membership_fee') {
+        await markMembershipFeePaid(target.member_id);
+      }
 
       setContributions((prev) =>
         prev.map((c) =>

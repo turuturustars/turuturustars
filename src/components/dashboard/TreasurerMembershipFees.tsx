@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertCircle, CheckCircle, Clock, DollarSign, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { markMembershipFeePaid } from '@/lib/membershipFee';
 
 interface MembershipContribution {
   id: string;
@@ -128,6 +129,7 @@ const TreasurerMembershipFees = () => {
         .eq('id', selectedContribution.id);
 
       if (error) throw error;
+      await markMembershipFeePaid(selectedContribution.member_id);
 
       // Update local state
       setContributions((prev) =>
