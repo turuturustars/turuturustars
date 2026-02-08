@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, CheckCircle, Mail } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, Mail, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -131,6 +131,35 @@ export const EmailVerification = ({
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
             Check your spam/junk folder if you don't see it. The link expires in 24 hours.
           </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Button asChild variant="outline" className="w-full">
+          <a href={`mailto:${email}`} aria-label="Open your email app">
+            <Mail className="w-4 h-4 mr-2" />
+            Open Email App
+          </a>
+        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="secondary" className="flex-1 min-w-[140px]">
+            <a href="https://mail.google.com/" target="_blank" rel="noreferrer" aria-label="Open Gmail">
+              Gmail
+              <ExternalLink className="w-3 h-3 ml-2" />
+            </a>
+          </Button>
+          <Button asChild variant="secondary" className="flex-1 min-w-[140px]">
+            <a href="https://outlook.live.com/mail/0/" target="_blank" rel="noreferrer" aria-label="Open Outlook">
+              Outlook
+              <ExternalLink className="w-3 h-3 ml-2" />
+            </a>
+          </Button>
+          <Button asChild variant="secondary" className="flex-1 min-w-[140px]">
+            <a href="https://mail.yahoo.com/" target="_blank" rel="noreferrer" aria-label="Open Yahoo Mail">
+              Yahoo Mail
+              <ExternalLink className="w-3 h-3 ml-2" />
+            </a>
+          </Button>
         </div>
       </div>
 
