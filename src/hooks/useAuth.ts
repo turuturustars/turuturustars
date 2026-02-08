@@ -42,6 +42,21 @@ export function useAuth() {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const purgeSupabaseStorage = () => {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('sb-')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+    } catch (error) {
+      console.warn('Failed to purge Supabase storage:', error);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
     const loadingTimeout = window.setTimeout(() => {
@@ -50,7 +65,28 @@ export function useAuth() {
       }
     }, 4000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const validateCurrentUser = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) {
+          purgeSupabaseStorage();
+          await supabase.auth.signOut({ scope: 'local' });
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+          setRoles([]);
+        }
+      } catch (error) {
+        purgeSupabaseStorage();
+        await supabase.auth.signOut({ scope: 'local' });
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setRoles([]);
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
@@ -70,18 +106,24 @@ export function useAuth() {
       .then(({ data: { session }, error }) => {
         if (error) {
           console.error('Error fetching session:', error);
+          purgeSupabaseStorage();
+          supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+          return;
         }
         setSession(session);
         setUser(session?.user ?? null);
         setIsLoading(false);
 
         if (session?.user) {
+          validateCurrentUser();
           fetchProfileWithRetry(session.user.id);
           fetchRoles(session.user.id);
         }
       })
       .catch((error) => {
         console.error('Unexpected error fetching session:', error);
+        purgeSupabaseStorage();
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {});
         setIsLoading(false);
       });
 
