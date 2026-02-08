@@ -25,6 +25,17 @@ export default function AuthDiagnostics() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
+  const getProjectRef = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    if (!url) return null;
+    try {
+      const host = new URL(url).hostname;
+      return host.split('.')[0] || null;
+    } catch {
+      return null;
+    }
+  };
+
   const updateResult = (name: string, status: TestResult['status'], message: string, details?: string) => {
     setResults((prev) => {
       const existing = prev.findIndex((r) => r.name === name);
@@ -96,7 +107,9 @@ export default function AuthDiagnostics() {
     // Test 5: Session Persistence
     updateResult('session-persist', 'pending', 'Checking session persistence...');
     try {
-      const stored = localStorage.getItem('sb-mkcgkfzltohxagqvsbqk-auth-token');
+      const ref = getProjectRef();
+      const storageKey = ref ? `sb-${ref}-auth-token` : null;
+      const stored = storageKey ? localStorage.getItem(storageKey) : null;
       if (stored) {
         updateResult('session-persist', 'success', 'Session stored in localStorage', 'Persistence enabled');
       } else {
