@@ -44,7 +44,7 @@ const AuthCallback = () => {
         }
 
         // Wait for profile to be created by trigger (with retries)
-        const profile = await waitForProfile(session.user.id, 6, 500);
+        const profile = await waitForProfile(session.user.id, 8, 500);
 
         // Redirect based on profile completion
         if (isProfileComplete(profile as any)) {
