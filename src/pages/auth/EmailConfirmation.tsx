@@ -108,10 +108,10 @@ const EmailConfirmation = () => {
                 nextPath = '/dashboard';
               } else {
                 console.warn('Profile completion after email confirm failed:', result.error);
-                nextPath = '/register';
+                nextPath = '/auth';
               }
             } else {
-              nextPath = '/register';
+              nextPath = '/auth';
             }
           }
         } catch (profileCheckError) {
