@@ -35,6 +35,14 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
     else setTimeOfDay('Evening');
   }, []);
 
+  useEffect(() => {
+    if (!showChat) return;
+    document.body.classList.add('overflow-hidden');
+    return () => {
+      document.body.classList.remove('overflow-hidden');
+    };
+  }, [showChat]);
+
   const getRoleBadge = () => {
     const officialRoles = roles.filter((r) => r.role !== 'member');
     if (officialRoles.length > 0) {
@@ -208,6 +216,11 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
       {/* Chat Sidebar */}
       {showChat && (
         <Suspense fallback={null}>
+          <div
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+            onClick={() => setShowChat(false)}
+            aria-hidden="true"
+          />
           <ChatSidebar onClose={() => setShowChat(false)} />
         </Suspense>
       )}
