@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+import { completeProfileViaBackend } from '@/utils/completeProfile';
+import { waitForProfile } from '@/utils/waitForProfile';
 // Turnstile / CAPTCHA disabled — the hook implementation is preserved but the integration is turned off.
 import {
   Loader2,
@@ -163,9 +165,30 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
   const removeCaptcha = () => {};
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isValidUuid = (value?: string | null) =>
+    !!value &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+  const resolveAuthUser = async () => {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        console.warn('Failed to resolve auth user:', error);
+        return null;
+      }
+      return data.user ?? null;
+    } catch (err) {
+      console.warn('Failed to resolve auth user:', err);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const checkExistingProfile = async () => {
+      if (!isValidUuid(user?.id)) {
+        setIsLoading(false);
+        return;
+      }
       try {
         const { data } = await supabase
           .from('profiles')
@@ -297,12 +320,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     }));
   };
 
-  const ensureMembershipNumber = async (): Promise<string | null> => {
+  const ensureMembershipNumber = async (userId: string): Promise<string | null> => {
+    if (!isValidUuid(userId)) return null;
     try {
       const { data: existing, error: existingError } = await supabase
         .from('profiles')
         .select('membership_number')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle();
 
       if (existingError) {
@@ -322,7 +346,7 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ membership_number: generated, updated_at: new Date().toISOString() })
-        .eq('id', user.id)
+        .eq('id', userId)
         .is('membership_number', null);
 
       if (updateError) {
@@ -336,12 +360,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     }
   };
 
-  const getMembershipFeeAmount = async (): Promise<number> => {
+  const getMembershipFeeAmount = async (userId: string): Promise<number> => {
+    if (!isValidUuid(userId)) return 200;
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('membership_fee_amount')
-        .eq('id', user.id)
+        .eq('id', userId)
         .maybeSingle();
 
       if (error) {
@@ -361,12 +386,13 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
     }
   };
 
-  const ensureInitialMembershipFee = async () => {
+  const ensureInitialMembershipFee = async (userId: string) => {
+    if (!isValidUuid(userId)) return;
     try {
       const { data: existingFees, error: feeError } = await supabase
         .from('contributions')
         .select('id')
-        .eq('member_id', user.id)
+        .eq('member_id', userId)
         .eq('contribution_type', 'membership_fee')
         .limit(1);
 
@@ -379,12 +405,12 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
         return;
       }
 
-      const amount = await getMembershipFeeAmount();
+      const amount = await getMembershipFeeAmount(userId);
 
       const { error: insertError } = await supabase
         .from('contributions')
         .insert({
-          member_id: user.id,
+          member_id: userId,
           contribution_type: 'membership_fee',
           amount,
           status: 'pending',
@@ -415,40 +441,66 @@ const StepByStepRegistration = ({ user }: StepByStepRegistrationProps) => {
 
     try {
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
+      const authUser = await resolveAuthUser();
+      const resolvedUserId = authUser?.id || user?.id;
+      const resolvedEmail = authUser?.email || user?.email || null;
+
+      if (!isValidUuid(resolvedUserId)) {
+        throw new Error('Invalid session. Please sign in again.');
+      }
 
       // Save profile data to database
       // Status is 'pending' until email is verified
+      const profilePayload = {
+        id: resolvedUserId,
+        full_name: formData.fullName.trim() || 'Member',
+        phone: formData.phone.trim() || '0000000000',
+        id_number: formData.idNumber.trim() || null,
+        email: resolvedEmail,
+        location: finalLocation || null,
+        occupation: formData.occupation.trim() || null,
+        employment_status: formData.employmentStatus || null,
+        interests: formData.interests.length > 0 ? formData.interests : null,
+        education_level: formData.educationLevel || null,
+        additional_notes: formData.additionalNotes || null,
+        is_student: formData.isStudent,
+        status: 'pending', // Pending email verification
+        email_verified_at: null, // Will be set after email confirmation
+        registration_progress: 100,
+        registration_completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
       const { error } = await (await import('@/utils/supabaseRetry')).retryUpsert(
         'profiles',
-        {
-          id: user.id,
-          full_name: formData.fullName,
-          phone: formData.phone,
-          id_number: formData.idNumber,
-          email: user.email,
-          location: finalLocation,
-          occupation: formData.occupation || null,
-          employment_status: formData.employmentStatus || null,
-          interests: formData.interests.length > 0 ? formData.interests : null,
-          education_level: formData.educationLevel || null,
-          additional_notes: formData.additionalNotes || null,
-          is_student: formData.isStudent,
-          status: 'pending', // Pending email verification
-          email_verified_at: null, // Will be set after email confirmation
-          registration_progress: 100,
-          registration_completed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
+        profilePayload,
         { onConflict: 'id' },
         3,
         300
       );
 
-      if (error) throw error;
+      if (error) {
+        // If RLS or auth issues block insert, try backend proxy (optional)
+        if (resolvedEmail) {
+          try {
+            await completeProfileViaBackend(resolvedEmail, profilePayload);
+          } catch (backendError) {
+            console.warn('Backend profile completion failed:', backendError);
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      const confirmedProfile = await waitForProfile(resolvedUserId, 6, 400);
+      if (!confirmedProfile) {
+        throw new Error('Profile could not be confirmed. Please try again.');
+      }
 
       await Promise.all([
-        ensureMembershipNumber(),
-        ensureInitialMembershipFee(),
+        ensureMembershipNumber(resolvedUserId),
+        ensureInitialMembershipFee(resolvedUserId),
       ]);
 
       // Store pending signup info in localStorage for recovery

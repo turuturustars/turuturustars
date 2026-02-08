@@ -44,6 +44,10 @@ const DEFAULT_PREFERENCES: Omit<NotificationPreferencesRecord, 'user_id' | 'crea
   enable_transactions: true,
 };
 
+const isValidUuid = (value?: string | null) =>
+  !!value &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 export function useNotificationPreferences(userId?: string) {
   const { toast } = useToast();
   const [preferences, setPreferences] = useState<NotificationPreferencesRecord | null>(null);
@@ -63,7 +67,7 @@ export function useNotificationPreferences(userId?: string) {
   );
 
   const ensureProfileExists = useCallback(async () => {
-    if (!userId) return;
+    if (!isValidUuid(userId)) return;
     // Minimal profile payload to satisfy NOT NULL constraints if profile is missing
     const { data, error } = await supabase
       .from('profiles')
@@ -86,7 +90,7 @@ export function useNotificationPreferences(userId?: string) {
   }, [userId]);
 
   const loadPreferences = useCallback(async () => {
-    if (!userId) {
+    if (!isValidUuid(userId)) {
       setPreferences(null);
       setIsLoading(false);
       return;
@@ -166,7 +170,7 @@ export function useNotificationPreferences(userId?: string) {
 
   const savePreferences = useCallback(
     async (updates: Partial<NotificationPreferencesRecord>) => {
-      if (!userId || !tableAvailable) return;
+      if (!isValidUuid(userId) || !tableAvailable) return;
 
       setIsSaving(true);
       const payload = {
