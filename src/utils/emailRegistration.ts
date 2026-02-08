@@ -210,7 +210,15 @@ export async function isEmailVerified(): Promise<boolean> {
 /**
  * Get pending signup info from localStorage
  */
-export function getPendingSignup(): { email?: string; userId?: string; timestamp?: string } | null {
+export function getPendingSignup(): {
+  email?: string;
+  userId?: string;
+  fullName?: string;
+  phone?: string;
+  idNumber?: string;
+  location?: string;
+  timestamp?: string;
+} | null {
   try {
     const pending = localStorage.getItem('pendingSignup');
     return pending ? JSON.parse(pending) : null;

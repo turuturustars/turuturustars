@@ -8,6 +8,7 @@ import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { isProfileComplete } from '@/utils/profileCompletion';
+import { getPendingSignup, clearPendingSignup, verifyEmailAndCompleteProfile } from '@/utils/emailRegistration';
 
 /**
  * Email Confirmation Page
@@ -86,7 +87,32 @@ const EmailConfirmation = () => {
             .maybeSingle();
 
           if (!isProfileComplete(profile as any)) {
-            nextPath = '/register';
+            const pending = getPendingSignup();
+            const metadata = user.user_metadata || {};
+            const fullName = pending?.fullName || (metadata.full_name as string) || 'Member';
+            const phone = pending?.phone || (metadata.phone as string) || '0000000000';
+            const idNumber = pending?.idNumber || (metadata.id_number as string) || '';
+            const location = pending?.location || (metadata.location as string) || '';
+
+            if (fullName && phone) {
+              const result = await verifyEmailAndCompleteProfile(user.id, {
+                fullName,
+                phone,
+                idNumber,
+                location,
+                occupation: (metadata.occupation as string) || undefined,
+                isStudent: Boolean(metadata.is_student),
+              });
+              if (result.success) {
+                clearPendingSignup();
+                nextPath = '/dashboard';
+              } else {
+                console.warn('Profile completion after email confirm failed:', result.error);
+                nextPath = '/register';
+              }
+            } else {
+              nextPath = '/register';
+            }
           }
         } catch (profileCheckError) {
           console.warn('Email confirmation profile check failed:', profileCheckError);

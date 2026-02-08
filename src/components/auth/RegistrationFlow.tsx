@@ -184,6 +184,10 @@ const LOCATIONS = [
             JSON.stringify({
               email: formData.email,
               userId: response.userId,
+              fullName: formData.fullName,
+              phone: formData.phone,
+              idNumber: formData.idNumber,
+              location: finalLocation,
               timestamp: new Date().toISOString(),
             })
           );

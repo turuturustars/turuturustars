@@ -164,7 +164,7 @@ export function useAuth() {
     const payload: Record<string, unknown> = {
       id: authUser.id,
       full_name: fullName,
-      phone: phone || null,
+      phone: phone || '0000000000',
       email: authUser.email || null,
       id_number: idNumber || null,
       location: location || null,
