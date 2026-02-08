@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { isProfileComplete } from '@/utils/profileCompletion';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -14,7 +15,7 @@ interface ProtectedRouteProps {
  * Optionally checks for specific roles
  */
 export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
-  const { user, roles, isLoading } = useAuth();
+  const { user, roles, isLoading, profile } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -31,6 +32,11 @@ export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps)
   // Check if user is authenticated
   if (!user) {
     // Redirect to auth page but save the location they were trying to visit
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+
+  // Force profile completion before accessing protected pages
+  if (!isProfileComplete(profile as any)) {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
@@ -98,7 +104,7 @@ interface PublicRouteProps {
  * Redirects authenticated users away from auth pages
  */
 export const PublicRoute = ({ children }: PublicRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, profile } = useAuth();
 
   if (isLoading) {
     return (
@@ -111,9 +117,12 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
     );
   }
 
-  // If user is authenticated and trying to access auth page, redirect to dashboard
+  // If user is authenticated and trying to access auth page, redirect only if profile is complete
   if (user && window.location.pathname === '/auth') {
-    return <Navigate to="/dashboard" replace />;
+    if (isProfileComplete(profile as any)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+    return <>{children}</>;
   }
 
   return <>{children}</>;
