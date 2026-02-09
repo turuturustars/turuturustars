@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { isProfileComplete } from '@/utils/profileCompletion';
+import { normalizeRoles } from '@/lib/rolePermissions';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -61,7 +62,7 @@ export const ProtectedRoute = ({ children, requiredRoles, stealth = false }: Pro
 
   // Check if user has required roles
   if (requiredRoles && requiredRoles.length > 0) {
-    const userRoles = roles.map((r) => r.role);
+    const userRoles = normalizeRoles(roles);
     const hasRequiredRole = requiredRoles.some((role) => userRoles.includes(role as typeof userRoles[number]));
 
     if (!hasRequiredRole) {

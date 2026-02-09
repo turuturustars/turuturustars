@@ -328,6 +328,54 @@ export const roleFeatures: Record<UserRole, string[]> = {
   ],
 };
 
+/**
+ * Normalize roles coming from Supabase.
+ * The database returns an array of role strings, but some components
+ * previously assumed objects shaped like { role: string }.
+ * This helper ensures we always operate on the string union type.
+ */
+const ALL_ROLES: UserRole[] = [
+  'admin',
+  'chairperson',
+  'vice_chairman',
+  'secretary',
+  'vice_secretary',
+  'treasurer',
+  'organizing_secretary',
+  'committee_member',
+  'patron',
+  'coordinator',
+  'member',
+];
+
+type RoleLike = UserRole | { role: UserRole } | string | { role: string } | null | undefined;
+
+export function normalizeRoles(roles: RoleLike[]): UserRole[] {
+  const toRole = (value: RoleLike): UserRole | null => {
+    if (!value) return null;
+
+    if (typeof value === 'string' && (ALL_ROLES as string[]).includes(value)) {
+      return value as UserRole;
+    }
+
+    if (typeof value === 'object' && 'role' in value) {
+      const candidate = (value as { role?: unknown }).role;
+      if (typeof candidate === 'string' && (ALL_ROLES as string[]).includes(candidate)) {
+        return candidate as UserRole;
+      }
+    }
+
+    return null;
+  };
+
+  const normalized = roles
+    .map(toRole)
+    .filter((role): role is UserRole => Boolean(role));
+
+  // Deduplicate while preserving order
+  return Array.from(new Set(normalized));
+}
+
 export function hasPermission(userRoles: UserRole[], permission: PermissionKey): boolean {
   return userRoles.some(role => {
     const permissions = rolePermissions[role] || [];

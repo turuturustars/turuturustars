@@ -26,7 +26,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { hasRole } from '@/lib/rolePermissions';
+import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
 import { cn } from '@/lib/utils';
 
@@ -56,7 +56,7 @@ const AnnouncementsManager = () => {
     published: false,
   });
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canManageAnnouncements = hasRole(userRoles, 'admin') ||
     hasRole(userRoles, 'chairperson') ||
     hasRole(userRoles, 'secretary');

@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
-import { hasPermission } from '@/lib/rolePermissions';
+import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
 import { searchItems, sortItems } from '@/lib/searchUtils';
 import { exportAsCSV } from '@/lib/exportUtils';
 import { usePaginationState } from '@/hooks/usePaginationState';
@@ -52,7 +52,7 @@ const AnnouncementsPage = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const pagination = usePaginationState(10);
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canCreateAnnouncement = hasPermission(userRoles, 'send_announcements');
 
   // Filter and search announcements

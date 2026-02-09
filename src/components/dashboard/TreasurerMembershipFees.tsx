@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeRoles } from '@/lib/rolePermissions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +61,7 @@ const TreasurerMembershipFees = () => {
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canAccess = userRoles.includes('treasurer') || userRoles.includes('admin') || userRoles.includes('chairperson');
 
   useEffect(() => {

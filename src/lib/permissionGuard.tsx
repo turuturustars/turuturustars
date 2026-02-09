@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { hasPermission, PermissionKey } from '@/lib/rolePermissions';
+import { hasPermission, PermissionKey, normalizeRoles } from '@/lib/rolePermissions';
 
 interface PermissionGuardProps {
   permission: PermissionKey;
@@ -13,7 +13,7 @@ interface PermissionGuardProps {
  */
 export function PermissionGuard({ permission, fallback = null, children }: PermissionGuardProps) {
   const { roles } = useAuth();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
 
   if (!hasPermission(userRoles, permission)) {
     return fallback;
@@ -27,7 +27,7 @@ export function PermissionGuard({ permission, fallback = null, children }: Permi
  */
 export function useHasPermission(permission: PermissionKey): boolean {
   const { roles } = useAuth();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   return hasPermission(userRoles, permission);
 }
 
@@ -36,7 +36,7 @@ export function useHasPermission(permission: PermissionKey): boolean {
  */
 export function usePermissions() {
   const { roles } = useAuth();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   
   return {
     roles: userRoles,

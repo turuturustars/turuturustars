@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { hasRole } from '@/lib/rolePermissions';
+import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
@@ -19,7 +19,7 @@ const ChairpersonDashboard = () => {
   const navigate = useNavigate();
   const { roles } = useAuth();
   const { status: statusMessage } = useStatus();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   
   const [stats, setStats] = useState({
     totalMembers: 0,

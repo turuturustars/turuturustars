@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeRoles } from '@/lib/rolePermissions';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import {
@@ -61,7 +62,7 @@ const AuditLogViewer = () => {
   const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
   const [actionTypes, setActionTypes] = useState<string[]>([]);
 
-  const userRoles = roles.map((r) => r.role);
+  const userRoles = normalizeRoles(roles);
   const auditRoles = [
     'admin',
     'chairperson',

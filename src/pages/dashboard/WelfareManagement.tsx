@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { hasPermission } from '@/lib/rolePermissions';
+import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
 import { 
   HandHeart, Loader2, Heart, Users, DollarSign, Plus, Trash2, 
   TrendingUp, RotateCcw, Eye, EyeOff
@@ -65,7 +65,7 @@ const WelfareManagement = () => {
     contribution_type: 'welfare' as const,
   });
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canManageContributions = hasPermission(userRoles, 'manage_welfare_transactions');
   const canRefund = hasPermission(userRoles, 'refund_welfare');
   const canRecordPayment = hasPermission(userRoles, 'record_welfare_payment');

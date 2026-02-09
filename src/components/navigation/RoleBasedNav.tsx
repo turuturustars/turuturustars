@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeRoles } from '@/lib/rolePermissions';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import {
@@ -29,7 +30,7 @@ interface NavItem {
 const RoleBasedNav = () => {
   const { roles, profile } = useAuth();
   const location = useLocation();
-  const userRoles = roles.map(r => r.role) as AppRole[];
+  const userRoles = normalizeRoles(roles) as AppRole[];
 
   // Define navigation items with role requirements
   const navItems: NavItem[] = [

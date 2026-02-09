@@ -34,7 +34,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
-import { hasRole } from '@/lib/rolePermissions';
+import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
 import { cn } from '@/lib/utils';
 
 type PriorityType = 'urgent' | 'high' | 'normal' | 'low';
@@ -64,7 +64,7 @@ const ScheduledAnnouncementsManager = () => {
     scheduledTime: '09:00',
   });
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canManage = hasRole(userRoles, 'admin') || hasRole(userRoles, 'chairperson');
 
   const { data: announcements, isLoading } = useQuery({

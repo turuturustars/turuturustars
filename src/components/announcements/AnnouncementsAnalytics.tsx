@@ -25,7 +25,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { hasRole } from '@/lib/rolePermissions';
+import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
 import { useAuth } from '@/hooks/useAuth';
 
 interface AnnouncementStats {
@@ -38,7 +38,7 @@ interface AnnouncementStats {
 
 const AnnouncementsAnalytics = () => {
   const { roles } = useAuth();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canView = hasRole(userRoles, 'admin') || hasRole(userRoles, 'chairperson');
 
   const { data: stats, isLoading, error } = useQuery({

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
+import { normalizeRoles } from '@/lib/rolePermissions';
 
 type UserRole = string;
 import {
@@ -30,7 +31,7 @@ const RolesPage = () => {
   const navigate = useNavigate();
   const { roles } = useAuth();
   const { status, showSuccess } = useStatus();
-  const userRolesList = roles.map(r => r.role);
+  const userRolesList = normalizeRoles(roles);
   const canSeeEverything = userRolesList.includes('admin');
   const canSeeBroad = userRolesList.includes('chairperson') || userRolesList.includes('vice_chairman');
 

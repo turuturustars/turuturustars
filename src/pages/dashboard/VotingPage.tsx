@@ -12,7 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { Vote, Plus, CheckCircle, XCircle, MinusCircle, Loader2, Gavel, Eye, EyeOff, Lock } from 'lucide-react';
-import { hasPermission } from '@/lib/rolePermissions';
+import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
 
 interface VotingMotion {
   id: string;
@@ -54,7 +54,7 @@ interface Meeting {
 export default function VotingPage() {
   const { user, hasRole, roles } = useAuth();
   const { status, showSuccess, showError } = useStatus();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const [motions, setMotions] = useState<VotingMotion[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [userVotes, setUserVotes] = useState<UserVote[]>([]);

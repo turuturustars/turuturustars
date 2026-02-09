@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { hasRole } from '@/lib/rolePermissions';
+import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ const SecretaryDashboard = () => {
   const navigate = useNavigate();
   const { roles } = useAuth();
   const { status: statusMessage, showSuccess } = useStatus();
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const isSecretary = hasRole(userRoles, 'secretary') || hasRole(userRoles, 'vice_secretary');
 
   const quickActions = [

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { getPrimaryRole } from '@/lib/rolePermissions';
+import { getPrimaryRole, normalizeRoles } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
@@ -94,7 +94,7 @@ const DashboardHome = () => {
   useEffect(() => {
     if (roles.length === 0) return;
     
-    const userRoles = roles.map(r => r.role);
+    const userRoles = normalizeRoles(roles);
     const primaryRole = getPrimaryRole(userRoles);
 
     const roleDashboards: Record<string, string> = {

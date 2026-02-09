@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { hasPermission } from '@/lib/rolePermissions';
+import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { HandHeart, Loader2, Heart, Users, DollarSign, Plus, Edit2, Trash2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -51,7 +51,7 @@ const WelfarePage = () => {
   const [beneficiaries, setBeneficiaries] = useState<Array<{id: string; full_name: string}>>([]);
   const pagination = usePaginationState(12);
 
-  const userRoles = roles.map(r => r.role);
+  const userRoles = normalizeRoles(roles);
   const canCreateWelfare = hasPermission(userRoles, 'create_welfare');
   const canManageWelfare = hasPermission(userRoles, 'manage_welfare');
 
