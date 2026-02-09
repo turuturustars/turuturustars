@@ -1,5 +1,3 @@
-import { supabase } from "@/integrations/supabase/client";
-
 export interface PesapalBillingAddress {
   email_address: string;
   phone_number?: string;
@@ -34,59 +32,48 @@ export interface PesapalSubmitOrderResponse {
   redirect_url: string;
 }
 
-export async function submitPesapalOrder(
-  params: PesapalSubmitOrderParams
-): Promise<PesapalSubmitOrderResponse> {
-  const { data, error } = await supabase.functions.invoke("pesapal", {
-    body: {
-      action: "submit_order",
-      ...params,
-    },
+const PESA_ENDPOINT =
+  (typeof window !== "undefined" ? window.location.origin : "") + "/pesapal";
+
+async function callPesapal(body: Record<string, unknown>) {
+  const resp = await fetch(PESA_ENDPOINT, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
   });
 
-  if (error) {
-    throw new Error(error.message);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    const message = data?.error || data?.message || resp.statusText;
+    throw new Error(message);
   }
   if (data?.error) {
     throw new Error(data.error);
   }
+  return data;
+}
 
+export async function submitPesapalOrder(
+  params: PesapalSubmitOrderParams
+): Promise<PesapalSubmitOrderResponse> {
+  const data = await callPesapal({
+    action: "submit_order",
+    ...params,
+  });
   return data as PesapalSubmitOrderResponse;
 }
 
 export async function getPesapalTransactionStatus(orderTrackingId: string) {
-  const { data, error } = await supabase.functions.invoke("pesapal", {
-    body: {
-      action: "get_status",
-      orderTrackingId,
-    },
+  return callPesapal({
+    action: "get_status",
+    orderTrackingId,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
-  return data;
 }
 
 export async function registerPesapalIpn(ipnUrl: string, ipnNotificationType = "POST") {
-  const { data, error } = await supabase.functions.invoke("pesapal", {
-    body: {
-      action: "register_ipn",
-      ipnUrl,
-      ipnNotificationType,
-    },
+  return callPesapal({
+    action: "register_ipn",
+    ipnUrl,
+    ipnNotificationType,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (data?.error) {
-    throw new Error(data.error);
-  }
-
-  return data;
 }
