@@ -42,6 +42,8 @@ const PESA_ENDPOINT =
   SUPABASE_EDGE ||
   LOCAL_EDGE;
 
+const CLIENT_NOTIFICATION_ID = (import.meta as any).env?.VITE_PESAPAL_IPN_ID;
+
 async function callPesapal(body: Record<string, unknown>) {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -82,6 +84,7 @@ export async function submitPesapalOrder(
   const data = await callPesapal({
     action: "submit_order",
     ...params,
+    notificationId: params.notificationId || CLIENT_NOTIFICATION_ID,
   });
   return data as PesapalSubmitOrderResponse;
 }
