@@ -25,8 +25,14 @@ verify_jwt = false
  [functions.send-verification-email]
  verify_jwt = false
  
- [functions.create-profile]
+[functions.create-profile]
  verify_jwt = false
 
 [functions.jobs-ingest]
+verify_jwt = false
+
+[functions.pesapal]
+verify_jwt = false
+
+[functions.pesapal-ipn]
 verify_jwt = false
