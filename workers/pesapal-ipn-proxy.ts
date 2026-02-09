@@ -22,9 +22,10 @@ export default {
     }
 
     /* ---------- TARGET ---------- */
+    // Always forward to the IPN handler in Supabase
     const target =
-      `https://mkcgkfzltohxagqvsbqk.functions.supabase.co` +
-      `${url.pathname}${url.search}`;
+      `https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal-ipn` +
+      `${url.search}`;
 
     /* ---------- HEADERS ---------- */
     const headers = new Headers();
