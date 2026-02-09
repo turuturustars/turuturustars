@@ -84,6 +84,8 @@ Crawl-delay: 1
 Sitemap: https://turuturustars.co.ke/sitemap.xml
 Sitemap: https://turuturustars.co.ke/sitemap-locations.xml
 Sitemap: https://turuturustars.co.ke/sitemap-landmarks.xml
+Sitemap: https://turuturustars.co.ke/jobs-sitemap.xml
+Sitemap: https://turuturustars.co.ke/jobs-atom.xml
 
 # ====================
 # ADDITIONAL DIRECTIVES
