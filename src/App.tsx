@@ -316,7 +316,19 @@ const App = () => {
                     <Route
                       path="approvals"
                       element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'secretary']} stealth>
+                        <ProtectedRoute
+                          requiredRoles={[
+                            'admin',
+                            'chairperson',
+                            'vice_chairman',
+                            'secretary',
+                            'vice_secretary',
+                            'treasurer',
+                            'organizing_secretary',
+                            'patron',
+                          ]}
+                          stealth
+                        >
                           <ApprovalsPage />
                         </ProtectedRoute>
                       }
@@ -324,7 +336,19 @@ const App = () => {
                     <Route
                       path="jobs"
                       element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
+                        <ProtectedRoute
+                          requiredRoles={[
+                            'admin',
+                            'chairperson',
+                            'vice_chairman',
+                            'treasurer',
+                            'secretary',
+                            'vice_secretary',
+                            'organizing_secretary',
+                            'patron',
+                          ]}
+                          stealth
+                        >
                           <JobsModerationPage />
                         </ProtectedRoute>
                       }

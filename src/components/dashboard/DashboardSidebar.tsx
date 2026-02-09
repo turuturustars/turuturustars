@@ -101,6 +101,9 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       return [
         { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
         { label: 'Records', href: '/dashboard/governance/secretary-dashboard', icon: ClipboardList },
+        { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
         operationsLink,
       ];
     }
@@ -110,6 +113,9 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         { label: 'Treasury', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
+        { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
         operationsLink,
       ];
     }
@@ -120,6 +126,8 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
         { label: 'Discipline & Fines', href: '/dashboard/members/discipline', icon: FileText },
         { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
         operationsLink,
       ];
     }
@@ -127,6 +135,9 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     if (hasRole(userRoles, 'patron')) {
       return [
         { label: 'Patron Dashboard', href: `/dashboard/roles/patron`, icon: Star },
+        { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
         operationsLink,
       ];
     }

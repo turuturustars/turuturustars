@@ -59,6 +59,7 @@ const MembersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [sendingResetId, setSendingResetId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     memberId?: string;
@@ -70,12 +71,34 @@ const MembersPage = () => {
     confirmText?: string;
     isDeleting?: boolean;
   }>({ step: 'idle' });
+  const [addDialog, setAddDialog] = useState<{
+    open: boolean;
+    fullName: string;
+    email: string;
+    phone: string;
+    isStudent: string;
+    feePaid: string;
+    status: 'active' | 'pending';
+    isSubmitting: boolean;
+  }>({
+    open: false,
+    fullName: '',
+    email: '',
+    phone: '',
+    isStudent: 'no',
+    feePaid: 'no',
+    status: 'active',
+    isSubmitting: false,
+  });
   const { toast } = useToast();
   const { status, showSuccess } = useStatus();
   const pagination = usePaginationState(15);
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
-  const { user, hasRole } = useAuth();
-  const canDelete = hasRole('admin');
+  const { user, hasRole, isOfficial } = useAuth();
+  const canDelete =
+    hasRole('admin') || hasRole('chairperson') || hasRole('vice_chairman') || hasRole('organizing_secretary');
+  const canManageMembers = isOfficial(); // all officials (including admin) can add/manage
+  const officialCanAssist = isOfficial();
 
   useEffect(() => {
     fetchMembers();
@@ -168,7 +191,7 @@ const MembersPage = () => {
   const requiredPhrase = (member?: Member) => {
     if (!member) return '';
     return `DELETE ${member.membership_number ?? member.id.slice(0, 8).toUpperCase()}`;
-    };
+  };
 
   const performDelete = async () => {
     const member = deleteDialog.member;
@@ -279,6 +302,97 @@ const MembersPage = () => {
     }
   };
 
+  const generateMembershipNumber = async () => {
+    try {
+      const { data, error } = await supabase.rpc('generate_membership_number');
+      if (error) throw error;
+      return (data as string) || null;
+    } catch (err) {
+      logError(err, 'MembersPage.generateMembershipNumber');
+      return null;
+    }
+  };
+
+  const handleAddMember = async () => {
+    if (!canManageMembers) return;
+    if (!addDialog.fullName || !addDialog.phone) {
+      toast({ title: 'Missing details', description: 'Name and phone are required', variant: 'destructive' });
+      return;
+    }
+
+    setAddDialog((prev) => ({ ...prev, isSubmitting: true }));
+    try {
+      const membershipNumber = await generateMembershipNumber();
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          full_name: addDialog.fullName,
+          email: addDialog.email || null,
+          phone: addDialog.phone,
+          membership_number: membershipNumber,
+          status: addDialog.status,
+          is_student: addDialog.isStudent === 'yes',
+          registration_fee_paid: addDialog.feePaid === 'yes',
+        })
+        .select('id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at')
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setMembers((prev) => [data as Member, ...prev]);
+        logAuditAction({
+          actionType: 'CREATE_MEMBER',
+          description: `Admin added member ${data.full_name} (${membershipNumber ?? 'no number'})`,
+          entityType: 'profile',
+          entityId: data.id,
+          metadata: { actor_id: user?.id },
+        });
+      }
+
+      toast({ title: 'Member created', description: 'New member profile added successfully' });
+      setAddDialog({
+        open: false,
+        fullName: '',
+        email: '',
+        phone: '',
+        isStudent: 'no',
+        feePaid: 'no',
+        status: 'active',
+        isSubmitting: false,
+      });
+    } catch (err) {
+      const msg = getErrorMessage(err);
+      toast({ title: 'Create failed', description: msg, variant: 'destructive' });
+      setAddDialog((prev) => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  const sendResetEmail = async (member: Member) => {
+    if (!member.email || !officialCanAssist) {
+      toast({ title: 'No email on file', description: 'Cannot send reset link without an email', variant: 'destructive' });
+      return;
+    }
+    setSendingResetId(member.id);
+    try {
+      await supabase.auth.resetPasswordForEmail(member.email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      logAuditAction({
+        actionType: 'RESET_PASSWORD_LINK',
+        description: `Password reset email triggered for ${member.email}`,
+        entityType: 'profile',
+        entityId: member.id,
+        metadata: { actor_id: user?.id },
+      });
+      toast({ title: 'Reset link sent', description: `Password reset email sent to ${member.email}` });
+    } catch (err) {
+      toast({ title: 'Failed to send reset', description: getErrorMessage(err), variant: 'destructive' });
+    } finally {
+      setSendingResetId(null);
+    }
+  };
+
   const stats = {
     total: members.length,
     active: members.filter((m) => m.status === 'active').length,
@@ -293,9 +407,16 @@ const MembersPage = () => {
         type={status.type} 
         isVisible={status.isVisible} 
       />
-      <div>
-        <h2 className="text-2xl font-serif font-bold text-foreground">Members Management</h2>
-        <p className="text-muted-foreground">View and manage all CBO members</p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-2xl font-serif font-bold text-foreground">Members Management</h2>
+          <p className="text-muted-foreground">View and manage all CBO members</p>
+        </div>
+        {canManageMembers && (
+          <Button onClick={() => setAddDialog((prev) => ({ ...prev, open: true }))} className="w-full md:w-auto">
+            Add Member
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -462,8 +583,19 @@ const MembersPage = () => {
                             <SelectItem value="suspended">Suspend</SelectItem>
                           </SelectContent>
                         </Select>
-                        {canDelete && (
-                          <div className="mt-3">
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {officialCanAssist && member.email && (
+                            <AccessibleButton
+                              variant="secondary"
+                              size="sm"
+                              disabled={sendingResetId === member.id}
+                              onClick={() => sendResetEmail(member)}
+                              icon={<UserCheck className="w-4 h-4" />}
+                            >
+                              {sendingResetId === member.id ? 'Sending…' : 'Send Reset'}
+                            </AccessibleButton>
+                          )}
+                          {canDelete && (
                             <AccessibleButton
                               variant="destructive"
                               size="sm"
@@ -473,8 +605,8 @@ const MembersPage = () => {
                             >
                               Delete Member
                             </AccessibleButton>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -531,7 +663,7 @@ const MembersPage = () => {
                           {new Date(member.joined_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center gap-2">
                             <Select
                               value={member.status}
                               onValueChange={(value) => handleStatusChange(member.id, value)}
@@ -547,6 +679,18 @@ const MembersPage = () => {
                                 <SelectItem value="suspended">Suspend</SelectItem>
                               </SelectContent>
                             </Select>
+
+                            {officialCanAssist && member.email && (
+                              <AccessibleButton
+                                size="sm"
+                                variant="secondary"
+                                disabled={sendingResetId === member.id}
+                                onClick={() => sendResetEmail(member)}
+                                icon={<UserCheck className="w-4 h-4" />}
+                              >
+                                {sendingResetId === member.id ? 'Sending…' : 'Send Reset'}
+                              </AccessibleButton>
+                            )}
 
                             {canDelete && (
                               <AccessibleButton
@@ -670,6 +814,99 @@ const MembersPage = () => {
             >
               {deleteDialog.isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Permanently Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member */}
+      <Dialog open={addDialog.open} onOpenChange={(open) => setAddDialog((prev) => ({ ...prev, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Member</DialogTitle>
+            <DialogDescription>Admins and officials can register members who need assistance.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Full name</label>
+              <Input
+                value={addDialog.fullName}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, fullName: e.target.value }))}
+                placeholder="Jane Doe"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Email (optional)</label>
+              <Input
+                type="email"
+                value={addDialog.email}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, email: e.target.value }))}
+                placeholder="jane@example.com"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Phone</label>
+              <Input
+                value={addDialog.phone}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, phone: e.target.value }))}
+                placeholder="+2547..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Status</label>
+              <Select
+                value={addDialog.status}
+                onValueChange={(value: 'active' | 'pending') => setAddDialog((prev) => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Student?</label>
+              <Select
+                value={addDialog.isStudent}
+                onValueChange={(value) => setAddDialog((prev) => ({ ...prev, isStudent: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Registration fee paid?</label>
+              <Select
+                value={addDialog.feePaid}
+                onValueChange={(value) => setAddDialog((prev) => ({ ...prev, feePaid: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="no">No</SelectItem>
+                  <SelectItem value="yes">Yes</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddDialog((prev) => ({ ...prev, open: false }))}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddMember} disabled={addDialog.isSubmitting}>
+              {addDialog.isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save Member
             </Button>
           </DialogFooter>
         </DialogContent>
