@@ -40,6 +40,7 @@ const PayWithPesapal = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [preferredMethod, setPreferredMethod] = useState<'mobile' | 'card' | 'bank'>('mobile');
   const [openedExternal, setOpenedExternal] = useState(false);
+  const [openHint, setOpenHint] = useState<string | null>(null);
 
   const [firstName, lastName] = useMemo(() => {
     const parts = fullName.trim().split(/\s+/);
@@ -93,11 +94,20 @@ const PayWithPesapal = ({
 
       onPaymentInitiated?.(result.order_tracking_id);
       setOrderTrackingId(result.order_tracking_id);
+      if (!result.redirect_url) {
+        throw new Error('Checkout link was not returned. Please try again.');
+      }
       setCheckoutUrl(result.redirect_url);
+      setOpenHint(null);
 
       if (result.redirect_url && !openedExternal) {
-        window.open(result.redirect_url, '_blank', 'noopener');
-        setOpenedExternal(true);
+        const newTab = window.open(result.redirect_url, '_blank', 'noopener');
+        if (!newTab) {
+          // Popup blocked
+          setOpenHint('Popup was blocked. Tap "Open secure checkout" below.');
+        } else {
+          setOpenedExternal(true);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Payment initiation failed';
@@ -119,6 +129,7 @@ const PayWithPesapal = ({
       setCheckoutUrl(null);
       setOrderTrackingId(null);
       setOpenedExternal(false);
+      setOpenHint(null);
     }
   };
 
@@ -221,6 +232,9 @@ const PayWithPesapal = ({
                 >
                   Open secure checkout in a new tab
                 </a>
+                {openHint && (
+                  <p className="text-[11px] text-amber-700 text-center">{openHint}</p>
+                )}
               </div>
             </div>
           ) : (

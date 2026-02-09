@@ -42,6 +42,7 @@ const WelfareContributeDialog = ({
   const [isPolling, setIsPolling] = useState(false);
   const [hasRecordedContribution, setHasRecordedContribution] = useState(false);
   const [openedExternal, setOpenedExternal] = useState(false);
+  const [openHint, setOpenHint] = useState<string | null>(null);
 
   const [firstName, lastName] = useMemo(() => {
     const parts = fullName.trim().split(/\s+/);
@@ -103,8 +104,12 @@ const WelfareContributeDialog = ({
       setOrderTrackingId(result.order_tracking_id);
 
       if (result.redirect_url && !openedExternal) {
-        window.open(result.redirect_url, '_blank', 'noopener');
-        setOpenedExternal(true);
+        const newTab = window.open(result.redirect_url, '_blank', 'noopener');
+        if (!newTab) {
+          setOpenHint('Popup was blocked. Tap "Open secure checkout" below.');
+        } else {
+          setOpenedExternal(true);
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process contribution';
@@ -197,6 +202,7 @@ const WelfareContributeDialog = ({
       setCheckoutUrl(null);
       setOrderTrackingId(null);
       setOpenedExternal(false);
+      setOpenHint(null);
     }
   }, [open]);
 
@@ -251,6 +257,9 @@ const WelfareContributeDialog = ({
                 >
                   Open checkout in a new tab
                 </a>
+                {openHint && (
+                  <p className="text-[11px] text-amber-700 text-center">{openHint}</p>
+                )}
               </div>
             </div>
           ) : (
@@ -358,7 +367,7 @@ const WelfareContributeDialog = ({
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
-                We’ll open a secure checkout where you can pay via Mobile Money, card, or bank.
+                We’ll open a secure checkout where you can pay via Mobile Money, card, or bank. If it doesn’t open, use “Open checkout in a new tab.”
               </div>
 
               <Button
