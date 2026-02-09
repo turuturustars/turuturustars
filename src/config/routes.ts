@@ -147,7 +147,7 @@ export const DASHBOARD_MENU: RouteConfig[] = [
       },
       {
         path: FINANCE_ROUTES.MPESA,
-        label: 'Payments (Pesapal)',
+        label: 'Payments',
         icon: 'CreditCard',
       },
       {

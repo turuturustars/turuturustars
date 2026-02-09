@@ -41,6 +41,7 @@ const WelfareContributeDialog = ({
   const [orderAmount, setOrderAmount] = useState<number | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [hasRecordedContribution, setHasRecordedContribution] = useState(false);
+  const [openedExternal, setOpenedExternal] = useState(false);
 
   const [firstName, lastName] = useMemo(() => {
     const parts = fullName.trim().split(/\s+/);
@@ -97,9 +98,14 @@ const WelfareContributeDialog = ({
         },
       });
 
-      toast.success('Pesapal checkout ready');
+      toast.success('Secure checkout ready');
       setCheckoutUrl(result.redirect_url);
       setOrderTrackingId(result.order_tracking_id);
+
+      if (result.redirect_url && !openedExternal) {
+        window.open(result.redirect_url, '_blank', 'noopener');
+        setOpenedExternal(true);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to process contribution';
       toast.error(errorMessage);
@@ -186,6 +192,14 @@ const WelfareContributeDialog = ({
 
   const remainingAmount = targetAmount ? Math.max(0, targetAmount - collectedAmount) : null;
 
+  useEffect(() => {
+    if (!open) {
+      setCheckoutUrl(null);
+      setOrderTrackingId(null);
+      setOpenedExternal(false);
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -207,7 +221,7 @@ const WelfareContributeDialog = ({
             Contribute to {welfareCaseTitle}
           </DialogTitle>
           <DialogDescription>
-            Complete your welfare contribution securely through Pesapal.
+            Complete your welfare contribution securely.
           </DialogDescription>
         </DialogHeader>
 
@@ -215,11 +229,11 @@ const WelfareContributeDialog = ({
           {checkoutUrl ? (
             <div className="space-y-3">
               <div className="text-sm text-muted-foreground">
-                Complete payment in the secure Pesapal checkout below.
+                Complete payment in the secure checkout below. A new tab may also be open for you.
               </div>
               <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/10">
                 <iframe
-                  title="Pesapal Welfare Checkout"
+                  title="Secure Welfare Checkout"
                   src={checkoutUrl}
                   className="w-full h-[520px] bg-white"
                   allow="payment *"
@@ -242,21 +256,21 @@ const WelfareContributeDialog = ({
           ) : (
             <>
               {targetAmount && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm">
-                      <p className="text-blue-900 font-medium">
-                        Remaining: KES {remainingAmount?.toLocaleString()}
-                      </p>
-                      <p className="text-blue-700 text-xs mt-1">
-                        {collectedAmount > 0 && (
-                          <>KES {collectedAmount.toLocaleString()} collected so far</>
-                        )}
-                      </p>
-                    </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="text-blue-900 font-medium">
+                      Remaining: KES {remainingAmount?.toLocaleString()}
+                    </p>
+                    <p className="text-blue-700 text-xs mt-1">
+                      {collectedAmount > 0 && (
+                        <>KES {collectedAmount.toLocaleString()} collected so far</>
+                      )}
+                    </p>
                   </div>
                 </div>
+              </div>
               )}
 
               <div className="space-y-2">
@@ -344,7 +358,7 @@ const WelfareContributeDialog = ({
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
-                You will be redirected to Pesapal to complete payment.
+                We’ll open a secure checkout where you can pay via Mobile Money, card, or bank.
               </div>
 
               <Button

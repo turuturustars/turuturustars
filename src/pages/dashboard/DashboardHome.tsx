@@ -643,13 +643,13 @@ const DashboardHome = () => {
               <PayWithPesapal
                 defaultAmount={100}
                 trigger={
-                  <AccessibleButton className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" ariaLabel="Pay with Pesapal for quick payment">
+                  <AccessibleButton className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" ariaLabel="Make a secure payment">
                     <div className="p-2 rounded-lg bg-white/20">
                       <DollarSign className="w-4 h-4" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="font-semibold text-sm">Pay with Pesapal</div>
-                      <div className="text-xs opacity-90">Secure Pesapal checkout</div>
+                      <div className="font-semibold text-sm">Pay Now</div>
+                      <div className="text-xs opacity-90">Secure checkout (Mobile Money / Card)</div>
                     </div>
                     <ArrowRight className="w-4 h-4" />
                   </AccessibleButton>

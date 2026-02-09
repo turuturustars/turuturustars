@@ -442,7 +442,7 @@ const ContributionsPage = () => {
                           <PayWithPesapal
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} with Pesapal for contribution ${contribution.id}`}>Pay with Pesapal</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} securely for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -495,7 +495,7 @@ const ContributionsPage = () => {
                           <PayWithPesapal
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} with Pesapal for contribution ${contribution.id}`}>Pay with Pesapal</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} securely for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { submitPesapalOrder, getPesapalTransactionStatus } from '@/lib/pesapal';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Smartphone, DollarSign, AlertCircle, Loader2, Info } from 'lucide-react';
+import { Smartphone, DollarSign, AlertCircle, ShieldCheck, CreditCard, Radio } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -38,6 +38,8 @@ const PayWithPesapal = ({
   const [orderTrackingId, setOrderTrackingId] = useState<string | null>(null);
   const [isPolling, setIsPolling] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [preferredMethod, setPreferredMethod] = useState<'mobile' | 'card' | 'bank'>('mobile');
+  const [openedExternal, setOpenedExternal] = useState(false);
 
   const [firstName, lastName] = useMemo(() => {
     const parts = fullName.trim().split(/\s+/);
@@ -63,10 +65,17 @@ const PayWithPesapal = ({
     setIsProcessing(true);
     try {
       const callbackUrl = `${window.location.origin}/payment/pesapal/callback`;
+      const methodLabel =
+        preferredMethod === 'mobile'
+          ? 'Mobile Money'
+          : preferredMethod === 'card'
+            ? 'Card'
+            : 'Bank/Transfer';
+
       const result = await submitPesapalOrder({
         amount: Number(amount),
         currency: 'KES',
-        description: paymentType || 'Contribution Payment',
+        description: `${paymentType || 'Contribution Payment'} - ${methodLabel}`,
         callbackUrl,
         contributionId,
         billingAddress: {
@@ -78,13 +87,18 @@ const PayWithPesapal = ({
       });
 
       toast({
-        title: 'Payment Started',
-        description: 'Choose your payment method to complete the transaction.',
+        title: 'Secure checkout ready',
+        description: 'Complete the payment in the secure window that just opened.',
       });
 
       onPaymentInitiated?.(result.order_tracking_id);
       setOrderTrackingId(result.order_tracking_id);
       setCheckoutUrl(result.redirect_url);
+
+      if (result.redirect_url && !openedExternal) {
+        window.open(result.redirect_url, '_blank', 'noopener');
+        setOpenedExternal(true);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Payment initiation failed';
       setErrors((prev) => ({ ...prev, submit: message }));
@@ -104,6 +118,7 @@ const PayWithPesapal = ({
       setErrors({});
       setCheckoutUrl(null);
       setOrderTrackingId(null);
+      setOpenedExternal(false);
     }
   };
 
@@ -166,17 +181,17 @@ const PayWithPesapal = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <AccessibleButton className="gap-2" ariaLabel="Pay with Pesapal">
+          <AccessibleButton className="gap-2" ariaLabel="Make a secure payment">
             <Smartphone className="w-4 h-4" />
-            Pay with Pesapal
+            Pay Now
           </AccessibleButton>
         )}
       </DialogTrigger>
       <DialogContent className="w-full max-w-sm">
         <DialogHeader>
-          <DialogTitle>Pay with Pesapal</DialogTitle>
+          <DialogTitle>Complete Payment</DialogTitle>
           <DialogDescription>
-            Complete payment securely using your preferred method.
+            Secure checkout – choose your preferred payment method in the next step.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,11 +199,11 @@ const PayWithPesapal = ({
           {checkoutUrl ? (
             <div className="space-y-3">
               <div className="text-sm text-muted-foreground">
-                Complete payment in the secure Pesapal checkout below.
+                Complete payment in the secure checkout below. If a new tab opened, you can finish there instead.
               </div>
               <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/10">
                 <iframe
-                  title="Pesapal Checkout"
+                  title="Secure Checkout"
                   src={checkoutUrl}
                   className="w-full h-[520px] bg-white"
                   allow="payment *"
@@ -204,16 +219,16 @@ const PayWithPesapal = ({
                   rel="noreferrer"
                   className="text-xs text-primary hover:underline text-center"
                 >
-                  Open checkout in a new tab
+                  Open secure checkout in a new tab
                 </a>
               </div>
             </div>
           ) : (
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
-                <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                <ShieldCheck className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-blue-700">
-                  You will be redirected to Pesapal to complete payment securely.
+                  Payments are processed securely. You’ll select Mobile Money, Card, or Bank inside checkout.
                 </p>
               </div>
 
@@ -292,6 +307,32 @@ const PayWithPesapal = ({
                 )}
               </div>
 
+              <div className="space-y-2">
+                <Label>Payment Method</Label>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    { key: 'mobile' as const, label: 'Mobile Money (M-Pesa/Airtel)', icon: Smartphone },
+                    { key: 'card' as const, label: 'Debit/Credit Card', icon: CreditCard },
+                    { key: 'bank' as const, label: 'Bank / Transfer', icon: Radio },
+                  ].map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPreferredMethod(key)}
+                      className={cn(
+                        'flex items-center gap-3 border rounded-lg px-3 py-2 text-left transition-all',
+                        preferredMethod === key
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/40'
+                      )}
+                    >
+                      <Icon className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {errors.submit && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-3">
                   <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
@@ -304,16 +345,20 @@ const PayWithPesapal = ({
                 disabled={isProcessing}
                 isLoading={isProcessing}
                 loadingText="Redirecting..."
-                ariaLabel="Proceed to Pesapal"
+                ariaLabel="Proceed to secure checkout"
                 className="w-full gap-2"
               >
                 {!isProcessing && (
                   <>
                     <DollarSign className="w-4 h-4" />
-                    Continue to Pesapal
+                    Start Secure Checkout
                   </>
                 )}
               </AccessibleButton>
+
+              <div className="text-[11px] text-muted-foreground text-center">
+                We use a PCI-DSS compliant gateway; no card or mobile details are stored here.
+              </div>
             </>
           )}
         </div>

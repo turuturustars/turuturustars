@@ -37,7 +37,7 @@ const ROUTE_LABELS: Record<string, string> = {
   communication: 'Communication',
   governance: 'Governance',
   'welfare-management': 'Welfare Management',
-  mpesa: 'Payments (Pesapal)',
+  mpesa: 'Payments',
 };
 
 export function Breadcrumb({ items }: BreadcrumbProps) {
