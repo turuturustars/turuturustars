@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {"name": "MyGov Job Adverts", "url": "https://www.mygov.go.ke/job-adverts", "category": "government_portal", "priority": 1},
+    {"name": "Public Service Commission", "url": "https://www.publicservice.go.ke/", "category": "government_portal", "priority": 2},
+    {"name": "Murang'a County Government", "url": "http://muranga.go.ke/", "category": "county", "priority": 1},
+    {"name": "Nairobi City County Government", "url": "http://www.nairobi.go.ke/", "category": "county", "priority": 2},
+    {"name": "Kenyatta University", "url": "https://www.ku.ac.ke/", "category": "university_public", "priority": 2},
+    {"name": "University of Nairobi", "url": "https://www.uonbi.ac.ke/", "category": "university_public", "priority": 2},
+    {"name": "Kenya Revenue Authority", "url": "https://www.kra.go.ke/", "category": "state_corporation", "priority": 2},
+    {"name": "Kenya Ports Authority", "url": "https://www.kpa.co.ke/", "category": "state_corporation", "priority": 2},
+    {"name": "Kenya Power and Lighting Company", "url": "https://www.kplc.co.ke/careers", "category": "private_employer", "priority": 3},
+    {"name": "Safaricom", "url": "https://www.safaricom.co.ke/careers", "category": "private_employer", "priority": 3},
+    {"name": "BrighterMonday Kenya", "url": "https://www.brightermonday.co.ke/", "category": "job_board", "priority": 4},
+    {"name": "Fuzu Kenya", "url": "https://www.fuzu.com/ke/en/jobs", "category": "job_board", "priority": 4}
+  ]
+}
