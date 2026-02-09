@@ -30,7 +30,7 @@ const LOCATIONS = [
 ] as const;
 
 const ProfilePage = () => {
-  const { profile, roles } = useAuth();
+  const { profile, roles = [] } = useAuth();
   const { toast } = useToast();
   const { status, showSuccess } = useStatus();
   const [isEditing, setIsEditing] = useState(false);
@@ -154,9 +154,9 @@ const ProfilePage = () => {
                   <Badge className={getStatusColor(profile?.status)}>
                     {profile?.status || 'Pending'}
                   </Badge>
-                  {roles.filter((r) => r.role !== 'member').map((r) => (
-                    <Badge key={r.role} variant="outline" className="capitalize">
-                      {r.role.replace('_', ' ')}
+                  {roles.filter((r) => r !== 'member').map((role) => (
+                    <Badge key={role} variant="outline" className="capitalize">
+                      {role.replace('_', ' ')}
                     </Badge>
                   ))}
                 </div>
