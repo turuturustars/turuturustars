@@ -27,6 +27,7 @@ const Donate = () => {
   const [isPolling, setIsPolling] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [openHint, setOpenHint] = useState<string | null>(null);
+  const [showThanks, setShowThanks] = useState(false);
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -163,6 +164,7 @@ const Donate = () => {
         setForm({ fullName: '', email: '', phone: '', amount: '', reference: '', notes: '' });
         setIsAnonymous(false);
         setOpenHint(null);
+        setShowThanks(true);
         return true;
       } else if (description.includes('failed')) {
         toast({
@@ -233,6 +235,22 @@ const Donate = () => {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Quick amounts */}
+                <div className="flex flex-wrap gap-2">
+                  {[500, 1000, 2500, 5000, 10000].map((amt) => (
+                    <Button
+                      key={amt}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-full border border-primary/20"
+                      onClick={() => updateField('amount', String(amt))}
+                    >
+                      KES {amt.toLocaleString()}
+                    </Button>
+                  ))}
+                </div>
+
                 <div className="flex items-center gap-2 p-3 rounded-lg border border-dashed border-primary/30 bg-primary/5">
                   <input
                     type="checkbox"
@@ -365,6 +383,19 @@ const Donate = () => {
                     </a>
                     {openHint && <p className="text-[11px] text-amber-700 text-center">{openHint}</p>}
                   </div>
+                </div>
+              )}
+
+              {showThanks && !checkoutUrl && (
+                <div className="mt-6 p-5 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900 space-y-2 shadow-sm">
+                  <p className="text-lg font-semibold">Asante sana! ❤️</p>
+                  <p className="text-sm">
+                    Your gift is already earmarked for welfare, education, and community programs.
+                    We publish quarterly impact notes so you can see the difference you made.
+                  </p>
+                  <p className="text-xs text-emerald-800">
+                    Promise: we use every shilling responsibly and transparently.
+                  </p>
                 </div>
               )}
             </CardContent>
