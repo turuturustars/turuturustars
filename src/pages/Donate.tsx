@@ -214,11 +214,11 @@ const Donate = () => {
       <Header />
       <main className="mx-auto max-w-5xl px-6 py-16">
         <div className="text-center space-y-4 mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary font-semibold text-xs tracking-wide uppercase">
-            Together We Rise
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-xs tracking-wide uppercase shadow-sm">
+            🌟 Together We Rise
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground leading-tight">
-            Fuel the Dreams of Turuturu Stars
+            Fuel the Dreams of Turuturu Stars 💚
           </h1>
           <p className="text-muted-foreground max-w-3xl mx-auto text-lg">
             Every shilling powers welfare, education, and community breakthroughs. Give with confidence—we steward funds transparently and responsibly.
@@ -226,11 +226,11 @@ const Donate = () => {
         </div>
 
         <div className="grid lg:grid-cols-[2fr,1fr] gap-8 items-start">
-          <Card className="shadow-xl border-primary/10">
+          <Card className="shadow-xl border-emerald-100">
             <CardHeader className="space-y-2">
-              <CardTitle className="text-2xl">Make a Donation</CardTitle>
+              <CardTitle className="text-2xl">Make a Donation 💝</CardTitle>
               <CardDescription className="text-base">
-                Pay securely. International donors welcome. Anonymous giving supported.
+                Pay securely. International donors welcome. Anonymous giving supported. 🔒
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -246,7 +246,7 @@ const Donate = () => {
                       className="rounded-full border border-primary/20"
                       onClick={() => updateField('amount', String(amt))}
                     >
-                      KES {amt.toLocaleString()}
+                      💚 KES {amt.toLocaleString()}
                     </Button>
                   ))}
                 </div>
@@ -356,15 +356,15 @@ const Donate = () => {
                 </Button>
               </form>
 
-              {checkoutUrl && (
-                <div className="mt-6 space-y-3">
-                  <div className="text-sm text-muted-foreground">
-                    Complete your donation in the Pesapal checkout below.
-                  </div>
-                  <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/10">
-                    <iframe
-                      title="Pesapal Donation Checkout"
-                      src={checkoutUrl}
+                {checkoutUrl && (
+                  <div className="mt-6 space-y-3">
+                    <div className="text-sm text-muted-foreground">
+                      Complete your donation in the secure checkout below. 💳
+                    </div>
+                    <div className="w-full rounded-lg overflow-hidden border border-border bg-muted/10">
+                      <iframe
+                        title="Pesapal Donation Checkout"
+                        src={checkoutUrl}
                       className="w-full h-[560px] bg-white"
                       allow="payment *"
                     />
@@ -388,22 +388,22 @@ const Donate = () => {
 
               {showThanks && !checkoutUrl && (
                 <div className="mt-6 p-5 rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-900 space-y-2 shadow-sm">
-                  <p className="text-lg font-semibold">Asante sana! ❤️</p>
+                  <p className="text-lg font-semibold">Asante sana! 💚</p>
                   <p className="text-sm">
                     Your gift is already earmarked for welfare, education, and community programs.
                     We publish quarterly impact notes so you can see the difference you made.
                   </p>
                   <p className="text-xs text-emerald-800">
-                    Promise: we use every shilling responsibly and transparently.
+                    Promise: we use every shilling responsibly and transparently. 🙏
                   </p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="shadow-md border-primary/10 bg-gradient-to-b from-primary/5 via-white to-white">
+          <Card className="shadow-md border-emerald-100 bg-gradient-to-b from-emerald-50 via-white to-white">
             <CardHeader>
-              <CardTitle>Where your gift goes</CardTitle>
+              <CardTitle>Where your gift goes 🌱</CardTitle>
               <CardDescription>We steward every shilling with care.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -415,8 +415,8 @@ const Donate = () => {
                   <li>• Community projects & resilience programs</li>
                 </ul>
               </div>
-              <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 text-sm text-primary-foreground bg-primary">
-                “We promise transparent use of funds. Quarterly reports are published to all donors.”
+              <div className="p-4 rounded-xl bg-emerald-600 text-white text-sm shadow-md">
+                “We promise transparent use of funds. Quarterly reports are published to all donors.” ✅
               </div>
               <div className="p-4 rounded-xl border border-muted-foreground/20">
                 <p className="text-sm font-semibold text-foreground mb-1">Thank you.</p>
