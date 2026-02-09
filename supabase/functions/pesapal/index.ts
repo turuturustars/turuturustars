@@ -316,4 +316,6 @@ serve(async (req) => {
       },
     );
   }
+}, {
+  verifyJWT: false,
 });
