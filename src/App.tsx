@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LocalOrganizationSchema } from "@/components/StructuredData";
 import { Logger } from "@/utils/errorHandler";
 import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
+import { AuthProvider } from "@/features/auth/AuthProvider";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -112,9 +113,10 @@ const App = () => {
           <LocalOrganizationSchema />
           <Toaster />
           <Sonner />
-          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
+          <AuthProvider>
+            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
                 {/* ==================== PUBLIC ROUTES ==================== */}
                 
                 {/* Landing Pages */}
@@ -268,6 +270,7 @@ const App = () => {
               </Routes>
             </Suspense>
           </BrowserRouter>
+          </AuthProvider>
         </TooltipProvider>
 
         {/* React Query DevTools - only in development */}

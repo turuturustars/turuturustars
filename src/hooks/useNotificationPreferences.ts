@@ -66,29 +66,6 @@ export function useNotificationPreferences(userId?: string) {
     []
   );
 
-  const ensureProfileExists = useCallback(async () => {
-    if (!isValidUuid(userId)) return;
-    // Minimal profile payload to satisfy NOT NULL constraints if profile is missing
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: userId,
-          full_name: 'Member',
-          phone: '0000000000',
-          status: 'pending',
-        },
-        { onConflict: 'id' }
-      )
-      .select('id')
-      .maybeSingle();
-
-    if (error) {
-      console.warn('ensureProfileExists failed', error);
-    }
-    return data?.id;
-  }, [userId]);
-
   const loadPreferences = useCallback(async () => {
     if (!isValidUuid(userId)) {
       setPreferences(null);
@@ -132,23 +109,6 @@ export function useNotificationPreferences(userId?: string) {
 
         if (insertError) {
           console.warn('Could not create notification preferences:', insertError.message);
-          // Retry once after ensuring profile exists (handles FK 409)
-          const createdProfile = await ensureProfileExists();
-          if (createdProfile) {
-            const { data: retryCreated, error: retryError } = await (supabase
-              .from('notification_preferences' as never) as any)
-              .upsert(insertPayload, { onConflict: 'user_id' })
-              .select('*')
-              .maybeSingle();
-            if (!retryError && retryCreated) {
-              setPreferences(retryCreated as NotificationPreferencesRecord);
-              setIsLoading(false);
-              return;
-            }
-            if (retryError) {
-              console.error('Retry creating notification preferences failed:', retryError);
-            }
-          }
           setPreferences(fallbackPrefs(userId));
         } else {
           setPreferences((created as NotificationPreferencesRecord) ?? fallbackPrefs(userId));
@@ -162,7 +122,7 @@ export function useNotificationPreferences(userId?: string) {
     }
 
     setIsLoading(false);
-  }, [userId, tableAvailable, fallbackPrefs, ensureProfileExists]);
+  }, [userId, tableAvailable, fallbackPrefs]);
 
   useEffect(() => {
     loadPreferences();

@@ -1,106 +1,28 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Home, ChevronLeft } from 'lucide-react';
-import Auth from '@/pages/Auth';
-import StepByStepRegistration from '@/components/auth/StepByStepRegistration';
-import { waitForProfile } from '@/utils/waitForProfile';
-import { buildSiteUrl } from '@/utils/siteUrl';
-import { isProfileComplete } from '@/utils/profileCompletion';
+import { useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import AuthScreen from '@/features/auth/components/AuthScreen';
+import { useAuth } from '@/hooks/useAuth';
 
+/**
+ * AuthFlow now delegates to the new AuthProvider-driven state machine.
+ * It routes authenticated users to the dashboard or profile setup and
+ * shows the unified AuthScreen for everyone else.
+ */
 const AuthFlow = () => {
-  const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'authenticated' | 'details-required'>('loading');
-  const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
+  const { status } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
 
   useEffect(() => {
-    // Check initial auth state
-    const checkAuthState = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          // User is authenticated, check if profile is complete
-          setUser({ id: session.user.id, email: session.user.email });
+    if (status === 'ready') {
+      navigate('/dashboard', { replace: true });
+    } else if (status === 'needs-profile') {
+      navigate('/profile-setup', { replace: true });
+    }
+  }, [status, navigate]);
 
-          // Attempt to read profile; wait briefly for trigger-created profiles
-          const profile = await waitForProfile(session.user.id, 5, 400);
-
-          if (isProfileComplete(profile as any)) {
-            // Profile is complete - redirect to dashboard
-            window.location.href = buildSiteUrl('/dashboard');
-          } else {
-            // Profile is incomplete, need details
-            setAuthState('details-required');
-          }
-        } else {
-          // Not authenticated
-          setAuthState('unauthenticated');
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-        setAuthState('unauthenticated');
-      }
-    };
-
-    checkAuthState();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-        setUser({ id: session.user.id, email: session.user.email });
-        
-        // Check profile completion (wait briefly for DB trigger if needed)
-        const profile = await waitForProfile(session.user.id, 5, 400);
-
-        if (isProfileComplete(profile as any)) {
-          window.location.href = buildSiteUrl('/dashboard');
-        } else {
-          setAuthState('details-required');
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setAuthState('unauthenticated');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  if (authState === 'loading') {
-    return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-background via-primary/5 to-background flex-col">
-        {/* Navigation Header */}
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
-          <a 
-            href="/" 
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-card transition-all"
-            title="Go to home page"
-          >
-            <Home className="w-4 h-4" />
-            <span className="hidden sm:inline">Home</span>
-          </a>
-        </div>
-
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-primary/20 rounded-full blur-2xl animate-pulse" />
-            <div className="relative bg-background/80 backdrop-blur-sm rounded-full p-6 border-2 border-primary/20">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground animate-pulse">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (authState === 'details-required' && user) {
-    return <StepByStepRegistration user={user} />;
-  }
-
-  return <Auth />;
+  const defaultMode = params.get('mode') === 'signup' ? 'signup' : 'signin';
+  return <AuthScreen defaultMode={defaultMode} />;
 };
 
 export default AuthFlow;
-

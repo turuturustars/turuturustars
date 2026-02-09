@@ -15,10 +15,10 @@ interface ProtectedRouteProps {
  * Optionally checks for specific roles
  */
 export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
-  const { user, roles, isLoading, profile } = useAuth();
+  const { user, roles, profile, status } = useAuth();
   const location = useLocation();
 
-  if (isLoading) {
+  if (status === 'checking') {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -30,14 +30,27 @@ export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps)
   }
 
   // Check if user is authenticated
-  if (!user) {
+  if (!user || status === 'signed-out') {
     // Redirect to auth page but save the location they were trying to visit
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // Allow dedicated flows to render without redirect loops
+  if (location.pathname === '/profile-setup' && status === 'needs-profile') {
+    return <>{children}</>;
+  }
+  if (location.pathname.startsWith('/auth/email-confirmation') && status === 'needs-email-verification') {
+    return <>{children}</>;
+  }
+
+  // Require verified email
+  if (status === 'needs-email-verification') {
+    return <Navigate to="/auth/email-confirmation" replace />;
+  }
+
   // Force profile completion before accessing protected pages
-  if (!isProfileComplete(profile as any)) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+  if (status === 'needs-profile' || !isProfileComplete(profile as any)) {
+    return <Navigate to="/profile-setup" state={{ from: location }} replace />;
   }
 
   // Check if user has required roles
@@ -104,9 +117,9 @@ interface PublicRouteProps {
  * Redirects authenticated users away from auth pages
  */
 export const PublicRoute = ({ children }: PublicRouteProps) => {
-  const { user, isLoading, profile } = useAuth();
+  const { user, profile, status } = useAuth();
 
-  if (isLoading) {
+  if (status === 'checking') {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -119,10 +132,8 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
 
   // If user is authenticated and trying to access auth page, redirect only if profile is complete
   if (user && window.location.pathname === '/auth') {
-    if (isProfileComplete(profile as any)) {
-      return <Navigate to="/dashboard" replace />;
-    }
-    return <>{children}</>;
+    if (status === 'ready' && isProfileComplete(profile as any)) return <Navigate to="/dashboard" replace />;
+    if (status === 'needs-profile') return <Navigate to="/profile-setup" replace />;
   }
 
   return <>{children}</>;

@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { buildSiteUrl } from '@/utils/siteUrl';
-import { isProfileComplete } from '@/utils/profileCompletion';
-import { waitForProfile } from '@/utils/waitForProfile';
+import { ensureProfileForUser, isProfileComplete } from '@/features/auth/authApi';
 
 /**
  * AuthCallback - Handles OAuth and email verification callbacks
@@ -43,16 +42,13 @@ const AuthCallback = () => {
           return;
         }
 
-        // Wait for profile to be created by trigger (with retries)
-        const profile = await waitForProfile(session.user.id, 8, 500);
+        // Ensure profile exists and then route based on completion
+        const profile = await ensureProfileForUser(session.user);
 
-        // Redirect based on profile completion
-        if (isProfileComplete(profile as any)) {
-          // Profile complete - go to dashboard
+        if (isProfileComplete(profile)) {
           window.location.href = buildSiteUrl('/dashboard');
         } else {
-          // Profile incomplete - go to registration to fill details
-          navigate('/auth', { replace: true });
+          navigate('/profile-setup', { replace: true });
         }
       } catch (err) {
         console.error('Callback error:', err);
