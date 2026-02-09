@@ -32,15 +32,15 @@ export interface PesapalSubmitOrderResponse {
   redirect_url: string;
 }
 
-const DEFAULT_EDGE_URL =
-  typeof window !== "undefined"
-    ? `${window.location.origin}/functions/v1/pesapal`
-    : "";
+// Prefer an explicit endpoint; fall back to Supabase edge; last resort try local edge path.
+const SUPABASE_EDGE = "https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal";
+const LOCAL_EDGE =
+  typeof window !== "undefined" ? `${window.location.origin}/functions/v1/pesapal` : "";
 
 const PESA_ENDPOINT =
   (import.meta as any).env?.VITE_PESAPAL_ENDPOINT ||
-  DEFAULT_EDGE_URL ||
-  "https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal";
+  SUPABASE_EDGE ||
+  LOCAL_EDGE;
 
 async function callPesapal(body: Record<string, unknown>) {
   const headers: Record<string, string> = {
