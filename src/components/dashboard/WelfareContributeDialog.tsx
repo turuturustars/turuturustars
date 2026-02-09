@@ -38,7 +38,9 @@ const WelfareContributeDialog = ({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [orderTrackingId, setOrderTrackingId] = useState<string | null>(null);
+  const [orderAmount, setOrderAmount] = useState<number | null>(null);
   const [isPolling, setIsPolling] = useState(false);
+  const [hasRecordedContribution, setHasRecordedContribution] = useState(false);
 
   const [firstName, lastName] = useMemo(() => {
     const parts = fullName.trim().split(/\s+/);
@@ -78,21 +80,7 @@ const WelfareContributeDialog = ({
 
     try {
       const numAmount = Math.round(Number.parseFloat(amount));
-
-      const { data: contributionData, error: contributionError } = await supabase
-        .from('contributions')
-        .insert({
-          welfare_case_id: welfareCaseId,
-          member_id: user.id,
-          amount: numAmount,
-          notes: notes || null,
-          contribution_type: 'welfare',
-          status: 'pending',
-        })
-        .select('id')
-        .single();
-
-      if (contributionError || !contributionData) throw contributionError;
+      setOrderAmount(numAmount);
 
       const callbackUrl = `${window.location.origin}/payment/pesapal/callback`;
       const result = await submitPesapalOrder({
@@ -100,7 +88,7 @@ const WelfareContributeDialog = ({
         currency: 'KES',
         description: `Welfare: ${welfareCaseTitle}`,
         callbackUrl,
-        contributionId: contributionData.id,
+        memberId: user.id,
         billingAddress: {
           email_address: email.trim(),
           phone_number: phone.trim() || undefined,
@@ -126,14 +114,46 @@ const WelfareContributeDialog = ({
       const data = await getPesapalTransactionStatus(orderTrackingId);
       const description = (data?.payment_status_description || '').toLowerCase();
       if (description.includes('completed')) {
+        // Record contribution only after confirmed payment
+        if (!hasRecordedContribution && orderAmount && user?.id) {
+          const { data: contributionInsert, error } = await supabase
+            .from('contributions')
+            .insert({
+              welfare_case_id: welfareCaseId,
+              member_id: user.id,
+              amount: orderAmount,
+              notes: notes || null,
+              contribution_type: 'welfare',
+              status: 'paid',
+              paid_at: new Date().toISOString(),
+              reference_number: data?.confirmation_code ?? null,
+            })
+            .select('id')
+            .single();
+
+          if (!error && contributionInsert?.id) {
+            await supabase
+              .from('pesapal_transactions')
+              .update({ contribution_id: contributionInsert.id })
+              .eq('order_tracking_id', orderTrackingId);
+            setHasRecordedContribution(true);
+          } else if (error) {
+            console.error('Failed to record contribution after payment', error);
+            toast.error('Payment confirmed, but recording contribution failed. Contact support.');
+          }
+        }
+
         toast.success('Payment confirmed. Thank you!');
         setOpen(false);
         setCheckoutUrl(null);
         setOrderTrackingId(null);
+        setOrderAmount(null);
+        setHasRecordedContribution(false);
         onContributionSuccess?.();
         return true;
       } else if (description.includes('failed')) {
         toast.error('Payment failed or was cancelled.');
+        setHasRecordedContribution(false);
         return true;
       } else {
         toast.message('Payment is still pending confirmation.');
@@ -162,7 +182,7 @@ const WelfareContributeDialog = ({
       clearInterval(interval);
       setIsPolling(false);
     };
-  }, [orderTrackingId, checkoutUrl, open]);
+  }, [orderTrackingId, checkoutUrl, open, handleCheckStatus]);
 
   const remainingAmount = targetAmount ? Math.max(0, targetAmount - collectedAmount) : null;
 
