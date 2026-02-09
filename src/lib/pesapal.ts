@@ -32,23 +32,46 @@ export interface PesapalSubmitOrderResponse {
   redirect_url: string;
 }
 
+const DEFAULT_EDGE_URL =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/functions/v1/pesapal`
+    : "";
+
 const PESA_ENDPOINT =
-  (typeof window !== "undefined" ? window.location.origin : "") + "/pesapal";
+  (import.meta as any).env?.VITE_PESAPAL_ENDPOINT ||
+  DEFAULT_EDGE_URL ||
+  "https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal";
 
 async function callPesapal(body: Record<string, unknown>) {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+
+  const anon = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+  if (anon) headers["apikey"] = anon;
+
   const resp = await fetch(PESA_ENDPOINT, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   });
 
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    const message = data?.error || data?.message || resp.statusText;
-    throw new Error(message);
+  const text = await resp.text();
+  let data: any = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
   }
-  if (data?.error) {
-    throw new Error(data.error);
+
+  if (!resp.ok || data?.error) {
+    const message =
+      data?.error?.message ||
+      data?.error ||
+      data?.message ||
+      resp.statusText ||
+      "Payment service unavailable";
+    throw new Error(message);
   }
   return data;
 }
