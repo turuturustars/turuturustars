@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Smartphone,
   ChevronDown,
+  ActivitySquare,
   X,
   Menu,
   MessageCircle,
@@ -65,66 +66,71 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   ];
 
   const roleSpecificLinks = () => {
-    if (hasRole(userRoles, 'chairperson')) {
+    const operationsLink = { label: 'Operations Center', href: '/dashboard/admin-panel/operations', icon: ActivitySquare };
+
+    // Super admin can see every dashboard
+    if (hasRole(userRoles, 'admin')) {
       return [
+        { label: 'Admin Dashboard', href: `/dashboard/roles/admin`, icon: Settings },
         { label: 'Chair Dashboard', href: `/dashboard/roles/chairperson`, icon: Star },
-        { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
-        { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell },
+        { label: 'Vice Chair Dashboard', href: `/dashboard/roles/vice-chairperson`, icon: Star },
+        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
+        { label: 'Treasurer', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
+        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
+        { label: 'Patron', href: `/dashboard/roles/patron`, icon: Star },
+        operationsLink,
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
       ];
     }
-    if (hasRole(userRoles, 'vice_chairman')) {
+
+    // Chair & Vice Chair can see all except admin + patron
+    if (hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairman')) {
       return [
-        { label: 'Vice Chairman', href: `/dashboard/roles/vice-chairperson`, icon: Star },
-        { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
-        { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell },
-        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
-        { label: 'Discipline', href: '/dashboard/members/discipline', icon: FileText },
+        { label: hasRole(userRoles, 'chairperson') ? 'Chair Dashboard' : 'Vice Chair', href: hasRole(userRoles, 'chairperson') ? '/dashboard/roles/chairperson' : '/dashboard/roles/vice-chairperson', icon: Star },
+        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
+        { label: 'Treasurer', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
+        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
+        operationsLink,
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
       ];
     }
+
     if (hasRole(userRoles, 'secretary') || hasRole(userRoles, 'vice_secretary')) {
       return [
         { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
         { label: 'Records', href: '/dashboard/governance/secretary-dashboard', icon: ClipboardList },
+        operationsLink,
       ];
     }
+
     if (hasRole(userRoles, 'treasurer')) {
       return [
         { label: 'Treasury', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
-        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
+        operationsLink,
       ];
     }
+
     if (hasRole(userRoles, 'organizing_secretary')) {
       return [
         { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
         { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
         { label: 'Discipline & Fines', href: '/dashboard/members/discipline', icon: FileText },
         { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
+        operationsLink,
       ];
     }
+
     if (hasRole(userRoles, 'patron')) {
       return [
         { label: 'Patron Dashboard', href: `/dashboard/roles/patron`, icon: Star },
-        { label: 'Reports', href: '/dashboard/finance/reports', icon: FileText },
+        operationsLink,
       ];
     }
-    if (hasRole(userRoles, 'admin')) {
-      return [
-        { label: 'Admin Dashboard', href: `/dashboard/roles/admin`, icon: Settings },
-        { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Welfare Management', href: '/dashboard/members/welfare-management', icon: HandHeart },
-        { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
-        { label: 'Reports', href: '/dashboard/finance/reports', icon: FileText },
-        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
-        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-      ];
-    }
+
     return [];
   };
 

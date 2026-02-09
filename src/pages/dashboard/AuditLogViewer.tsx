@@ -62,15 +62,25 @@ const AuditLogViewer = () => {
   const [actionTypes, setActionTypes] = useState<string[]>([]);
 
   const userRoles = roles.map((r) => r.role);
-  const isAdmin = userRoles.includes('admin');
+  const auditRoles = [
+    'admin',
+    'chairperson',
+    'vice_chairman',
+    'treasurer',
+    'secretary',
+    'vice_secretary',
+    'organizing_secretary',
+    'patron',
+  ];
+  const canViewOperations = userRoles.some((role) => auditRoles.includes(role));
 
   useEffect(() => {
-    if (isAdmin) {
+    if (canViewOperations) {
       fetchAuditLogs();
     } else {
       setIsLoading(false);
     }
-  }, [isAdmin]);
+  }, [canViewOperations]);
 
   useEffect(() => {
     filterLogs();
@@ -169,7 +179,7 @@ const AuditLogViewer = () => {
     return <Eye className="w-4 h-4" />;
   };
 
-  if (!isAdmin) {
+  if (!canViewOperations) {
     return (
       <div className="flex items-center justify-center h-96">
         <Card className="border-red-200">
@@ -177,7 +187,7 @@ const AuditLogViewer = () => {
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <p className="text-foreground font-medium">Access Denied</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Only administrators can view audit logs
+              Only authorized admins can view the Operations Center
             </p>
           </CardContent>
         </Card>
@@ -189,11 +199,19 @@ const AuditLogViewer = () => {
     <div className="space-y-6">
       <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
       {/* Header */}
-      <div className="border-b border-border pb-4">
-        <h1 className="text-3xl font-bold">Audit Logs</h1>
-        <p className="text-muted-foreground mt-1">
-          View all system activities and user actions
-        </p>
+      <div className="border-b border-border pb-4 space-y-2">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold">Operations Center</h1>
+          <p className="text-muted-foreground">
+            Transparent, read-only feed of admin activity across the organization.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+          <div className="font-medium text-foreground">Visibility</div>
+          <p>
+            Accessible to admin, chair, vice chair, secretary (and deputy), treasurer, organizing secretary, and patron. Members cannot access or see this area.
+          </p>
+        </div>
       </div>
 
       {/* Stats Cards */}

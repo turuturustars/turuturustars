@@ -61,6 +61,7 @@ const OrganizingSecretaryDashboard = lazy(() => import("./pages/dashboard/Organi
 const PatronDashboard = lazy(() => import("./pages/dashboard/PatronDashboard"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
 const RolesPage = lazy(() => import("./pages/dashboard/RolesPage"));
+const OperationsCenter = lazy(() => import("./pages/dashboard/AuditLogViewer"));
 
 // Feature pages
 const ContributionsPage = lazy(() => import("./pages/dashboard/ContributionsPage"));
@@ -181,15 +182,90 @@ const App = () => {
                   <Route path="home" element={<DashboardHome />} />
 
                   {/* Role-specific dashboards - organized by hierarchy */}
-                  <Route path="roles" element={<RolesPage />}>
-                    <Route path="chairperson" element={<ChairpersonDashboard />} />
-                    <Route path="vice-chairperson" element={<ViceChairmanDashboard />} />
-                    <Route path="secretary" element={<SecretaryRole />} />
-                    <Route path="vice-secretary" element={<SecretaryRole />} />
-                    <Route path="treasurer" element={<TreasurerRole />} />
-                    <Route path="organizing-secretary" element={<OrganizingSecretaryDashboard />} />
-                    <Route path="patron" element={<PatronDashboard />} />
-                    <Route path="admin" element={<AdminDashboard />} />
+                  <Route
+                    path="roles"
+                    element={
+                      <ProtectedRoute
+                        requiredRoles={[
+                          'admin',
+                          'chairperson',
+                          'vice_chairman',
+                          'secretary',
+                          'vice_secretary',
+                          'treasurer',
+                          'organizing_secretary',
+                          'patron',
+                        ]}
+                        stealth
+                      >
+                        <RolesPage />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route
+                      path="chairperson"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
+                          <ChairpersonDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="vice-chairperson"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
+                          <ViceChairmanDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="secretary"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'secretary']} stealth>
+                          <SecretaryRole />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="vice-secretary"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'vice_secretary']} stealth>
+                          <SecretaryRole />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="treasurer"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'treasurer']} stealth>
+                          <TreasurerRole />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="organizing-secretary"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'organizing_secretary']} stealth>
+                          <OrganizingSecretaryDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="patron"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'patron']} stealth>
+                          <PatronDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="admin"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin']} stealth>
+                          <AdminDashboard />
+                        </ProtectedRoute>
+                      }
+                    />
                   </Route>
 
                   {/* Legacy role routes - redirect to new structure */}
@@ -237,8 +313,42 @@ const App = () => {
 
                   {/* Admin functions */}
                   <Route path="admin-panel">
-                    <Route path="approvals" element={<ApprovalsPage />} />
-                    <Route path="jobs" element={<JobsModerationPage />} />
+                    <Route
+                      path="approvals"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'secretary']} stealth>
+                          <ApprovalsPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="jobs"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
+                          <JobsModerationPage />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="operations"
+                      element={
+                        <ProtectedRoute
+                          requiredRoles={[
+                            'admin',
+                            'chairperson',
+                            'vice_chairman',
+                            'treasurer',
+                            'secretary',
+                            'vice_secretary',
+                            'organizing_secretary',
+                            'patron',
+                          ]}
+                          stealth
+                        >
+                          <OperationsCenter />
+                        </ProtectedRoute>
+                      }
+                    />
                   </Route>
 
                   {/* User profile */}

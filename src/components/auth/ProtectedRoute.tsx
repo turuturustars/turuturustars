@@ -7,6 +7,12 @@ import { Loader2 } from 'lucide-react';
 interface ProtectedRouteProps {
   children: ReactNode;
   requiredRoles?: string[];
+  /**
+   * When true, users without the required role are quietly redirected
+   * to the dashboard home instead of seeing an access denied screen.
+   * Use for hidden/privileged routes so other roles don't learn they exist.
+   */
+  stealth?: boolean;
 }
 
 /**
@@ -14,7 +20,7 @@ interface ProtectedRouteProps {
  * Prevents access to protected routes without authentication
  * Optionally checks for specific roles
  */
-export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, requiredRoles, stealth = false }: ProtectedRouteProps) => {
   const { user, roles, profile, status } = useAuth();
   const location = useLocation();
 
@@ -59,6 +65,9 @@ export const ProtectedRoute = ({ children, requiredRoles }: ProtectedRouteProps)
     const hasRequiredRole = requiredRoles.some((role) => userRoles.includes(role as typeof userRoles[number]));
 
     if (!hasRequiredRole) {
+      // For sensitive routes, fail quietly to avoid leaking that the route exists
+      if (stealth) return <Navigate to="/dashboard/home" replace />;
+
       return (
         <div className="flex h-screen w-full items-center justify-center">
           <div className="text-center">

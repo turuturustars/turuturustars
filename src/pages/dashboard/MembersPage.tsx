@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -11,6 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -28,6 +37,8 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { useDebounce } from '@/hooks/useDebounce';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
+import { logAuditAction } from '@/lib/auditLogger';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Member {
   id: string;
@@ -53,10 +64,18 @@ const MembersPage = () => {
     memberId?: string;
     newStatus?: string;
   }>({ open: false });
+  const [deleteDialog, setDeleteDialog] = useState<{
+    step: 'idle' | 'prompt' | 'confirm';
+    member?: Member;
+    confirmText?: string;
+    isDeleting?: boolean;
+  }>({ step: 'idle' });
   const { toast } = useToast();
   const { status, showSuccess } = useStatus();
   const pagination = usePaginationState(15);
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { user, hasRole } = useAuth();
+  const canDelete = hasRole('admin');
 
   useEffect(() => {
     fetchMembers();
@@ -139,6 +158,77 @@ const MembersPage = () => {
       memberId,
       newStatus,
     });
+  };
+
+  const openDeleteFlow = (member: Member) => {
+    if (!canDelete) return;
+    setDeleteDialog({ step: 'prompt', member, confirmText: '', isDeleting: false });
+  };
+
+  const requiredPhrase = (member?: Member) => {
+    if (!member) return '';
+    return `DELETE ${member.membership_number ?? member.id.slice(0, 8).toUpperCase()}`;
+    };
+
+  const performDelete = async () => {
+    const member = deleteDialog.member;
+    if (!member || !canDelete) return;
+    setDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
+
+    const snapshot = {
+      id: member.id,
+      full_name: member.full_name,
+      email: member.email,
+      phone: member.phone,
+      membership_number: member.membership_number,
+      status: member.status,
+      joined_at: member.joined_at,
+    };
+
+    try {
+      await retryAsync(
+        async () => {
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              soft_deleted: true,
+              deleted_at: new Date().toISOString(),
+              deleted_by: user?.id ?? null,
+              status: 'suspended',
+            })
+            .eq('id', member.id);
+
+          if (error) throw error;
+          return true;
+        },
+        { maxRetries: 2, delayMs: 600 }
+      );
+
+      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+
+      logAuditAction({
+        actionType: 'DELETE_MEMBER',
+        description: `Deleted member ${member.full_name} (${member.membership_number ?? member.id})`,
+        entityType: 'profile',
+        entityId: member.id,
+        metadata: { snapshot, actor_id: user?.id },
+      });
+
+      toast({
+        title: 'Member deleted',
+        description: `${member.full_name}'s account was removed (soft delete).`,
+      });
+    } catch (err) {
+      const errorMsg = getErrorMessage(err);
+      logError(err, 'MembersPage.performDelete');
+      toast({
+        title: 'Delete failed',
+        description: errorMsg,
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteDialog({ step: 'idle', member: undefined, confirmText: '', isDeleting: false });
+    }
   };
 
   const updateMemberStatus = async () => {
@@ -372,6 +462,19 @@ const MembersPage = () => {
                             <SelectItem value="suspended">Suspend</SelectItem>
                           </SelectContent>
                         </Select>
+                        {canDelete && (
+                          <div className="mt-3">
+                            <AccessibleButton
+                              variant="destructive"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => openDeleteFlow(member)}
+                              icon={<AlertCircle className="w-4 h-4" />}
+                            >
+                              Delete Member
+                            </AccessibleButton>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -428,21 +531,35 @@ const MembersPage = () => {
                           {new Date(member.joined_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <Select
-                            value={member.status}
-                            onValueChange={(value) => handleStatusChange(member.id, value)}
-                            disabled={updatingId === member.id}
-                          >
-                            <SelectTrigger className="w-[120px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="active">Activate</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="dormant">Dormant</SelectItem>
-                              <SelectItem value="suspended">Suspend</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <div className="flex items-center gap-3">
+                            <Select
+                              value={member.status}
+                              onValueChange={(value) => handleStatusChange(member.id, value)}
+                              disabled={updatingId === member.id}
+                            >
+                              <SelectTrigger className="w-[140px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="active">Activate</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="dormant">Dormant</SelectItem>
+                                <SelectItem value="suspended">Suspend</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            {canDelete && (
+                              <AccessibleButton
+                                size="sm"
+                                variant="outline"
+                                className="border-destructive text-destructive hover:bg-destructive/10"
+                                icon={<AlertCircle className="w-4 h-4" />}
+                                onClick={() => openDeleteFlow(member)}
+                              >
+                                Delete
+                              </AccessibleButton>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -481,6 +598,82 @@ const MembersPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Flow - Step 1 */}
+      <Dialog open={deleteDialog.step === 'prompt'} onOpenChange={(open) => !open && setDeleteDialog({ step: 'idle' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Member</DialogTitle>
+            <DialogDescription>
+              Do you really want to delete {deleteDialog.member?.full_name}? This action is sensitive.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteDialog({ step: 'idle' })}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={() => setDeleteDialog((prev) => ({ ...prev, step: 'confirm', confirmText: '' }))}>
+              Yes, continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Flow - Step 2 */}
+      <Dialog open={deleteDialog.step === 'confirm'} onOpenChange={(open) => !open && setDeleteDialog({ step: 'idle' })}>
+        <DialogContent className="space-y-4">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Final Confirmation</DialogTitle>
+            <DialogDescription>
+              This will remove all records for this member (soft delete). Their membership number and history will be removed from active systems.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-border/60 bg-muted/30 p-4 text-sm space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <span className="font-semibold text-foreground">{deleteDialog.member?.full_name}</span>
+              <Badge variant="outline">{deleteDialog.member?.membership_number || 'No Membership #'}</Badge>
+            </div>
+            <p className="text-muted-foreground">
+              Email: {deleteDialog.member?.email || 'N/A'} · Phone: {deleteDialog.member?.phone}
+            </p>
+            <p className="text-muted-foreground">
+              Current status: <strong className="text-foreground">{deleteDialog.member?.status}</strong>
+            </p>
+            <p className="text-[13px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
+              This is irreversible. All user details and operations history tied to this membership will be removed from active views.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground block">
+              Type <span className="font-mono">{requiredPhrase(deleteDialog.member)}</span> to confirm
+            </label>
+            <Input
+              value={deleteDialog.confirmText}
+              onChange={(e) => setDeleteDialog((prev) => ({ ...prev, confirmText: e.target.value }))}
+              placeholder={requiredPhrase(deleteDialog.member)}
+            />
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteDialog({ step: 'idle' })}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={
+                deleteDialog.isDeleting ||
+                deleteDialog.confirmText?.trim() !== requiredPhrase(deleteDialog.member)
+              }
+              onClick={performDelete}
+            >
+              {deleteDialog.isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Permanently Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmDialog.open}

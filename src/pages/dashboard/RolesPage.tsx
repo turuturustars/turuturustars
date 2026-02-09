@@ -30,6 +30,9 @@ const RolesPage = () => {
   const navigate = useNavigate();
   const { roles } = useAuth();
   const { status, showSuccess } = useStatus();
+  const userRolesList = roles.map(r => r.role);
+  const canSeeEverything = userRolesList.includes('admin');
+  const canSeeBroad = userRolesList.includes('chairperson') || userRolesList.includes('vice_chairman');
 
   const availableRoles: Role[] = [
     {
@@ -97,9 +100,14 @@ const RolesPage = () => {
     },
   ];
 
+  const visibleRoles = availableRoles.filter((role) => {
+    if (canSeeEverything) return true;
+    if (canSeeBroad) return !['admin', 'patron'].includes(role.id);
+    return userRolesList.includes(role.id as any);
+  });
+
   const handleRoleNavigation = (role: Role) => {
-    const userRolesList = roles.map(r => r.role);
-    if (userRolesList.includes(role.id as any) || userRolesList.includes('admin')) {
+    if (userRolesList.includes(role.id as any) || canSeeEverything || (canSeeBroad && !['admin', 'patron'].includes(role.id))) {
       navigate(role.path);
       showSuccess(`Navigating to ${role.title} dashboard`);
     }
@@ -117,9 +125,11 @@ const RolesPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {availableRoles.map((role) => {
-          const userRolesList = roles.map(r => r.role);
-          const hasAccess = userRolesList.includes(role.id as any) || userRolesList.includes('admin');
+      {visibleRoles.map((role) => {
+          const hasAccess =
+            userRolesList.includes(role.id as any) ||
+            canSeeEverything ||
+            (canSeeBroad && !['admin', 'patron'].includes(role.id));
 
           return (
             <Card

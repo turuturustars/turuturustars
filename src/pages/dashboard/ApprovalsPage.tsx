@@ -22,6 +22,8 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { logAuditAction } from '@/lib/auditLogger';
 import {
   UserCheck,
   UserX,
@@ -52,6 +54,8 @@ const ApprovalsPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const { toast } = useToast();
+  const { user, roles } = useAuth();
+  const actorRole = roles?.[0]?.role || 'member';
 
   useEffect(() => {
     fetchData();
@@ -91,6 +95,14 @@ const ApprovalsPage = () => {
 
       setPendingMembers((prev) => prev.filter((m) => m.id !== memberId));
 
+      logAuditAction({
+        actionType: 'APPROVE_MEMBER',
+        description: `Approved membership for ${memberId}`,
+        entityType: 'profile',
+        entityId: memberId,
+        metadata: { actor_id: user?.id, actor_role: actorRole },
+      });
+
       toast({
         title: 'Success',
         description: 'Member approved successfully',
@@ -121,6 +133,14 @@ const ApprovalsPage = () => {
         type: 'membership_rejected',
         title: 'Membership Application Rejected',
         message: rejectReason || 'Your membership application has been rejected.',
+      });
+
+      logAuditAction({
+        actionType: 'REJECT_MEMBER',
+        description: `Rejected membership for ${selectedMember.id}`,
+        entityType: 'profile',
+        entityId: selectedMember.id,
+        metadata: { actor_id: user?.id, actor_role: actorRole, reason: rejectReason },
       });
 
       setPendingMembers((prev) => prev.filter((m) => m.id !== selectedMember.id));
