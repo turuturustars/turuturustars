@@ -72,7 +72,7 @@ const looksLikeJob = (text: string, url: string) => {
     haystack.includes("recruit");
 };
 
-const buildJobs = (links: Array<{ url: string; text: string }>, source: any): Job[] => {
+const buildJobs = (links: Array<{ url: string; text: string }>, source: any, defaultDeadline: string): Job[] => {
   const now = new Date().toISOString();
   return links.map((link) => ({
     title: link.text,
@@ -80,7 +80,7 @@ const buildJobs = (links: Array<{ url: string; text: string }>, source: any): Jo
     location: "Kenya",
     county: "Kenya",
     job_type: "other",
-    deadline: null,
+    deadline: defaultDeadline,
     posted_at: now,
     source_name: source.name,
     source_url: link.url,
@@ -118,6 +118,12 @@ serve(async (req) => {
     SOURCE_FILTER.length ? SOURCE_FILTER.includes(source.name) : DEFAULT_SOURCES.includes(source.name) || source.priority <= 2
   );
 
+  const defaultDeadline = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  })();
+
   const summary: Array<{ source: string; found: number; sent: number; error?: string }> = [];
 
   for (const source of selected) {
@@ -138,7 +144,7 @@ serve(async (req) => {
         continue;
       }
 
-      const jobs = buildJobs(links, source);
+      const jobs = buildJobs(links, source, defaultDeadline);
 
       const ingestResp = await fetch(JOBS_INGEST_URL, {
         method: "POST",
