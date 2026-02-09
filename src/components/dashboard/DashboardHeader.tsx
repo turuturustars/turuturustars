@@ -14,7 +14,7 @@ interface DashboardHeaderProps {
 }
 
 const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
-  const { profile, roles } = useAuth();
+  const { profile, roles = [] } = useAuth();
   const [showChat, setShowChat] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [timeOfDay, setTimeOfDay] = useState('');
@@ -44,18 +44,17 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
   }, [showChat]);
 
   const getRoleBadge = () => {
-    const officialRoles = roles.filter((r) => r.role !== 'member');
-    if (officialRoles.length > 0) {
-      const role = officialRoles[0].role;
-      return role.split('_').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' ');
-    }
-    return 'Member';
+    const officialRoles = roles.filter((r) => r !== 'member');
+    const role = officialRoles[0];
+    if (!role) return 'Member';
+    return role
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const getRoleIcon = () => {
-    const officialRoles = roles.filter((r) => r.role !== 'member');
+    const officialRoles = roles.filter((r) => r !== 'member');
     return officialRoles.length > 0 ? <Sparkles className="w-3 h-3" /> : null;
   };
 

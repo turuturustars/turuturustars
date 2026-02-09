@@ -34,8 +34,8 @@ interface DashboardSidebarProps {
 
 const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const location = useLocation();
-  const { profile, roles, isOfficial, signOut, isLoading } = useAuth();
-  const userRoles = roles.map(r => r.role);
+  const { profile, roles = [], isOfficial, signOut, isLoading } = useAuth();
+  const userRoles = roles;
   const primaryRole = getPrimaryRole(userRoles);
   const isUserOfficial = userRoles.some(r => ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairman', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron', 'coordinator'].includes(r));
   
