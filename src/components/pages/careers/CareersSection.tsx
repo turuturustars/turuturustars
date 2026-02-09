@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { supabase } from '@/integrations/supabase/client';
+import { StructuredData } from '@/components/StructuredData';
 
 type JobType =
   | 'casual'
@@ -174,11 +175,25 @@ const CareersSection = () => {
     return `${diff} days left`;
   };
 
+  const jobSchema = useMemo(() => {
+    const topJobs = sortedJobs.slice(0, 25);
+    return {
+      itemListElement: topJobs.map((job, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        url: job.apply_url || job.source_url,
+        name: `${job.title} at ${job.organization}`,
+        description: job.excerpt || `${job.title} in ${job.location}`,
+      })),
+    };
+  }, [sortedJobs]);
+
   return (
     <section
       id="careers"
       className="py-24 bg-gradient-to-br from-background via-section-accent to-background relative overflow-hidden"
     >
+      <StructuredData data={jobSchema} type="ItemList" />
       <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse animation-delay-300 -z-10"></div>
       <div className="absolute bottom-0 left-0 w-80 h-80 bg-gold/5 rounded-full blur-3xl animate-pulse animation-delay-500 -z-10"></div>
       <div className="absolute top-1/2 right-1/4 w-72 h-72 bg-secondary/5 rounded-full blur-3xl animate-float -z-10"></div>
