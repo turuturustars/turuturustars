@@ -43,3 +43,4 @@ supabase/.env.local
 Thumbs.db
 \# Supabase CLI temp
 supabase/.temp/
+supabase/.temp/gotrue-version

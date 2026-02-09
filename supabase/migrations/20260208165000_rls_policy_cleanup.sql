@@ -376,11 +376,26 @@ CREATE POLICY "Users can send messages in their conversations"
     )
   );
 
-DROP POLICY IF EXISTS "Users can update read status of received messages" ON public.private_messages;
-CREATE POLICY "Users can update read status of received messages"
-  ON public.private_messages FOR UPDATE
-  TO authenticated
-  USING (recipient_id = (select auth.uid()));
+DO $$
+BEGIN
+  -- Only create the read-status update policy if the recipient_id column exists
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'private_messages'
+      AND column_name = 'recipient_id'
+  ) THEN
+    DROP POLICY IF EXISTS "Users can update read status of received messages" ON public.private_messages;
+    CREATE POLICY "Users can update read status of received messages"
+      ON public.private_messages FOR UPDATE
+      TO authenticated
+      USING (recipient_id = (select auth.uid()));
+  ELSE
+    RAISE NOTICE 'Skipping read-status update policy on private_messages (recipient_id column missing)';
+  END IF;
+END
+$$;
 
 -- Typing indicators
 DROP POLICY IF EXISTS "Users can view typing indicators" ON public.typing_indicators;
