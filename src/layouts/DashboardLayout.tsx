@@ -112,8 +112,8 @@ const DashboardLayout = () => {
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 xl:w-72 lg:flex-col border-r border-border/50 bg-background/95 backdrop-blur-sm shadow-sm">
+      {/* Desktop Sidebar (fixed for scroll stability) */}
+      <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:w-64 xl:w-72 lg:flex-col border-r border-border/50 bg-background/95 backdrop-blur-sm shadow-sm">
         <Sidebar />
       </aside>
 
@@ -142,7 +142,7 @@ const DashboardLayout = () => {
       )}
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex flex-1 flex-col min-w-0 lg:ml-64 xl:ml-72">
         <NotificationToastListener />
         {/* Header */}
         <div className="relative z-30">
