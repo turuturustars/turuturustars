@@ -1,7 +1,12 @@
-const ANON_KEY = 'sb_publishable_MDs8dxvnfc6wGUXUHzB1iA_WLFwJO6T';
+export interface Env {
+  SUPABASE_ANON_KEY: string;
+  SUPABASE_FUNCTION_URL?: string;
+}
+
+const FALLBACK_FUNCTION_URL = 'https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal-ipn';
 
 export default {
-  async fetch(req: Request): Promise<Response> {
+  async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
     /* ---------- CORS ---------- */
@@ -21,20 +26,23 @@ export default {
       return new Response('Not found', { status: 404 });
     }
 
+    /* ---------- CONFIG ---------- */
+    const anonKey = env.SUPABASE_ANON_KEY;
+    if (!anonKey) {
+      return new Response('Missing SUPABASE_ANON_KEY', { status: 500 });
+    }
+    const targetBase = env.SUPABASE_FUNCTION_URL || FALLBACK_FUNCTION_URL;
+
     /* ---------- TARGET ---------- */
-    // Always forward to the IPN handler in Supabase
-    const target =
-      `https://mkcgkfzltohxagqvsbqk.functions.supabase.co/pesapal-ipn` +
-      `${url.search}`;
+    const target = `${targetBase}${url.search}`;
 
     /* ---------- HEADERS ---------- */
     const headers = new Headers();
     headers.set('content-type', 'application/json');
-    headers.set('apikey', ANON_KEY);
+    headers.set('apikey', anonKey);
     headers.set('x-client-info', 'pesapal-ipn-proxy');
 
-    // ❌ DO NOT forward Authorization for IPN
-    // Supabase Edge Function has verifyJWT: false
+    // Do not forward Authorization for IPN; function verify_jwt is false
 
     /* ---------- PROXY ---------- */
     const resp = await fetch(target, {
