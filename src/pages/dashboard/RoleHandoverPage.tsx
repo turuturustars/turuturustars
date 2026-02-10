@@ -17,6 +17,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserCog, Plus, Clock, CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
 import { format, isFuture, isPast, isWithinInterval } from 'date-fns';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface RoleHandover {
   id: string;
@@ -59,6 +69,18 @@ const ROLE_LABELS: Record<string, string> = {
   member: 'Member'
 };
 
+const ASSIGNABLE_ROLES = [
+  'admin',
+  'chairperson',
+  'vice_chairman',
+  'secretary',
+  'treasurer',
+  'organizing_secretary',
+  'coordinator',
+  'committee_member',
+  'patron'
+] as const;
+
 export default function RoleHandoverPage() {
   const { user, hasRole } = useAuth();
   const { status: statusMessage, showSuccess } = useStatus();
@@ -67,6 +89,13 @@ export default function RoleHandoverPage() {
   const [members, setMembers] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [assignForm, setAssignForm] = useState({ userId: '', role: '' });
+  const [confirmReassign, setConfirmReassign] = useState<{ open: boolean; userId: string; newRole: string; currentRole?: string }>({
+    open: false,
+    userId: '',
+    newRole: '',
+    currentRole: undefined,
+  });
 
   const [newHandover, setNewHandover] = useState({
     original_user_id: '',
@@ -77,7 +106,7 @@ export default function RoleHandoverPage() {
     reason: ''
   });
 
-  const canManage = hasRole('admin') || hasRole('chairperson');
+  const canManage = hasRole('admin') || hasRole('chairperson') || hasRole('vice_chairman');
 
   useEffect(() => {
     fetchHandovers();
@@ -130,6 +159,45 @@ export default function RoleHandoverPage() {
   const fetchMembers = async () => {
     const { data } = await supabase.from('profiles').select('id, full_name, membership_number').eq('status', 'active');
     setMembers(data || []);
+  };
+
+  const persistAssignment = async (userId: string, role: string) => {
+    // remove existing official roles for this user, keep member row intact
+    const { error: delError } = await supabase.from('user_roles').delete().eq('user_id', userId).neq('role', 'member');
+    if (delError) {
+      toast.error('Failed to clear previous roles');
+      return false;
+    }
+    const { error: upsertError } = await supabase.from('user_roles').upsert({ user_id: userId, role });
+    if (upsertError) {
+      toast.error('Failed to assign role');
+      return false;
+    }
+    toast.success(`Assigned role: ${ROLE_LABELS[role] || role}`);
+    await fetchOfficials();
+    return true;
+  };
+
+  const handleAssign = async () => {
+    if (!assignForm.userId || !assignForm.role) {
+      toast.error('Select both member and role');
+      return;
+    }
+    const currentRole = officials.find((o) => o.user_id === assignForm.userId && o.role !== 'member');
+    if (currentRole && currentRole.role !== assignForm.role) {
+      setConfirmReassign({ open: true, userId: assignForm.userId, newRole: assignForm.role, currentRole: currentRole.role });
+      return;
+    }
+    const ok = await persistAssignment(assignForm.userId, assignForm.role);
+    if (ok) setAssignForm({ userId: '', role: '' });
+  };
+
+  const confirmReassignAction = async () => {
+    const ok = await persistAssignment(confirmReassign.userId, confirmReassign.newRole);
+    if (ok) {
+      setAssignForm({ userId: '', role: '' });
+      setConfirmReassign({ open: false, userId: '', newRole: '', currentRole: undefined });
+    }
   };
 
   const createHandover = async () => {
@@ -340,6 +408,55 @@ export default function RoleHandoverPage() {
         )}
       </div>
 
+      {canManage && (
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-lg">Assign or Reassign Official Roles</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Admin, Chairperson, and Vice Chairperson can assign administrative roles. Reassigning replaces any existing official role.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Member</label>
+                <Select value={assignForm.userId} onValueChange={(v) => setAssignForm((p) => ({ ...p, userId: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pick a member" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.full_name} {m.membership_number ? `• ${m.membership_number}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Role</label>
+                <Select value={assignForm.role} onValueChange={(v) => setAssignForm((p) => ({ ...p, role: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ASSIGNABLE_ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {ROLE_LABELS[role] || role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <AccessibleButton onClick={handleAssign} className="w-full" ariaLabel="Assign role to member">
+              Assign Role
+            </AccessibleButton>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -542,6 +659,26 @@ export default function RoleHandoverPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      <AlertDialog open={confirmReassign.open} onOpenChange={(open) => setConfirmReassign((p) => ({ ...p, open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reassign this official?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmReassign.currentRole
+                ? `This member currently holds the ${ROLE_LABELS[confirmReassign.currentRole] || confirmReassign.currentRole} role. Reassigning will replace it with ${ROLE_LABELS[confirmReassign.newRole] || confirmReassign.newRole}.`
+                : 'Proceed with assigning this role?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmReassign({ open: false, userId: '', newRole: '', currentRole: undefined })}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReassignAction} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Yes, reassign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
