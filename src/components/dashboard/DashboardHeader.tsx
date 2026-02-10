@@ -94,16 +94,18 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
     <>
       <header 
         className={cn(
-          'sticky top-0 z-40 w-full transition-all duration-300',
+          'sticky top-0 z-50 w-full transition-all duration-300',
           'bg-gradient-to-r from-background via-card/95 to-background',
           'backdrop-blur-xl supports-[backdrop-filter]:bg-card/90',
           'border-b',
           scrolled 
-            ? 'border-border/60 shadow-lg shadow-black/5' 
-            : 'border-border/30'
+            ? 'border-border/60 shadow-lg shadow-primary/10'
+            : 'border-border/30 shadow-sm shadow-black/5'
         )}
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
-        <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between">
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-70" />
+        <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between gap-3">
           {/* Left Section */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
             {/* Logo and Menu */}
@@ -112,7 +114,8 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  'lg:hidden shrink-0 h-10 w-10 rounded-xl transition-all duration-200',
+                  'lg:hidden shrink-0 h-10 w-10 rounded-2xl transition-all duration-200',
+                  'bg-card/60 border border-border/50 hover:border-primary/40',
                   'hover:bg-primary/10 hover:text-primary active:scale-95',
                   'hover:shadow-md hover:shadow-primary/10'
                 )}
@@ -137,7 +140,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
             <div className="min-w-0 flex-1 max-w-2xl">
               {/* Greeting */}
               <div className="flex items-baseline gap-2 mb-1">
-                <h1 className="font-serif text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent truncate">
+                <h1 className="font-serif text-base sm:text-lg md:text-xl lg:text-2xl font-bold bg-gradient-to-r from-foreground via-primary to-foreground/70 bg-clip-text text-transparent truncate">
                   Good {timeOfDay}
                   <span className="hidden xs:inline">, {firstName}</span>
                 </h1>
@@ -149,7 +152,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
                   variant="outline" 
                   className={cn(
                     "text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 h-6 font-medium",
-                    "bg-primary/5 border-primary/20 text-primary",
+                    "bg-primary/5 border-primary/25 text-primary shadow-sm shadow-primary/15",
                     "hover:bg-primary/10 transition-colors duration-200",
                     "flex items-center gap-1.5"
                   )}
@@ -161,7 +164,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
                 <Badge 
                   className={cn(
                     "text-xs sm:text-sm px-2 sm:px-2.5 py-0.5 h-6 font-medium border",
-                    "transition-all duration-200 hover:scale-105",
+                    "transition-all duration-200 hover:scale-105 shadow-sm",
                     "flex items-center gap-1.5",
                     statusConfig.color
                   )}
@@ -184,6 +187,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
               size="icon" 
               className={cn(
                 'h-10 w-10 rounded-xl transition-all duration-200 relative group',
+                'bg-card/60 border border-border/50 hover:border-primary/40',
                 'hover:bg-accent active:scale-95',
                 showChat && 'bg-accent text-primary'
               )}
