@@ -95,16 +95,23 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
       <header 
         className={cn(
           'sticky top-0 z-50 w-full transition-all duration-300',
-          'bg-gradient-to-r from-background via-card/95 to-background',
-          'backdrop-blur-xl supports-[backdrop-filter]:bg-card/90',
+          'bg-gradient-to-r from-background/80 via-card/85 to-background/80',
+          'backdrop-blur-xl backdrop-saturate-125 supports-[backdrop-filter]:bg-card/85',
           'border-b',
           scrolled 
-            ? 'border-border/60 shadow-lg shadow-primary/10'
+            ? 'border-border/70 shadow-2xl shadow-primary/15 backdrop-blur-2xl'
             : 'border-border/30 shadow-sm shadow-black/5'
         )}
         style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-70" />
+        <div className={cn(
+          'absolute inset-0 pointer-events-none transition-opacity duration-300',
+          scrolled ? 'opacity-60' : 'opacity-30'
+        )}>
+          <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+          <div className="absolute inset-x-4 bottom-0 h-[6px] rounded-full bg-gradient-to-r from-primary/25 via-cyan-400/25 to-transparent blur-2xl" />
+        </div>
         <div className="h-14 sm:h-16 md:h-18 px-3 sm:px-4 md:px-6 lg:px-8 flex items-center justify-between gap-3">
           {/* Left Section */}
           <div className="flex items-center gap-3 sm:gap-4 md:gap-6 min-w-0 flex-1">
