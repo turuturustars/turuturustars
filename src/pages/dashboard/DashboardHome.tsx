@@ -58,7 +58,6 @@ const DashboardHome = () => {
     unreadNotifications: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [greeting, setGreeting] = useState('');
   const [dayOfWeek, setDayOfWeek] = useState('');
   const [currentTime, setCurrentTime] = useState('');
   const [pendingMembershipFee, setPendingMembershipFee] = useState<PendingMembershipFee | null>(null);
@@ -75,12 +74,6 @@ const DashboardHome = () => {
       const day = days[now.getDay()];
       const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
       
-      let greeting = '';
-      if (hour < 12) greeting = 'Good Morning';
-      else if (hour < 17) greeting = 'Good Afternoon';
-      else greeting = 'Good Evening';
-      
-      setGreeting(greeting);
       setDayOfWeek(day);
       setCurrentTime(time);
     };
@@ -430,62 +423,44 @@ const DashboardHome = () => {
           </div>
         </div>
       )}
-      {/* Welcome Header - Responsive */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 px-4 py-4 sm:px-6 sm:py-5 lg:px-10 lg:py-7 shadow-[0_22px_70px_-35px_rgba(14,116,144,0.75)] transition-shadow duration-300">
-        {/* Animated background elements */}
+      {/* Welcome Header - compact and minimal */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary/90 via-blue-700 to-cyan-500 px-4 py-4 sm:px-6 shadow-[0_16px_50px_-28px_rgba(14,116,144,0.9)]">
         <div className="absolute inset-0 opacity-50">
-          <div className="absolute -top-8 -right-10 h-56 w-56 rounded-full bg-white/20 blur-3xl" />
-          <div className="absolute -bottom-16 left-6 h-52 w-52 rounded-full bg-cyan-200/30 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.25),transparent_55%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.2),transparent_50%)]" />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.08),transparent_35%,rgba(255,255,255,0.06))]" />
+          <div className="absolute -top-12 -right-6 h-48 w-48 rounded-full bg-white/15 blur-3xl" />
+          <div className="absolute -bottom-20 left-0 h-44 w-44 rounded-full bg-blue-200/25 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.16),transparent_55%),radial-gradient(circle_at_80%_60%,rgba(255,255,255,0.18),transparent_50%)]" />
         </div>
 
-        <div className="relative grid gap-5 lg:grid-cols-[1fr_auto] lg:items-center">
-          {/* Left: Greeting */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-2 rounded-full bg-white/25 px-3 py-1 text-xs font-semibold text-white/95 backdrop-blur-sm">
-                <Sparkles className="h-4 w-4 animate-pulse" />
-                Dashboard
-              </div>
-              <div className="hidden sm:flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs text-white/85">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" />
-                Member Portal
-              </div>
-            </div>
-            <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
-              <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-semibold text-white leading-tight drop-shadow-sm">
-                Good Morning,{" "}
-                <span className="text-white/95">
-                  {profile?.full_name?.split(' ')[0] || 'Member'}
-                </span>
-              </h1>
-              <p className="text-sm sm:text-base text-white/85">
-                Happy {dayOfWeek}!
-              </p>
-            </div>
-            <p className="text-xs sm:text-sm text-white/80">
-              Active member of Turuturu Stars CBO
+        <div className="relative grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-semibold leading-tight bg-gradient-to-r from-white via-cyan-100 to-purple-100 bg-clip-text text-transparent drop-shadow-sm">
+              Hello, {profile?.full_name?.split(' ')[0] || 'Member'}
+            </h1>
+            <p className="text-sm sm:text-base text-white/85">
+              {dayOfWeek
+                ? `Keep the momentum, ${dayOfWeek} is yours.`
+                : 'Stay consistent—every contribution counts.'}
             </p>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-white/85">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-white/85">
               <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-200" />
-                Membership: {profile?.status ? profile.status.charAt(0).toUpperCase() + profile.status.slice(1) : 'Pending'}
+                {profile?.status ? profile.status.charAt(0).toUpperCase() + profile.status.slice(1) : 'Pending'} member
               </span>
               <span className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1">
-                Contribution streak ready
+                <Sparkles className="h-3.5 w-3.5" />
+                Streak ready—make today count
               </span>
             </div>
           </div>
 
-          {/* Right: Time + Date */}
-          <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/15 px-4 py-3 text-white/95 backdrop-blur-md lg:justify-end lg:px-5">
+          <div className="flex items-center gap-3 rounded-xl bg-white/12 px-4 py-3 text-white/90 backdrop-blur-md">
             <div>
-              <p className="text-[10px] uppercase tracking-[0.3em] text-white/60">Local Time</p>
-              <p className="text-lg sm:text-xl font-semibold text-white">{currentTime}</p>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-white/65">Time</p>
+              <p className="text-lg font-semibold text-white">{currentTime}</p>
             </div>
-            <div className="hidden sm:block border-l border-white/20 pl-3">
-              <p className="text-xs text-white/75">Today</p>
+            <div className="h-10 w-px bg-white/20" />
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-white/65">Today</p>
               <p className="text-sm font-medium text-white">
                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </p>
