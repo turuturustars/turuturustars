@@ -94,7 +94,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
     <>
       <header 
         className={cn(
-          'sticky top-0 z-50 w-full transition-all duration-300',
+          'fixed top-0 inset-x-0 z-50 w-full transition-all duration-300',
           'bg-gradient-to-r from-white/92 via-blue-50/85 to-white/90 dark:from-background/85 dark:via-card/85 dark:to-background/85',
           'backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-card/85',
           'border-b',
@@ -211,6 +211,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
             
             <NotificationBell />
           </div>
+        </div>
         </div>
 
         {/* Animated gradient line */}

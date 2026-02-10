@@ -147,6 +147,8 @@ const DashboardLayout = () => {
         {/* Header */}
         <div className="relative z-30">
           <DashboardHeader onMenuToggle={() => setMobileOpen(true)} />
+          {/* Spacer to offset fixed header height */}
+          <div className="h-14 sm:h-16 md:h-18" aria-hidden />
         </div>
 
         {/* Main Content */}
