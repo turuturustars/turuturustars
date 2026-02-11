@@ -26,7 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
-import { getPrimaryRole, hasRole } from '@/lib/rolePermissions';
+import { getPrimaryRole } from '@/lib/rolePermissions';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
 
 interface DashboardSidebarProps {
@@ -66,84 +66,87 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   ];
 
   const roleSpecificLinks = () => {
-    const operationsLink = { label: 'Operations Center', href: '/dashboard/admin-panel/operations', icon: ActivitySquare };
+    const links: Array<{ label: string; href: string; icon: any }> = [];
+    const dashboardPathByRole: Record<string, string> = {
+      admin: '/dashboard/admin',
+      chairperson: '/dashboard/chairperson',
+      vice_chairman: '/dashboard/vice-chairperson',
+      secretary: '/dashboard/secretary',
+      vice_secretary: '/dashboard/vice-secretary',
+      treasurer: '/dashboard/treasurer',
+      organizing_secretary: '/dashboard/organizing-secretary',
+      patron: '/dashboard/patron',
+    };
 
-    // Super admin can see every dashboard
-    if (hasRole(userRoles, 'admin')) {
-      return [
-        { label: 'Admin Dashboard', href: `/dashboard/roles/admin`, icon: Settings },
-        { label: 'Chair Dashboard', href: `/dashboard/roles/chairperson`, icon: Star },
-        { label: 'Vice Chair Dashboard', href: `/dashboard/roles/vice-chairperson`, icon: Star },
-        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
-        { label: 'Treasurer', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
-        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
-        { label: 'Patron', href: `/dashboard/roles/patron`, icon: Star },
-        operationsLink,
-        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
-        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-      ];
+    const myDashboardPath = dashboardPathByRole[primaryRole];
+    if (myDashboardPath) {
+      links.push({ label: 'My Dashboard', href: myDashboardPath, icon: LayoutDashboard });
     }
 
-    // Chair & Vice Chair can see all except admin + patron
-    if (hasRole(userRoles, 'chairperson') || hasRole(userRoles, 'vice_chairman')) {
-      return [
-        { label: hasRole(userRoles, 'chairperson') ? 'Chair Dashboard' : 'Vice Chair', href: hasRole(userRoles, 'chairperson') ? '/dashboard/roles/chairperson' : '/dashboard/roles/vice-chairperson', icon: Star },
-        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
-        { label: 'Treasurer', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
-        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
-        operationsLink,
+    if (userRoles.includes('admin')) {
+      links.push(
+        { label: 'Operations Center', href: '/dashboard/admin-panel/operations', icon: ActivitySquare },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
         { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-      ];
-    }
-
-    if (hasRole(userRoles, 'secretary') || hasRole(userRoles, 'vice_secretary')) {
-      return [
-        { label: 'Secretary', href: `/dashboard/roles/secretary`, icon: FileText },
-        { label: 'Records', href: '/dashboard/governance/secretary-dashboard', icon: ClipboardList },
         { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
-        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-        operationsLink,
-      ];
+        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
+        { label: 'Finance Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
+      );
+      return links;
     }
 
-    if (hasRole(userRoles, 'treasurer')) {
-      return [
-        { label: 'Treasury', href: `/dashboard/roles/treasurer`, icon: PiggyBank },
+    if (userRoles.includes('chairperson') || userRoles.includes('vice_chairman')) {
+      links.push(
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
+        { label: 'Members', href: '/dashboard/members', icon: Users },
+        { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
+      );
+      return links;
+    }
+
+    if (userRoles.includes('secretary') || userRoles.includes('vice_secretary')) {
+      links.push(
+        { label: 'Records', href: '/dashboard/governance/secretary-dashboard', icon: FileText },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
+      );
+      return links;
+    }
+
+    if (userRoles.includes('treasurer')) {
+      links.push(
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
-        { label: 'Members', href: '/dashboard/members', icon: Users },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
         { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-        operationsLink,
-      ];
+      );
+      return links;
     }
 
-    if (hasRole(userRoles, 'organizing_secretary')) {
-      return [
-        { label: 'Org Secretary', href: `/dashboard/roles/organizing-secretary`, icon: ClipboardList },
+    if (userRoles.includes('organizing_secretary')) {
+      links.push(
         { label: 'Meetings', href: '/dashboard/governance/meetings', icon: FileText },
         { label: 'Discipline & Fines', href: '/dashboard/members/discipline', icon: FileText },
+        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
+        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
+      );
+      return links;
+    }
+
+    if (userRoles.includes('patron')) {
+      links.push(
         { label: 'Members', href: '/dashboard/members', icon: Users },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
         { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-        operationsLink,
-      ];
+      );
+      return links;
     }
 
-    if (hasRole(userRoles, 'patron')) {
-      return [
-        { label: 'Patron Dashboard', href: `/dashboard/roles/patron`, icon: Star },
-        { label: 'Members', href: '/dashboard/members', icon: Users },
-        { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
-        { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
-        operationsLink,
-      ];
-    }
-
-    return [];
+    return links;
   };
+
+  const officialLinks = roleSpecificLinks();
 
   const handleNavClick = () => {
     onClose?.();
@@ -279,7 +282,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
         </div>
 
         {/* Role-Specific Section */}
-        {isUserOfficial && (
+        {isUserOfficial && officialLinks.length > 0 && (
           <div className="mt-4 pt-3 border-t border-border/20">
             <button
               onClick={toggleRoleSection}
@@ -313,7 +316,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
             )}>
               <div className="overflow-hidden">
                 <div className="space-y-0.5 pt-1">
-                  {roleSpecificLinks().map((link) => {
+                  {officialLinks.map((link) => {
                     const Icon = link.icon;
                     const isActive = location.pathname === link.href;
                     return (

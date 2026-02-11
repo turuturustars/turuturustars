@@ -102,15 +102,15 @@ export const ADMIN_ROUTES = {
  * Role-Based Dashboard Routes
  */
 export const ROLE_ROUTES = {
-  BASE: '/dashboard/roles',
-  CHAIRPERSON: '/dashboard/roles/chairperson',
-  VICE_CHAIRPERSON: '/dashboard/roles/vice-chairperson',
-  SECRETARY: '/dashboard/roles/secretary',
-  VICE_SECRETARY: '/dashboard/roles/vice-secretary',
-  TREASURER: '/dashboard/roles/treasurer',
-  ORGANIZING_SECRETARY: '/dashboard/roles/organizing-secretary',
-  PATRON: '/dashboard/roles/patron',
-  ADMIN: '/dashboard/roles/admin',
+  BASE: '/dashboard',
+  CHAIRPERSON: '/dashboard/chairperson',
+  VICE_CHAIRPERSON: '/dashboard/vice-chairperson',
+  SECRETARY: '/dashboard/secretary',
+  VICE_SECRETARY: '/dashboard/vice-secretary',
+  TREASURER: '/dashboard/treasurer',
+  ORGANIZING_SECRETARY: '/dashboard/organizing-secretary',
+  PATRON: '/dashboard/patron',
+  ADMIN: '/dashboard/admin',
 } as const;
 
 /**
@@ -222,12 +222,6 @@ export const DASHBOARD_MENU: RouteConfig[] = [
     ],
   },
   {
-    path: ROLE_ROUTES.BASE,
-    label: 'Role Dashboards',
-    icon: 'Shield',
-    description: 'Role-specific dashboards',
-  },
-  {
     path: ADMIN_ROUTES.BASE,
     label: 'Administration',
     icon: 'Settings',
@@ -282,8 +276,8 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   'admin-panel': 'Administration',
   approvals: 'Approvals',
 
-  // Roles
-  roles: 'Role Dashboards',
+  // Role paths
+  roles: 'Official Dashboard',
   chairperson: 'Chairperson',
   'vice-chairperson': 'Vice Chairperson',
   secretary: 'Secretary',

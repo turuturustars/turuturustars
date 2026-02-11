@@ -149,7 +149,7 @@ const AdminDashboard = () => {
       icon: Users,
       items: [
         { label: 'All Members', path: '/dashboard/members', icon: Users, badge: '156' },
-        { label: 'Role Management', path: '/dashboard/roles', icon: Shield, badge: null },
+        { label: 'Role Management', path: '/dashboard/governance/handover', icon: Shield, badge: null },
         { label: 'Pending Approvals', path: '/dashboard/admin-panel/approvals', icon: CheckCircle2, badge: '3' },
       ],
       gradient: 'from-blue-500 to-cyan-500',
@@ -389,13 +389,13 @@ const AdminDashboard = () => {
               variant="outline" 
               className="justify-start gap-2 h-auto py-3" 
               onClick={() => {
-                navigate('/dashboard/roles/admin');
-                showSuccess('Navigating to admin settings', 1500);
+                navigate('/dashboard/admin-panel/operations');
+                showSuccess('Navigating to operations center', 1500);
               }}
-              ariaLabel="Access system settings and configuration"
+              ariaLabel="Access operations center"
             >
               <Settings className="w-4 h-4" />
-              System Settings
+              Operations Center
             </AccessibleButton>
           </div>
         </CardContent>

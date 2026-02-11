@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
@@ -57,6 +57,7 @@ const encouragements = [
 
 const DashboardHome = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { profile, isOfficial, roles } = useAuth();
   const { status, showSuccess } = useStatus();
   const { toast } = useToast();
@@ -90,7 +91,7 @@ const DashboardHome = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Redirect officials to role-specific dashboards
+  // Redirect officials to their own dashboard only.
   useEffect(() => {
     if (roles.length === 0) return;
     
@@ -98,21 +99,21 @@ const DashboardHome = () => {
     const primaryRole = getPrimaryRole(userRoles);
 
     const roleDashboards: Record<string, string> = {
-      'chairperson': '/dashboard/roles/chairperson',
-      'vice_chairman': '/dashboard/roles/vice-chairperson',
-      'secretary': '/dashboard/roles/secretary',
-      'vice_secretary': '/dashboard/roles/vice-secretary',
-      'treasurer': '/dashboard/roles/treasurer',
-      'organizing_secretary': '/dashboard/roles/organizing-secretary',
-      'patron': '/dashboard/roles/patron',
-      'admin': '/dashboard/roles/admin',
+      'chairperson': '/dashboard/chairperson',
+      'vice_chairman': '/dashboard/vice-chairperson',
+      'secretary': '/dashboard/secretary',
+      'vice_secretary': '/dashboard/vice-secretary',
+      'treasurer': '/dashboard/treasurer',
+      'organizing_secretary': '/dashboard/organizing-secretary',
+      'patron': '/dashboard/patron',
+      'admin': '/dashboard/admin',
     };
 
     const targetDashboard = roleDashboards[primaryRole];
-    if (targetDashboard && !window.location.pathname.includes('/dashboard/home')) {
+    if (targetDashboard && location.pathname === '/dashboard/home') {
       navigate(targetDashboard, { replace: true });
     }
-  }, [roles, navigate]);
+  }, [roles, navigate, location.pathname]);
 
   useEffect(() => {
     fetchDashboardData();

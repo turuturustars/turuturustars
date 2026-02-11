@@ -60,7 +60,6 @@ const TreasurerRole = lazy(() => import("./pages/dashboard/TreasurerRole"));
 const OrganizingSecretaryDashboard = lazy(() => import("./pages/dashboard/OrganizingSecretaryDashboard"));
 const PatronDashboard = lazy(() => import("./pages/dashboard/PatronDashboard"));
 const AdminDashboard = lazy(() => import("./pages/dashboard/AdminDashboard"));
-const RolesPage = lazy(() => import("./pages/dashboard/RolesPage"));
 const OperationsCenter = lazy(() => import("./pages/dashboard/AuditLogViewer"));
 
 // Feature pages
@@ -181,102 +180,75 @@ const App = () => {
                   <Route index element={<Navigate to="home" replace />} />
                   <Route path="home" element={<DashboardHome />} />
 
-                  {/* Role-specific dashboards - organized by hierarchy */}
+                  {/* Official dashboards - each role stays on its own dashboard */}
                   <Route
-                    path="roles"
+                    path="admin"
                     element={
-                      <ProtectedRoute
-                        requiredRoles={[
-                          'admin',
-                          'chairperson',
-                          'vice_chairman',
-                          'secretary',
-                          'vice_secretary',
-                          'treasurer',
-                          'organizing_secretary',
-                          'patron',
-                        ]}
-                        stealth
-                      >
-                        <RolesPage />
+                      <ProtectedRoute requiredRoles={['admin']} stealth>
+                        <AdminDashboard />
                       </ProtectedRoute>
                     }
-                  >
-                    <Route
-                      path="chairperson"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
-                          <ChairpersonDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="vice-chairperson"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman']} stealth>
-                          <ViceChairmanDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="secretary"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'secretary']} stealth>
-                          <SecretaryRole />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="vice-secretary"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'vice_secretary']} stealth>
-                          <SecretaryRole />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="treasurer"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'treasurer']} stealth>
-                          <TreasurerRole />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="organizing-secretary"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'chairperson', 'vice_chairman', 'organizing_secretary']} stealth>
-                          <OrganizingSecretaryDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="patron"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin', 'patron']} stealth>
-                          <PatronDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="admin"
-                      element={
-                        <ProtectedRoute requiredRoles={['admin']} stealth>
-                          <AdminDashboard />
-                        </ProtectedRoute>
-                      }
-                    />
-                  </Route>
+                  />
+                  <Route
+                    path="chairperson"
+                    element={
+                      <ProtectedRoute requiredRoles={['chairperson']} stealth>
+                        <ChairpersonDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="vice-chairperson"
+                    element={
+                      <ProtectedRoute requiredRoles={['vice_chairman']} stealth>
+                        <ViceChairmanDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="secretary"
+                    element={
+                      <ProtectedRoute requiredRoles={['secretary']} stealth>
+                        <SecretaryRole />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="vice-secretary"
+                    element={
+                      <ProtectedRoute requiredRoles={['vice_secretary']} stealth>
+                        <SecretaryRole />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="treasurer"
+                    element={
+                      <ProtectedRoute requiredRoles={['treasurer']} stealth>
+                        <TreasurerRole />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="organizing-secretary"
+                    element={
+                      <ProtectedRoute requiredRoles={['organizing_secretary']} stealth>
+                        <OrganizingSecretaryDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="patron"
+                    element={
+                      <ProtectedRoute requiredRoles={['patron']} stealth>
+                        <PatronDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
 
-                  {/* Legacy role routes - redirect to new structure */}
-                  <Route path="chairperson" element={<Navigate to="/dashboard/roles/chairperson" replace />} />
-                  <Route path="vice-chairperson" element={<Navigate to="/dashboard/roles/vice-chairperson" replace />} />
-                  <Route path="secretary-role" element={<Navigate to="/dashboard/roles/secretary" replace />} />
-                  <Route path="vice-secretary" element={<Navigate to="/dashboard/roles/vice-secretary" replace />} />
-                  <Route path="treasurer-role" element={<Navigate to="/dashboard/roles/treasurer" replace />} />
-                  <Route path="organizing-secretary" element={<Navigate to="/dashboard/roles/organizing-secretary" replace />} />
-                  <Route path="patron" element={<Navigate to="/dashboard/roles/patron" replace />} />
-                  <Route path="admin" element={<Navigate to="/dashboard/roles/admin" replace />} />
+                  {/* Legacy role aliases */}
+                  <Route path="secretary-role" element={<Navigate to="/dashboard/secretary" replace />} />
+                  <Route path="treasurer-role" element={<Navigate to="/dashboard/treasurer" replace />} />
 
                   {/* Financial management */}
                   <Route path="finance">
@@ -381,7 +353,7 @@ const App = () => {
                   {/* Legacy routes - redirect to new structure */}
                   <Route path="contributions" element={<Navigate to="/dashboard/finance/contributions" replace />} />
                   <Route path="all-contributions" element={<Navigate to="/dashboard/finance/all-contributions" replace />} />
-                  <Route path="treasurer" element={<Navigate to="/dashboard/finance/treasurer-dashboard" replace />} />
+                  <Route path="treasurer-dashboard" element={<Navigate to="/dashboard/finance/treasurer-dashboard" replace />} />
                   <Route path="mpesa-management" element={<Navigate to="/dashboard/finance/mpesa" replace />} />
                   <Route path="reports" element={<Navigate to="/dashboard/finance/reports" replace />} />
                   <Route path="welfare" element={<Navigate to="/dashboard/members/welfare" replace />} />
@@ -390,7 +362,7 @@ const App = () => {
                   <Route path="meetings" element={<Navigate to="/dashboard/governance/meetings" replace />} />
                   <Route path="voting" element={<Navigate to="/dashboard/governance/voting" replace />} />
                   <Route path="role-handover" element={<Navigate to="/dashboard/governance/handover" replace />} />
-                  <Route path="secretary" element={<Navigate to="/dashboard/governance/secretary-dashboard" replace />} />
+                  <Route path="secretary-dashboard" element={<Navigate to="/dashboard/governance/secretary-dashboard" replace />} />
                   <Route path="announcements" element={<Navigate to="/dashboard/communication/announcements" replace />} />
                   <Route path="notifications" element={<Navigate to="/dashboard/communication/notifications" replace />} />
                   <Route path="community" element={<Navigate to="/dashboard/communication/messages" replace />} />
