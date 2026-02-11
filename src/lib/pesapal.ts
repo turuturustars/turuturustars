@@ -19,9 +19,7 @@ export interface PesapalSubmitOrderParams {
   description: string;
   callbackUrl: string;
   billingAddress: PesapalBillingAddress;
-  contributionId?: string;
   donationId?: string;
-  memberId?: string;
   merchantReference?: string;
   notificationId?: string;
 }
