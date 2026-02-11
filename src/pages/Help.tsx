@@ -24,7 +24,7 @@ const Help = () => {
       topics: [
         'Creating your account',
         'Verifying your identity',
-        'Setting up Pesapal payments',
+        'Setting up M-Pesa payments',
         'Understanding membership levels',
       ],
     },
