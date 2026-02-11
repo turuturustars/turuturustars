@@ -36,7 +36,7 @@ This migration creates:
 
 It also adds:
 
-- RLS policies for members and finance officials
+- RLS policies for members and admin/treasurer finance access
 - Replay protection (unique receipt and checkout request IDs)
 - Completed payment immutability trigger
 
