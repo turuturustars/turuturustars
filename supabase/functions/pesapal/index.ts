@@ -168,31 +168,16 @@ serve(async (req) => {
         throw new Error("Invalid amount");
       }
       if (!callbackUrl) throw new Error("Missing callback URL");
-
-      let memberId = params.memberId ?? null;
-      if (contributionId) {
-        const { data: contribution, error } = await supabase
-          .from("contributions")
-          .select("member_id")
-          .eq("id", contributionId)
-          .maybeSingle();
-        if (error || !contribution?.member_id) {
-          throw new Error("Contribution not found");
-        }
-        memberId = contribution.member_id;
+      if (!donationId) {
+        throw new Error("Pesapal is only enabled for donations. Missing donationId.");
       }
-
-      if (params.memberId && userId && params.memberId !== userId) {
-        throw new Error("Unauthorized member");
+      if (contributionId) {
+        throw new Error("Pesapal no longer supports contribution payments");
       }
 
       const merchantReference =
         params.merchantReference ||
-        (contributionId
-          ? `C-${contributionId}`
-          : donationId
-            ? `D-${donationId}`
-            : `TS-${crypto.randomUUID()}`);
+        `D-${donationId}`;
 
       const notificationId = PESAPAL_IPN_ID || params.notificationId;
       if (!notificationId) {
@@ -240,8 +225,8 @@ serve(async (req) => {
         currency,
         description,
         status: "pending",
-        member_id: memberId,
-        contribution_id: contributionId,
+        member_id: null,
+        contribution_id: null,
         donation_id: donationId,
         initiated_by: userId,
       });
@@ -262,7 +247,7 @@ serve(async (req) => {
 
       const { data: transaction } = await supabase
         .from("pesapal_transactions")
-        .select("id, contribution_id, donation_id")
+        .select("id, donation_id")
         .eq("order_tracking_id", orderTrackingId)
         .maybeSingle();
 
@@ -277,17 +262,6 @@ serve(async (req) => {
         .eq("order_tracking_id", orderTrackingId);
 
       if (normalizedStatus === "completed") {
-        if (transaction?.contribution_id) {
-          await supabase
-            .from("contributions")
-            .update({
-              status: "paid",
-              paid_at: new Date().toISOString(),
-              reference_number: status.confirmation_code ?? null,
-            })
-            .eq("id", transaction.contribution_id);
-        }
-
         if (transaction?.donation_id) {
           await supabase
             .from("donations")
