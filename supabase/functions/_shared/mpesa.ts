@@ -330,8 +330,8 @@ export async function validateTreasurerAccess(supabase: ReturnType<typeof create
 
 export async function validateFinanceAccess(supabase: ReturnType<typeof createServiceClient>, userId: string): Promise<void> {
   const roles = await getUserRoles(supabase, userId);
-  if (!hasAnyRole(roles, ["admin", "treasurer", "chairperson"])) {
-    throw new HttpError(403, "Only finance officials can perform this action");
+  if (!hasAnyRole(roles, ["admin", "treasurer"])) {
+    throw new HttpError(403, "Only admin/treasurer users can perform this action");
   }
 }
 
