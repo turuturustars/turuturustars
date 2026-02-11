@@ -138,7 +138,7 @@ serve(async (req) => {
 
     const { data: transaction } = await supabase
       .from("pesapal_transactions")
-      .select("id, contribution_id, donation_id")
+      .select("id, donation_id")
       .eq("order_tracking_id", orderTrackingId)
       .maybeSingle();
 
@@ -153,17 +153,6 @@ serve(async (req) => {
       .eq("order_tracking_id", orderTrackingId);
 
     if (normalizedStatus === "completed") {
-      if (transaction?.contribution_id) {
-        await supabase
-          .from("contributions")
-          .update({
-            status: "paid",
-            paid_at: new Date().toISOString(),
-            reference_number: status.confirmation_code ?? null,
-          })
-          .eq("id", transaction.contribution_id);
-      }
-
       if (transaction?.donation_id) {
         await supabase
           .from("donations")
