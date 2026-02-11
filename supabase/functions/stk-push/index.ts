@@ -45,7 +45,7 @@ serve(async (req) => {
     let memberId = user.id;
     if (body.member_id && body.member_id !== user.id) {
       const userRoles = await getUserRoles(supabase, user.id);
-      const canPayForOthers = hasAnyRole(userRoles, ["admin", "treasurer", "chairperson"]);
+      const canPayForOthers = hasAnyRole(userRoles, ["admin", "treasurer"]);
       if (!canPayForOthers) {
         throw new HttpError(403, "You can only initiate STK payments for your own account");
       }
