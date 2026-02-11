@@ -44,7 +44,7 @@ serve(async (req) => {
     }
 
     const roles = await getUserRoles(supabase, user.id);
-    const isFinanceOfficial = hasAnyRole(roles, ["admin", "treasurer", "chairperson"]);
+    const isFinanceOfficial = hasAnyRole(roles, ["admin", "treasurer"]);
     const isOwner = submission.member_id === user.id;
 
     if (!isFinanceOfficial && !isOwner) {
