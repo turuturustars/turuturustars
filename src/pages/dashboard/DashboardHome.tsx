@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
 import WelfareParticipationChart from '@/components/dashboard/WelfareParticipationChart';
-import PayWithPesapal from '@/components/dashboard/PayWithPesapal';
+import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { 
   DollarSign, 
@@ -626,16 +626,16 @@ const DashboardHome = () => {
             })}
             
             <div className="pt-2">
-              <PayWithPesapal
+              <PayWithMpesa
                 defaultAmount={100}
                 trigger={
-                  <AccessibleButton className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" ariaLabel="Make a secure payment">
+                  <AccessibleButton className="w-full justify-start h-auto py-3 gap-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" ariaLabel="Pay now via M-Pesa">
                     <div className="p-2 rounded-lg bg-white/20">
                       <DollarSign className="w-4 h-4" />
                     </div>
                     <div className="text-left flex-1">
-                      <div className="font-semibold text-sm">Pay Now</div>
-                      <div className="text-xs opacity-90">Secure checkout (Mobile Money / Card)</div>
+                      <div className="font-semibold text-sm">Pay with M-Pesa</div>
+                      <div className="text-xs opacity-90">Phone + amount, instant STK prompt</div>
                     </div>
                     <ArrowRight className="w-4 h-4" />
                   </AccessibleButton>
