@@ -26,7 +26,7 @@ import {
   useStatus,
   AccessibleStatus,
 } from '@/components/accessible';
-import PayWithPesapal from '@/components/dashboard/PayWithPesapal';
+import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -439,10 +439,10 @@ const ContributionsPage = () => {
 
                       <div className="pt-2 border-t">
                         {contribution.status !== 'paid' ? (
-                          <PayWithPesapal
+                          <PayWithMpesa
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} securely for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -492,10 +492,10 @@ const ContributionsPage = () => {
                       </TableCell>
                       <TableCell>
                         {contribution.status !== 'paid' ? (
-                          <PayWithPesapal
+                          <PayWithMpesa
                             contributionId={contribution.id}
                             defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} securely for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
+                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
                           />
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
@@ -613,7 +613,7 @@ const ContributionsPage = () => {
 
                       {/* Pay Button */}
                       <div className="flex justify-end">
-                        <PayWithPesapal
+                        <PayWithMpesa
                           contributionId={contribution.id}
                           defaultAmount={contribution.amount}
                           trigger={
@@ -639,7 +639,7 @@ const ContributionsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Payment handled by PayWithPesapal component */}
+      {/* Payment handled by PayWithMpesa component */}
     </div>
   );
 };
