@@ -255,7 +255,14 @@ const App = () => {
                     <Route path="contributions" element={<ContributionsPage />} />
                     <Route path="all-contributions" element={<AllContributionsPage />} />
                     <Route path="treasurer-dashboard" element={<TreasurerDashboard />} />
-                    <Route path="mpesa" element={<PaymentsManagement />} />
+                    <Route
+                      path="mpesa"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'treasurer']} stealth>
+                          <PaymentsManagement />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="membership-fees" element={<MembershipFeesPage />} />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>
