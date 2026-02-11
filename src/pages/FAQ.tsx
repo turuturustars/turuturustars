@@ -48,7 +48,7 @@ const FAQ = () => {
       category: 'Contributions',
       question: 'How do I set up my contribution?',
       answer:
-        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. Payments are processed securely via Pesapal.',
+        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. Payments are processed via M-Pesa STK push.',
     },
     {
       category: 'Contributions',
@@ -60,7 +60,7 @@ const FAQ = () => {
       category: 'Contributions',
       question: 'What payment methods do you accept?',
       answer:
-        'We accept payments via Pesapal. You will choose your preferred method during checkout.',
+        'We accept payments via M-Pesa for member contributions and welfare payments.',
     },
     {
       category: 'Welfare',
