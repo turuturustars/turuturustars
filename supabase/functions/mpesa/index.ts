@@ -13,8 +13,8 @@ const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Use sandbox for testing, production for live
-const MPESA_BASE_URL = "https://sandbox.safaricom.co.ke";
+// Use edge function secret to choose sandbox vs production endpoint.
+const MPESA_BASE_URL = Deno.env.get("MPESA_BASE_URL") || "https://sandbox.safaricom.co.ke";
 
 const getFunctionsBaseUrl = () => {
   const host = new URL(SUPABASE_URL).hostname;

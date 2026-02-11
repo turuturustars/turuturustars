@@ -34,6 +34,21 @@ verify_jwt = false
 [functions.jobs-scrape]
 verify_jwt = false
 
+[functions.stk-push]
+verify_jwt = true
+
+[functions.stk-callback]
+verify_jwt = false
+
+[functions.till-submit]
+verify_jwt = true
+
+[functions.verify-till]
+verify_jwt = true
+
+[functions.approve-payment]
+verify_jwt = true
+
 [functions.pesapal]
 verify_jwt = false
 

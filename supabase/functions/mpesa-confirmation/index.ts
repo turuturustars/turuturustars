@@ -1,93 +1,67 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import { createServiceClient, logCallbackAudit, normalizeKenyanPhone, normalizeReceipt } from "../_shared/mpesa.ts";
 
 serve(async (req) => {
+  const supabase = createServiceClient();
+
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const body = await req.json();
-    
-    console.log("M-Pesa Confirmation received:", JSON.stringify(body, null, 2));
-    
-    const {
-      TransID,
-      TransAmount,
-      MSISDN,
-      BillRefNumber,
-      TransTime,
-      FirstName,
-      MiddleName,
-      LastName,
-    } = body;
-    
-    // Find member by phone number
+    if (req.method !== "POST") {
+      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const payload = await req.json().catch(() => ({}));
+    const receipt = payload?.TransID ? normalizeReceipt(String(payload.TransID)) : null;
+    const amount = Number(payload?.TransAmount ?? 0);
+    const phone = payload?.MSISDN ? normalizeKenyanPhone(String(payload.MSISDN)) : null;
+
+    await logCallbackAudit(supabase, {
+      event_type: "c2b_confirmation",
+      mpesa_receipt: receipt,
+      result_code: 0,
+      payload,
+    });
+
+    if (!receipt || !phone || !Number.isFinite(amount) || amount <= 0) {
+      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
-      .eq("phone", MSISDN)
-      .single();
-    
-    // Parse transaction time
-    const transactionDate = new Date(
-      parseInt(TransTime.substring(0, 4)),
-      parseInt(TransTime.substring(4, 6)) - 1,
-      parseInt(TransTime.substring(6, 8)),
-      parseInt(TransTime.substring(8, 10)),
-      parseInt(TransTime.substring(10, 12)),
-      parseInt(TransTime.substring(12, 14))
-    );
-    
-    // Record the C2B transaction
-    await supabase.from("mpesa_transactions").insert({
-      transaction_type: "c2b",
-      mpesa_receipt_number: TransID,
-      amount: parseFloat(TransAmount),
-      phone_number: MSISDN,
-      member_id: profile?.id,
-      transaction_date: transactionDate.toISOString(),
-      status: "completed",
-      initiated_by: profile?.id || "00000000-0000-0000-0000-000000000000",
-      metadata: {
-        billRefNumber: BillRefNumber,
-        firstName: FirstName,
-        middleName: MiddleName,
-        lastName: LastName,
-      },
-    });
-    
-    // Auto-create contribution if member found
-    if (profile) {
-      await supabase.from("contributions").insert({
-        member_id: profile.id,
-        amount: parseFloat(TransAmount),
-        contribution_type: "welfare",
-        status: "paid",
-        paid_at: transactionDate.toISOString(),
-        reference_number: TransID,
-        notes: `Auto-recorded from M-Pesa C2B. Ref: ${BillRefNumber}`,
+      .eq("phone", phone)
+      .maybeSingle();
+
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("mpesa_receipt", receipt)
+      .maybeSingle();
+
+    if (!existingPayment?.id) {
+      await supabase.from("payments").insert({
+        member_id: profile?.id ?? null,
+        phone,
+        amount,
+        method: "till",
+        checkout_request_id: null,
+        merchant_request_id: null,
+        mpesa_receipt: receipt,
+        status: "awaiting_approval",
+        verified_at: new Date().toISOString(),
       });
-      
-      // Update contribution tracking
-      await supabase
-        .from("contribution_tracking")
-        .update({
-          last_contribution_date: transactionDate.toISOString(),
-          consecutive_missed: 0,
-        })
-        .eq("member_id", profile.id);
     }
-    
-    return new Response(
-      JSON.stringify({ ResultCode: 0, ResultDesc: "Success" }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+
+    return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error("Confirmation error:", error);
-    return new Response(
-      JSON.stringify({ ResultCode: 0, ResultDesc: "Success" }),
-      { headers: { "Content-Type": "application/json" } }
-    );
+    console.error("mpesa-confirmation error", error);
+    return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+      headers: { "Content-Type": "application/json" },
+    });
   }
 });

@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { getPesapalTransactionStatus, registerPesapalIpn } from '@/lib/pesapal';
 import { useToast } from '@/hooks/use-toast';
+import CboMpesaWorkspace from '@/components/payment/CboMpesaWorkspace';
 import { format } from 'date-fns';
 import {
   RefreshCw,
@@ -63,7 +64,9 @@ const PaymentsManagement = () => {
     if (user && canManageFinances) {
       fetchTransactions();
       fetchAuditLogs();
+      return;
     }
+    setIsLoading(false);
   }, [user, canManageFinances]);
 
   const fetchTransactions = async () => {
@@ -159,23 +162,7 @@ const PaymentsManagement = () => {
     ? Math.round((transactions.filter(t => t.status === 'completed').length / transactions.length) * 100)
     : 0;
 
-  if (!canManageFinances) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col items-center justify-center py-12">
-            <AlertCircle className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">Access Restricted</h3>
-            <p className="text-muted-foreground text-center mt-2">
-              Only the Chairman, Treasurer, and Admin can access payments management.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (isLoading) {
+  if (canManageFinances && isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -187,9 +174,13 @@ const PaymentsManagement = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-serif font-bold text-foreground">Payments Management</h1>
-        <p className="text-muted-foreground">Monitor Pesapal transactions and callbacks</p>
+        <p className="text-muted-foreground">Manage CBO M-Pesa contributions and finance payment operations</p>
       </div>
 
+      <CboMpesaWorkspace />
+
+      {canManageFinances ? (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -462,6 +453,22 @@ const PaymentsManagement = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </>
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-muted-foreground mt-0.5" />
+              <div>
+                <h3 className="font-medium">Finance Operations Restricted</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Pesapal management, audit logs, and IPN controls are available to Chairperson, Treasurer, and Admin roles.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

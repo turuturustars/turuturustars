@@ -251,7 +251,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   contributions: 'Contributions',
   'all-contributions': 'All Contributions',
   'treasurer-dashboard': 'Treasurer Dashboard',
-  mpesa: 'Payments (Pesapal)',
+  mpesa: 'Payments',
   reports: 'Reports',
 
   // Members
