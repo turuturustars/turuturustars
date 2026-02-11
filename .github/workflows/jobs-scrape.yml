@@ -1,0 +1,26 @@
+name: Daily Jobs Scrape
+
+on:
+  schedule:
+    - cron: "0 4 * * *" # 04:00 UTC daily
+  workflow_dispatch:
+
+env:
+  FUNCTIONS_BASE_URL: https://mkcgkfzltohxagqvsbqk.functions.supabase.co
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger jobs scrape
+        run: |
+          set -e
+          RESP=$(curl -sS -w "\n%{http_code}" -X POST "$FUNCTIONS_BASE_URL/jobs-scrape" \
+            -H "x-cron-key: ${{ secrets.JOBS_CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{"reason":"github-schedule"}')
+          BODY=$(echo "$RESP" | head -n1)
+          STATUS=$(echo "$RESP" | tail -n1)
+          echo "HTTP $STATUS"
+          echo "$BODY"
+          test "$STATUS" -lt 300

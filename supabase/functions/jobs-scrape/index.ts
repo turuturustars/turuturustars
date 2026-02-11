@@ -1,9 +1,15 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import sourcesData from "./sources.json" assert { type: "json" };
 
-const DEFAULT_SOURCES = ["MyGov Job Adverts", "Public Service Commission", "Murang'a County Government"];
-const MAX_PER_SOURCE = Number(Deno.env.get("MAX_PER_SOURCE") || 20);
-const REQUEST_DELAY_MS = Number(Deno.env.get("REQUEST_DELAY_MS") || 1200);
+export const config = {
+  // We handle auth manually to support cron token and official user auth.
+  verify_jwt: false,
+};
+
+const DEFAULT_MAX_PER_SOURCE = 20;
+const DEFAULT_REQUEST_DELAY_MS = 1200;
+const DEFAULT_MAX_PRIORITY = 2;
 
 const JOBS_INGEST_URL =
   Deno.env.get("JOBS_INGEST_URL") ||
@@ -12,16 +18,22 @@ const JOBS_INGEST_URL =
     : "");
 
 const JOBS_INGEST_KEY = Deno.env.get("JOBS_INGEST_KEY") || "";
-const SOURCE_FILTER = (Deno.env.get("JOB_SOURCES") || "")
-  .split(",")
-  .map((v) => v.trim())
-  .filter(Boolean);
+const CRON_SECRET = Deno.env.get("JOBS_CRON_SECRET") || "";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+const SCRAPE_CONTROL_ROLES = ["admin"];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ingest-key",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-ingest-key, x-cron-key",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
 };
+
+type Actor =
+  | { ok: true; actor: "cron"; role: "cron"; userId?: undefined }
+  | { ok: true; actor: "admin"; role: string; userId: string }
+  | { ok: false; status: number; message: string };
 
 type Job = {
   title: string;
@@ -40,8 +52,74 @@ type Job = {
   status: "pending" | "approved" | "rejected";
 };
 
+type Source = {
+  name: string;
+  url: string;
+  category?: string;
+  priority?: number;
+  is_active?: boolean;
+};
+
+type RuntimeSettings = {
+  maxPerSource: number;
+  requestDelayMs: number;
+  maxPriority: number;
+  sourceMode: "database" | "fallback_json";
+  availableSources: Source[];
+};
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
+
+const createServiceClient = () => {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+};
+
+const authorize = async (req: Request): Promise<Actor> => {
+  if (CRON_SECRET && req.headers.get("x-cron-key") === CRON_SECRET) {
+    return { ok: true, actor: "cron", role: "cron" };
+  }
+
+  const authHeader = req.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false, status: 401, message: "Missing auth" };
+  }
+
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    return { ok: false, status: 500, message: "Missing SUPABASE_URL or SERVICE_ROLE_KEY" };
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  });
+
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData?.user) {
+    return { ok: false, status: 401, message: "Unauthorized" };
+  }
+
+  const userId = userData.user.id;
+  const { data: roles, error: roleError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId);
+
+  if (roleError || !roles?.length) {
+    return { ok: false, status: 403, message: "No role" };
+  }
+
+  const matchedRole = roles
+    .map((row: { role: string }) => row.role)
+    .find((role: string) => SCRAPE_CONTROL_ROLES.includes(role));
+
+  if (!matchedRole) {
+    return { ok: false, status: 403, message: "Forbidden" };
+  }
+
+  return { ok: true, actor: "admin", role: matchedRole, userId };
+};
 
 const extractLinks = (html: string, baseUrl: string) => {
   const links: Array<{ url: string; text: string }> = [];
@@ -72,7 +150,7 @@ const looksLikeJob = (text: string, url: string) => {
     haystack.includes("recruit");
 };
 
-const buildJobs = (links: Array<{ url: string; text: string }>, source: any, defaultDeadline: string): Job[] => {
+const buildJobs = (links: Array<{ url: string; text: string }>, source: Source, defaultDeadline: string): Job[] => {
   const now = new Date().toISOString();
   return links.map((link) => ({
     title: link.text,
@@ -95,6 +173,57 @@ const buildJobs = (links: Array<{ url: string; text: string }>, source: any, def
   }));
 };
 
+const loadRuntimeSettings = async (): Promise<RuntimeSettings> => {
+  const fallbackSources = (sourcesData.sources || []) as Source[];
+  const fallback: RuntimeSettings = {
+    maxPerSource: DEFAULT_MAX_PER_SOURCE,
+    requestDelayMs: DEFAULT_REQUEST_DELAY_MS,
+    maxPriority: DEFAULT_MAX_PRIORITY,
+    sourceMode: "fallback_json",
+    availableSources: fallbackSources,
+  };
+
+  const supabase = createServiceClient();
+  if (!supabase) return fallback;
+
+  const settingsQuery = supabase
+    .from("job_scrape_settings")
+    .select("max_per_source,request_delay_ms,job_max_priority")
+    .eq("id", 1)
+    .maybeSingle();
+
+  const sourcesQuery = supabase
+    .from("job_scrape_sources")
+    .select("name,url,category,priority,is_active")
+    .eq("is_active", true)
+    .order("priority", { ascending: true })
+    .order("name", { ascending: true });
+
+  const [settingsResp, sourcesResp] = await Promise.all([settingsQuery, sourcesQuery]);
+
+  const row = settingsResp.error ? null : settingsResp.data;
+  const dbSources = sourcesResp.error ? null : sourcesResp.data;
+
+  if (!row && (!dbSources || dbSources.length === 0)) {
+    return fallback;
+  }
+
+  return {
+    maxPerSource: Number(row?.max_per_source ?? DEFAULT_MAX_PER_SOURCE),
+    requestDelayMs: Number(row?.request_delay_ms ?? DEFAULT_REQUEST_DELAY_MS),
+    maxPriority: Number(row?.job_max_priority ?? DEFAULT_MAX_PRIORITY),
+    sourceMode: dbSources && dbSources.length > 0 ? "database" : "fallback_json",
+    availableSources: (dbSources && dbSources.length > 0
+      ? (dbSources as Source[])
+      : fallbackSources),
+  };
+};
+
+const asNumber = (value: unknown, fallback: number) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -107,6 +236,14 @@ serve(async (req) => {
     });
   }
 
+  const auth = await authorize(req);
+  if (!auth.ok) {
+    return new Response(JSON.stringify({ error: auth.message }), {
+      status: auth.status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   if (!JOBS_INGEST_URL || !JOBS_INGEST_KEY) {
     return new Response(JSON.stringify({ error: "Missing JOBS_INGEST_URL or JOBS_INGEST_KEY" }), {
       status: 500,
@@ -114,9 +251,46 @@ serve(async (req) => {
     });
   }
 
-  const selected = (sourcesData.sources as any[]).filter((source) =>
-    SOURCE_FILTER.length ? SOURCE_FILTER.includes(source.name) : DEFAULT_SOURCES.includes(source.name) || source.priority <= 2
+  let payload: Record<string, unknown> = {};
+  if (req.method === "POST") {
+    try {
+      payload = await req.json();
+    } catch {
+      payload = {};
+    }
+  }
+
+  const runtime = await loadRuntimeSettings();
+  const query = new URL(req.url).searchParams;
+
+  const overrideSources = Array.isArray(payload.sources)
+    ? (payload.sources as string[]).map((v) => v.trim()).filter(Boolean)
+    : (query.get("sources") || "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+
+  const priorityCutoff = asNumber(
+    payload.max_priority ?? query.get("max_priority"),
+    runtime.maxPriority,
   );
+
+  const maxPerSource = asNumber(
+    payload.max_per_source ?? query.get("max_per_source"),
+    runtime.maxPerSource,
+  );
+
+  const requestDelayMs = asNumber(
+    payload.request_delay_ms ?? query.get("request_delay_ms"),
+    runtime.requestDelayMs,
+  );
+
+  const selected = runtime.availableSources
+    .filter((source) => {
+      if (overrideSources.length > 0) return overrideSources.includes(source.name);
+      return (source.priority ?? 99) <= priorityCutoff;
+    })
+    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
 
   const defaultDeadline = (() => {
     const d = new Date();
@@ -136,16 +310,15 @@ serve(async (req) => {
       const html = await resp.text();
       const links = extractLinks(html, source.url)
         .filter((link) => looksLikeJob(link.text, link.url))
-        .slice(0, MAX_PER_SOURCE);
+        .slice(0, maxPerSource);
 
-      if (!links.length) {
+      if (links.length === 0) {
         summary.push({ source: source.name, found: 0, sent: 0 });
-        await sleep(REQUEST_DELAY_MS);
+        await sleep(requestDelayMs);
         continue;
       }
 
       const jobs = buildJobs(links, source, defaultDeadline);
-
       const ingestResp = await fetch(JOBS_INGEST_URL, {
         method: "POST",
         headers: {
@@ -162,13 +335,27 @@ serve(async (req) => {
         summary.push({ source: source.name, found: links.length, sent: jobs.length });
       }
 
-      await sleep(REQUEST_DELAY_MS);
+      await sleep(requestDelayMs);
     } catch (error) {
       summary.push({ source: source.name, found: 0, sent: 0, error: String(error) });
     }
   }
 
-  return new Response(JSON.stringify({ success: true, summary }), {
+  return new Response(JSON.stringify({
+    success: true,
+    actor: auth.actor,
+    role: auth.role,
+    ran_at: new Date().toISOString(),
+    settings: {
+      max_per_source: maxPerSource,
+      request_delay_ms: requestDelayMs,
+      job_max_priority: priorityCutoff,
+      source_mode: runtime.sourceMode,
+    },
+    sources_requested: overrideSources.length > 0 ? overrideSources : undefined,
+    selected_sources: selected.length,
+    summary,
+  }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.jobs-ingest]
 verify_jwt = false
 
+[functions.jobs-scrape]
+verify_jwt = false
+
 [functions.pesapal]
 verify_jwt = false
 
