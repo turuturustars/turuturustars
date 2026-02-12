@@ -47,6 +47,10 @@ interface Profile {
   id: string;
   full_name: string;
   membership_number: string | null;
+  phone: string | null;
+  id_number: string | null;
+  status: string;
+  registration_fee_paid: boolean | null;
 }
 
 interface UserRole {
@@ -106,7 +110,7 @@ export default function RoleHandoverPage() {
     reason: ''
   });
 
-  const canManage = hasRole('admin') || hasRole('chairperson') || hasRole('vice_chairman');
+  const canManage = hasRole('admin') || hasRole('chairperson');
 
   useEffect(() => {
     fetchHandovers();
@@ -157,22 +161,42 @@ export default function RoleHandoverPage() {
   };
 
   const fetchMembers = async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name, membership_number').eq('status', 'active');
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, membership_number, phone, id_number, status, registration_fee_paid')
+      .eq('status', 'active');
     setMembers(data || []);
   };
 
+  const isEligibleForOfficialRole = (member: Profile) => (
+    member.status === 'active' &&
+    member.registration_fee_paid === true &&
+    Boolean(member.membership_number) &&
+    Boolean(member.phone) &&
+    Boolean(member.id_number)
+  );
+
+  const eligibleMembers = members.filter(isEligibleForOfficialRole);
+
   const persistAssignment = async (userId: string, role: string) => {
-    // remove existing official roles for this user, keep member row intact
-    const { error: delError } = await supabase.from('user_roles').delete().eq('user_id', userId).neq('role', 'member');
-    if (delError) {
-      toast.error('Failed to clear previous roles');
+    const { data, error } = await supabase.functions.invoke('admin-ops', {
+      body: {
+        action: 'assign_official_role',
+        user_id: userId,
+        role,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message || 'Failed to assign role');
       return false;
     }
-    const { error: upsertError } = await supabase.from('user_roles').upsert({ user_id: userId, role });
-    if (upsertError) {
-      toast.error('Failed to assign role');
+
+    if (data?.error) {
+      toast.error(data.error);
       return false;
     }
+
     toast.success(`Assigned role: ${ROLE_LABELS[role] || role}`);
     await fetchOfficials();
     return true;
@@ -183,6 +207,13 @@ export default function RoleHandoverPage() {
       toast.error('Select both member and role');
       return;
     }
+
+    const selectedMember = members.find((m) => m.id === assignForm.userId);
+    if (!selectedMember || !isEligibleForOfficialRole(selectedMember)) {
+      toast.error('Only fully registered, active members with paid registration can be assigned official roles.');
+      return;
+    }
+
     const currentRole = officials.find((o) => o.user_id === assignForm.userId && o.role !== 'member');
     if (currentRole && currentRole.role !== assignForm.role) {
       setConfirmReassign({ open: true, userId: assignForm.userId, newRole: assignForm.role, currentRole: currentRole.role });
@@ -413,7 +444,7 @@ export default function RoleHandoverPage() {
           <CardHeader>
             <CardTitle className="text-lg">Assign or Reassign Official Roles</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Admin, Chairperson, and Vice Chairperson can assign administrative roles. Reassigning replaces any existing official role.
+              Only Admin and Chairperson can assign roles. Members must be active, fully registered, and fee-paid.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -425,7 +456,7 @@ export default function RoleHandoverPage() {
                     <SelectValue placeholder="Pick a member" />
                   </SelectTrigger>
                   <SelectContent className="max-h-64">
-                    {members.map((m) => (
+                    {eligibleMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.full_name} {m.membership_number ? `• ${m.membership_number}` : ''}
                       </SelectItem>
@@ -450,9 +481,19 @@ export default function RoleHandoverPage() {
                 </Select>
               </div>
             </div>
-            <AccessibleButton onClick={handleAssign} className="w-full" ariaLabel="Assign role to member">
+            <AccessibleButton
+              onClick={handleAssign}
+              className="w-full"
+              ariaLabel="Assign role to member"
+              disabled={eligibleMembers.length === 0}
+            >
               Assign Role
             </AccessibleButton>
+            {eligibleMembers.length === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No eligible members found. Activate and complete profile details, then mark registration fee as paid.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

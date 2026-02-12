@@ -7,7 +7,8 @@ type Action =
   | "suspend_member"
   | "reject_member"
   | "approve_user"
-  | "approve_payment";
+  | "approve_payment"
+  | "assign_official_role";
 
 type MemberLifecycleMode = "suspend" | "permanent";
 
@@ -17,7 +18,10 @@ type MemberProfile = {
   full_name: string;
   email: string | null;
   phone: string | null;
+  id_number?: string | null;
   status: string | null;
+  registration_fee_paid?: boolean | null;
+  registration_completed_at?: string | null;
   soft_deleted?: boolean | null;
 };
 
@@ -75,6 +79,18 @@ const OFFICIAL_ROLES = [
 ] as const;
 
 const IGNORED_CLEANUP_ERROR_CODES = new Set(["42P01", "42703", "PGRST204", "PGRST205"]);
+const ASSIGNABLE_OFFICIAL_ROLES = new Set([
+  "admin",
+  "chairperson",
+  "vice_chairman",
+  "secretary",
+  "vice_secretary",
+  "treasurer",
+  "organizing_secretary",
+  "coordinator",
+  "committee_member",
+  "patron",
+]);
 
 function hasAnyRole(userRoles: string[], requiredRoles: readonly string[]): boolean {
   return userRoles.some((role) => requiredRoles.includes(role));
@@ -89,6 +105,12 @@ function ensureElevated(roles: string[]): void {
 function ensureAdmin(roles: string[]): void {
   if (!roles.includes("admin")) {
     throw new HttpError(403, "Only admins can permanently delete members");
+  }
+}
+
+function ensureAdminOrChairperson(roles: string[]): void {
+  if (!roles.includes("admin") && !roles.includes("chairperson")) {
+    throw new HttpError(403, "Only admin or chairperson can assign official roles");
   }
 }
 
@@ -160,7 +182,7 @@ async function fetchMemberProfile(
 ): Promise<MemberProfile> {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("id, membership_number, full_name, email, phone, status, soft_deleted")
+    .select("id, membership_number, full_name, email, phone, id_number, status, registration_fee_paid, registration_completed_at, soft_deleted")
     .eq("id", memberId)
     .maybeSingle();
 
@@ -169,6 +191,24 @@ async function fetchMemberProfile(
   }
 
   return profile as MemberProfile;
+}
+
+function ensureEligibleForOfficialRole(profile: MemberProfile): void {
+  if (profile.status !== "active") {
+    throw new HttpError(400, "Member must be active before assigning an official role");
+  }
+
+  if (!profile.registration_fee_paid) {
+    throw new HttpError(400, "Member must have paid the registration membership fee");
+  }
+
+  if (!profile.membership_number) {
+    throw new HttpError(400, "Member must have a membership number");
+  }
+
+  if (!profile.full_name || !profile.phone || !profile.id_number) {
+    throw new HttpError(400, "Member must be fully registered before role assignment");
+  }
 }
 
 async function notifyMember(
@@ -377,6 +417,65 @@ async function permanentlyDeleteMember(
   return profile;
 }
 
+async function assignOfficialRole(
+  supabase: ReturnType<typeof createClient>,
+  actor: Actor,
+  targetUserId: string,
+  role: string,
+): Promise<void> {
+  ensureAdminOrChairperson(actor.roles);
+
+  if (!ASSIGNABLE_OFFICIAL_ROLES.has(role)) {
+    throw new HttpError(400, "Invalid role for official assignment");
+  }
+
+  const profile = await fetchMemberProfile(supabase, targetUserId);
+  ensureEligibleForOfficialRole(profile);
+
+  const { error: ensureMemberRoleError } = await supabase
+    .from("user_roles")
+    .upsert(
+      {
+        user_id: targetUserId,
+        role: "member",
+        assigned_by: actor.id,
+      },
+      { onConflict: "user_id,role" },
+    );
+
+  if (ensureMemberRoleError) {
+    throw new HttpError(500, "Failed to ensure base member role", {
+      detail: ensureMemberRoleError.message,
+    });
+  }
+
+  const { error: clearError } = await supabase
+    .from("user_roles")
+    .delete()
+    .eq("user_id", targetUserId)
+    .neq("role", "member");
+
+  if (clearError) {
+    throw new HttpError(500, "Failed to clear previous official roles", {
+      detail: clearError.message,
+    });
+  }
+
+  const { error: assignError } = await supabase
+    .from("user_roles")
+    .insert({
+      user_id: targetUserId,
+      role,
+      assigned_by: actor.id,
+    });
+
+  if (assignError) {
+    throw new HttpError(500, "Failed to assign official role", {
+      detail: assignError.message,
+    });
+  }
+}
+
 function parseLifecycleMode(action: Action, value: unknown): MemberLifecycleMode {
   if (action === "suspend_member") {
     return "suspend";
@@ -561,6 +660,39 @@ serve(async (req) => {
 
       await logAdminAction(supabase, actor.id, actor.primaryRole, "payment_approved", "payment", paymentId, null);
       return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "assign_official_role") {
+      const targetUserId: string | undefined = body.user_id;
+      const role: string | undefined = body.role;
+
+      if (!targetUserId || !role) {
+        throw new HttpError(400, "Missing user_id or role");
+      }
+
+      await assignOfficialRole(supabase, actor, targetUserId, role);
+
+      await notifyMember(
+        supabase,
+        targetUserId,
+        "Official Role Assigned",
+        `You have been assigned the ${role.replace(/_/g, " ")} role.`,
+        "role_assignment",
+      );
+
+      await logAdminAction(
+        supabase,
+        actor.id,
+        actor.primaryRole,
+        "official_role_assigned",
+        "user_role",
+        targetUserId,
+        { assigned_role: role },
+      );
+
+      return new Response(JSON.stringify({ ok: true, user_id: targetUserId, role }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
