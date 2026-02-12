@@ -1,175 +1,152 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+﻿import { useNavigate } from 'react-router-dom';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
-import { Badge } from '@/components/ui/badge';
+import {
+  OfficialDashboardHero,
+  OfficialMetricCard,
+  OfficialQuickActionCard,
+  OfficialResponsibilityCard,
+} from '@/components/dashboard/officials/OfficialDashboardPrimitives';
+import { formatKES, useOfficialDashboardStats } from '@/hooks/useOfficialDashboardStats';
 import {
   BarChart3,
+  Bell,
+  Handshake,
+  Landmark,
+  MessageSquare,
+  ShieldCheck,
   TrendingUp,
   Users,
-  FileText,
 } from 'lucide-react';
 
 const PatronDashboard = () => {
   const navigate = useNavigate();
-  const { roles } = useAuth();
-  const { status: statusMessage, showSuccess } = useStatus();
-  const userRoles = normalizeRoles(roles);
-  const isPatron = hasRole(userRoles, 'patron');
-
-  const quickActions = [
-    {
-      title: 'Association Reports',
-      description: 'View key metrics and reports',
-      icon: <BarChart3 className="w-5 h-5" />,
-      path: '/dashboard/finance/reports',
-      color: 'bg-blue-100 dark:bg-blue-900/30',
-    },
-    {
-      title: 'Member Statistics',
-      description: 'Overview of membership',
-      icon: <Users className="w-5 h-5" />,
-      path: '/dashboard/members',
-      color: 'bg-green-100 dark:bg-green-900/30',
-    },
-    {
-      title: 'Key Insights',
-      description: 'Association performance',
-      icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/finance/reports',
-      color: 'bg-purple-100 dark:bg-purple-900/30',
-    },
-    {
-      title: 'Announcements',
-      description: 'Stay informed',
-      icon: <FileText className="w-5 h-5" />,
-      path: '/dashboard/communication/announcements',
-      color: 'bg-amber-100 dark:bg-amber-900/30',
-    },
-  ];
+  const { status: statusMessage } = useStatus();
+  const { stats, isLoading } = useOfficialDashboardStats();
 
   return (
-    <div className="space-y-6">
-      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
-      {/* Header */}
-      <div className="border-b border-border pb-4">
-        <h1 className="text-3xl font-bold">Patron Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Oversee association progress and performance
-        </p>
+    <div className="space-y-6 pb-8">
+      <AccessibleStatus
+        message={statusMessage.message}
+        type={statusMessage.type}
+        isVisible={statusMessage.isVisible}
+      />
+
+      <OfficialDashboardHero
+        title="Patron Dashboard"
+        subtitle="Monitor association health, funding momentum, and governance progress with live board-level metrics."
+        icon={Landmark}
+        badgeLabel="Patron"
+        gradientClassName="bg-gradient-to-br from-teal-700 via-cyan-700 to-blue-700"
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <OfficialMetricCard
+          title="Total Members"
+          value={stats.totalMembers}
+          caption={`${stats.activeMembers} members currently active`}
+          icon={Users}
+          tone="blue"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="This Month Collections"
+          value={formatKES(stats.collectedThisMonthAmount)}
+          caption="Paid contributions in current month"
+          icon={TrendingUp}
+          tone="emerald"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="Published Notices"
+          value={stats.publishedAnnouncements}
+          caption="Active announcements to members"
+          icon={Bell}
+          tone="amber"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="Active Welfare Cases"
+          value={stats.welfareActiveCases}
+          caption="Member welfare matters under review"
+          icon={Handshake}
+          tone="violet"
+          isLoading={isLoading}
+        />
       </div>
 
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Active</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-- %</div>
-            <p className="text-xs text-muted-foreground mt-1">This year</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Partnerships</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Active networks</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Satisfaction</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">-- %</div>
-            <p className="text-xs text-muted-foreground mt-1">Member feedback</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, idx) => (
-            <button
-              key={idx}
-              onClick={() => navigate(action.path)}
-              aria-label={`Navigate to ${action.title}`}
-              className="group"
-            >
-              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader>
-                  <div className={`w-12 h-12 rounded-lg ${action.color} flex items-center justify-center text-foreground mb-3 group-hover:scale-110 transition-transform`}>
-                    {action.icon}
-                  </div>
-                  <CardTitle className="text-base">{action.title}</CardTitle>
-                  <CardDescription className="text-sm">{action.description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </button>
-          ))}
+        <h2 className="mb-4 text-xl font-semibold">Strategic Oversight</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <OfficialQuickActionCard
+            title="Executive Reports"
+            description="Review financial and governance performance reports."
+            icon={BarChart3}
+            tone="blue"
+            onClick={() => navigate('/dashboard/finance/reports')}
+          />
+          <OfficialQuickActionCard
+            title="Member Overview"
+            description="Inspect membership distribution and status trends."
+            icon={Users}
+            tone="emerald"
+            badge={`${stats.totalMembers} members`}
+            onClick={() => navigate('/dashboard/members')}
+          />
+          <OfficialQuickActionCard
+            title="Contribution Trends"
+            description="Track paid, pending, and missed contribution flows."
+            icon={TrendingUp}
+            tone="amber"
+            badge={`${stats.missedContributionsCount} missed`}
+            onClick={() => navigate('/dashboard/finance/all-contributions')}
+          />
+          <OfficialQuickActionCard
+            title="Governance Calendar"
+            description="Follow upcoming meetings and key agenda periods."
+            icon={Landmark}
+            tone="slate"
+            badge={`${stats.upcomingMeetings} upcoming`}
+            onClick={() => navigate('/dashboard/governance/meetings')}
+          />
+          <OfficialQuickActionCard
+            title="Announcements"
+            description="View published communication to all members."
+            icon={Bell}
+            tone="violet"
+            badge={`${stats.publishedAnnouncements} live`}
+            onClick={() => navigate('/dashboard/communication/announcements')}
+          />
+          <OfficialQuickActionCard
+            title="Direct Committee Chat"
+            description="Share guidance with management committee quickly."
+            icon={MessageSquare}
+            tone="rose"
+            badge={`${stats.unreadPrivateMessages} unread`}
+            onClick={() => navigate('/dashboard/communication/messages')}
+          />
         </div>
       </div>
 
-      {/* Key Responsibilities */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Key Responsibilities</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Oversee overall wellbeing of the Association</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Facilitate networking and partnerships</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Provide strategic guidance and mentorship</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Maintain communication with Management Committee</span>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Message to Management Committee */}
-      <Card className="border-purple-200 dark:border-purple-800">
-        <CardHeader>
-          <CardTitle>Direct Communication</CardTitle>
-          <CardDescription>Reach out to the Management Committee</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <button
-            onClick={() => navigate('/dashboard/communication/messages')}
-            aria-label="Open private chat with management committee"
-            className="text-primary hover:underline text-sm"
-          >
-            Open Private Chat with MC →
-          </button>
-        </CardContent>
-      </Card>
+      <OfficialResponsibilityCard
+        title="Patron Responsibilities"
+        description="Strategic guidance and institutional continuity duties."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {[
+            'Provide strategic guidance to leadership and committees.',
+            'Promote partnerships and external support for the association.',
+            'Monitor overall welfare and performance of membership programs.',
+            'Maintain direct advisory communication with management committee.',
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-2 rounded-lg border bg-background p-3 text-sm">
+              <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </OfficialResponsibilityCard>
     </div>
   );
 };
 
 export default PatronDashboard;
-

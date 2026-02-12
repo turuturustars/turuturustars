@@ -1,156 +1,133 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { hasRole, normalizeRoles } from '@/lib/rolePermissions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
-import { Badge } from '@/components/ui/badge';
+import {
+  OfficialDashboardHero,
+  OfficialMetricCard,
+  OfficialQuickActionCard,
+  OfficialResponsibilityCard,
+} from '@/components/dashboard/officials/OfficialDashboardPrimitives';
+import { formatKES, useOfficialDashboardStats } from '@/hooks/useOfficialDashboardStats';
 import {
   BarChart3,
-  TrendingUp,
-  PieChart,
+  CheckCircle2,
   Download,
   DollarSign,
+  ShieldCheck,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
 } from 'lucide-react';
 
 const TreasurerRole = () => {
   const navigate = useNavigate();
-  const { roles } = useAuth();
-  const { status: statusMessage, showSuccess } = useStatus();
-  const userRoles = normalizeRoles(roles);
-  const isTreasurer = hasRole(userRoles, 'treasurer');
-
-  const quickActions = [
-    {
-      title: 'Payment Tracking',
-      description: 'Monitor M-Pesa transactions',
-      icon: <DollarSign className="w-5 h-5" />,
-      path: '/dashboard/finance/mpesa',
-      color: 'bg-green-100 dark:bg-green-900/30',
-    },
-    {
-      title: 'Financial Reports',
-      description: 'View and export reports',
-      icon: <BarChart3 className="w-5 h-5" />,
-      path: '/dashboard/finance/reports',
-      color: 'bg-blue-100 dark:bg-blue-900/30',
-    },
-    {
-      title: 'Contributions',
-      description: 'View all member contributions',
-      icon: <TrendingUp className="w-5 h-5" />,
-      path: '/dashboard/finance/all-contributions',
-      color: 'bg-purple-100 dark:bg-purple-900/30',
-    },
-    {
-      title: 'Export Data',
-      description: 'Download financial statements',
-      icon: <Download className="w-5 h-5" />,
-      path: '/dashboard/finance/reports',
-      color: 'bg-amber-100 dark:bg-amber-900/30',
-    },
-  ];
+  const { status: statusMessage } = useStatus();
+  const { stats, isLoading } = useOfficialDashboardStats();
 
   return (
-    <div className="space-y-6">
-      <AccessibleStatus message={statusMessage.message} type={statusMessage.type} isVisible={statusMessage.isVisible} />
-      {/* Header */}
-      <div className="border-b border-border pb-4">
-        <h1 className="text-3xl font-bold">Treasurer Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage financial records and payment tracking
-        </p>
+    <div className="space-y-6 pb-8">
+      <AccessibleStatus
+        message={statusMessage.message}
+        type={statusMessage.type}
+        isVisible={statusMessage.isVisible}
+      />
+
+      <OfficialDashboardHero
+        title="Treasurer Dashboard"
+        subtitle="Track contribution inflows, pending obligations, and M-Pesa performance from one finance workspace."
+        icon={DollarSign}
+        badgeLabel="Treasury"
+        gradientClassName="bg-gradient-to-br from-emerald-700 via-green-700 to-lime-600"
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <OfficialMetricCard
+          title="Total Collected"
+          value={formatKES(stats.totalCollectedAmount)}
+          caption="Paid contributions on record"
+          icon={TrendingUp}
+          tone="emerald"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="This Month"
+          value={formatKES(stats.collectedThisMonthAmount)}
+          caption="Collections in current month"
+          icon={Wallet}
+          tone="blue"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="Pending Payments"
+          value={`${stats.pendingContributionsCount}`}
+          caption={`${formatKES(stats.pendingContributionsAmount)} awaiting confirmation`}
+          icon={TrendingDown}
+          tone="amber"
+          isLoading={isLoading}
+        />
+        <OfficialMetricCard
+          title="M-Pesa Settled"
+          value={stats.mpesaCompletedCount}
+          caption={`${stats.mpesaThisMonthCount} transactions this month`}
+          icon={CheckCircle2}
+          tone="violet"
+          isLoading={isLoading}
+        />
       </div>
 
-      {/* Financial Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">KES --</div>
-            <p className="text-xs text-muted-foreground mt-1">All time</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">KES --</div>
-            <p className="text-xs text-muted-foreground mt-1">Collected</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Pending Payments</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">Members</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">--</div>
-            <p className="text-xs text-muted-foreground mt-1">This month</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {quickActions.map((action, idx) => (
-            <button
-              key={idx}
-              onClick={() => navigate(action.path)}
-              aria-label={`Navigate to ${action.title}`}
-              className="group"
-            >
-              <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
-                <CardHeader>
-                  <div className={`w-12 h-12 rounded-lg ${action.color} flex items-center justify-center text-foreground mb-3 group-hover:scale-110 transition-transform`}>
-                    {action.icon}
-                  </div>
-                  <CardTitle className="text-base">{action.title}</CardTitle>
-                  <CardDescription className="text-sm">{action.description}</CardDescription>
-                </CardHeader>
-              </Card>
-            </button>
-          ))}
+        <h2 className="mb-4 text-xl font-semibold">Financial Controls</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <OfficialQuickActionCard
+            title="M-Pesa Monitoring"
+            description="Review live transaction statuses and reconciliation state."
+            icon={DollarSign}
+            tone="emerald"
+            badge={`${stats.mpesaThisMonthCount} this month`}
+            onClick={() => navigate('/dashboard/finance/mpesa')}
+          />
+          <OfficialQuickActionCard
+            title="Contribution Ledger"
+            description="Audit every member contribution and missed payment."
+            icon={TrendingUp}
+            tone="blue"
+            badge={`${stats.missedContributionsCount} missed`}
+            onClick={() => navigate('/dashboard/finance/all-contributions')}
+          />
+          <OfficialQuickActionCard
+            title="Treasury Reports"
+            description="View export-ready reports for committee approvals."
+            icon={BarChart3}
+            tone="violet"
+            onClick={() => navigate('/dashboard/finance/reports')}
+          />
+          <OfficialQuickActionCard
+            title="Export Statements"
+            description="Generate downloadable monthly and annual statements."
+            icon={Download}
+            tone="amber"
+            onClick={() => navigate('/dashboard/finance/reports')}
+          />
         </div>
       </div>
 
-      {/* Key Responsibilities */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Key Responsibilities</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Receive and disburse funds as authorized</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Maintain accurate books of accounts</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Track all vouchers, cheques, and banking slips</span>
-          </div>
-          <div className="flex items-start gap-3">
-            <Badge className="mt-0.5">•</Badge>
-            <span>Prepare financial reports and statements for approval</span>
-          </div>
-        </CardContent>
-      </Card>
+      <OfficialResponsibilityCard
+        title="Treasurer Governance Duties"
+        description="Financial custodianship standards for the treasury office."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {[
+            'Receive and disburse funds only through approved processes.',
+            'Maintain accurate books of account and payment records.',
+            'Monitor pending, paid, and missed contribution obligations.',
+            'Prepare transparent finance reports for committee decisions.',
+          ].map((item) => (
+            <div key={item} className="flex items-start gap-2 rounded-lg border bg-background p-3 text-sm">
+              <ShieldCheck className="mt-0.5 h-4 w-4 text-primary" />
+              <span>{item}</span>
+            </div>
+          ))}
+        </div>
+      </OfficialResponsibilityCard>
     </div>
   );
 };
