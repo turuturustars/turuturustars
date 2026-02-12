@@ -335,6 +335,35 @@ export async function validateFinanceAccess(supabase: ReturnType<typeof createSe
   }
 }
 
+export async function ensureMemberCanInteract(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  preloadedRoles?: string[],
+): Promise<void> {
+  const roles = preloadedRoles ?? await getUserRoles(supabase, userId);
+  if (hasAnyRole(roles, ["admin", "treasurer", "chairperson"])) {
+    return;
+  }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(500, "Unable to validate account status", error);
+  }
+
+  if (!profile?.status || profile.status !== "active") {
+    throw new HttpError(
+      403,
+      "Your account is in read-only mode until approval. Contact admin if this persists.",
+      { status: profile?.status ?? null },
+    );
+  }
+}
+
 export function parsePositiveAmount(amount: unknown): number {
   const value = Number(amount);
   if (!Number.isFinite(value) || value <= 0) {

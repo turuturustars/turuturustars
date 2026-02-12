@@ -4,6 +4,7 @@ import {
   createServiceClient,
   createStkPassword,
   createTimestamp,
+  ensureMemberCanInteract,
   extractClientIp,
   fetchWithRetry,
   getMpesaAccessToken,
@@ -42,14 +43,19 @@ serve(async (req) => {
     const accountReference = body.accountReference?.trim() || `CBO-${Date.now()}`;
     const transactionDesc = body.transactionDesc?.trim() || "CBO contribution payment";
 
+    const userRoles = await getUserRoles(supabase, user.id);
+    const canPayForOthers = hasAnyRole(userRoles, ["admin", "treasurer"]);
+
     let memberId = user.id;
     if (body.member_id && body.member_id !== user.id) {
-      const userRoles = await getUserRoles(supabase, user.id);
-      const canPayForOthers = hasAnyRole(userRoles, ["admin", "treasurer"]);
       if (!canPayForOthers) {
         throw new HttpError(403, "You can only initiate STK payments for your own account");
       }
       memberId = body.member_id;
+    }
+
+    if (!canPayForOthers) {
+      await ensureMemberCanInteract(supabase, user.id, userRoles);
     }
 
     const baseUrl = requireEnv("MPESA_BASE_URL");

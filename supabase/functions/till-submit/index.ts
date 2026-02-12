@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { HttpError, corsHeaders, errorResponse, isOptionsRequest, jsonResponse, readJsonBody } from "../_shared/http.ts";
 import {
+  ensureMemberCanInteract,
   normalizeKenyanPhone,
   normalizeReceipt,
   parsePositiveAmount,
@@ -37,6 +38,8 @@ serve(async (req) => {
     if (body.member_id && body.member_id !== user.id) {
       await validateFinanceAccess(supabase, user.id);
       memberId = body.member_id;
+    } else {
+      await ensureMemberCanInteract(supabase, user.id);
     }
 
     const { data: duplicateSubmission, error: duplicateCheckError } = await supabase

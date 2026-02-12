@@ -63,6 +63,32 @@ function parseAmount(rawValue: unknown): number {
   return Math.round(amount);
 }
 
+async function ensureMemberCanTransact(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  hasFinancialRole: boolean,
+) {
+  if (hasFinancialRole) {
+    return;
+  }
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(500, "Failed to validate member status", { detail: error.message });
+  }
+
+  if (!profile || profile.status !== "active") {
+    throw new HttpError(403, "Your account is pending approval and currently read-only", {
+      profile_status: profile?.status ?? null,
+    });
+  }
+}
+
 function assertMpesaConfig(): void {
   const missing: string[] = [];
   if (!MPESA_CONSUMER_KEY) missing.push("MPESA_CONSUMER_KEY");
@@ -228,9 +254,13 @@ serve(async (req) => {
     });
 
     // Some actions require financial roles (members are allowed to initiate STK pushes)
-    const financialActions = ["register_urls", "generate_qr", "create_standing_order"];
+    const financialActions = ["register_urls", "generate_qr", "create_standing_order", "simulate_c2b"];
     if (financialActions.includes(action) && !hasFinancialRole) {
       throw new Error("Insufficient permissions for financial operations");
+    }
+
+    if (action === "stk_push" || action === "query_status") {
+      await ensureMemberCanTransact(supabase, user.id, Boolean(hasFinancialRole));
     }
 
     const accessToken = await getAccessToken();
@@ -238,7 +268,21 @@ serve(async (req) => {
 
     switch (action) {
       case "stk_push": {
-        const { phoneNumber: rawPhone, amount: rawAmount, accountReference, transactionDesc, memberId, contributionId } = params;
+        const {
+          phoneNumber: rawPhone,
+          amount: rawAmount,
+          accountReference,
+          transactionDesc,
+          memberId: rawMemberId,
+          contributionId,
+        } = params;
+        const memberId =
+          typeof rawMemberId === "string" && rawMemberId.trim().length > 0
+            ? rawMemberId.trim()
+            : user.id;
+        if (memberId !== user.id && !hasFinancialRole) {
+          throw new HttpError(403, "You can only initiate payments for your own account");
+        }
         const phoneNumber = normalizeKenyanPhone(rawPhone);
         const amount = parseAmount(rawAmount);
         const timestamp = generateTimestamp();
@@ -353,6 +397,28 @@ serve(async (req) => {
 
       case "query_status": {
         const { checkoutRequestId } = params;
+        if (typeof checkoutRequestId !== "string" || !checkoutRequestId.trim()) {
+          throw new HttpError(400, "checkoutRequestId is required");
+        }
+
+        if (!hasFinancialRole) {
+          const { data: transaction, error: transactionError } = await supabase
+            .from("mpesa_transactions")
+            .select("id, member_id")
+            .eq("checkout_request_id", checkoutRequestId)
+            .maybeSingle();
+
+          if (transactionError) {
+            throw new HttpError(500, "Failed to validate transaction ownership", {
+              detail: transactionError.message,
+            });
+          }
+
+          if (!transaction || transaction.member_id !== user.id) {
+            throw new HttpError(403, "You do not have access to this transaction");
+          }
+        }
+
         const timestamp = generateTimestamp();
         const password = generatePassword(timestamp);
         const queryTime = new Date().toISOString();
