@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Home, Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck, KeyRound, PhoneCall } from 'lucide-react';
+import { ArrowLeft, Home, Loader2, Mail, Lock, ShieldCheck, KeyRound, PhoneCall } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { requestPasswordResetByIdentifier, signInWithEmail, signUpWithEmail } from '../authApi';
@@ -58,10 +58,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const [signupForm, setSignupForm] = useState({
     email: '',
     password: '',
-    fullName: '',
-    phone: '',
-    idNumber: '',
-    location: '',
+    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -345,6 +342,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
+    if (signupForm.password !== signupForm.confirmPassword) {
+      toast({
+        title: 'Password mismatch',
+        description: 'Password and confirm password must match.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (hasCaptchaProtection && !signupCaptchaToken) {
       toast({
         title: 'Complete security check',
@@ -368,10 +374,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       const { requiresEmailVerification, existingUserHint } = await signUpWithEmail({
         email: signupForm.email,
         password: signupForm.password,
-        fullName: signupForm.fullName,
-        phone: signupForm.phone,
-        idNumber: signupForm.idNumber,
-        location: signupForm.location,
         captchaToken: signupCaptchaToken || undefined,
       });
 
@@ -796,62 +798,28 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="signup-fullname" className="text-sm font-medium text-foreground/80">
-                      Full Name
+                    <Label htmlFor="signup-confirm-password" className="text-sm font-medium text-foreground/80">
+                      Confirm Password
                     </Label>
                     <div className="relative">
-                      <User className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <Input
-                        id="signup-fullname"
+                        id="signup-confirm-password"
+                        type="password"
                         required
+                        minLength={8}
                         className="pl-9 border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={signupForm.fullName}
-                        onChange={(e) => setSignupForm((prev) => ({ ...prev, fullName: e.target.value }))}
+                        value={signupForm.confirmPassword}
+                        onChange={(e) => setSignupForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-phone" className="text-sm font-medium text-foreground/80">
-                      Phone
-                    </Label>
-                    <div className="relative">
-                      <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-phone"
-                        placeholder="+2547..."
-                        className="pl-9 border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={signupForm.phone}
-                        onChange={(e) => setSignupForm((prev) => ({ ...prev, phone: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-id" className="text-sm font-medium text-foreground/80">
-                      National ID
-                    </Label>
-                    <Input
-                      id="signup-id"
-                      className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                      value={signupForm.idNumber}
-                      onChange={(e) => setSignupForm((prev) => ({ ...prev, idNumber: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="signup-location" className="text-sm font-medium text-foreground/80">
-                      Location
-                    </Label>
-                    <div className="relative">
-                      <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="signup-location"
-                        className="pl-9 border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={signupForm.location}
-                        onChange={(e) => setSignupForm((prev) => ({ ...prev, location: e.target.value }))}
-                      />
-                    </div>
+                  <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                    <p className="text-sm font-medium text-foreground">Profile details come next</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      After account creation, you will complete full name, phone, national ID, location, and student-member checkbox in your profile setup.
+                    </p>
                   </div>
 
                   {hasCaptchaProtection && (

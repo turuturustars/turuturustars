@@ -89,12 +89,12 @@ const EmailConfirmation = () => {
           if (!isProfileComplete(profile as any)) {
             const pending = getPendingSignup();
             const metadata = user.user_metadata || {};
-            const fullName = pending?.fullName || (metadata.full_name as string) || 'Member';
-            const phone = pending?.phone || (metadata.phone as string) || '0000000000';
+            const fullName = pending?.fullName || (metadata.full_name as string) || '';
+            const phone = pending?.phone || (metadata.phone as string) || '';
             const idNumber = pending?.idNumber || (metadata.id_number as string) || '';
             const location = pending?.location || (metadata.location as string) || '';
 
-            if (fullName && phone) {
+            if (fullName && phone && idNumber) {
               const result = await verifyEmailAndCompleteProfile(user.id, {
                 fullName,
                 phone,
@@ -108,10 +108,10 @@ const EmailConfirmation = () => {
                 nextPath = '/dashboard';
               } else {
                 console.warn('Profile completion after email confirm failed:', result.error);
-                nextPath = '/auth';
+                nextPath = '/profile-setup';
               }
             } else {
-              nextPath = '/auth';
+              nextPath = '/profile-setup';
             }
           }
         } catch (profileCheckError) {

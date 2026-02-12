@@ -5,11 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Mail, GraduationCap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { resendVerificationEmail, updateProfile } from '@/features/auth/authApi';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { MEMBER_LOCATIONS } from '@/constants/memberLocations';
 
 const ProfileSetup = () => {
   usePageMeta({
@@ -28,7 +31,9 @@ const ProfileSetup = () => {
     phone: '',
     idNumber: '',
     location: '',
+    otherLocation: '',
     occupation: '',
+    isStudent: false,
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -36,12 +41,15 @@ const ProfileSetup = () => {
 
   useEffect(() => {
     if (profile) {
+      const isOtherLocation = profile.location && !MEMBER_LOCATIONS.slice(0, -1).includes(profile.location as any);
       setForm({
         fullName: profile.full_name || '',
         phone: profile.phone || '',
         idNumber: profile.id_number || '',
-        location: profile.location || '',
+        location: isOtherLocation ? 'Other' : profile.location || '',
+        otherLocation: isOtherLocation ? profile.location || '' : '',
         occupation: profile.occupation || '',
+        isStudent: Boolean(profile.is_student),
       });
     }
   }, [profile]);
@@ -77,12 +85,14 @@ const ProfileSetup = () => {
 
     setIsSaving(true);
     try {
+      const finalLocation = form.location === 'Other' ? form.otherLocation.trim() : form.location;
       await updateProfile(user.id, {
         full_name: form.fullName,
         phone: form.phone,
         id_number: form.idNumber,
-        location: form.location || null,
+        location: finalLocation || null,
         occupation: form.occupation || null,
+        is_student: form.isStudent,
         status: profile?.status === 'active' ? 'active' : profile?.status === 'suspended' ? 'suspended' : 'pending',
       });
 
@@ -153,6 +163,7 @@ const ProfileSetup = () => {
               <Label htmlFor="phone">Phone *</Label>
               <Input
                 id="phone"
+                placeholder="+2547..."
                 value={form.phone}
                 onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                 required
@@ -171,11 +182,29 @@ const ProfileSetup = () => {
 
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
+              <Select
                 value={form.location}
-                onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
-              />
+                onValueChange={(value) => setForm((prev) => ({ ...prev, location: value }))}
+              >
+                <SelectTrigger id="location" className="w-full">
+                  <SelectValue placeholder="Select your location" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEMBER_LOCATIONS.map((locationOption) => (
+                    <SelectItem key={locationOption} value={locationOption}>
+                      {locationOption}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.location === 'Other' && (
+                <Input
+                  id="location-other"
+                  placeholder="Specify your location"
+                  value={form.otherLocation}
+                  onChange={(e) => setForm((prev) => ({ ...prev, otherLocation: e.target.value }))}
+                />
+              )}
             </div>
 
             <div className="space-y-2">
@@ -185,6 +214,30 @@ const ProfileSetup = () => {
                 value={form.occupation}
                 onChange={(e) => setForm((prev) => ({ ...prev, occupation: e.target.value }))}
               />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="is-student" className="flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Membership Type
+              </Label>
+              <label
+                htmlFor="is-student"
+                className="inline-flex cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-background px-3 py-2 text-sm"
+              >
+                <Checkbox
+                  id="is-student"
+                  checked={form.isStudent}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({ ...prev, isStudent: checked === true }))
+                  }
+                />
+                I am a student member
+              </label>
+            </div>
+
+            <div className="md:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+              You can always edit these profile details later from your dashboard profile page.
             </div>
 
             <Button type="submit" className="md:col-span-2" disabled={isSaving || !canSubmit}>

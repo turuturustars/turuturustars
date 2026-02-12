@@ -5,29 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin, ShieldCheck, IdCard } from 'lucide-react';
+import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin, ShieldCheck, IdCard, GraduationCap } from 'lucide-react';
 import ProfilePhotoUpload from '@/components/dashboard/ProfilePhotoUpload';
-
-// Location options
-const LOCATIONS = [
-  'Turuturu',
-  'Gatune',
-  'Mutoho',
-  'Githeru',
-  'Kahariro',
-  'Kiangige',
-  'Daboo',
-  'Githima',
-  'Nguku',
-  'Ngaru',
-  'Kiugu',
-  'Kairi',
-  'Other'
-] as const;
+import { MEMBER_LOCATIONS } from '@/constants/memberLocations';
 
 const ProfilePage = () => {
   const { profile, roles = [] } = useAuth();
@@ -42,12 +27,13 @@ const ProfilePage = () => {
     location: '',
     otherLocation: '',
     occupation: '',
+    is_student: false,
   });
 
   // Initialize form data when profile loads
   useEffect(() => {
     if (profile) {
-      const isOtherLocation = profile.location && !LOCATIONS.slice(0, -1).includes(profile.location as any);
+      const isOtherLocation = profile.location && !MEMBER_LOCATIONS.slice(0, -1).includes(profile.location as any);
       setFormData({
         full_name: profile.full_name || '',
         phone: profile.phone || '',
@@ -55,6 +41,7 @@ const ProfilePage = () => {
         location: isOtherLocation ? 'Other' : (profile.location || ''),
         otherLocation: isOtherLocation ? (profile.location || '') : '',
         occupation: profile.occupation || '',
+        is_student: Boolean(profile.is_student),
       });
     }
   }, [profile]);
@@ -75,6 +62,7 @@ const ProfilePage = () => {
           id_number: formData.id_number,
           location: finalLocation || null,
           occupation: formData.occupation || null,
+          is_student: formData.is_student,
         })
         .eq('id', profile.id);
 
@@ -267,7 +255,7 @@ const ProfilePage = () => {
                       <SelectValue placeholder="Select your location" />
                     </SelectTrigger>
                     <SelectContent>
-                      {LOCATIONS.map((loc) => (
+                      {MEMBER_LOCATIONS.map((loc) => (
                         <SelectItem key={loc} value={loc}>
                           {loc}
                         </SelectItem>
@@ -300,6 +288,29 @@ const ProfilePage = () => {
                 />
               ) : (
                 <p className="text-foreground py-2">{profile?.occupation || 'Not specified'}</p>
+              )}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="is_student" className="flex items-center gap-2">
+                <GraduationCap className="w-4 h-4" />
+                Student Membership
+              </Label>
+              {isEditing ? (
+                <label
+                  htmlFor="is_student"
+                  className="inline-flex cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-background/70 px-3 py-2 text-sm"
+                >
+                  <Checkbox
+                    id="is_student"
+                    checked={formData.is_student}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, is_student: checked === true }))
+                    }
+                  />
+                  I am a student member
+                </label>
+              ) : (
+                <p className="text-foreground py-2">{profile?.is_student ? 'Yes - Student member' : 'No - Full member'}</p>
               )}
             </div>
           </div>
