@@ -38,10 +38,15 @@ export function usePrivateMessages(conversationId?: string) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchConversations = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setConversations([]);
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const { data, error } = await (supabase.from('private_conversations' as 'announcements') as any)
+      const { data, error } = await supabase
+        .from('private_conversations')
         .select('id, participant_one, participant_two, updated_at, created_at')
         .or(`participant_one.eq.${user.id},participant_two.eq.${user.id}`)
         .order('updated_at', { ascending: false });
@@ -70,15 +75,17 @@ export function usePrivateMessages(conversationId?: string) {
             const otherId = conv.participant_one === user.id ? conv.participant_two : conv.participant_one;
             
             // Get last message
-            const { data: lastMsgData } = await (supabase.from('private_messages' as 'announcements') as any)
-              .select('id, sender_id, message, created_at, read_at')
+            const { data: lastMsgData } = await supabase
+              .from('private_messages')
+              .select('id, sender_id, content, created_at, read_at, conversation_id')
               .eq('conversation_id', conv.id)
               .order('created_at', { ascending: false })
               .limit(1)
               .single();
 
             // Get unread count
-            const { count } = await (supabase.from('private_messages' as 'announcements') as any)
+            const { count } = await supabase
+              .from('private_messages')
               .select('id', { count: 'exact', head: true })
               .eq('conversation_id', conv.id)
               .neq('sender_id', user.id)
@@ -108,7 +115,8 @@ export function usePrivateMessages(conversationId?: string) {
     if (!user || !conversationId) return;
 
     try {
-      const { data, error } = await (supabase.from('private_messages' as 'announcements') as any)
+      const { data, error } = await supabase
+        .from('private_messages')
         .select('*')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
@@ -135,18 +143,21 @@ export function usePrivateMessages(conversationId?: string) {
         setMessages(messagesWithProfiles);
 
         // Mark messages as read
-        await (supabase.from('private_messages' as 'announcements') as any)
+        await supabase
+          .from('private_messages')
           .update({ read_at: new Date().toISOString() })
           .eq('conversation_id', conversationId)
           .neq('sender_id', user.id)
           .is('read_at', null);
+
+        await fetchConversations();
       } else {
         setMessages([]);
       }
     } catch (err) {
       console.error('Error in fetchMessages:', err);
     }
-  }, [user, conversationId]);
+  }, [user, conversationId, fetchConversations]);
 
   useEffect(() => {
     fetchConversations();
@@ -154,21 +165,21 @@ export function usePrivateMessages(conversationId?: string) {
 
   useEffect(() => {
     if (conversationId) {
-      fetchMessages();
+      void fetchMessages();
 
-      // Subscribe to new messages
       const channel = supabase
         .channel(`private-messages-${conversationId}`)
         .on(
           'postgres_changes',
-          { 
-            event: 'INSERT', 
-            schema: 'public', 
+          {
+            event: '*',
+            schema: 'public',
             table: 'private_messages',
-            filter: `conversation_id=eq.${conversationId}`
+            filter: `conversation_id=eq.${conversationId}`,
           },
           () => {
-            fetchMessages();
+            void fetchMessages();
+            void fetchConversations();
           }
         )
         .subscribe();
@@ -177,13 +188,55 @@ export function usePrivateMessages(conversationId?: string) {
         supabase.removeChannel(channel);
       };
     }
-  }, [conversationId, fetchMessages]);
+  }, [conversationId, fetchConversations, fetchMessages]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const participantOneChannel = supabase
+      .channel(`private-conversations-one-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_conversations',
+          filter: `participant_one=eq.${user.id}`,
+        },
+        () => {
+          void fetchConversations();
+        }
+      )
+      .subscribe();
+
+    const participantTwoChannel = supabase
+      .channel(`private-conversations-two-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_conversations',
+          filter: `participant_two=eq.${user.id}`,
+        },
+        () => {
+          void fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(participantOneChannel);
+      supabase.removeChannel(participantTwoChannel);
+    };
+  }, [user, fetchConversations]);
 
   const startConversation = async (otherUserId: string) => {
     if (!user) throw new Error('Not authenticated');
 
     // Check if conversation already exists
-    const { data: existing } = await (supabase.from('private_conversations' as 'announcements') as any)
+    const { data: existing } = await supabase
+      .from('private_conversations')
       .select('id')
       .or(`and(participant_one.eq.${user.id},participant_two.eq.${otherUserId}),and(participant_one.eq.${otherUserId},participant_two.eq.${user.id})`)
       .single();
@@ -193,7 +246,8 @@ export function usePrivateMessages(conversationId?: string) {
     }
 
     // Create new conversation
-    const { data, error } = await (supabase.from('private_conversations' as 'announcements') as any)
+    const { data, error } = await supabase
+      .from('private_conversations')
       .insert({
         participant_one: user.id,
         participant_two: otherUserId,
@@ -210,7 +264,8 @@ export function usePrivateMessages(conversationId?: string) {
   const sendPrivateMessage = async (content: string) => {
     if (!user || !conversationId) throw new Error('Not authenticated or no conversation');
 
-    const { data, error } = await (supabase.from('private_messages' as 'announcements') as any)
+    const { data, error } = await supabase
+      .from('private_messages')
       .insert({
         conversation_id: conversationId,
         sender_id: user.id,
@@ -222,9 +277,12 @@ export function usePrivateMessages(conversationId?: string) {
     if (error) throw error;
 
     // Update conversation timestamp
-    await (supabase.from('private_conversations' as 'announcements') as any)
+    await supabase
+      .from('private_conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversationId);
+
+    await fetchConversations();
 
     return data;
   };

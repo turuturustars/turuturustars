@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
 import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
@@ -8,10 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { OptimizedAvatarImage } from '@/components/ui/OptimizedAvatarImage';
-import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users, Bell, BellOff, Edit2, Trash2 } from 'lucide-react';
+import { MessageCircle, Search, Plus, ArrowLeft, Send, Loader2, Users, Bell, BellOff, Edit2, Trash2, Sparkles, Inbox } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface MemberProfile {
@@ -22,9 +23,11 @@ interface MemberProfile {
 
 export default function PrivateMessagesPage() {
   const { user } = useAuth();
-  const { status, showSuccess } = useStatus();
+  const { status, showSuccess, showError } = useStatus();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [conversationSearchTerm, setConversationSearchTerm] = useState('');
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [newMessageText, setNewMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const [members, setMembers] = useState<MemberProfile[]>([]);
@@ -34,6 +37,7 @@ export default function PrivateMessagesPage() {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+  const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
   const { preferences: notificationPreferences } = useNotificationPreferences(user?.id);
 
   const { 
@@ -65,6 +69,29 @@ export default function PrivateMessagesPage() {
   );
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
+  const unreadConversationsCount = useMemo(
+    () => conversations.filter((conv) => (conv.unread_count ?? 0) > 0).length,
+    [conversations]
+  );
+  const totalUnreadMessages = useMemo(
+    () => conversations.reduce((sum, conv) => sum + (conv.unread_count ?? 0), 0),
+    [conversations]
+  );
+
+  const groupedMessages = useMemo(() => {
+    return messages.reduce<Array<{ date: string; items: typeof messages }>>((groups, message) => {
+      const dateKey = new Date(message.created_at).toDateString();
+      const existingGroup = groups[groups.length - 1];
+
+      if (!existingGroup || existingGroup.date !== dateKey) {
+        groups.push({ date: dateKey, items: [message] });
+        return groups;
+      }
+
+      existingGroup.items.push(message);
+      return groups;
+    }, []);
+  }, [messages]);
 
   // Initialize notification state
   useEffect(() => {
@@ -72,6 +99,17 @@ export default function PrivateMessagesPage() {
       setNotificationsEnabled(checkNotificationsEnabled());
     }
   }, [isNotificationsSupported, checkNotificationsEnabled]);
+
+  useEffect(() => {
+    if (!showNewConversation) {
+      setMemberSearchTerm('');
+    }
+  }, [showNewConversation]);
+
+  useEffect(() => {
+    if (!selectedConversationId) return;
+    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [selectedConversationId, messages.length]);
 
   // Fetch members for new conversation
   const fetchMembers = async () => {
@@ -87,6 +125,7 @@ export default function PrivateMessagesPage() {
       setMembers(data || []);
     } catch (err) {
       console.error('Error fetching members:', err);
+      showError('Unable to load member list right now.', 2500);
     } finally {
       setLoadingMembers(false);
     }
@@ -94,7 +133,7 @@ export default function PrivateMessagesPage() {
 
   useEffect(() => {
     if (showNewConversation) {
-      fetchMembers();
+      void fetchMembers();
     }
   }, [showNewConversation]);
 
@@ -103,8 +142,10 @@ export default function PrivateMessagesPage() {
       const convId = await startConversation(memberId);
       setSelectedConversationId(convId);
       setShowNewConversation(false);
+      showSuccess('Conversation ready. Say hello!', 1800);
     } catch (err) {
       console.error('Error starting conversation:', err);
+      showError('Could not start conversation. Please try again.', 2500);
     }
   };
 
@@ -117,10 +158,12 @@ export default function PrivateMessagesPage() {
 
     try {
       await sendPrivateMessage(messageToSend);
-      refreshMessages();
+      await refreshMessages();
+      showSuccess('Message sent', 1200);
     } catch (err) {
       console.error('Error sending message:', err);
       setNewMessageText(messageToSend);
+      showError('Message failed to send. Try again.', 2500);
     } finally {
       setSending(false);
     }
@@ -130,15 +173,20 @@ export default function PrivateMessagesPage() {
     if (notificationsEnabled) {
       disableNotifications();
       setNotificationsEnabled(false);
+      showSuccess('Notifications disabled', 1800);
     } else {
       try {
         const granted = await requestPermission();
         if (granted) {
           enableNotifications();
           setNotificationsEnabled(true);
+          showSuccess('Message notifications enabled', 2000);
+        } else {
+          showError('Notification permission was blocked.', 2500);
         }
       } catch (err) {
         console.error('Error enabling notifications:', err);
+        showError('Could not enable notifications.', 2500);
       }
     }
   };
@@ -161,9 +209,11 @@ export default function PrivateMessagesPage() {
       
       setEditingMessageId(null);
       setEditingContent('');
-      refreshMessages();
+      await refreshMessages();
+      showSuccess('Message updated', 2000);
     } catch (err) {
       console.error('Error updating message:', err);
+      showError('Unable to update message.', 2500);
     }
   };
 
@@ -179,20 +229,25 @@ export default function PrivateMessagesPage() {
 
       if (error) throw error;
       
-      refreshMessages();
+      await refreshMessages();
+      showSuccess('Message deleted', 2000);
     } catch (err) {
       console.error('Error deleting message:', err);
+      showError('Unable to delete message.', 2500);
     } finally {
       setDeletingMessageId(null);
     }
   };
 
-  const filteredConversations = conversations.filter(conv =>
-    conv.other_participant?.full_name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredConversations = conversations.filter((conversation) => {
+    const name = conversation.other_participant?.full_name?.toLowerCase() || '';
+    const matchesSearch = name.includes(conversationSearchTerm.toLowerCase());
+    const matchesUnread = showUnreadOnly ? (conversation.unread_count ?? 0) > 0 : true;
+    return matchesSearch && matchesUnread;
+  });
 
-  const filteredMembers = members.filter(m =>
-    m.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMembers = members.filter((member) =>
+    (member.full_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase())
   );
 
   // Mobile: Show either list or conversation
@@ -209,18 +264,24 @@ export default function PrivateMessagesPage() {
               <MessageCircle className="w-6 h-6 text-primary" />
             </div>
             <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary flex items-center gap-1">
+                <Sparkles className="h-3.5 w-3.5" />
+                Communication Hub
+              </p>
               <h1 className="text-2xl font-bold text-foreground">Messages</h1>
               <p className="text-sm text-muted-foreground">Private conversations with members</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{conversations.length} chats</Badge>
+                <Badge variant="secondary">{unreadConversationsCount} unread chats</Badge>
+                <Badge variant="secondary">{totalUnreadMessages} unread messages</Badge>
+              </div>
             </div>
           </div>
           {isNotificationsSupported() && (
             <AccessibleButton
               size="sm"
               variant={notificationsEnabled ? 'default' : 'outline'}
-              onClick={() => {
-                handleToggleNotifications();
-                showSuccess(notificationsEnabled ? 'Notifications disabled' : 'Notifications enabled', 2000);
-              }}
+              onClick={handleToggleNotifications}
               className="h-9 gap-2"
               ariaLabel={notificationsEnabled ? 'Disable message notifications' : 'Enable message notifications'}
             >
@@ -274,8 +335,8 @@ export default function PrivateMessagesPage() {
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search members..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={memberSearchTerm}
+                        onChange={(e) => setMemberSearchTerm(e.target.value)}
                         className="pl-9"
                       />
                     </div>
@@ -294,7 +355,7 @@ export default function PrivateMessagesPage() {
                             >
                               <OptimizedAvatarImage
                                 photoUrl={member.photo_url}
-                                fallback={member.full_name.charAt(0).toUpperCase()}
+                                fallback={member.full_name?.charAt(0).toUpperCase() || 'M'}
                                 size={40}
                                 className="h-10 w-10"
                               />
@@ -318,10 +379,24 @@ export default function PrivateMessagesPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search conversations..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={conversationSearchTerm}
+              onChange={(e) => setConversationSearchTerm(e.target.value)}
               className="pl-9"
             />
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              {filteredConversations.length} shown - {totalUnreadMessages} unread
+            </p>
+            <AccessibleButton
+              size="sm"
+              variant={showUnreadOnly ? 'default' : 'outline'}
+              className="h-7 px-2 text-xs"
+              onClick={() => setShowUnreadOnly((current) => !current)}
+              ariaLabel={showUnreadOnly ? 'Show all conversations' : 'Show unread conversations only'}
+            >
+              {showUnreadOnly ? 'Unread only' : 'All chats'}
+            </AccessibleButton>
           </div>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-hidden">
@@ -332,7 +407,7 @@ export default function PrivateMessagesPage() {
               </div>
             ) : filteredConversations.length === 0 ? (
               <div className="text-center py-8 px-4">
-                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                <Inbox className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
                 <p className="text-muted-foreground">No conversations yet</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">
                   Start a new conversation with a member
@@ -372,7 +447,7 @@ export default function PrivateMessagesPage() {
                 </AccessibleButton>
                 <OptimizedAvatarImage
                   photoUrl={selectedConversation.other_participant?.photo_url}
-                  fallback={selectedConversation.other_participant?.full_name.charAt(0).toUpperCase() || 'M'}
+                  fallback={selectedConversation.other_participant?.full_name?.charAt(0).toUpperCase() || 'M'}
                   size={40}
                   className="h-10 w-10"
                 />
@@ -389,7 +464,10 @@ export default function PrivateMessagesPage() {
             <CardContent className="flex-1 p-0 overflow-hidden">
               <ScrollArea className="h-full p-4">
                 <div className="space-y-4">
-                  {messages.map((msg) => {
+                  {groupedMessages.map((group) => (
+                    <div key={group.date} className="space-y-2">
+                      <MessageDateDivider label={group.date} />
+                      {group.items.map((msg) => {
                     const isOwn = msg.sender_id === user?.id;
                     const isEditing = editingMessageId === msg.id;
                     return (
@@ -400,14 +478,14 @@ export default function PrivateMessagesPage() {
                         <div className={`max-w-[80%] ${isOwn ? 'order-2' : ''}`}>
                           {isEditing ? (
                             <div className="flex gap-2 mb-2">
-                              <input
-                                type="text"
+                              <Textarea
                                 value={editingContent}
                                 onChange={(e) => setEditingContent(e.target.value)}
-                                className="flex-1 px-3 py-2 rounded-lg border border-primary bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                className="flex-1 min-h-[48px] text-sm"
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleSaveEdit(msg.id);
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    void handleSaveEdit(msg.id);
                                   } else if (e.key === 'Escape') {
                                     setEditingMessageId(null);
                                     setEditingContent('');
@@ -417,10 +495,7 @@ export default function PrivateMessagesPage() {
                               />
                               <AccessibleButton
                                 size="sm"
-                                onClick={() => {
-                                  handleSaveEdit(msg.id);
-                                  showSuccess('Message updated', 2000);
-                                }}
+                                onClick={() => void handleSaveEdit(msg.id)}
                                 className="h-9"
                                 ariaLabel="Save message changes"
                               >
@@ -464,10 +539,7 @@ export default function PrivateMessagesPage() {
                                   <AccessibleButton
                                     size="sm"
                                     variant="ghost"
-                                    onClick={() => {
-                                      handleDeleteMessage(msg.id);
-                                      showSuccess('Message deleted', 2000);
-                                    }}
+                                    onClick={() => void handleDeleteMessage(msg.id)}
                                     disabled={deletingMessageId === msg.id}
                                     className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                                     ariaLabel="Delete this message"
@@ -489,6 +561,8 @@ export default function PrivateMessagesPage() {
                       </div>
                     );
                   })}
+                    </div>
+                  ))}
                   {messages.length === 0 && (
                     <div className="text-center py-12">
                       <p className="text-muted-foreground">
@@ -496,32 +570,33 @@ export default function PrivateMessagesPage() {
                       </p>
                     </div>
                   )}
+                  <div ref={endOfMessagesRef} />
                 </div>
               </ScrollArea>
             </CardContent>
 
             {/* Input */}
             <div className="p-4 border-t flex-shrink-0">
-              <div className="flex gap-2">
-                <Input
+              <div className="flex items-end gap-2">
+                <Textarea
                   value={newMessageText}
                   onChange={(e) => setNewMessageText(e.target.value)}
                   placeholder="Type a message..."
+                  className="min-h-[52px] resize-none"
+                  maxLength={1200}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      handleSendMessage();
+                      void handleSendMessage();
                     }
                   }}
                   disabled={sending}
                 />
                 <AccessibleButton
-                  onClick={() => {
-                    handleSendMessage();
-                    showSuccess('Message sent', 1500);
-                  }}
+                  onClick={() => void handleSendMessage()}
                   disabled={!newMessageText.trim() || sending}
                   size="icon"
+                  className="h-11 w-11"
                   ariaLabel="Send message"
                 >
                   {sending ? (
@@ -531,21 +606,45 @@ export default function PrivateMessagesPage() {
                   )}
                 </AccessibleButton>
               </div>
+              <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>Enter to send, Shift+Enter for a new line</span>
+                <span>{newMessageText.length}/1200</span>
+              </div>
             </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
+            <div className="text-center space-y-3">
               <MessageCircle className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
               <h3 className="font-semibold text-lg">Select a conversation</h3>
               <p className="text-muted-foreground mt-1">
                 Choose a conversation from the list or start a new one
               </p>
+              <AccessibleButton
+                onClick={() => setShowNewConversation(true)}
+                className="gap-2"
+                ariaLabel="Start a new conversation"
+              >
+                <Plus className="h-4 w-4" />
+                New conversation
+              </AccessibleButton>
             </div>
           </div>
         )}
       </Card>
       </div>
+    </div>
+  );
+}
+
+function MessageDateDivider({ label }: { readonly label: string }) {
+  return (
+    <div className="my-4 flex items-center gap-3">
+      <div className="h-px flex-1 bg-border/60" />
+      <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      <div className="h-px flex-1 bg-border/60" />
     </div>
   );
 }
@@ -573,7 +672,7 @@ function ConversationItem({
     >
       <OptimizedAvatarImage
         photoUrl={other_participant?.photo_url}
-        fallback={other_participant?.full_name.charAt(0).toUpperCase() || 'M'}
+        fallback={other_participant?.full_name?.charAt(0).toUpperCase() || 'M'}
         size={48}
         className="h-12 w-12 flex-shrink-0"
       />
