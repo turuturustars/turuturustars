@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
@@ -8,11 +9,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
-import { searchItems, sortItems } from '@/lib/searchUtils';
+import { searchItems } from '@/lib/searchUtils';
 import { exportAsCSV } from '@/lib/exportUtils';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
-import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight, Sparkles, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +23,9 @@ interface Announcement {
   title: string;
   content: string;
   priority: string;
-  published_at: string;
+  published: boolean;
+  published_at: string | null;
+  created_at: string;
   created_by: string;
   created_by_profile?: {
     full_name: string;
@@ -31,6 +34,7 @@ interface Announcement {
 
 const AnnouncementsPage = () => {
   const { toast } = useToast();
+  const location = useLocation();
   const { user, roles } = useAuth();
   const { status, showSuccess } = useStatus();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -51,9 +55,16 @@ const AnnouncementsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const pagination = usePaginationState(10);
+  const highlightedAnnouncementId = location.hash.replace('#', '');
 
   const userRoles = normalizeRoles(roles);
   const canCreateAnnouncement = hasPermission(userRoles, 'send_announcements');
+  const priorityOrder: Record<string, number> = {
+    urgent: 0,
+    high: 1,
+    normal: 2,
+    low: 3,
+  };
 
   // Filter and search announcements
   const filteredAnnouncements = useMemo(() => {
@@ -71,18 +82,21 @@ const AnnouncementsPage = () => {
 
     // Sort
     if (sortBy === 'priority') {
-      const priorityOrder = { high: 0, normal: 1, low: 2 };
       results = [...results].sort((a, b) => {
-        const aIndex = priorityOrder[a.priority as keyof typeof priorityOrder] || 999;
-        const bIndex = priorityOrder[b.priority as keyof typeof priorityOrder] || 999;
+        const aIndex = priorityOrder[a.priority] ?? 999;
+        const bIndex = priorityOrder[b.priority] ?? 999;
         return aIndex - bIndex;
       });
     } else {
-      results = sortItems(results, 'published_at', 'desc');
+      results = [...results].sort((a, b) => {
+        const aTime = new Date(a.published_at || a.created_at).getTime();
+        const bTime = new Date(b.published_at || b.created_at).getTime();
+        return bTime - aTime;
+      });
     }
 
     return results;
-  }, [announcements, searchTerm, priorityFilter, sortBy]);
+  }, [announcements, searchTerm, priorityFilter, sortBy, priorityOrder]);
 
   // Update pagination when filtered announcements change
   useEffect(() => {
@@ -94,6 +108,43 @@ const AnnouncementsPage = () => {
     return filteredAnnouncements.slice(offset, offset + pagination.pageSize);
   }, [filteredAnnouncements, pagination.page, pagination.pageSize]);
 
+  const recentAnnouncementHighlights = useMemo(
+    () => announcements.slice(0, 4),
+    [announcements]
+  );
+
+  useEffect(() => {
+    if (!highlightedAnnouncementId) return;
+
+    const announcementIndex = filteredAnnouncements.findIndex(
+      (announcement) => announcement.id === highlightedAnnouncementId
+    );
+
+    if (announcementIndex < 0) return;
+
+    const pageForAnnouncement = Math.floor(announcementIndex / pagination.pageSize) + 1;
+    if (pagination.page !== pageForAnnouncement) {
+      pagination.goToPage(pageForAnnouncement);
+      return;
+    }
+
+    const targetId = `announcement-${highlightedAnnouncementId}`;
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(targetId);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    highlightedAnnouncementId,
+    filteredAnnouncements,
+    pagination.page,
+    pagination.pageSize,
+    pagination.goToPage,
+  ]);
+
   // Fetch announcements with error handling
   const fetchAnnouncements = async () => {
     setIsLoading(true);
@@ -102,13 +153,20 @@ const AnnouncementsPage = () => {
       
       await retryAsync(
         async () => {
-          const { data, error: fetchError } = await supabase
+          let query = supabase
             .from('announcements')
-            .select('id, title, content, priority, published_at, created_by')
+            .select('id, title, content, priority, published, published_at, created_at, created_by')
             .order('published_at', { ascending: false });
 
+          // Non-official users only need published announcements.
+          if (!canCreateAnnouncement) {
+            query = query.eq('published', true);
+          }
+
+          const { data, error: fetchError } = await query;
+
           if (fetchError) throw fetchError;
-          setAnnouncements(data || []);
+          setAnnouncements((data || []) as Announcement[]);
           return data;
         },
         {
@@ -159,7 +217,7 @@ const AnnouncementsPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [canCreateAnnouncement]);
 
   const handleCreateAnnouncement = async () => {
     if (!formData.title.trim() || !formData.content.trim()) {
@@ -404,6 +462,45 @@ const AnnouncementsPage = () => {
         )}
       </div>
 
+      {!isLoading && recentAnnouncementHighlights.length > 0 && (
+        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-primary/10">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <CardTitle className="text-lg">Recent Updates</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {recentAnnouncementHighlights.map((announcement) => (
+                <Link
+                  key={announcement.id}
+                  to={`/dashboard/communication/announcements#${announcement.id}`}
+                  className={cn(
+                    'group rounded-xl border bg-background p-3 transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md',
+                    highlightedAnnouncementId === announcement.id && 'border-primary ring-1 ring-primary/40'
+                  )}
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    {getPriorityBadge(announcement.priority)}
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                  </div>
+                  <p className="line-clamp-2 text-sm font-semibold text-foreground">{announcement.title}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {new Date(announcement.published_at || announcement.created_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -460,7 +557,7 @@ const AnnouncementsPage = () => {
                       const exportData = filteredAnnouncements.map((a) => ({
                         'Title': a.title,
                         'Priority': a.priority,
-                        'Date': new Date(a.published_at).toLocaleDateString(),
+                        'Date': new Date(a.published_at || a.created_at).toLocaleDateString(),
                         'Creator': a.created_by_profile?.full_name || 'Unknown',
                       }));
                       exportAsCSV(exportData, { filename: 'announcements' });
@@ -490,8 +587,10 @@ const AnnouncementsPage = () => {
                 {paginatedAnnouncements.map((announcement) => (
             <Card
               key={announcement.id}
+              id={`announcement-${announcement.id}`}
               className={cn(
-                newestAnnouncementId === announcement.id && 'ring-2 ring-primary/40 shadow-md'
+                newestAnnouncementId === announcement.id && 'ring-2 ring-primary/40 shadow-md',
+                highlightedAnnouncementId === announcement.id && 'border-primary/70 bg-primary/5 shadow-md'
               )}
             >
               <CardHeader className="pb-3">
@@ -504,7 +603,7 @@ const AnnouncementsPage = () => {
                       <CardTitle className="text-lg">{announcement.title}</CardTitle>
                       <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
                         <p>
-                          {new Date(announcement.published_at).toLocaleDateString('en-US', {
+                          {new Date(announcement.published_at || announcement.created_at).toLocaleDateString('en-US', {
                             weekday: 'short',
                             year: 'numeric',
                             month: 'short',
