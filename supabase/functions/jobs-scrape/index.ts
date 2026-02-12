@@ -70,6 +70,8 @@ type RuntimeSettings = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
+const keywordRegex = /(job|vacan|career|recruit|opportunit|internship|position|employment)/i;
+const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|vacancies?|job adverts?)$/i;
 
 const createServiceClient = () => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
@@ -141,13 +143,44 @@ const extractLinks = (html: string, baseUrl: string) => {
   return links;
 };
 
-const looksLikeJob = (text: string, url: string) => {
-  const haystack = `${text} ${url}`.toLowerCase();
-  return haystack.includes("job") ||
-    haystack.includes("vacan") ||
-    haystack.includes("advert") ||
-    haystack.includes("career") ||
-    haystack.includes("recruit");
+const dedupeLinks = (links: Array<{ url: string; text: string }>) => {
+  const seen = new Set<string>();
+  const unique: Array<{ url: string; text: string }> = [];
+  for (const link of links) {
+    if (seen.has(link.url)) continue;
+    seen.add(link.url);
+    unique.push(link);
+  }
+  return unique;
+};
+
+const isSameDocumentLink = (candidateUrl: string, sourceUrl: string) => {
+  try {
+    const candidate = new URL(candidateUrl);
+    const source = new URL(sourceUrl);
+    return candidate.origin === source.origin &&
+      candidate.pathname === source.pathname &&
+      candidate.search === source.search;
+  } catch {
+    return false;
+  }
+};
+
+const looksLikeJob = (text: string, url: string, sourceUrl: string) => {
+  const normalizedText = text.trim().toLowerCase();
+  if (!normalizedText || normalizedText.length < 3) return false;
+  if (utilityTextRegex.test(normalizedText)) return false;
+  if (isSameDocumentLink(url, sourceUrl)) return false;
+
+  const haystack = `${normalizedText} ${url}`.toLowerCase();
+  if (keywordRegex.test(haystack)) return true;
+
+  // Dedicated jobs/careers pages often link to job PDF adverts with non-keyword titles.
+  const sourceHintsJobs = /(job|vacan|career|recruit)/i.test(sourceUrl);
+  const isLikelyAdDocument = /\.(pdf|doc|docx)$/i.test(url);
+  if (sourceHintsJobs && isLikelyAdDocument && normalizedText.length >= 8) return true;
+
+  return false;
 };
 
 const buildJobs = (links: Array<{ url: string; text: string }>, source: Source, defaultDeadline: string): Job[] => {
@@ -220,6 +253,7 @@ const loadRuntimeSettings = async (): Promise<RuntimeSettings> => {
 };
 
 const asNumber = (value: unknown, fallback: number) => {
+  if (value === null || value === undefined || value === "") return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
@@ -307,10 +341,21 @@ serve(async (req) => {
           "User-Agent": "TuruturuStarsJobsBot/1.0 (+https://turuturustars.co.ke)",
         },
       });
+      if (!resp.ok) {
+        summary.push({
+          source: source.name,
+          found: 0,
+          sent: 0,
+          error: `Source request failed with status ${resp.status}`,
+        });
+        await sleep(requestDelayMs);
+        continue;
+      }
+
       const html = await resp.text();
-      const links = extractLinks(html, source.url)
-        .filter((link) => looksLikeJob(link.text, link.url))
-        .slice(0, maxPerSource);
+      const links = dedupeLinks(extractLinks(html, source.url)
+        .filter((link) => looksLikeJob(link.text, link.url, source.url))
+        .slice(0, maxPerSource));
 
       if (links.length === 0) {
         summary.push({ source: source.name, found: 0, sent: 0 });

@@ -61,8 +61,16 @@ const normalizeJobType = (value?: string): JobType => {
   return allowed.includes(normalized as JobType) ? (normalized as JobType) : "other";
 };
 
-const normalizeText = (value?: string | null, fallback = "") =>
-  (value ?? fallback).toString().trim();
+const normalizeText = (value?: string | null, fallback = "") => {
+  const candidate = value ?? fallback;
+  if (candidate === null || candidate === undefined) return "";
+  return String(candidate).trim();
+};
+
+const normalizeOptionalText = (value?: string | null) => {
+  const normalized = normalizeText(value);
+  return normalized || null;
+};
 
 const isMuranga = (value: string) => value.toLowerCase().includes("murang");
 
@@ -105,19 +113,20 @@ serve(async (req) => {
         const county = normalizeText(job.county, "Kenya");
         const sourceName = normalizeText(job.source_name);
         const sourceUrl = normalizeText(job.source_url);
-        const deadline = normalizeText(job.deadline ?? null, null as unknown as string) || null;
+        const deadline = normalizeOptionalText(job.deadline);
         const postedAt = normalizeText(job.posted_at ?? nowIso);
-        if (!title || !organization || !sourceName || !sourceUrl || !deadline) {
-          if (!title || !organization || !sourceName || !sourceUrl) {
-            return null;
-          }
+        if (!title || !organization || !sourceName || !sourceUrl) {
+          return null;
         }
 
         const priority =
           job.is_priority_location ??
           (isMuranga(county) || isMuranga(location));
 
-        const status = job.status ?? (deadline ? "approved" : "pending");
+        const requestedStatus = job.status ?? (deadline ? "approved" : "pending");
+        const status = requestedStatus === "approved" && !deadline
+          ? "pending"
+          : requestedStatus;
 
         return {
           title,
@@ -130,12 +139,12 @@ serve(async (req) => {
           source_name: sourceName,
           source_url: sourceUrl,
           apply_url: normalizeText(job.apply_url || sourceUrl, sourceUrl),
-          excerpt: normalizeText(job.excerpt, null as unknown as string) || null,
-          external_id: normalizeText(job.external_id ?? null, null as unknown as string) || null,
+          excerpt: normalizeOptionalText(job.excerpt),
+          external_id: normalizeOptionalText(job.external_id),
           is_government: Boolean(job.is_government),
           is_priority_location: Boolean(priority),
           status,
-          rejected_reason: normalizeText(job.rejected_reason ?? null, null as unknown as string) || null,
+          rejected_reason: normalizeOptionalText(job.rejected_reason),
         };
       })
       .filter(Boolean) as Array<Record<string, unknown>>;
