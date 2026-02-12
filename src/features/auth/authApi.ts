@@ -32,6 +32,21 @@ export interface SignInPayload {
   captchaToken?: string;
 }
 
+export interface PasswordRecoveryPayload {
+  identifier: string;
+  captchaToken?: string;
+}
+
+export interface PasswordRecoveryResult {
+  success: boolean;
+  exists: boolean;
+  resetSent: boolean;
+  message: string;
+  emailHint: string | null;
+  supportPhone: string;
+  identifierType: 'email' | 'membership_number';
+}
+
 export interface AuthRequestError extends Error {
   status?: number;
   code?: string;
@@ -72,9 +87,12 @@ export async function signUpWithEmail(payload: SignUpPayload) {
     throw toAuthRequestError(error);
   }
 
+  const existingUserHint = Boolean(data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+
   return {
     user: data.user,
     requiresEmailVerification: !data.session,
+    existingUserHint,
   };
 }
 
@@ -106,6 +124,41 @@ export async function sendPasswordReset(email: string) {
     redirectTo: buildSiteUrl('/auth/reset-password'),
   });
   if (error) throw new Error(error.message);
+}
+
+export async function requestPasswordResetByIdentifier(
+  payload: PasswordRecoveryPayload
+): Promise<PasswordRecoveryResult> {
+  const { data, error } = await supabase.functions.invoke('auth-recovery', {
+    body: {
+      identifier: payload.identifier,
+      captchaToken: payload.captchaToken,
+      redirectTo: buildSiteUrl('/auth/reset-password'),
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to process password recovery request.');
+  }
+
+  if (!data || typeof data !== 'object') {
+    throw new Error('Password recovery service returned an invalid response.');
+  }
+
+  const response = data as Partial<PasswordRecoveryResult> & { error?: string };
+  if (response.success !== true && response.error) {
+    throw new Error(response.error);
+  }
+
+  return {
+    success: Boolean(response.success),
+    exists: Boolean(response.exists),
+    resetSent: Boolean(response.resetSent),
+    message: response.message || 'Password recovery request processed.',
+    emailHint: response.emailHint ?? null,
+    supportPhone: response.supportPhone || '0700471113',
+    identifierType: response.identifierType === 'membership_number' ? 'membership_number' : 'email',
+  };
 }
 
 export async function fetchProfile(userId: string) {

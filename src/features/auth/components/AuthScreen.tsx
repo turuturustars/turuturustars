@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Home, Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Home, Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck, KeyRound, PhoneCall } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { signInWithEmail, signUpWithEmail } from '../authApi';
+import { requestPasswordResetByIdentifier, signInWithEmail, signUpWithEmail } from '../authApi';
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
 
 type Mode = 'signin' | 'signup';
+
+const SUPPORT_PHONE = '0700471113';
 
 interface AuthScreenProps {
   defaultMode?: Mode;
@@ -22,6 +24,7 @@ interface AuthScreenProps {
 
 export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/home' }: AuthScreenProps) => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { status } = useAuth();
   const turnstileSiteKey =
@@ -39,6 +42,17 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const [signupCaptchaResetSignal, setSignupCaptchaResetSignal] = useState(0);
   const [requiresManualCheck, setRequiresManualCheck] = useState({ signin: false, signup: false });
   const [manualCheckPassed, setManualCheckPassed] = useState({ signin: false, signup: false });
+  const [showRecoveryPanel, setShowRecoveryPanel] = useState(false);
+  const [recoveryIdentifier, setRecoveryIdentifier] = useState('');
+  const [recoveryCaptchaToken, setRecoveryCaptchaToken] = useState<string | null>(null);
+  const [recoveryCaptchaResetSignal, setRecoveryCaptchaResetSignal] = useState(0);
+  const [isRecoverySubmitting, setIsRecoverySubmitting] = useState(false);
+  const [recoveryFeedback, setRecoveryFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    supportPhone?: string;
+    emailHint?: string | null;
+  } | null>(null);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({
@@ -60,6 +74,18 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       });
     }
   }, [navigate, status, redirectPath]);
+
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+    if (requestedMode === 'forgot') {
+      setMode('signin');
+      setShowRecoveryPanel(true);
+      const identifier = searchParams.get('identifier');
+      if (identifier) {
+        setRecoveryIdentifier(identifier);
+      }
+    }
+  }, [searchParams]);
 
   const isPotentialCaptchaServerError = (error: unknown) => {
     const message = error instanceof Error ? error.message.toLowerCase() : '';
@@ -85,6 +111,49 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     resetManualCheck();
   }, [resetManualCheck]);
 
+  const handleRecoveryCaptchaChange = useCallback((token: string | null) => {
+    setRecoveryCaptchaToken(token);
+  }, []);
+
+  const openRecoveryPanel = useCallback(
+    (prefillIdentifier?: string) => {
+      setMode('signin');
+      setShowRecoveryPanel(true);
+      setRecoveryFeedback(null);
+      if (prefillIdentifier) {
+        setRecoveryIdentifier(prefillIdentifier.trim());
+      }
+
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set('mode', 'forgot');
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams]
+  );
+
+  const closeRecoveryPanel = useCallback(() => {
+    setShowRecoveryPanel(false);
+    setRecoveryFeedback(null);
+    setRecoveryCaptchaToken(null);
+    setRecoveryCaptchaResetSignal((prev) => prev + 1);
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextParams.get('mode') === 'forgot') {
+      nextParams.delete('mode');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const looksLikeExistingAccountError = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('already registered') ||
+      normalized.includes('already exists') ||
+      normalized.includes('account already') ||
+      normalized.includes('email already')
+    );
+  };
+
   const handleManualLoginCheck = async () => {
     if (!loginCaptchaToken) return;
     const verified = await verifyTurnstileToken(loginCaptchaToken);
@@ -106,6 +175,89 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         title: 'Security check passed',
         description: 'Cloudflare manual verification succeeded. You can try creating your account again.',
       });
+    }
+  };
+
+  const recoveryButtonLabel = useMemo(() => {
+    if (isRecoverySubmitting) return 'Checking account...';
+    if (recoveryFeedback?.type === 'success') return 'Send another reset link';
+    return 'Check account and send reset link';
+  }, [isRecoverySubmitting, recoveryFeedback?.type]);
+
+  const handlePasswordRecovery = async () => {
+    if (!recoveryIdentifier.trim()) {
+      toast({
+        title: 'Missing identifier',
+        description: 'Enter your email or TS membership number to recover your account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!hasCaptchaProtection || !recoveryCaptchaToken) {
+      toast({
+        title: 'Complete security check',
+        description: 'Please complete Cloudflare verification before continuing.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsRecoverySubmitting(true);
+    try {
+      const response = await requestPasswordResetByIdentifier({
+        identifier: recoveryIdentifier.trim(),
+        captchaToken: recoveryCaptchaToken,
+      });
+
+      if (response.resetSent) {
+        setRecoveryFeedback({
+          type: 'success',
+          message: response.message,
+          supportPhone: response.supportPhone,
+          emailHint: response.emailHint,
+        });
+        toast({
+          title: 'Reset link sent',
+          description: response.emailHint
+            ? `We sent the reset link to ${response.emailHint}.`
+            : response.message,
+        });
+      } else if (response.exists) {
+        setRecoveryFeedback({
+          type: 'info',
+          message: response.message,
+          supportPhone: response.supportPhone,
+          emailHint: response.emailHint,
+        });
+        toast({
+          title: 'Account found',
+          description: response.message,
+        });
+      } else {
+        setRecoveryFeedback({
+          type: 'error',
+          message: response.message,
+          supportPhone: response.supportPhone,
+        });
+        toast({
+          title: 'Account not found',
+          description: `${response.message} Support: ${response.supportPhone}.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to process recovery request.';
+      setRecoveryFeedback({ type: 'error', message, supportPhone: SUPPORT_PHONE });
+      toast({
+        title: 'Recovery failed',
+        description: `${message} Support: ${SUPPORT_PHONE}.`,
+        variant: 'destructive',
+      });
+    } finally {
+      setRecoveryCaptchaToken(null);
+      setRecoveryCaptchaResetSignal((prev) => prev + 1);
+      setIsRecoverySubmitting(false);
     }
   };
 
@@ -213,7 +365,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
     setIsSubmitting(true);
     try {
-      const { requiresEmailVerification } = await signUpWithEmail({
+      const { requiresEmailVerification, existingUserHint } = await signUpWithEmail({
         email: signupForm.email,
         password: signupForm.password,
         fullName: signupForm.fullName,
@@ -222,6 +374,18 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         location: signupForm.location,
         captchaToken: signupCaptchaToken || undefined,
       });
+
+      if (existingUserHint) {
+        setMode('signin');
+        setLoginForm((prev) => ({ ...prev, email: signupForm.email }));
+        openRecoveryPanel(signupForm.email);
+        toast({
+          title: 'Account already exists',
+          description: `This email is already registered. Use password recovery or call support ${SUPPORT_PHONE}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
 
       setRequiresManualCheck((prev) => ({ ...prev, signup: false }));
       setManualCheckPassed((prev) => ({ ...prev, signup: false }));
@@ -240,6 +404,18 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign up failed';
+      if (looksLikeExistingAccountError(message)) {
+        setMode('signin');
+        setLoginForm((prev) => ({ ...prev, email: signupForm.email }));
+        openRecoveryPanel(signupForm.email);
+        toast({
+          title: 'Account already exists',
+          description: `An account with this email already exists. Recover your password or call ${SUPPORT_PHONE}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (isPotentialCaptchaServerError(error) && signupCaptchaToken) {
         const configHint = message.toLowerCase().includes('captcha verification process failed')
           ? ' Supabase captcha provider appears misconfigured; admin should re-save Turnstile secret in Auth > Attack Protection.'
@@ -346,7 +522,17 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
               </Alert>
             )}
 
-            <Tabs value={mode} onValueChange={(val) => setMode(val as Mode)} className="space-y-6">
+            <Tabs
+              value={mode}
+              onValueChange={(val) => {
+                const nextMode = val as Mode;
+                setMode(nextMode);
+                if (nextMode === 'signup' && showRecoveryPanel) {
+                  closeRecoveryPanel();
+                }
+              }}
+              className="space-y-6"
+            >
               <TabsList className="grid grid-cols-2 rounded-full border border-border/60 bg-muted/60 p-1">
                 <TabsTrigger
                   value="signin"
@@ -383,9 +569,18 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="login-password" className="text-sm font-medium text-foreground/80">
-                      Password
-                    </Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="login-password" className="text-sm font-medium text-foreground/80">
+                        Password
+                      </Label>
+                      <button
+                        type="button"
+                        className="text-xs font-medium text-primary hover:underline"
+                        onClick={() => openRecoveryPanel(loginForm.email)}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
                     <div className="relative">
                       <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <Input
@@ -399,6 +594,99 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       />
                     </div>
                   </div>
+
+                  {showRecoveryPanel && (
+                    <Alert className="border-primary/30 bg-primary/5">
+                      <AlertDescription>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <KeyRound className="h-4 w-4 text-primary" />
+                              Recover account
+                            </div>
+                            <button
+                              type="button"
+                              className="text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                              onClick={closeRecoveryPanel}
+                            >
+                              Close
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="recovery-identifier" className="text-xs font-medium text-foreground/80">
+                              Email or TS membership number
+                            </Label>
+                            <Input
+                              id="recovery-identifier"
+                              type="text"
+                              placeholder="name@example.com or TS-00001"
+                              className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
+                              value={recoveryIdentifier}
+                              onChange={(e) => {
+                                setRecoveryIdentifier(e.target.value);
+                                setRecoveryFeedback(null);
+                              }}
+                              disabled={isRecoverySubmitting}
+                            />
+                          </div>
+
+                          {hasCaptchaProtection && (
+                            <TurnstileWidget
+                              siteKey={turnstileSiteKey}
+                              action="password_recovery"
+                              resetSignal={recoveryCaptchaResetSignal}
+                              onTokenChange={handleRecoveryCaptchaChange}
+                            />
+                          )}
+
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full border-primary/40 bg-background/80 text-primary hover:bg-primary/10"
+                            onClick={() => void handlePasswordRecovery()}
+                            disabled={isRecoverySubmitting || !hasCaptchaProtection || !recoveryCaptchaToken}
+                          >
+                            {isRecoverySubmitting ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Checking...
+                              </>
+                            ) : (
+                              recoveryButtonLabel
+                            )}
+                          </Button>
+
+                          <p className="text-[11px] text-muted-foreground">
+                            Need help? Call support <span className="font-semibold text-foreground">{SUPPORT_PHONE}</span>.
+                          </p>
+
+                          {recoveryFeedback && (
+                            <div
+                              className={`rounded-lg border px-3 py-2 text-xs ${
+                                recoveryFeedback.type === 'success'
+                                  ? 'border-emerald-300/70 bg-emerald-50 text-emerald-800'
+                                  : recoveryFeedback.type === 'info'
+                                    ? 'border-blue-300/70 bg-blue-50 text-blue-800'
+                                    : 'border-amber-300/70 bg-amber-50 text-amber-900'
+                              }`}
+                            >
+                              <p>{recoveryFeedback.message}</p>
+                              {recoveryFeedback.emailHint && (
+                                <p className="mt-1 font-medium">
+                                  Reset link destination: {recoveryFeedback.emailHint}
+                                </p>
+                              )}
+                              <p className="mt-2 inline-flex items-center gap-1 font-semibold">
+                                <PhoneCall className="h-3.5 w-3.5" />
+                                Support: {recoveryFeedback.supportPhone || SUPPORT_PHONE}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   {hasCaptchaProtection && (
                     <TurnstileWidget
