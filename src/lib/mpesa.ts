@@ -23,6 +23,50 @@ export interface QRCodeParams {
   refNumber?: string;
 }
 
+type FunctionInvokeError = Error & {
+  context?: Response;
+};
+
+async function extractFunctionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  if (!error || typeof error !== "object") {
+    return fallback;
+  }
+
+  const typedError = error as FunctionInvokeError;
+  const context = typedError.context;
+  if (!context || typeof context.text !== "function") {
+    return typedError.message || fallback;
+  }
+
+  try {
+    const raw = await context.text();
+    if (!raw) {
+      return typedError.message || fallback;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const message =
+        parsed.error_description ||
+        parsed.error ||
+        parsed.message ||
+        parsed.details;
+
+      if (typeof message === "string" && message.trim().length > 0) {
+        return message;
+      }
+    } catch {
+      if (raw.trim().length > 0) {
+        return raw;
+      }
+    }
+  } catch {
+    // Fall through to generic message
+  }
+
+  return typedError.message || fallback;
+}
+
 export async function initiateSTKPush(params: STKPushParams): Promise<STKPushResponse> {
   const { data, error } = await supabase.functions.invoke("mpesa", {
     body: {
@@ -34,7 +78,7 @@ export async function initiateSTKPush(params: STKPushParams): Promise<STKPushRes
   // Handle error response from Supabase function
   if (error) {
     console.error("Supabase function error:", error);
-    throw new Error(error.message);
+    throw new Error(await extractFunctionErrorMessage(error, "Failed to call M-Pesa function"));
   }
 
   // Handle error response from M-Pesa API
@@ -56,7 +100,7 @@ export async function queryTransactionStatus(checkoutRequestId: string) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(await extractFunctionErrorMessage(error, "Failed to query transaction status"));
   }
 
   return data;
@@ -71,7 +115,7 @@ export async function generateQRCode(params: QRCodeParams) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(await extractFunctionErrorMessage(error, "Failed to generate M-Pesa QR code"));
   }
 
   return data;
@@ -85,7 +129,7 @@ export async function registerUrls() {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(await extractFunctionErrorMessage(error, "Failed to register M-Pesa URLs"));
   }
 
   return data;
@@ -104,7 +148,7 @@ export async function simulateC2B(params: {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(await extractFunctionErrorMessage(error, "Failed to simulate C2B payment"));
   }
 
   return data;

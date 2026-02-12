@@ -16,6 +16,74 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Use edge function secret to choose sandbox vs production endpoint.
 const MPESA_BASE_URL = Deno.env.get("MPESA_BASE_URL") || "https://sandbox.safaricom.co.ke";
 
+class HttpError extends Error {
+  status: number;
+  details?: Record<string, unknown>;
+
+  constructor(status: number, message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.status = status;
+    this.details = details;
+  }
+}
+
+function normalizeKenyanPhone(rawValue: unknown): string {
+  const raw = String(rawValue ?? "").trim();
+  if (!raw) {
+    throw new HttpError(400, "Missing phone number", { expected: "phoneNumber", received: rawValue as unknown });
+  }
+
+  const digits = raw.replace(/[^\d+]/g, "").replace(/^\+/, "");
+  let normalized = digits;
+
+  if (normalized.startsWith("0")) {
+    normalized = `254${normalized.slice(1)}`;
+  } else if (normalized.startsWith("7")) {
+    normalized = `254${normalized}`;
+  }
+
+  if (!/^2547\d{8}$/.test(normalized)) {
+    throw new HttpError(400, "Invalid phone number format", {
+      expected: "2547XXXXXXXX",
+      received: raw,
+    });
+  }
+
+  return normalized;
+}
+
+function parseAmount(rawValue: unknown): number {
+  const amount = Number(rawValue);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new HttpError(400, "Invalid amount", {
+      expected: "positive number",
+      received: rawValue as unknown,
+    });
+  }
+  return Math.round(amount);
+}
+
+function assertMpesaConfig(): void {
+  const missing: string[] = [];
+  if (!MPESA_CONSUMER_KEY) missing.push("MPESA_CONSUMER_KEY");
+  if (!MPESA_CONSUMER_SECRET) missing.push("MPESA_CONSUMER_SECRET");
+  if (!MPESA_PASSKEY) missing.push("MPESA_PASSKEY");
+  if (!MPESA_SHORTCODE) missing.push("MPESA_SHORTCODE");
+  if (!SUPABASE_URL) missing.push("SUPABASE_URL");
+  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (missing.length > 0) {
+    throw new HttpError(500, "Missing required Edge Function secrets", { missing });
+  }
+
+  if (!/^\d{5,7}$/.test(MPESA_SHORTCODE)) {
+    throw new HttpError(500, "Invalid MPESA_SHORTCODE secret", {
+      expected: "numeric shortcode, e.g. 174379",
+      receivedPreview: MPESA_SHORTCODE.slice(0, 8),
+    });
+  }
+}
+
 const getFunctionsBaseUrl = () => {
   const host = new URL(SUPABASE_URL).hostname;
   const ref = host.split(".")[0];
@@ -37,6 +105,7 @@ const logInitialization = () => {
 logInitialization();
 
 async function getAccessToken(): Promise<string> {
+  assertMpesaConfig();
   const credentials = btoa(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`);
   const timestamp = new Date().toISOString();
   
@@ -97,6 +166,7 @@ serve(async (req) => {
   }
 
   try {
+    assertMpesaConfig();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const authHeader = req.headers.get("authorization");
     
@@ -122,7 +192,26 @@ serve(async (req) => {
       ["admin", "treasurer", "chairperson"].includes(r.role)
     );
 
-    const { action, ...params } = await req.json();
+    let payload: Record<string, unknown>;
+    try {
+      payload = await req.json();
+    } catch (jsonError) {
+      throw new HttpError(400, "Invalid JSON request body", {
+        parseError: jsonError instanceof Error ? jsonError.message : String(jsonError),
+      });
+    }
+
+    const { action, ...params } = payload;
+    if (typeof action !== "string" || !action.trim()) {
+      throw new HttpError(400, "Missing action", {
+        receivedKeys: Object.keys(payload || {}),
+      });
+    }
+
+    console.log(`[${new Date().toISOString()}] Incoming M-Pesa request`, {
+      action,
+      keys: Object.keys(params),
+    });
 
     // Some actions require financial roles (members are allowed to initiate STK pushes)
     const financialActions = ["register_urls", "generate_qr", "create_standing_order"];
@@ -135,7 +224,9 @@ serve(async (req) => {
 
     switch (action) {
       case "stk_push": {
-        const { phoneNumber, amount, accountReference, transactionDesc, memberId, contributionId } = params;
+        const { phoneNumber: rawPhone, amount: rawAmount, accountReference, transactionDesc, memberId, contributionId } = params;
+        const phoneNumber = normalizeKenyanPhone(rawPhone);
+        const amount = parseAmount(rawAmount);
         const timestamp = generateTimestamp();
         const password = generatePassword(timestamp);
         const requestTime = new Date().toISOString();
@@ -147,13 +238,6 @@ serve(async (req) => {
         console.log(`  Transaction Description: ${transactionDesc || "Contribution"}`);
         if (memberId) console.log(`  Member ID: ${memberId}`);
         if (contributionId) console.log(`  Contribution ID: ${contributionId}`);
-        
-        // Validate amount
-        if (amount < 1) {
-          console.error(`[${new Date().toISOString()}] ❌ Invalid amount: ${amount} (minimum: 1)`);
-          throw new Error("Amount must be at least KES 1");
-        }
-        
         const callbackUrl = `${getFunctionsBaseUrl()}/functions/v1/mpesa-callback`;
         
         const stkPayload = {
@@ -433,7 +517,9 @@ serve(async (req) => {
       }
 
       default:
-        throw new Error(`Unknown action: ${action}`);
+        throw new HttpError(400, `Unknown action: ${action}`, {
+          supportedActions: ["stk_push", "query_status", "generate_qr", "register_urls", "simulate_c2b"],
+        });
     }
 
     return new Response(JSON.stringify(result), {
@@ -442,6 +528,8 @@ serve(async (req) => {
   } catch (error: unknown) {
     const errorTime = new Date().toISOString();
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const statusCode = error instanceof HttpError ? error.status : 400;
+    const details = error instanceof HttpError ? error.details : undefined;
     
     console.error(`[${errorTime}] ❌ M-Pesa Edge Function Error Occurred`);
     console.error(`  Error Type: ${error instanceof Error ? error.constructor.name : typeof error}`);
@@ -457,10 +545,11 @@ serve(async (req) => {
         error: errorMessage,
         success: false,
         errorCode: "MPESA_REQUEST_FAILED",
+        details,
         timestamp: errorTime,
       }),
       {
-        status: 400,
+        status: statusCode,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
