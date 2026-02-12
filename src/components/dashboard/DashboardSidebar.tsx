@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -27,11 +27,20 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 import { getPrimaryRole } from '@/lib/rolePermissions';
+import { supabase } from '@/integrations/supabase/client';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
 
 interface DashboardSidebarProps {
   onClose?: () => void;
 }
+
+type RecentAnnouncement = {
+  id: string;
+  title: string;
+  priority: string | null;
+  published_at: string | null;
+  created_at: string | null;
+};
 
 const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const location = useLocation();
@@ -42,6 +51,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   
   const [expandedRole, setExpandedRole] = useState<string | null>(primaryRole);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+  const [recentAnnouncements, setRecentAnnouncements] = useState<RecentAnnouncement[]>([]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -49,16 +59,62 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    const fetchRecentAnnouncements = async () => {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select('id,title,priority,published_at,created_at')
+        .eq('published', true)
+        .order('published_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error('Failed to fetch recent announcements for sidebar', error);
+        return;
+      }
+
+      setRecentAnnouncements((data || []) as RecentAnnouncement[]);
+    };
+
+    fetchRecentAnnouncements();
+
+    const channel = supabase
+      .channel('sidebar-announcements')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
+        fetchRecentAnnouncements();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const recentAnnouncementCount = useMemo(() => {
+    const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return recentAnnouncements.filter((announcement) => {
+      const timestamp = new Date(
+        announcement.published_at || announcement.created_at || 0
+      ).getTime();
+      return Number.isFinite(timestamp) && timestamp >= oneWeekAgo;
+    }).length;
+  }, [recentAnnouncements]);
+
   const toggleRoleSection = () => {
     setExpandedRole(expandedRole ? null : primaryRole);
   };
 
-  const memberLinks = [
+  const memberLinks: Array<{ label: string; href: string; icon: any; badge: string | number | null }> = [
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
     { label: 'Membership Fees', href: '/dashboard/finance/membership-fees', icon: PiggyBank, badge: null },
     { label: 'Welfare Cases', href: '/dashboard/members/welfare', icon: HandHeart, badge: null },
-    { label: 'Announcements', href: '/dashboard/communication/announcements', icon: Bell, badge: 'new' },
+    {
+      label: 'Announcements',
+      href: '/dashboard/communication/announcements',
+      icon: Bell,
+      badge: recentAnnouncementCount > 0 ? recentAnnouncementCount : null,
+    },
     { label: 'Notifications', href: '/dashboard/communication/notifications', icon: BellRing, badge: null },
     { label: 'Voting', href: '/dashboard/governance/voting', icon: Vote, badge: null },
     { label: 'Private Messages', href: '/dashboard/communication/messages', icon: MessageCircle, badge: null },
@@ -273,7 +329,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
                   
                   {link.badge && (
                     <span className="relative flex items-center justify-center min-w-[18px] h-4 px-1 text-[9px] font-bold rounded-full bg-red-500/90 text-white shadow-sm ml-1 flex-shrink-0">
-                      1
+                      {typeof link.badge === 'number' && link.badge > 9 ? '9+' : link.badge}
                     </span>
                   )}
                 </Link>
@@ -281,6 +337,45 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
             })}
           </div>
         </div>
+
+        {recentAnnouncements.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-border/20">
+            <div className="px-3 py-2 mb-1">
+              <p className="text-xs font-bold text-muted-foreground/60 uppercase tracking-wider">
+                Recent Announcements
+              </p>
+            </div>
+            <div className="space-y-1">
+              {recentAnnouncements.slice(0, 3).map((announcement) => (
+                <Link
+                  key={announcement.id}
+                  to={`/dashboard/communication/announcements#${announcement.id}`}
+                  onClick={handleNavClick}
+                  className="group flex items-start gap-2 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-all duration-200"
+                >
+                  <span
+                    className={cn(
+                      'mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0',
+                      announcement.priority === 'urgent' && 'bg-red-500',
+                      announcement.priority === 'high' && 'bg-orange-500',
+                      announcement.priority !== 'urgent' &&
+                        announcement.priority !== 'high' &&
+                        'bg-blue-500'
+                    )}
+                  />
+                  <span className="line-clamp-2 leading-relaxed">{announcement.title}</span>
+                </Link>
+              ))}
+              <Link
+                to="/dashboard/communication/announcements"
+                onClick={handleNavClick}
+                className="block px-3 py-1.5 text-[11px] font-semibold text-primary hover:underline"
+              >
+                View all announcements
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Role-Specific Section */}
         {isUserOfficial && officialLinks.length > 0 && (

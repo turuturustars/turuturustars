@@ -695,8 +695,9 @@ const DashboardHome = () => {
             ) : (
               <div className="space-y-3">
                 {announcements.slice(0, 3).map((announcement) => (
-                  <div
+                  <Link
                     key={announcement.id}
+                    to={`/dashboard/communication/announcements#${announcement.id}`}
                     className="group p-4 rounded-xl bg-gradient-to-br from-accent/50 to-accent/30 border-2 border-border hover:border-primary transition-all duration-300 cursor-pointer hover:shadow-lg"
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -727,7 +728,7 @@ const DashboardHome = () => {
                       </div>
                       <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

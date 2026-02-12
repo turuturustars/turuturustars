@@ -12,6 +12,15 @@ interface Announcement {
   created_at: string | null;
 }
 
+const sortAnnouncements = (items: Announcement[]) =>
+  [...items]
+    .sort((a, b) => {
+      const aTime = new Date(a.published_at || a.created_at || 0).getTime();
+      const bTime = new Date(b.published_at || b.created_at || 0).getTime();
+      return bTime - aTime;
+    })
+    .slice(0, 10);
+
 export const useRealtimeAnnouncements = () => {
   const { toast } = useToast();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -30,7 +39,7 @@ export const useRealtimeAnnouncements = () => {
       if (error) {
         console.error('Error fetching announcements:', error);
       } else if (data) {
-        setAnnouncements(data as Announcement[]);
+        setAnnouncements(sortAnnouncements(data as Announcement[]));
       }
       setIsLoading(false);
     };
@@ -54,11 +63,11 @@ export const useRealtimeAnnouncements = () => {
               if (prev.some(a => a.id === newAnnouncement.id)) {
                 return prev;
               }
-              return [newAnnouncement, ...prev];
+              return sortAnnouncements([newAnnouncement, ...prev]);
             });
 
             toast({
-              title: '📢 New Announcement',
+              title: 'New announcement',
               description: newAnnouncement.title,
             });
           }
@@ -79,9 +88,11 @@ export const useRealtimeAnnouncements = () => {
             
             if (updatedAnnouncement.published) {
               if (exists) {
-                return prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a);
+                return sortAnnouncements(
+                  prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a)
+                );
               } else {
-                return [updatedAnnouncement, ...prev];
+                return sortAnnouncements([updatedAnnouncement, ...prev]);
               }
             } else {
               return prev.filter(a => a.id !== updatedAnnouncement.id);
