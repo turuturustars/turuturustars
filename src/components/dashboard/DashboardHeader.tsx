@@ -78,6 +78,12 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
           dot: 'bg-rose-500',
           label: 'Dormant'
         };
+      case 'suspended':
+        return {
+          color: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200/50 dark:border-red-500/20',
+          dot: 'bg-red-500',
+          label: 'Suspended'
+        };
       default:
         return {
           color: 'bg-muted text-muted-foreground border-border/50',
@@ -137,7 +143,7 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
               <img 
                 src={turuturuLogo}
                 alt="Turuturu Stars Logo"
-                className="h-10 w-auto hidden sm:block object-contain transition-transform duration-300 hover:scale-110"
+                className="hidden h-10 w-10 object-contain sm:block"
                 loading="eager"
                 width="40"
                 height="40"

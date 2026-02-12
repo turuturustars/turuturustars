@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
 import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
@@ -23,6 +24,7 @@ interface MemberProfile {
 
 export default function PrivateMessagesPage() {
   const { user } = useAuth();
+  const { canInteract, assertCanInteract, readOnlyMessage } = useInteractionGuard();
   const { status, showSuccess, showError } = useStatus();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [conversationSearchTerm, setConversationSearchTerm] = useState('');
@@ -138,6 +140,8 @@ export default function PrivateMessagesPage() {
   }, [showNewConversation]);
 
   const handleStartConversation = async (memberId: string) => {
+    if (!assertCanInteract('start new conversations')) return;
+
     try {
       const convId = await startConversation(memberId);
       setSelectedConversationId(convId);
@@ -150,6 +154,7 @@ export default function PrivateMessagesPage() {
   };
 
   const handleSendMessage = async () => {
+    if (!assertCanInteract('send messages')) return;
     if (!newMessageText.trim() || sending) return;
     
     setSending(true);
@@ -170,6 +175,8 @@ export default function PrivateMessagesPage() {
   };
 
   const handleToggleNotifications = async () => {
+    if (!assertCanInteract('change notification preferences')) return;
+
     if (notificationsEnabled) {
       disableNotifications();
       setNotificationsEnabled(false);
@@ -197,6 +204,7 @@ export default function PrivateMessagesPage() {
   };
 
   const handleSaveEdit = async (messageId: string) => {
+    if (!assertCanInteract('edit messages')) return;
     if (!editingContent.trim()) return;
     
     try {
@@ -218,6 +226,7 @@ export default function PrivateMessagesPage() {
   };
 
   const handleDeleteMessage = async (messageId: string) => {
+    if (!assertCanInteract('delete messages')) return;
     if (!globalThis.confirm('Delete this message?')) return;
     
     setDeletingMessageId(messageId);
@@ -255,6 +264,11 @@ export default function PrivateMessagesPage() {
 
   return (
     <div className="space-y-4">
+      {!canInteract && readOnlyMessage && (
+        <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {readOnlyMessage}
+        </div>
+      )}
       <div className="relative overflow-hidden rounded-2xl border-2 border-primary/10 bg-gradient-to-br from-primary/5 via-purple-50/40 to-transparent p-5 shadow-sm">
         <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
         <div className="absolute bottom-0 left-10 h-24 w-24 rounded-full bg-purple-200/30 blur-2xl" />
@@ -282,6 +296,7 @@ export default function PrivateMessagesPage() {
               size="sm"
               variant={notificationsEnabled ? 'default' : 'outline'}
               onClick={handleToggleNotifications}
+              disabled={!canInteract}
               className="h-9 gap-2"
               ariaLabel={notificationsEnabled ? 'Disable message notifications' : 'Enable message notifications'}
             >
@@ -316,9 +331,18 @@ export default function PrivateMessagesPage() {
               Messages
             </CardTitle>
             <div className="flex items-center gap-1">
-              <Dialog open={showNewConversation} onOpenChange={setShowNewConversation}>
+              <Dialog
+                open={showNewConversation}
+                onOpenChange={(open) => {
+                  if (open && !canInteract) {
+                    assertCanInteract('start new conversations');
+                    return;
+                  }
+                  setShowNewConversation(open);
+                }}
+              >
                 <DialogTrigger asChild>
-                  <AccessibleButton size="sm" variant="outline" ariaLabel="Start a new conversation">
+                  <AccessibleButton size="sm" variant="outline" ariaLabel="Start a new conversation" disabled={!canInteract}>
                     <Plus className="h-4 w-4 mr-1" />
                     New
                   </AccessibleButton>
@@ -351,6 +375,7 @@ export default function PrivateMessagesPage() {
                             <button
                               key={member.id}
                               onClick={() => handleStartConversation(member.id)}
+                              disabled={!canInteract}
                               className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
                             >
                               <OptimizedAvatarImage
@@ -590,11 +615,11 @@ export default function PrivateMessagesPage() {
                       void handleSendMessage();
                     }
                   }}
-                  disabled={sending}
+                  disabled={sending || !canInteract}
                 />
                 <AccessibleButton
                   onClick={() => void handleSendMessage()}
-                  disabled={!newMessageText.trim() || sending}
+                  disabled={!newMessageText.trim() || sending || !canInteract}
                   size="icon"
                   className="h-11 w-11"
                   ariaLabel="Send message"
@@ -622,6 +647,7 @@ export default function PrivateMessagesPage() {
               </p>
               <AccessibleButton
                 onClick={() => setShowNewConversation(true)}
+                disabled={!canInteract}
                 className="gap-2"
                 ariaLabel="Start a new conversation"
               >

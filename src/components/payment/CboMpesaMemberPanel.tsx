@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
+import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { useToast } from '@/hooks/use-toast';
 import {
   CboPayment,
@@ -26,6 +27,7 @@ const statusTone: Record<CboPayment['status'], string> = {
 
 const CboMpesaMemberPanel = () => {
   const { user, profile } = useAuth();
+  const { canInteract, assertCanInteract, readOnlyMessage } = useInteractionGuard();
   const { toast } = useToast();
 
   const [stkPhone, setStkPhone] = useState(profile?.phone ?? '');
@@ -117,6 +119,8 @@ const CboMpesaMemberPanel = () => {
   }, [payments]);
 
   const handleStkPush = async () => {
+    if (!assertCanInteract('initiate STK push')) return;
+
     const amount = Number(stkAmount);
     if (!stkPhone.trim() || !Number.isFinite(amount) || amount <= 0) {
       toast({
@@ -159,6 +163,8 @@ const CboMpesaMemberPanel = () => {
   };
 
   const handleTillSubmit = async () => {
+    if (!assertCanInteract('submit till payment')) return;
+
     const amount = Number(tillAmount);
     if (!tillPhone.trim() || !tillReceipt.trim() || !Number.isFinite(amount) || amount <= 0) {
       toast({
@@ -201,6 +207,12 @@ const CboMpesaMemberPanel = () => {
 
   return (
     <div className="space-y-4">
+      {!canInteract && readOnlyMessage && (
+        <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          {readOnlyMessage}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
@@ -213,13 +225,13 @@ const CboMpesaMemberPanel = () => {
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="stk-phone">Phone Number</Label>
-              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX" />
+              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX" disabled={!canInteract} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="stk-amount">Amount (KES)</Label>
-              <Input id="stk-amount" type="number" min={1} value={stkAmount} onChange={(event) => setStkAmount(event.target.value)} placeholder="500" />
+              <Input id="stk-amount" type="number" min={1} value={stkAmount} onChange={(event) => setStkAmount(event.target.value)} placeholder="500" disabled={!canInteract} />
             </div>
-            <Button onClick={handleStkPush} disabled={stkLoading} className="w-full">
+            <Button onClick={handleStkPush} disabled={stkLoading || !canInteract} className="w-full">
               {stkLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}
               Initiate STK Push
             </Button>
@@ -243,17 +255,17 @@ const CboMpesaMemberPanel = () => {
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="till-phone">Phone Number</Label>
-              <Input id="till-phone" value={tillPhone} onChange={(event) => setTillPhone(event.target.value)} placeholder="07XXXXXXXX" />
+              <Input id="till-phone" value={tillPhone} onChange={(event) => setTillPhone(event.target.value)} placeholder="07XXXXXXXX" disabled={!canInteract} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="till-amount">Amount (KES)</Label>
-              <Input id="till-amount" type="number" min={1} value={tillAmount} onChange={(event) => setTillAmount(event.target.value)} placeholder="500" />
+              <Input id="till-amount" type="number" min={1} value={tillAmount} onChange={(event) => setTillAmount(event.target.value)} placeholder="500" disabled={!canInteract} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="till-receipt">M-Pesa Receipt</Label>
-              <Input id="till-receipt" value={tillReceipt} onChange={(event) => setTillReceipt(event.target.value)} placeholder="RCK8Y2Q9M7" />
+              <Input id="till-receipt" value={tillReceipt} onChange={(event) => setTillReceipt(event.target.value)} placeholder="RCK8Y2Q9M7" disabled={!canInteract} />
             </div>
-            <Button onClick={handleTillSubmit} disabled={tillLoading} variant="secondary" className="w-full">
+            <Button onClick={handleTillSubmit} disabled={tillLoading || !canInteract} variant="secondary" className="w-full">
               {tillLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wallet className="w-4 h-4 mr-2" />}
               Submit Till Receipt
             </Button>

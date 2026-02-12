@@ -249,15 +249,12 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
           className="flex items-center gap-2.5 group flex-1 min-w-0"
           onClick={handleNavClick}
         >
-          <div className="relative flex-shrink-0">
-            <div className="absolute inset-0 bg-primary/20 rounded-lg blur group-hover:blur-md transition-all duration-300" />
-            <img 
-              src={turuturuLogo}
-              alt="Turuturu Stars Logo"
-              className="w-10 h-10 object-contain relative hover:scale-110 transition-transform duration-300"
-              loading="eager"
-            />
-          </div>
+          <img 
+            src={turuturuLogo}
+            alt="Turuturu Stars Logo"
+            className="h-10 w-10 object-contain flex-shrink-0"
+            loading="eager"
+          />
           <div className="flex-1 min-w-0">
             <span className="text-sm font-bold text-foreground block">
               Turuturu Stars
@@ -285,7 +282,11 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
                 {profile?.full_name?.split(' ')[0] || 'Member'}
               </p>
               <p className="text-xs text-muted-foreground/70 truncate">
-                {profile?.membership_number ? `ID: ${profile.membership_number}` : 'Pending'}
+                {profile?.status === 'pending'
+                  ? 'Pending approval (read-only)'
+                  : profile?.membership_number
+                    ? `ID: ${profile.membership_number}`
+                    : 'No Membership ID'}
               </p>
             </div>
           </div>

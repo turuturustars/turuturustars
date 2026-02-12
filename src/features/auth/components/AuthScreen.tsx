@@ -15,9 +15,10 @@ type Mode = 'signin' | 'signup';
 
 interface AuthScreenProps {
   defaultMode?: Mode;
+  redirectPath?: string;
 }
 
-export const AuthScreen = ({ defaultMode = 'signin' }: AuthScreenProps) => {
+export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/home' }: AuthScreenProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { status } = useAuth();
@@ -37,12 +38,15 @@ export const AuthScreen = ({ defaultMode = 'signin' }: AuthScreenProps) => {
   });
 
   useEffect(() => {
-    if (status === 'ready') {
-      navigate('/dashboard', { replace: true });
+    if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
+      navigate(redirectPath, { replace: true });
     } else if (status === 'needs-profile') {
-      navigate('/profile-setup', { replace: true });
+      navigate('/profile-setup', {
+        replace: true,
+        state: { from: { pathname: redirectPath } },
+      });
     }
-  }, [navigate, status]);
+  }, [navigate, status, redirectPath]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,7 +54,7 @@ export const AuthScreen = ({ defaultMode = 'signin' }: AuthScreenProps) => {
     try {
       await signInWithEmail(loginForm);
       toast({ title: 'Welcome back', description: 'You are now signed in.' });
-      navigate('/dashboard', { replace: true });
+      navigate(redirectPath, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed';
       toast({ title: 'Unable to sign in', description: message, variant: 'destructive' });

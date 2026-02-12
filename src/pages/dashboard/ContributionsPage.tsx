@@ -29,6 +29,7 @@ import {
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { useToast } from '@/hooks/use-toast';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
@@ -50,6 +51,7 @@ interface Contribution {
 
 const ContributionsPage = () => {
   const { profile } = useAuth();
+  const { canInteract, assertCanInteract, readOnlyMessage } = useInteractionGuard();
   const { toast } = useToast();
   const { status, showSuccess, showError } = useStatus();
   const [contributions, setContributions] = useState<Contribution[]>([]);
@@ -137,6 +139,7 @@ const ContributionsPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!assertCanInteract('record contributions')) return;
     
     // Reset errors
     setError(null);
@@ -232,6 +235,11 @@ const ContributionsPage = () => {
         type={status.type}
         isVisible={status.isVisible}
       />
+      {!canInteract && readOnlyMessage && (
+        <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {readOnlyMessage}
+        </div>
+      )}
       {error && (
         <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
@@ -257,7 +265,7 @@ const ContributionsPage = () => {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <AccessibleButton className="btn-primary" ariaLabel="Record a new contribution">
+            <AccessibleButton className="btn-primary" ariaLabel="Record a new contribution" disabled={!canInteract}>
               <Plus className="w-4 h-4 mr-2" />
               Record Contribution
             </AccessibleButton>
@@ -322,7 +330,7 @@ const ContributionsPage = () => {
                   setNewContribution({ ...newContribution, notes: e.target.value })
                 }
               />
-              <AccessibleButton type="submit" className="w-full btn-primary" disabled={isSubmitting} isLoading={isSubmitting} loadingText="Submitting...">
+              <AccessibleButton type="submit" className="w-full btn-primary" disabled={isSubmitting || !canInteract} isLoading={isSubmitting} loadingText="Submitting...">
                 Submit Contribution
               </AccessibleButton>
             </form>

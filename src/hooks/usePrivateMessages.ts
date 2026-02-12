@@ -32,7 +32,7 @@ export interface PrivateMessage {
 }
 
 export function usePrivateMessages(conversationId?: string) {
-  const { user } = useAuth();
+  const { user, canInteract } = useAuth();
   const [conversations, setConversations] = useState<PrivateConversation[]>([]);
   const [messages, setMessages] = useState<PrivateMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -143,21 +143,23 @@ export function usePrivateMessages(conversationId?: string) {
         setMessages(messagesWithProfiles);
 
         // Mark messages as read
-        await supabase
-          .from('private_messages')
-          .update({ read_at: new Date().toISOString() })
-          .eq('conversation_id', conversationId)
-          .neq('sender_id', user.id)
-          .is('read_at', null);
+        if (canInteract) {
+          await supabase
+            .from('private_messages')
+            .update({ read_at: new Date().toISOString() })
+            .eq('conversation_id', conversationId)
+            .neq('sender_id', user.id)
+            .is('read_at', null);
 
-        await fetchConversations();
+          await fetchConversations();
+        }
       } else {
         setMessages([]);
       }
     } catch (err) {
       console.error('Error in fetchMessages:', err);
     }
-  }, [user, conversationId, fetchConversations]);
+  }, [user, conversationId, fetchConversations, canInteract]);
 
   useEffect(() => {
     fetchConversations();
@@ -233,6 +235,7 @@ export function usePrivateMessages(conversationId?: string) {
 
   const startConversation = async (otherUserId: string) => {
     if (!user) throw new Error('Not authenticated');
+    if (!canInteract) throw new Error('Your account is currently read-only');
 
     // Check if conversation already exists
     const { data: existing } = await supabase
@@ -263,6 +266,7 @@ export function usePrivateMessages(conversationId?: string) {
 
   const sendPrivateMessage = async (content: string) => {
     if (!user || !conversationId) throw new Error('Not authenticated or no conversation');
+    if (!canInteract) throw new Error('Your account is currently read-only');
 
     const { data, error } = await supabase
       .from('private_messages')

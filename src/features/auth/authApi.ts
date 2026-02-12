@@ -11,6 +11,8 @@ export type AuthStatus =
   | 'signed-out'
   | 'needs-email-verification'
   | 'needs-profile'
+  | 'pending-approval'
+  | 'suspended'
   | 'ready';
 
 export interface SignUpPayload {

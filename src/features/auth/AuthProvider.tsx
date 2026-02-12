@@ -36,7 +36,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     (nextUser: User | null, nextProfile: ProfileRow | null) => {
       if (!nextUser) return setStatus('signed-out');
       if (!nextUser.email_confirmed_at) return setStatus('needs-email-verification');
+      const profileStatus = nextProfile?.status ?? 'pending';
+      if (profileStatus === 'suspended') return setStatus('suspended');
       if (!isProfileComplete(nextProfile)) return setStatus('needs-profile');
+      if (profileStatus === 'pending') return setStatus('pending-approval');
       return setStatus('ready');
     },
     []

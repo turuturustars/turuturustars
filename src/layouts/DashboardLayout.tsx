@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import MemberInteractionBanner from '@/components/dashboard/MemberInteractionBanner';
 import NotificationToastListener from '@/components/notifications/NotificationToastListener';
 import { Loader2, Wifi, WifiOff } from 'lucide-react';
 
@@ -154,6 +155,7 @@ const DashboardLayout = () => {
         {/* Main Content */}
         <main className="flex-1">
           <div className="mx-auto w-full max-w-7xl px-3 py-4 sm:px-4 sm:py-6 md:px-6 md:py-6 lg:px-8 lg:py-8">
+            <MemberInteractionBanner />
             {/* Content wrapper with subtle animations */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <Outlet />

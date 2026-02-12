@@ -353,6 +353,13 @@ const DashboardHome = () => {
         borderColor: 'border-red-200 dark:border-red-800',
         message: 'Your membership requires attention',
       },
+      suspended: {
+        icon: AlertCircle,
+        color: 'text-red-700 dark:text-red-400',
+        bgColor: 'bg-red-50 dark:bg-red-950/50',
+        borderColor: 'border-red-200 dark:border-red-800',
+        message: 'Your account is suspended and currently read-only',
+      },
     };
     return configs[status as keyof typeof configs] || configs.pending;
   };

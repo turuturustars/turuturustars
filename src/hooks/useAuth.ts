@@ -24,12 +24,22 @@ export const useAuth = () => {
 
   return useMemo(() => {
     const isLoading = ctx.status === 'checking';
+    const official = isOfficial();
+    const memberStatus = ctx.profile?.status ?? 'pending';
+    const isPendingApproval = !official && memberStatus === 'pending';
+    const isSuspended = !official && memberStatus === 'suspended';
+    const canInteract = official || (!isPendingApproval && !isSuspended);
+
     return {
       ...ctx,
       isLoading,
       profile: ctx.profile as ProfileRow | null,
       hasRole,
       isOfficial,
+      memberStatus,
+      isPendingApproval,
+      isSuspended,
+      canInteract,
     };
   }, [ctx]);
 };

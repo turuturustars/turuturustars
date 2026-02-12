@@ -11,6 +11,7 @@ import { Logger } from "@/utils/errorHandler";
 import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import PWAInstallPrompt from "@/components/pwa/PWAInstallPrompt";
+import { useAuth } from "@/hooks/useAuth";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -21,6 +22,30 @@ const PageLoader = () => (
     </div>
   </div>
 );
+
+const isPwaLaunch = () => {
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+  const source = new URLSearchParams(window.location.search).get("source");
+  return standalone || source === "pwa";
+};
+
+const RootEntryRoute = () => {
+  const { status } = useAuth();
+
+  if (!isPwaLaunch()) return <Index />;
+
+  if (status === "checking") return <PageLoader />;
+  if (status === "ready" || status === "pending-approval" || status === "suspended") {
+    return <Navigate to="/dashboard/home" replace />;
+  }
+  if (status === "needs-profile") return <Navigate to="/profile-setup" replace />;
+  if (status === "needs-email-verification") return <Navigate to="/auth/email-confirmation" replace />;
+  if (status === "signed-out") return <Navigate to="/auth" replace />;
+
+  return <Index />;
+};
 
 
 
@@ -122,7 +147,7 @@ const App = () => {
                 {/* ==================== PUBLIC ROUTES ==================== */}
                 
                 {/* Landing Pages */}
-                <Route path="/" element={<Index />} />
+                <Route path="/" element={<RootEntryRoute />} />
                 <Route path="/home" element={<Home />} />
                 <Route path="/donate" element={<Donate />} />
                 <Route path="/payment/pesapal/callback" element={<PesapalCallback />} />

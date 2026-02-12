@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { MpesaTransactionService } from '@/lib/mpesaTransactionService';
 import { useAuth } from '@/hooks/useAuth';
+import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { useToast } from '@/hooks/use-toast';
 import {
   Smartphone,
@@ -35,6 +36,7 @@ const PayWithMpesa = ({
   onPaymentSuccess,
 }: Props) => {
   const { profile } = useAuth();
+  const { assertCanInteract, canInteract } = useInteractionGuard();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState(profile?.phone || '');
@@ -130,6 +132,8 @@ const PayWithMpesa = ({
   };
 
   const handlePay = async () => {
+    if (!assertCanInteract('initiate payment')) return;
+
     if (!isValid) {
       // Mark all fields as touched to show errors
       setTouched({ phone: true, amount: true });
@@ -232,6 +236,11 @@ const PayWithMpesa = ({
   };
 
   const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen && !canInteract) {
+      assertCanInteract('open payment form');
+      return;
+    }
+
     setOpen(newOpen);
     // Reset on close
     if (!newOpen) {

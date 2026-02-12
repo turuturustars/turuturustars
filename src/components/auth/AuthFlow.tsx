@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import AuthScreen from '@/features/auth/components/AuthScreen';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -11,18 +11,35 @@ import { useAuth } from '@/hooks/useAuth';
 const AuthFlow = () => {
   const { status } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
 
+  const redirectState = location.state as {
+    from?: { pathname?: string; search?: string; hash?: string };
+  } | null;
+
+  const fromPath = redirectState?.from?.pathname
+    ? `${redirectState.from.pathname}${redirectState.from.search || ''}${redirectState.from.hash || ''}`
+    : '/dashboard/home';
+
+  const redirectPath =
+    fromPath.startsWith('/auth') || fromPath.startsWith('/register') || fromPath === '/'
+      ? '/dashboard/home'
+      : fromPath;
+
   useEffect(() => {
-    if (status === 'ready') {
-      navigate('/dashboard', { replace: true });
+    if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
+      navigate(redirectPath, { replace: true });
     } else if (status === 'needs-profile') {
-      navigate('/profile-setup', { replace: true });
+      navigate('/profile-setup', {
+        replace: true,
+        state: { from: { pathname: redirectPath } },
+      });
     }
-  }, [status, navigate]);
+  }, [status, navigate, redirectPath]);
 
   const defaultMode = params.get('mode') === 'signup' ? 'signup' : 'signin';
-  return <AuthScreen defaultMode={defaultMode} />;
+  return <AuthScreen defaultMode={defaultMode} redirectPath={redirectPath} />;
 };
 
 export default AuthFlow;

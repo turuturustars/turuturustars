@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -53,6 +54,7 @@ interface Meeting {
 
 export default function VotingPage() {
   const { user, hasRole, roles } = useAuth();
+  const { canInteract, assertCanInteract, readOnlyMessage } = useInteractionGuard();
   const { status, showSuccess, showError } = useStatus();
   const userRoles = normalizeRoles(roles);
   const [motions, setMotions] = useState<VotingMotion[]>([]);
@@ -71,8 +73,8 @@ export default function VotingPage() {
     is_confidential: true
   });
 
-  const canManage = hasPermission(userRoles, 'manage_voting') || hasPermission(userRoles, 'create_voting');
-  const canVote = hasPermission(userRoles, 'cast_vote');
+  const canManage = canInteract && (hasPermission(userRoles, 'manage_voting') || hasPermission(userRoles, 'create_voting'));
+  const canVote = canInteract && hasPermission(userRoles, 'cast_vote');
   const canViewResults = hasPermission(userRoles, 'view_voting_results');
   const isChair = hasRole('chairperson') || hasRole('vice_chairman');
 
@@ -139,6 +141,8 @@ export default function VotingPage() {
   };
 
   const createMotion = async () => {
+    if (!assertCanInteract('create motions')) return;
+
     if (!newMotion.title.trim()) {
       showError('Please enter a motion title');
       return;
@@ -172,6 +176,8 @@ export default function VotingPage() {
   };
 
   const openVoting = async (motionId: string) => {
+    if (!assertCanInteract('open voting')) return;
+
     const { error } = await supabase
       .from('voting_motions')
       .update({ status: 'open', opened_at: new Date().toISOString() })
@@ -186,6 +192,8 @@ export default function VotingPage() {
   };
 
   const closeVoting = async (motion: VotingMotion) => {
+    if (!assertCanInteract('close voting')) return;
+
     let finalStatus: string;
 
     if (motion.votes_for > motion.votes_against) {
@@ -210,6 +218,8 @@ export default function VotingPage() {
   };
 
   const castVote = async (motionId: string, vote: 'for' | 'against' | 'abstain') => {
+    if (!assertCanInteract('cast votes')) return;
+
     const existingVote = userVotes.find(v => v.motion_id === motionId);
     if (existingVote) {
       showError('You have already voted on this motion - Voting is confidential and cannot be changed');
@@ -254,6 +264,8 @@ export default function VotingPage() {
   };
 
   const castTieBreaker = async (motionId: string, vote: 'for' | 'against') => {
+    if (!assertCanInteract('cast tie-breaker vote')) return;
+
     const motion = motions.find(m => m.id === motionId);
     if (!motion) return;
 
@@ -335,6 +347,11 @@ export default function VotingPage() {
 
   return (
     <div className="space-y-6">
+      {!canInteract && readOnlyMessage && (
+        <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {readOnlyMessage}
+        </div>
+      )}
       <AccessibleStatus 
         message={status.message} 
         type={status.type} 

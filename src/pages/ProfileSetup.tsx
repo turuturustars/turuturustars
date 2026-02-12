@@ -52,7 +52,7 @@ const ProfileSetup = () => {
       return;
     }
 
-    if (status === 'ready') {
+    if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
       const target = (location.state as any)?.from ?? '/dashboard';
       navigate(target, { replace: true });
     }
@@ -83,7 +83,7 @@ const ProfileSetup = () => {
         id_number: form.idNumber,
         location: form.location || null,
         occupation: form.occupation || null,
-        status: 'active',
+        status: profile?.status === 'active' ? 'active' : profile?.status === 'suspended' ? 'suspended' : 'pending',
       });
 
       await refreshProfile();

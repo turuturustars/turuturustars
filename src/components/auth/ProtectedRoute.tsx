@@ -46,6 +46,9 @@ export const ProtectedRoute = ({ children, requiredRoles, stealth = false }: Pro
   if (location.pathname === '/profile-setup' && status === 'needs-profile') {
     return <>{children}</>;
   }
+  if (location.pathname === '/profile-setup' && status !== 'needs-profile') {
+    return <Navigate to="/dashboard/home" replace />;
+  }
   if (location.pathname.startsWith('/auth/email-confirmation') && status === 'needs-email-verification') {
     return <>{children}</>;
   }
@@ -55,8 +58,10 @@ export const ProtectedRoute = ({ children, requiredRoles, stealth = false }: Pro
     return <Navigate to="/auth/email-confirmation" replace />;
   }
 
+  const profileGateBypass = status === 'pending-approval' || status === 'suspended';
+
   // Force profile completion before accessing protected pages
-  if (status === 'needs-profile' || !isProfileComplete(profile as any)) {
+  if (!profileGateBypass && (status === 'needs-profile' || !isProfileComplete(profile as any))) {
     return <Navigate to="/profile-setup" state={{ from: location }} replace />;
   }
 
@@ -142,7 +147,12 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
 
   // If user is authenticated and trying to access auth page, redirect only if profile is complete
   if (user && window.location.pathname === '/auth') {
-    if (status === 'ready' && isProfileComplete(profile as any)) return <Navigate to="/dashboard" replace />;
+    if (status === 'pending-approval' || status === 'suspended') {
+      return <Navigate to="/dashboard" replace />;
+    }
+    if (status === 'ready' && isProfileComplete(profile as any)) {
+      return <Navigate to="/dashboard" replace />;
+    }
     if (status === 'needs-profile') return <Navigate to="/profile-setup" replace />;
   }
 
