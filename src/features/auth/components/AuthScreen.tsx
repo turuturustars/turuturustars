@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithEmail, signUpWithEmail } from '../authApi';
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
+import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
 
 type Mode = 'signin' | 'signup';
 
@@ -26,6 +27,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const turnstileSiteKey =
     import.meta.env.VITE_TURNSTILE_SITE_KEY || import.meta.env.VITE_CLOUDFLARE_SITE_KEY || '';
   const hasCaptchaProtection = Boolean(turnstileSiteKey);
+  const { verify: verifyTurnstileToken, isVerifying, error: manualCheckError, reset: resetManualCheck } =
+    useVerifyTurnstile();
 
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,6 +37,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const [signupCaptchaToken, setSignupCaptchaToken] = useState<string | null>(null);
   const [loginCaptchaResetSignal, setLoginCaptchaResetSignal] = useState(0);
   const [signupCaptchaResetSignal, setSignupCaptchaResetSignal] = useState(0);
+  const [requiresManualCheck, setRequiresManualCheck] = useState({ signin: false, signup: false });
+  const [manualCheckPassed, setManualCheckPassed] = useState({ signin: false, signup: false });
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({
@@ -56,20 +61,78 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     }
   }, [navigate, status, redirectPath]);
 
+  const isPotentialCaptchaServerError = (error: unknown) => {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    const statusCode = typeof error === 'object' && error !== null ? (error as { status?: number }).status : undefined;
+    const code = typeof error === 'object' && error !== null ? (error as { code?: string }).code : undefined;
+    return (
+      statusCode === 500 ||
+      code === 'unexpected_failure' ||
+      message.includes('captcha') ||
+      message.includes('unexpected failure')
+    );
+  };
+
   const handleLoginCaptchaChange = useCallback((token: string | null) => {
     setLoginCaptchaToken(token);
-  }, []);
+    setManualCheckPassed((prev) => ({ ...prev, signin: false }));
+    resetManualCheck();
+  }, [resetManualCheck]);
 
   const handleSignupCaptchaChange = useCallback((token: string | null) => {
     setSignupCaptchaToken(token);
-  }, []);
+    setManualCheckPassed((prev) => ({ ...prev, signup: false }));
+    resetManualCheck();
+  }, [resetManualCheck]);
+
+  const handleManualLoginCheck = async () => {
+    if (!loginCaptchaToken) return;
+    const verified = await verifyTurnstileToken(loginCaptchaToken);
+    if (verified) {
+      setManualCheckPassed((prev) => ({ ...prev, signin: true }));
+      toast({
+        title: 'Security check passed',
+        description: 'Cloudflare manual verification succeeded. You can try signing in again.',
+      });
+    }
+  };
+
+  const handleManualSignupCheck = async () => {
+    if (!signupCaptchaToken) return;
+    const verified = await verifyTurnstileToken(signupCaptchaToken);
+    if (verified) {
+      setManualCheckPassed((prev) => ({ ...prev, signup: true }));
+      toast({
+        title: 'Security check passed',
+        description: 'Cloudflare manual verification succeeded. You can try creating your account again.',
+      });
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasCaptchaProtection) {
+      toast({
+        title: 'Security configuration missing',
+        description: 'Captcha site key is not configured on this deployment. Contact admin to restore sign-in.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (hasCaptchaProtection && !loginCaptchaToken) {
       toast({
         title: 'Complete security check',
         description: 'Please complete the verification to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (requiresManualCheck.signin && !manualCheckPassed.signin) {
+      toast({
+        title: 'Manual Cloudflare check required',
+        description: 'Run manual verification below, then try signing in again.',
         variant: 'destructive',
       });
       return;
@@ -81,15 +144,30 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         ...loginForm,
         captchaToken: loginCaptchaToken || undefined,
       });
+      setRequiresManualCheck((prev) => ({ ...prev, signin: false }));
+      setManualCheckPassed((prev) => ({ ...prev, signin: false }));
       toast({ title: 'Welcome back', description: 'You are now signed in.' });
       navigate(redirectPath, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed';
-      toast({ title: 'Unable to sign in', description: message, variant: 'destructive' });
+      if (isPotentialCaptchaServerError(error) && loginCaptchaToken) {
+        const configHint = message.toLowerCase().includes('captcha verification process failed')
+          ? ' Supabase captcha provider appears misconfigured; admin should re-save Turnstile secret in Auth > Attack Protection.'
+          : '';
+        setRequiresManualCheck((prev) => ({ ...prev, signin: true }));
+        toast({
+          title: 'Automatic verification failed',
+          description: `Use the Cloudflare manual check button, then sign in again.${configHint}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Unable to sign in', description: message, variant: 'destructive' });
+      }
     } finally {
       if (hasCaptchaProtection) {
         setLoginCaptchaToken(null);
         setLoginCaptchaResetSignal((prev) => prev + 1);
+        setManualCheckPassed((prev) => ({ ...prev, signin: false }));
       }
       setIsSubmitting(false);
     }
@@ -97,6 +175,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasCaptchaProtection) {
+      toast({
+        title: 'Security configuration missing',
+        description: 'Captcha site key is not configured on this deployment. Contact admin to restore sign-up.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!signupForm.email || !signupForm.password || signupForm.password.length < 8) {
       toast({
         title: 'Missing details',
@@ -115,6 +202,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
+    if (requiresManualCheck.signup && !manualCheckPassed.signup) {
+      toast({
+        title: 'Manual Cloudflare check required',
+        description: 'Run manual verification below, then try creating your account again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { requiresEmailVerification } = await signUpWithEmail({
@@ -127,6 +223,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         captchaToken: signupCaptchaToken || undefined,
       });
 
+      setRequiresManualCheck((prev) => ({ ...prev, signup: false }));
+      setManualCheckPassed((prev) => ({ ...prev, signup: false }));
       setSignupAcknowledged(true);
       if (requiresEmailVerification) {
         toast({
@@ -142,11 +240,24 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign up failed';
-      toast({ title: 'Unable to sign up', description: message, variant: 'destructive' });
+      if (isPotentialCaptchaServerError(error) && signupCaptchaToken) {
+        const configHint = message.toLowerCase().includes('captcha verification process failed')
+          ? ' Supabase captcha provider appears misconfigured; admin should re-save Turnstile secret in Auth > Attack Protection.'
+          : '';
+        setRequiresManualCheck((prev) => ({ ...prev, signup: true }));
+        toast({
+          title: 'Automatic verification failed',
+          description: `Use the Cloudflare manual check button, then try account creation again.${configHint}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'Unable to sign up', description: message, variant: 'destructive' });
+      }
     } finally {
       if (hasCaptchaProtection) {
         setSignupCaptchaToken(null);
         setSignupCaptchaResetSignal((prev) => prev + 1);
+        setManualCheckPassed((prev) => ({ ...prev, signup: false }));
       }
       setIsSubmitting(false);
     }
@@ -298,10 +409,45 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     />
                   )}
 
+                  {requiresManualCheck.signin && (
+                    <Alert className="border-amber-400/50 bg-amber-50/80 text-amber-900">
+                      <AlertDescription className="space-y-3">
+                        <p className="text-sm">
+                          Automatic Turnstile validation failed. Run a manual Cloudflare check, then sign in again.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full border-amber-300 bg-amber-100/80 text-amber-900 hover:bg-amber-200"
+                          onClick={handleManualLoginCheck}
+                          disabled={isVerifying || !loginCaptchaToken}
+                        >
+                          {isVerifying ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Checking...
+                            </>
+                          ) : manualCheckPassed.signin ? (
+                            'Cloudflare check passed'
+                          ) : (
+                            'Run Cloudflare manual check'
+                          )}
+                        </Button>
+                        {manualCheckError && <p className="text-xs text-destructive">{manualCheckError}</p>}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
-                    disabled={isSubmitting || (hasCaptchaProtection && !loginCaptchaToken)}
+                    disabled={
+                      isSubmitting ||
+                      !hasCaptchaProtection ||
+                      !loginCaptchaToken ||
+                      (requiresManualCheck.signin && !manualCheckPassed.signin)
+                    }
                   >
                     {isSubmitting ? (
                       <>
@@ -430,10 +576,45 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     />
                   )}
 
+                  {requiresManualCheck.signup && (
+                    <Alert className="md:col-span-2 border-amber-400/50 bg-amber-50/80 text-amber-900">
+                      <AlertDescription className="space-y-3">
+                        <p className="text-sm">
+                          Automatic Turnstile validation failed. Run a manual Cloudflare check, then submit again.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full border-amber-300 bg-amber-100/80 text-amber-900 hover:bg-amber-200"
+                          onClick={handleManualSignupCheck}
+                          disabled={isVerifying || !signupCaptchaToken}
+                        >
+                          {isVerifying ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Checking...
+                            </>
+                          ) : manualCheckPassed.signup ? (
+                            'Cloudflare check passed'
+                          ) : (
+                            'Run Cloudflare manual check'
+                          )}
+                        </Button>
+                        {manualCheckError && <p className="text-xs text-destructive">{manualCheckError}</p>}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full md:col-span-2 bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
-                    disabled={isSubmitting || (hasCaptchaProtection && !signupCaptchaToken)}
+                    disabled={
+                      isSubmitting ||
+                      !hasCaptchaProtection ||
+                      !signupCaptchaToken ||
+                      (requiresManualCheck.signup && !manualCheckPassed.signup)
+                    }
                   >
                     {isSubmitting ? (
                       <>

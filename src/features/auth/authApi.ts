@@ -32,6 +32,18 @@ export interface SignInPayload {
   captchaToken?: string;
 }
 
+export interface AuthRequestError extends Error {
+  status?: number;
+  code?: string;
+}
+
+const toAuthRequestError = (error: { message: string; status?: number; code?: string }): AuthRequestError => {
+  const authError = new Error(error.message) as AuthRequestError;
+  authError.status = error.status;
+  authError.code = error.code;
+  return authError;
+};
+
 export const isProfileComplete = (profile?: Partial<ProfileRow> | null) => {
   if (!profile) return false;
   return Boolean(profile.full_name && profile.phone && profile.id_number);
@@ -57,7 +69,7 @@ export async function signUpWithEmail(payload: SignUpPayload) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw toAuthRequestError(error);
   }
 
   return {
@@ -75,7 +87,7 @@ export async function signInWithEmail(payload: SignInPayload) {
     },
   });
 
-  if (error) throw new Error(error.message);
+  if (error) throw toAuthRequestError(error);
   return { user: data.user, session: data.session };
 }
 

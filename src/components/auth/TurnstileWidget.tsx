@@ -168,6 +168,14 @@ const TurnstileWidget = ({
     return 'Complete the check to continue';
   }, [error, isLoading, isVerified]);
 
+  const retryCheck = () => {
+    if (!widgetIdRef.current || !window.turnstile) return;
+    window.turnstile.reset(widgetIdRef.current);
+    onTokenChange(null);
+    setIsVerified(false);
+    setError(null);
+  };
+
   if (!siteKey) {
     return (
       <div className={cn('rounded-xl border border-amber-300/60 bg-amber-50/70 p-3 text-sm text-amber-900', className)}>
@@ -195,15 +203,26 @@ const TurnstileWidget = ({
 
       <div ref={containerRef} className="min-h-[72px]" />
 
-      <div className="mt-2 flex items-center gap-2 text-xs">
-        {isLoading ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-        ) : error ? (
-          <AlertCircle className="h-3.5 w-3.5 text-destructive" />
-        ) : (
-          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          {isLoading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          ) : error ? (
+            <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+          ) : (
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          )}
+          <span className={error ? 'text-destructive' : 'text-muted-foreground'}>{status}</span>
+        </div>
+        {!isLoading && (
+          <button
+            type="button"
+            className="rounded-full border border-border/60 px-2 py-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            onClick={retryCheck}
+          >
+            Retry
+          </button>
         )}
-        <span className={error ? 'text-destructive' : 'text-muted-foreground'}>{status}</span>
       </div>
     </div>
   );
