@@ -1,4 +1,4 @@
-import { Menu, MessageSquare, Sparkles } from 'lucide-react';
+import { Home, Menu, MessageSquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,6 +6,7 @@ import NotificationBell from './NotificationBell';
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
+import { Link } from 'react-router-dom';
 
 const ChatSidebar = lazy(() => import('@/components/chat/ChatSidebar'));
 
@@ -143,10 +144,10 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
               <img 
                 src={turuturuLogo}
                 alt="Turuturu Stars Logo"
-                className="hidden h-10 w-10 object-contain sm:block"
+                className="hidden h-11 w-11 object-contain drop-shadow-[0_10px_16px_rgba(14,116,144,0.25)] sm:block"
                 loading="eager"
-                width="40"
-                height="40"
+                width="44"
+                height="44"
                 decoding="async"
               />
             </div>
@@ -196,6 +197,21 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
 
           {/* Right Section */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'h-10 w-10 rounded-xl transition-all duration-200 relative group',
+                'bg-card/60 border border-border/50 hover:border-primary/40',
+                'hover:bg-accent active:scale-95'
+              )}
+            >
+              <Link to="/" aria-label="Go to public home page">
+                <Home className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+              </Link>
+            </Button>
+
             <Button 
               variant="ghost" 
               size="icon" 

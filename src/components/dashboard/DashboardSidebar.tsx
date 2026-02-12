@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
+  Home,
   LayoutDashboard, 
   Users, 
   HandHeart, 
@@ -105,6 +106,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   };
 
   const memberLinks: Array<{ label: string; href: string; icon: any; badge: string | number | null }> = [
+    { label: 'Website Home', href: '/', icon: Home, badge: null },
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
     { label: 'Membership Fees', href: '/dashboard/finance/membership-fees', icon: PiggyBank, badge: null },
@@ -221,15 +223,15 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       {/* Mobile Header */}
       <div className="lg:hidden sticky top-0 z-10 bg-gradient-to-r from-card via-card to-card/95 backdrop-blur-md border-b border-border/40 px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link to="/" onClick={handleNavClick} className="flex items-center gap-2.5">
             <img 
               src={turuturuLogo}
               alt="Turuturu Stars Logo"
-              className="w-7 h-7 object-contain"
+              className="h-9 w-9 object-contain drop-shadow-[0_8px_14px_rgba(14,116,144,0.28)]"
               loading="eager"
             />
-            <span className="font-serif font-bold text-sm text-foreground">TS</span>
-          </div>
+            <span className="font-serif font-bold text-sm text-foreground">Turuturu Stars</span>
+          </Link>
           {onClose && (
             <button
               onClick={onClose}
@@ -252,7 +254,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
           <img 
             src={turuturuLogo}
             alt="Turuturu Stars Logo"
-            className="h-10 w-10 object-contain flex-shrink-0"
+            className="h-12 w-12 object-contain drop-shadow-[0_10px_16px_rgba(14,116,144,0.26)] flex-shrink-0"
             loading="eager"
           />
           <div className="flex-1 min-w-0">

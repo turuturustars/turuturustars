@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Home, Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithEmail, signUpWithEmail } from '../authApi';
@@ -147,6 +147,26 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
           </div>
 
           <div className="relative p-6 sm:p-8 md:p-10">
+            <div className="mb-5 flex items-center justify-between gap-2">
+              <Button asChild type="button" variant="outline" size="sm" className="rounded-full border-border/60 bg-background/60">
+                <Link to="/" className="inline-flex items-center gap-2">
+                  <Home className="h-4 w-4" />
+                  Home
+                </Link>
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="rounded-full"
+                onClick={() => navigate(-1)}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            </div>
+
             <div className="mb-6 space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary md:hidden">
                 <ShieldCheck className="h-4 w-4" />
