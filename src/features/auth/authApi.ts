@@ -23,11 +23,13 @@ export interface SignUpPayload {
   idNumber?: string;
   location?: string;
   occupation?: string;
+  captchaToken?: string;
 }
 
 export interface SignInPayload {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export const isProfileComplete = (profile?: Partial<ProfileRow> | null) => {
@@ -36,13 +38,14 @@ export const isProfileComplete = (profile?: Partial<ProfileRow> | null) => {
 };
 
 export async function signUpWithEmail(payload: SignUpPayload) {
-  const { email, password } = payload;
+  const { email, password, captchaToken } = payload;
 
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: buildSiteUrl('/auth/callback'),
+      captchaToken,
       data: {
         full_name: payload.fullName,
         phone: payload.phone,
@@ -67,6 +70,9 @@ export async function signInWithEmail(payload: SignInPayload) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: payload.email,
     password: payload.password,
+    options: {
+      captchaToken: payload.captchaToken,
+    },
   });
 
   if (error) throw new Error(error.message);

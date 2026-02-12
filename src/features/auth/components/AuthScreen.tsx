@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { ArrowLeft, Home, Loader2, Mail, Lock, User, Phone, MapPin, ShieldCheck 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithEmail, signUpWithEmail } from '../authApi';
+import TurnstileWidget from '@/components/auth/TurnstileWidget';
 
 type Mode = 'signin' | 'signup';
 
@@ -22,10 +23,17 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const navigate = useNavigate();
   const { toast } = useToast();
   const { status } = useAuth();
+  const turnstileSiteKey =
+    import.meta.env.VITE_TURNSTILE_SITE_KEY || import.meta.env.VITE_CLOUDFLARE_SITE_KEY || '';
+  const hasCaptchaProtection = Boolean(turnstileSiteKey);
 
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [signupAcknowledged, setSignupAcknowledged] = useState(false);
+  const [loginCaptchaToken, setLoginCaptchaToken] = useState<string | null>(null);
+  const [signupCaptchaToken, setSignupCaptchaToken] = useState<string | null>(null);
+  const [loginCaptchaResetSignal, setLoginCaptchaResetSignal] = useState(0);
+  const [signupCaptchaResetSignal, setSignupCaptchaResetSignal] = useState(0);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({
@@ -48,17 +56,41 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     }
   }, [navigate, status, redirectPath]);
 
+  const handleLoginCaptchaChange = useCallback((token: string | null) => {
+    setLoginCaptchaToken(token);
+  }, []);
+
+  const handleSignupCaptchaChange = useCallback((token: string | null) => {
+    setSignupCaptchaToken(token);
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (hasCaptchaProtection && !loginCaptchaToken) {
+      toast({
+        title: 'Complete security check',
+        description: 'Please complete the verification to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await signInWithEmail(loginForm);
+      await signInWithEmail({
+        ...loginForm,
+        captchaToken: loginCaptchaToken || undefined,
+      });
       toast({ title: 'Welcome back', description: 'You are now signed in.' });
       navigate(redirectPath, { replace: true });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed';
       toast({ title: 'Unable to sign in', description: message, variant: 'destructive' });
     } finally {
+      if (hasCaptchaProtection) {
+        setLoginCaptchaToken(null);
+        setLoginCaptchaResetSignal((prev) => prev + 1);
+      }
       setIsSubmitting(false);
     }
   };
@@ -74,6 +106,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
+    if (hasCaptchaProtection && !signupCaptchaToken) {
+      toast({
+        title: 'Complete security check',
+        description: 'Please complete the verification to continue.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { requiresEmailVerification } = await signUpWithEmail({
@@ -83,6 +124,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         phone: signupForm.phone,
         idNumber: signupForm.idNumber,
         location: signupForm.location,
+        captchaToken: signupCaptchaToken || undefined,
       });
 
       setSignupAcknowledged(true);
@@ -102,6 +144,10 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       const message = error instanceof Error ? error.message : 'Sign up failed';
       toast({ title: 'Unable to sign up', description: message, variant: 'destructive' });
     } finally {
+      if (hasCaptchaProtection) {
+        setSignupCaptchaToken(null);
+        setSignupCaptchaResetSignal((prev) => prev + 1);
+      }
       setIsSubmitting(false);
     }
   };
@@ -181,6 +227,14 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
               </p>
             </div>
 
+            {!hasCaptchaProtection && (
+              <Alert className="mb-5 border-amber-400/50 bg-amber-50/80 text-amber-900">
+                <AlertDescription>
+                  Bot protection is not configured. Add `VITE_CLOUDFLARE_SITE_KEY` to enable Turnstile verification.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Tabs value={mode} onValueChange={(val) => setMode(val as Mode)} className="space-y-6">
               <TabsList className="grid grid-cols-2 rounded-full border border-border/60 bg-muted/60 p-1">
                 <TabsTrigger
@@ -235,10 +289,19 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                   </div>
 
+                  {hasCaptchaProtection && (
+                    <TurnstileWidget
+                      siteKey={turnstileSiteKey}
+                      action="signin"
+                      resetSignal={loginCaptchaResetSignal}
+                      onTokenChange={handleLoginCaptchaChange}
+                    />
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || (hasCaptchaProtection && !loginCaptchaToken)}
                   >
                     {isSubmitting ? (
                       <>
@@ -357,10 +420,20 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                   </div>
 
+                  {hasCaptchaProtection && (
+                    <TurnstileWidget
+                      siteKey={turnstileSiteKey}
+                      action="signup"
+                      resetSignal={signupCaptchaResetSignal}
+                      onTokenChange={handleSignupCaptchaChange}
+                      className="md:col-span-2"
+                    />
+                  )}
+
                   <Button
                     type="submit"
                     className="w-full md:col-span-2 bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || (hasCaptchaProtection && !signupCaptchaToken)}
                   >
                     {isSubmitting ? (
                       <>
