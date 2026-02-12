@@ -123,21 +123,35 @@ async function getAccessToken(): Promise<string> {
       }
     );
     
-    const data = await response.json();
+    let data: Record<string, unknown>;
+    try {
+      data = await response.json();
+    } catch {
+      throw new HttpError(502, "Invalid OAuth response from M-Pesa", {
+        httpStatus: response.status,
+      });
+    }
     
-    if (!data.access_token) {
+    if (!response.ok || !data.access_token) {
       const errorTime = new Date().toISOString();
-      console.error(`[${errorTime}] ❌ M-Pesa Access Token Request Failed`);
+      console.error(`[${errorTime}] [ERROR] M-Pesa Access Token Request Failed`);
       console.error(`  HTTP Status: ${response.status}`);
       console.error(`  Error Code: ${data.error}`);
       console.error(`  Error Description: ${data.error_description}`);
       console.error(`  Full Response: ${JSON.stringify(data, null, 2)}`);
-      throw new Error(`M-Pesa auth failed: ${data.error_description || data.error || 'Unknown error'}`);
+      const errorCode = typeof data.error === "string" ? data.error : undefined;
+      const errorDescription =
+        typeof data.error_description === "string" ? data.error_description : undefined;
+      throw new HttpError(502, `M-Pesa auth failed: ${errorDescription || errorCode || "Unknown error"}`, {
+        httpStatus: response.status,
+        mpesaErrorCode: errorCode,
+        mpesaErrorDescription: errorDescription,
+      });
     }
     
-    console.log(`[${new Date().toISOString()}] ✅ Access token obtained successfully`);
+    console.log(`[${new Date().toISOString()}] [OK] Access token obtained successfully`);
     console.log(`  Token Expires In: ${data.expires_in} seconds`);
-    return data.access_token;
+    return String(data.access_token);
   } catch (error) {
     console.error(`[${new Date().toISOString()}] ❌ Access token fetch error:`, error);
     throw error;
@@ -269,10 +283,16 @@ serve(async (req) => {
           }
         );
         
-        result = await response.json();
+        try {
+          result = await response.json();
+        } catch {
+          throw new HttpError(502, "Invalid STK response from M-Pesa", {
+            httpStatus: response.status,
+          });
+        }
         const responseTime = new Date().toISOString();
         
-        console.log(`[${responseTime}] 📥 Safaricom STK Push Response Received`);
+        console.log(`[${responseTime}] [INFO] Safaricom STK Push Response Received`);
         console.log(`  Response Code: ${result.ResponseCode}`);
         console.log(`  Response Description: ${result.ResponseDescription}`);
         if (result.MerchantRequestID) console.log(`  Merchant Request ID: ${result.MerchantRequestID}`);
@@ -280,17 +300,27 @@ serve(async (req) => {
         console.log(`  Full Response: ${JSON.stringify(result, null, 2)}`);
         
         // Return Safaricom's actual error message instead of generic error
-        if (result.errorCode) {
+        if (!response.ok || result.errorCode) {
           const errorMsg = result.errorMessage || `M-Pesa Error: ${result.errorCode}`;
-          console.error(`[${new Date().toISOString()}] ❌ STK Push Failed - Code: ${result.errorCode}`);
+          console.error(`[${new Date().toISOString()}] [ERROR] STK Push Failed - Code: ${result.errorCode}`);
           console.error(`  Message: ${errorMsg}`);
-          throw new Error(errorMsg);
+          throw new HttpError(400, errorMsg, {
+            httpStatus: response.status,
+            mpesaErrorCode: result.errorCode,
+            mpesaErrorMessage: result.errorMessage,
+            mpesaResponseCode: result.ResponseCode,
+            mpesaResponseDescription: result.ResponseDescription,
+          });
         }
         
         if (result.ResponseCode !== "0") {
           const errorMsg = result.ResponseDescription || `Failed with code: ${result.ResponseCode}`;
-          console.error(`[${new Date().toISOString()}] ❌ STK Push Response Error: ${errorMsg}`);
-          throw new Error(errorMsg);
+          console.error(`[${new Date().toISOString()}] [ERROR] STK Push Response Error: ${errorMsg}`);
+          throw new HttpError(400, errorMsg, {
+            httpStatus: response.status,
+            mpesaResponseCode: result.ResponseCode,
+            mpesaResponseDescription: result.ResponseDescription,
+          });
         }
         
         // Log the transaction
