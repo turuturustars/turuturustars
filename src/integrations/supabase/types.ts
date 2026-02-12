@@ -1254,6 +1254,10 @@ export type Database = {
         }
         Returns: string
       }
+      mark_private_conversation_read: {
+        Args: { _conversation_id: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role:

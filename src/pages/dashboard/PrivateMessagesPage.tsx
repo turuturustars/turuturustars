@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
@@ -20,6 +20,22 @@ interface MemberProfile {
   id: string;
   full_name: string;
   photo_url: string | null;
+  presence: {
+    status: 'online' | 'offline';
+    last_seen: string | null;
+    is_online: boolean;
+  };
+}
+
+const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
+
+function formatPresenceLabel(lastSeen: string | null, isOnline: boolean) {
+  if (isOnline) return 'Online now';
+  if (!lastSeen) return 'Offline';
+
+  const parsedDate = new Date(lastSeen);
+  if (Number.isNaN(parsedDate.getTime())) return 'Offline';
+  return `Last seen ${formatDistanceToNow(parsedDate, { addSuffix: true })}`;
 }
 
 export default function PrivateMessagesPage() {
@@ -75,9 +91,25 @@ export default function PrivateMessagesPage() {
     () => conversations.filter((conv) => (conv.unread_count ?? 0) > 0).length,
     [conversations]
   );
+  const onlineConversationsCount = useMemo(
+    () => conversations.filter((conv) => conv.other_participant_presence?.is_online).length,
+    [conversations]
+  );
   const totalUnreadMessages = useMemo(
     () => conversations.reduce((sum, conv) => sum + (conv.unread_count ?? 0), 0),
     [conversations]
+  );
+  const onlineMembersCount = useMemo(
+    () => members.filter((member) => member.presence.is_online).length,
+    [members]
+  );
+  const selectedPresenceLabel = useMemo(
+    () =>
+      formatPresenceLabel(
+        selectedConversation?.other_participant_presence?.last_seen ?? null,
+        selectedConversation?.other_participant_presence?.is_online ?? false
+      ),
+    [selectedConversation]
   );
 
   const groupedMessages = useMemo(() => {
@@ -113,31 +145,95 @@ export default function PrivateMessagesPage() {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [selectedConversationId, messages.length]);
 
-  // Fetch members for new conversation
-  const fetchMembers = async () => {
+  // Fetch members for new conversation with live presence details.
+  const fetchMembers = useCallback(async () => {
     if (!user) return;
     setLoadingMembers(true);
     try {
-      const { data } = await supabase
+      const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, full_name, photo_url')
         .neq('id', user.id)
         .order('full_name');
-      
-      setMembers(data || []);
+
+      if (profilesError) throw profilesError;
+
+      const profileRows = profilesData || [];
+      const memberIds = profileRows.map((profile) => profile.id);
+
+      const statusMap = new Map<
+        string,
+        { status: 'online' | 'offline'; last_seen: string | null }
+      >();
+
+      if (memberIds.length > 0) {
+        const { data: statusRows, error: statusError } = await supabase
+          .from('user_status')
+          .select('user_id, status, last_seen')
+          .in('user_id', memberIds);
+
+        if (statusError) throw statusError;
+
+        (statusRows || []).forEach((row) => {
+          statusMap.set(row.user_id, {
+            status: row.status === 'online' ? 'online' : 'offline',
+            last_seen: row.last_seen,
+          });
+        });
+      }
+
+      const now = Date.now();
+      const rowsWithPresence: MemberProfile[] = profileRows.map((member) => {
+        const rawStatus = statusMap.get(member.id);
+        const lastSeen = rawStatus?.last_seen ?? null;
+        const isOnline =
+          rawStatus?.status === 'online' &&
+          !!lastSeen &&
+          now - new Date(lastSeen).getTime() <= PRESENCE_ACTIVE_WINDOW_MS;
+
+        return {
+          ...member,
+          presence: {
+            status: rawStatus?.status ?? 'offline',
+            last_seen: lastSeen,
+            is_online: isOnline,
+          },
+        };
+      });
+
+      setMembers(rowsWithPresence);
     } catch (err) {
       console.error('Error fetching members:', err);
       showError('Unable to load member list right now.', 2500);
     } finally {
       setLoadingMembers(false);
     }
-  };
+  }, [showError, user]);
 
   useEffect(() => {
     if (showNewConversation) {
       void fetchMembers();
     }
-  }, [showNewConversation]);
+  }, [fetchMembers, showNewConversation]);
+
+  useEffect(() => {
+    if (!showNewConversation || !user) return;
+
+    const memberStatusChannel = supabase
+      .channel(`private-members-presence-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_status' },
+        () => {
+          void fetchMembers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(memberStatusChannel);
+    };
+  }, [fetchMembers, showNewConversation, user]);
 
   const handleStartConversation = async (memberId: string) => {
     if (!assertCanInteract('start new conversations')) return;
@@ -258,6 +354,10 @@ export default function PrivateMessagesPage() {
   const filteredMembers = members.filter((member) =>
     (member.full_name || '').toLowerCase().includes(memberSearchTerm.toLowerCase())
   );
+  const filteredOnlineMembersCount = useMemo(
+    () => filteredMembers.filter((member) => member.presence.is_online).length,
+    [filteredMembers]
+  );
 
   // Mobile: Show either list or conversation
   const showConversationView = selectedConversationId !== null;
@@ -288,6 +388,7 @@ export default function PrivateMessagesPage() {
                 <Badge variant="secondary">{conversations.length} chats</Badge>
                 <Badge variant="secondary">{unreadConversationsCount} unread chats</Badge>
                 <Badge variant="secondary">{totalUnreadMessages} unread messages</Badge>
+                <Badge variant="secondary">{onlineConversationsCount} online now</Badge>
               </div>
             </div>
           </div>
@@ -364,6 +465,11 @@ export default function PrivateMessagesPage() {
                         className="pl-9"
                       />
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant="secondary">{members.length} members</Badge>
+                      <Badge variant="secondary">{onlineMembersCount} online</Badge>
+                      <Badge variant="secondary">{filteredOnlineMembersCount} online in results</Badge>
+                    </div>
                     <ScrollArea className="h-64">
                       {loadingMembers ? (
                         <div className="flex items-center justify-center py-8">
@@ -378,13 +484,29 @@ export default function PrivateMessagesPage() {
                               disabled={!canInteract}
                               className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors text-left"
                             >
-                              <OptimizedAvatarImage
-                                photoUrl={member.photo_url}
-                                fallback={member.full_name?.charAt(0).toUpperCase() || 'M'}
-                                size={40}
-                                className="h-10 w-10"
-                              />
-                              <span className="font-medium">{member.full_name}</span>
+                              <div className="relative">
+                                <OptimizedAvatarImage
+                                  photoUrl={member.photo_url}
+                                  fallback={member.full_name?.charAt(0).toUpperCase() || 'M'}
+                                  size={40}
+                                  className="h-10 w-10"
+                                />
+                                <span
+                                  className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${
+                                    member.presence.is_online ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+                                  }`}
+                                />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{member.full_name}</p>
+                                <p
+                                  className={`text-xs ${
+                                    member.presence.is_online ? 'text-emerald-600' : 'text-muted-foreground'
+                                  }`}
+                                >
+                                  {formatPresenceLabel(member.presence.last_seen, member.presence.is_online)}
+                                </p>
+                              </div>
                             </button>
                           ))}
                           {filteredMembers.length === 0 && !loadingMembers && (
@@ -411,7 +533,7 @@ export default function PrivateMessagesPage() {
           </div>
           <div className="mt-2 flex items-center justify-between">
             <p className="text-xs text-muted-foreground">
-              {filteredConversations.length} shown - {totalUnreadMessages} unread
+              {filteredConversations.length} shown - {totalUnreadMessages} unread - {onlineConversationsCount} online
             </p>
             <AccessibleButton
               size="sm"
@@ -444,6 +566,7 @@ export default function PrivateMessagesPage() {
                   <ConversationItem
                     key={conv.id}
                     conversation={conv}
+                    currentUserId={user?.id ?? null}
                     isSelected={conv.id === selectedConversationId}
                     onClick={() => setSelectedConversationId(conv.id)}
                   />
@@ -480,7 +603,18 @@ export default function PrivateMessagesPage() {
                   <h3 className="font-semibold">
                     {selectedConversation.other_participant?.full_name}
                   </h3>
-                  <p className="text-xs text-muted-foreground">Private conversation</p>
+                  <p
+                    className={`flex items-center gap-1.5 text-xs ${
+                      selectedConversation.other_participant_presence?.is_online ? 'text-emerald-600' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        selectedConversation.other_participant_presence?.is_online ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'
+                      }`}
+                    />
+                    {selectedPresenceLabel}
+                  </p>
                 </div>
               </div>
             </CardHeader>
@@ -492,9 +626,14 @@ export default function PrivateMessagesPage() {
                   {groupedMessages.map((group) => (
                     <div key={group.date} className="space-y-2">
                       <MessageDateDivider label={group.date} />
-                      {group.items.map((msg) => {
+                  {group.items.map((msg) => {
                     const isOwn = msg.sender_id === user?.id;
                     const isEditing = editingMessageId === msg.id;
+                    const readReceiptLabel = isOwn
+                      ? msg.read_at
+                        ? `Read ${formatDistanceToNow(new Date(msg.read_at), { addSuffix: true })}`
+                        : 'Sent'
+                      : null;
                     return (
                       <div
                         key={msg.id}
@@ -579,8 +718,11 @@ export default function PrivateMessagesPage() {
                               )}
                             </>
                           )}
-                          <p className={`text-[10px] text-muted-foreground mt-1 ${isOwn ? 'text-right' : ''}`}>
-                            {formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}
+                          <p className={`mt-1 flex items-center gap-1 text-[10px] text-muted-foreground ${isOwn ? 'justify-end' : ''}`}>
+                            <span>{formatDistanceToNow(new Date(msg.created_at), { addSuffix: true })}</span>
+                            {isOwn && readReceiptLabel && (
+                              <span className={msg.read_at ? 'font-medium text-emerald-600' : ''}>{readReceiptLabel}</span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -678,14 +820,26 @@ function MessageDateDivider({ label }: { readonly label: string }) {
 // Conversation List Item
 function ConversationItem({
   conversation,
+  currentUserId,
   isSelected,
   onClick,
 }: {
   readonly conversation: PrivateConversation;
+  readonly currentUserId: string | null;
   readonly isSelected: boolean;
   readonly onClick: () => void;
 }) {
-  const { other_participant, last_message, unread_count } = conversation;
+  const { other_participant, last_message, unread_count, other_participant_presence } = conversation;
+  const presenceLabel = formatPresenceLabel(
+    other_participant_presence?.last_seen ?? null,
+    other_participant_presence?.is_online ?? false
+  );
+  const lastMessageReceiptLabel =
+    last_message && currentUserId && last_message.sender_id === currentUserId
+      ? last_message.read_at
+        ? 'Read'
+        : 'Sent'
+      : null;
 
   return (
     <button
@@ -696,17 +850,31 @@ function ConversationItem({
           : 'hover:bg-muted'
       }`}
     >
-      <OptimizedAvatarImage
-        photoUrl={other_participant?.photo_url}
-        fallback={other_participant?.full_name?.charAt(0).toUpperCase() || 'M'}
-        size={48}
-        className="h-12 w-12 flex-shrink-0"
-      />
+      <div className="relative">
+        <OptimizedAvatarImage
+          photoUrl={other_participant?.photo_url}
+          fallback={other_participant?.full_name?.charAt(0).toUpperCase() || 'M'}
+          size={48}
+          className="h-12 w-12 flex-shrink-0"
+        />
+        <span
+          className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background ${
+            other_participant_presence?.is_online ? 'bg-emerald-500' : 'bg-muted-foreground/30'
+          }`}
+        />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <span className="font-medium truncate">
-            {other_participant?.full_name}
-          </span>
+          <div className="min-w-0">
+            <span className="font-medium truncate block">{other_participant?.full_name}</span>
+            <span
+              className={`text-[10px] ${
+                other_participant_presence?.is_online ? 'text-emerald-600' : 'text-muted-foreground'
+              }`}
+            >
+              {presenceLabel}
+            </span>
+          </div>
           {last_message && (
             <span className="text-[10px] text-muted-foreground">
               {formatDistanceToNow(new Date(last_message.created_at), { addSuffix: false })}
@@ -717,11 +885,22 @@ function ConversationItem({
           <p className="text-sm text-muted-foreground truncate">
             {last_message?.content || 'No messages yet'}
           </p>
-          {(unread_count ?? 0) > 0 && (
-            <Badge variant="default" className="ml-2 h-5 min-w-5 flex items-center justify-center">
-              {unread_count}
-            </Badge>
-          )}
+          <div className="ml-2 flex items-center gap-1">
+            {lastMessageReceiptLabel && (
+              <span
+                className={`text-[10px] ${
+                  lastMessageReceiptLabel === 'Read' ? 'text-emerald-600 font-medium' : 'text-muted-foreground'
+                }`}
+              >
+                {lastMessageReceiptLabel}
+              </span>
+            )}
+            {(unread_count ?? 0) > 0 && (
+              <Badge variant="default" className="h-5 min-w-5 flex items-center justify-center">
+                {unread_count}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     </button>

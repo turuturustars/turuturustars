@@ -15,6 +15,11 @@ export interface PrivateConversation {
   };
   last_message?: PrivateMessage;
   unread_count?: number;
+  other_participant_presence?: {
+    status: 'online' | 'offline';
+    last_seen: string | null;
+    is_online: boolean;
+  };
 }
 
 export interface PrivateMessage {
@@ -30,6 +35,8 @@ export interface PrivateMessage {
     photo_url: string | null;
   };
 }
+
+const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
 
 export function usePrivateMessages(conversationId?: string) {
   const { user, canInteract } = useAuth();
@@ -69,10 +76,31 @@ export function usePrivateMessages(conversationId?: string) {
 
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+        const { data: statusRows } = await supabase
+          .from('user_status')
+          .select('user_id, status, last_seen')
+          .in('user_id', otherParticipantIds);
+
+        const statusMap = new Map(
+          (statusRows || []).map((row) => [
+            row.user_id,
+            {
+              status: row.status === 'online' ? 'online' : 'offline',
+              last_seen: row.last_seen,
+            },
+          ])
+        );
+
         // Get last messages and unread counts
         const conversationsWithData = await Promise.all(
           data.map(async (conv: any) => {
             const otherId = conv.participant_one === user.id ? conv.participant_two : conv.participant_one;
+            const rawPresence = statusMap.get(otherId);
+            const lastSeen = rawPresence?.last_seen || null;
+            const isOnline =
+              rawPresence?.status === 'online' &&
+              !!lastSeen &&
+              Date.now() - new Date(lastSeen).getTime() <= PRESENCE_ACTIVE_WINDOW_MS;
             
             // Get last message
             const { data: lastMsgData } = await supabase
@@ -81,7 +109,7 @@ export function usePrivateMessages(conversationId?: string) {
               .eq('conversation_id', conv.id)
               .order('created_at', { ascending: false })
               .limit(1)
-              .single();
+              .maybeSingle();
 
             // Get unread count
             const { count } = await supabase
@@ -94,6 +122,11 @@ export function usePrivateMessages(conversationId?: string) {
             return {
               ...conv,
               other_participant: profileMap.get(otherId),
+              other_participant_presence: {
+                status: rawPresence?.status || 'offline',
+                last_seen: lastSeen,
+                is_online: isOnline,
+              },
               last_message: lastMsgData || undefined,
               unread_count: count || 0,
             };
@@ -144,14 +177,15 @@ export function usePrivateMessages(conversationId?: string) {
 
         // Mark messages as read
         if (canInteract) {
-          await supabase
-            .from('private_messages')
-            .update({ read_at: new Date().toISOString() })
-            .eq('conversation_id', conversationId)
-            .neq('sender_id', user.id)
-            .is('read_at', null);
+          const { error: markReadError } = await supabase.rpc('mark_private_conversation_read', {
+            _conversation_id: conversationId,
+          });
 
-          await fetchConversations();
+          if (markReadError) {
+            console.error('Error marking private messages as read:', markReadError);
+          } else {
+            await fetchConversations();
+          }
         }
       } else {
         setMessages([]);
@@ -230,6 +264,65 @@ export function usePrivateMessages(conversationId?: string) {
     return () => {
       supabase.removeChannel(participantOneChannel);
       supabase.removeChannel(participantTwoChannel);
+    };
+  }, [user, fetchConversations]);
+
+  const updateOwnPresence = useCallback(
+    async (status: 'online' | 'offline') => {
+      if (!user) return;
+
+      try {
+        await supabase.from('user_status').upsert({
+          user_id: user.id,
+          status,
+          last_seen: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error('Error updating private chat presence:', error);
+      }
+    },
+    [user]
+  );
+
+  useEffect(() => {
+    if (!user) return;
+
+    void updateOwnPresence('online');
+    const heartbeat = window.setInterval(() => {
+      void updateOwnPresence('online');
+    }, 45000);
+
+    const handleBeforeUnload = () => {
+      void updateOwnPresence('offline');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
+    return () => {
+      window.clearInterval(heartbeat);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+      void updateOwnPresence('offline');
+    };
+  }, [user, updateOwnPresence]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const statusChannel = supabase
+      .channel(`private-user-status-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'user_status' },
+        () => {
+          void fetchConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(statusChannel);
     };
   }, [user, fetchConversations]);
 
