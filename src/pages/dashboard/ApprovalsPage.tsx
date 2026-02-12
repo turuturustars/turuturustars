@@ -55,7 +55,7 @@ const ApprovalsPage = () => {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const { toast } = useToast();
   const { user, roles } = useAuth();
-  const actorRole = roles?.[0]?.role || 'member';
+  const actorRole = roles?.[0] || 'member';
 
   useEffect(() => {
     fetchData();
@@ -86,12 +86,15 @@ const ApprovalsPage = () => {
 
   const approveMember = async (memberId: string) => {
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'active' })
-        .eq('id', memberId);
+      const { data, error } = await supabase.functions.invoke('admin-ops', {
+        body: {
+          action: 'approve_user',
+          user_id: memberId,
+        },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setPendingMembers((prev) => prev.filter((m) => m.id !== memberId));
 
@@ -121,19 +124,16 @@ const ApprovalsPage = () => {
     if (!selectedMember) return;
 
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'suspended' })
-        .eq('id', selectedMember.id);
+      const { data, error } = await supabase.functions.invoke('admin-ops', {
+        body: {
+          action: 'reject_member',
+          member_id: selectedMember.id,
+          reason: rejectReason || undefined,
+        },
+      });
 
       if (error) throw error;
-
-      await supabase.from('notifications').insert({
-        user_id: selectedMember.id,
-        type: 'membership_rejected',
-        title: 'Membership Application Rejected',
-        message: rejectReason || 'Your membership application has been rejected.',
-      });
+      if (data?.error) throw new Error(data.error);
 
       logAuditAction({
         actionType: 'REJECT_MEMBER',
@@ -150,7 +150,7 @@ const ApprovalsPage = () => {
 
       toast({
         title: 'Member Rejected',
-        description: 'Member has been rejected and notified',
+        description: 'Member rejected, notified, and profile details were purged.',
       });
     } catch (error) {
       console.error('Error rejecting member:', error);
@@ -411,7 +411,7 @@ const ApprovalsPage = () => {
             <DialogTitle>Reject Member Application</DialogTitle>
             <DialogDescription>
               Are you sure you want to reject {selectedMember?.full_name}'s membership
-              application? Please provide a reason.
+              application? Their member number and profile details will be purged. Please provide a reason.
             </DialogDescription>
           </DialogHeader>
           <Textarea

@@ -4,8 +4,41 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 type Action =
   | "log_action"
   | "delete_member"
+  | "suspend_member"
+  | "reject_member"
   | "approve_user"
   | "approve_payment";
+
+type MemberLifecycleMode = "suspend" | "permanent";
+
+type MemberProfile = {
+  id: string;
+  membership_number: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  soft_deleted?: boolean | null;
+};
+
+type Actor = {
+  id: string;
+  roles: string[];
+  primaryRole: string;
+  name?: string;
+  email?: string;
+};
+
+class HttpError extends Error {
+  status: number;
+  details?: Record<string, unknown>;
+
+  constructor(status: number, message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.status = status;
+    this.details = details;
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,16 +52,49 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ELEVATED_ROLES = [
   "admin",
   "chairperson",
-  "vice_chairperson",
-  "treasurer",
+  "vice_chairman",
   "secretary",
+  "vice_secretary",
+  "treasurer",
+  "organizing_secretary",
   "coordinator",
   "patron",
 ] as const;
 
-function ensureElevated(role?: string | null) {
-  if (!role || !ELEVATED_ROLES.includes(role as (typeof ELEVATED_ROLES)[number])) {
-    throw new Error("Insufficient permissions");
+const OFFICIAL_ROLES = [
+  "admin",
+  "chairperson",
+  "vice_chairman",
+  "secretary",
+  "vice_secretary",
+  "treasurer",
+  "organizing_secretary",
+  "coordinator",
+  "patron",
+  "committee_member",
+] as const;
+
+function hasAnyRole(userRoles: string[], requiredRoles: readonly string[]): boolean {
+  return userRoles.some((role) => requiredRoles.includes(role));
+}
+
+function ensureElevated(roles: string[]): void {
+  if (!hasAnyRole(roles, ELEVATED_ROLES)) {
+    throw new HttpError(403, "Insufficient permissions");
+  }
+}
+
+function ensureAdmin(roles: string[]): void {
+  if (!roles.includes("admin")) {
+    throw new HttpError(403, "Only admins can permanently delete members");
+  }
+}
+
+function requireConfirmation(profile: MemberProfile, confirmation?: string): void {
+  const expected = `DELETE ${(profile.membership_number || profile.id).toUpperCase()}`;
+  const normalized = (confirmation || "").trim().toUpperCase();
+  if (normalized !== expected) {
+    throw new HttpError(400, "Confirmation text mismatch", { expected });
   }
 }
 
@@ -54,21 +120,172 @@ async function logAdminAction(
 async function getActor(
   supabase: ReturnType<typeof createClient>,
   token: string,
-): Promise<{ id: string; role: string; name?: string; email?: string }> {
+): Promise<Actor> {
   const { data: authData, error: authError } = await supabase.auth.getUser(token);
   if (authError || !authData?.user) {
-    throw new Error("Unauthorized");
+    throw new HttpError(401, "Unauthorized");
   }
+
   const userId = authData.user.id;
   const { data: roles, error: roleError } = await supabase
     .from("user_roles")
     .select("role, user_name, user_email")
-    .eq("user_id", userId)
-    .limit(1);
-  if (roleError || !roles?.length) throw new Error("Unauthorized");
-  const role = roles[0].role as string;
-  ensureElevated(role);
-  return { id: userId, role, name: roles[0].user_name ?? undefined, email: roles[0].user_email ?? undefined };
+    .eq("user_id", userId);
+
+  if (roleError || !roles?.length) {
+    throw new HttpError(401, "Unauthorized");
+  }
+
+  const roleList = roles.map((row) => row.role as string);
+  ensureElevated(roleList);
+
+  return {
+    id: userId,
+    roles: roleList,
+    primaryRole: roleList[0] ?? "member",
+    name: roles[0]?.user_name ?? undefined,
+    email: roles[0]?.user_email ?? undefined,
+  };
+}
+
+async function fetchMemberProfile(
+  supabase: ReturnType<typeof createClient>,
+  memberId: string,
+): Promise<MemberProfile> {
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, membership_number, full_name, email, phone, status, soft_deleted")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    throw new HttpError(404, "Member not found");
+  }
+
+  return profile as MemberProfile;
+}
+
+async function notifyMember(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  title: string,
+  message: string,
+  type = "membership_update",
+): Promise<void> {
+  const { error } = await supabase.from("notifications").insert({
+    user_id: userId,
+    title,
+    message,
+    type,
+    read: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    console.warn("Failed to notify member", { userId, error: error.message });
+  }
+}
+
+async function suspendMemberProfile(
+  supabase: ReturnType<typeof createClient>,
+  memberId: string,
+  actorId: string,
+  options: { purgeSensitive: boolean },
+): Promise<void> {
+  const payload: Record<string, unknown> = {
+    status: "suspended",
+    updated_at: new Date().toISOString(),
+  };
+
+  if (options.purgeSensitive) {
+    payload.soft_deleted = true;
+    payload.deleted_at = new Date().toISOString();
+    payload.deleted_by = actorId;
+    payload.membership_number = null;
+    payload.id_number = null;
+    payload.email = null;
+    payload.location = null;
+    payload.occupation = null;
+    payload.full_name = "Rejected Member";
+    payload.phone = `REJECTED-${memberId.slice(0, 8)}`;
+  } else {
+    payload.soft_deleted = false;
+    payload.deleted_at = null;
+    payload.deleted_by = null;
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("id", memberId);
+
+  if (updateError) {
+    throw new HttpError(500, "Failed to update member status", { detail: updateError.message });
+  }
+
+  if (options.purgeSensitive) {
+    await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", memberId)
+      .neq("role", "member");
+  }
+}
+
+async function permanentlyDeleteMember(
+  supabase: ReturnType<typeof createClient>,
+  actor: Actor,
+  memberId: string,
+  confirmation?: string,
+  force = false,
+): Promise<MemberProfile> {
+  ensureAdmin(actor.roles);
+
+  if (actor.id === memberId) {
+    throw new HttpError(409, "You cannot permanently delete your own account");
+  }
+
+  const profile = await fetchMemberProfile(supabase, memberId);
+  requireConfirmation(profile, confirmation);
+
+  const { data: memberRoles, error: rolesError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", memberId);
+
+  if (rolesError) {
+    throw new HttpError(500, "Failed to read member roles", { detail: rolesError.message });
+  }
+
+  const roleList = (memberRoles ?? []).map((row) => row.role as string);
+  const isOfficial = hasAnyRole(roleList, OFFICIAL_ROLES);
+
+  if (isOfficial && !force) {
+    throw new HttpError(
+      409,
+      "This member has official roles. Suspend first, then retry with force if you still need permanent delete.",
+    );
+  }
+
+  // Best-effort FK cleanup for nullable references.
+  await supabase.from("user_roles").update({ assigned_by: null }).eq("assigned_by", memberId);
+  await supabase.from("welfare_cases").update({ created_by: null }).eq("created_by", memberId);
+  await supabase.from("announcements").update({ created_by: null }).eq("created_by", memberId);
+  await supabase.from("admin_audit_log").update({ actor_id: null }).eq("actor_id", memberId);
+
+  const { error: deleteError } = await (supabase.auth.admin as any).deleteUser(memberId, false);
+  if (deleteError) {
+    throw new HttpError(500, "Failed to permanently delete member", {
+      detail: deleteError.message,
+    });
+  }
+
+  return profile;
+}
+
+function parseLifecycleMode(value: unknown): MemberLifecycleMode {
+  return value === "permanent" ? "permanent" : "suspend";
 }
 
 serve(async (req) => {
@@ -77,93 +294,180 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) throw new Error("Unauthorized");
-    const token = authHeader.replace("Bearer ", "");
+    if (req.method !== "POST") {
+      throw new HttpError(405, "Method not allowed");
+    }
 
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      throw new HttpError(401, "Unauthorized");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const actor = await getActor(supabase, token);
 
     const body = await req.json();
     const action: Action = body.action;
 
-    if (!action) throw new Error("Missing action");
+    if (!action) {
+      throw new HttpError(400, "Missing action");
+    }
 
     if (action === "log_action") {
       await logAdminAction(
         supabase,
         actor.id,
-        actor.role,
+        actor.primaryRole,
         body.event || "custom",
         body.entity_type || "custom",
         body.entity_id || null,
         body.details || null,
       );
-      return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    if (action === "delete_member") {
+    if (action === "suspend_member" || action === "delete_member") {
       const memberId: string | undefined = body.member_id;
-      const confirmation: string | undefined = body.confirmation;
-      if (!memberId) throw new Error("Missing member_id");
-
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("id, membership_number, full_name, email, phone, soft_deleted")
-        .eq("id", memberId)
-        .maybeSingle();
-      if (profileError || !profile) throw new Error("Member not found");
-      if (!confirmation || confirmation !== `DELETE ${profile.membership_number ?? profile.id}`) {
-        throw new Error("Confirmation text mismatch");
+      if (!memberId) {
+        throw new HttpError(400, "Missing member_id");
       }
 
-      // Soft-delete profile
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          soft_deleted: true,
-          deleted_at: new Date().toISOString(),
-          deleted_by: actor.id,
-          status: "suspended",
-        })
-        .eq("id", memberId);
-      if (updateError) throw new Error(updateError.message);
+      const mode = parseLifecycleMode(body.mode);
+      if (mode === "permanent") {
+        const profile = await permanentlyDeleteMember(
+          supabase,
+          actor,
+          memberId,
+          body.confirmation,
+          Boolean(body.force),
+        );
 
-      // Disable auth user (best-effort)
-      await supabase.auth.admin.deleteUser(memberId);
+        await logAdminAction(supabase, actor.id, actor.primaryRole, "member_permanently_deleted", "member", memberId, {
+          full_name: profile.full_name,
+          membership_number: profile.membership_number,
+          email: profile.email,
+          phone: profile.phone,
+          force: Boolean(body.force),
+        });
 
-      await logAdminAction(supabase, actor.id, actor.role, "member_deleted", "member", memberId, {
-        membership_number: profile.membership_number,
-        full_name: profile.full_name,
-        email: profile.email,
-        phone: profile.phone,
+        return new Response(JSON.stringify({ ok: true, deleted: memberId, mode }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await suspendMemberProfile(supabase, memberId, actor.id, { purgeSensitive: false });
+
+      await notifyMember(
+        supabase,
+        memberId,
+        "Membership Suspended",
+        body.reason || "Your account has been suspended by the admin office. Contact officials for review.",
+        "membership_suspended",
+      );
+
+      await logAdminAction(supabase, actor.id, actor.primaryRole, "member_suspended", "member", memberId, {
+        reason: body.reason ?? null,
       });
 
-      return new Response(JSON.stringify({ ok: true, deleted: memberId }), { headers: corsHeaders });
+      return new Response(JSON.stringify({ ok: true, member_id: memberId, mode }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "reject_member") {
+      const memberId: string | undefined = body.member_id;
+      if (!memberId) {
+        throw new HttpError(400, "Missing member_id");
+      }
+
+      const reason = typeof body.reason === "string" && body.reason.trim().length > 0
+        ? body.reason.trim()
+        : "Your membership application was not approved.";
+
+      await suspendMemberProfile(supabase, memberId, actor.id, { purgeSensitive: true });
+
+      await notifyMember(
+        supabase,
+        memberId,
+        "Membership Application Rejected",
+        `${reason} Your assigned member number and profile details have been removed.`,
+        "membership_rejected",
+      );
+
+      if (Boolean(body.delete_account)) {
+        await permanentlyDeleteMember(supabase, actor, memberId, body.confirmation, Boolean(body.force));
+      }
+
+      await logAdminAction(supabase, actor.id, actor.primaryRole, "member_rejected", "member", memberId, {
+        reason,
+        delete_account: Boolean(body.delete_account),
+        force: Boolean(body.force),
+      });
+
+      return new Response(JSON.stringify({ ok: true, member_id: memberId, rejected: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (action === "approve_user") {
       const targetUserId: string | undefined = body.user_id;
-      if (!targetUserId) throw new Error("Missing user_id");
-      // Example: set profile status to active
-      await supabase.from("profiles").update({ status: "active" }).eq("id", targetUserId);
-      await logAdminAction(supabase, actor.id, actor.role, "user_approved", "user", targetUserId, null);
-      return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+      if (!targetUserId) {
+        throw new HttpError(400, "Missing user_id");
+      }
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          status: "active",
+          soft_deleted: false,
+          deleted_at: null,
+          deleted_by: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetUserId);
+
+      if (error) {
+        throw new HttpError(500, "Failed to approve user", { detail: error.message });
+      }
+
+      await notifyMember(
+        supabase,
+        targetUserId,
+        "Membership Approved",
+        "Your membership has been approved. You now have full access.",
+        "approval",
+      );
+
+      await logAdminAction(supabase, actor.id, actor.primaryRole, "user_approved", "user", targetUserId, null);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (action === "approve_payment") {
       const paymentId: string | undefined = body.payment_id;
-      if (!paymentId) throw new Error("Missing payment_id");
-      // Placeholder: mark payment as approved if such table exists
-      await logAdminAction(supabase, actor.id, actor.role, "payment_approved", "payment", paymentId, null);
-      return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
+      if (!paymentId) {
+        throw new HttpError(400, "Missing payment_id");
+      }
+
+      await logAdminAction(supabase, actor.id, actor.primaryRole, "payment_approved", "payment", paymentId, null);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw new HttpError(400, `Unknown action: ${action}`);
   } catch (error: unknown) {
+    const status = error instanceof HttpError ? error.status : 400;
     const message = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 400,
+    const details = error instanceof HttpError ? error.details : null;
+
+    return new Response(JSON.stringify({ error: message, details }), {
+      status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

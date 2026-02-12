@@ -68,6 +68,7 @@ const MembersPage = () => {
   const [deleteDialog, setDeleteDialog] = useState<{
     step: 'idle' | 'prompt' | 'confirm';
     member?: Member;
+    mode?: 'suspend' | 'permanent';
     confirmText?: string;
     isDeleting?: boolean;
   }>({ step: 'idle' });
@@ -97,6 +98,7 @@ const MembersPage = () => {
   const { user, hasRole, isOfficial } = useAuth();
   const canDelete =
     hasRole('admin') || hasRole('chairperson') || hasRole('vice_chairman') || hasRole('organizing_secretary');
+  const canPermanentDelete = hasRole('admin');
   const canManageMembers = isOfficial(); // all officials (including admin) can add/manage
   const officialCanAssist = isOfficial();
 
@@ -185,16 +187,17 @@ const MembersPage = () => {
 
   const openDeleteFlow = (member: Member) => {
     if (!canDelete) return;
-    setDeleteDialog({ step: 'prompt', member, confirmText: '', isDeleting: false });
+    setDeleteDialog({ step: 'prompt', member, mode: undefined, confirmText: '', isDeleting: false });
   };
 
   const requiredPhrase = (member?: Member) => {
     if (!member) return '';
-    return `DELETE ${member.membership_number ?? member.id.slice(0, 8).toUpperCase()}`;
+    return `DELETE ${(member.membership_number ?? member.id).toUpperCase()}`;
   };
 
   const performDelete = async () => {
     const member = deleteDialog.member;
+    const mode = deleteDialog.mode ?? 'suspend';
     if (!member || !canDelete) return;
     setDeleteDialog((prev) => ({ ...prev, isDeleting: true }));
 
@@ -211,35 +214,48 @@ const MembersPage = () => {
     try {
       await retryAsync(
         async () => {
-          const { error } = await supabase
-            .from('profiles')
-            .update({
-              soft_deleted: true,
-              deleted_at: new Date().toISOString(),
-              deleted_by: user?.id ?? null,
-              status: 'suspended',
-            })
-            .eq('id', member.id);
+          const { data, error } = await supabase.functions.invoke('admin-ops', {
+            body: {
+              action: 'delete_member',
+              member_id: member.id,
+              mode,
+              confirmation: deleteDialog.confirmText?.trim(),
+              reason: mode === 'suspend' ? 'Suspended by official from members dashboard' : undefined,
+            },
+          });
 
           if (error) throw error;
+          if (data?.error) throw new Error(data.error);
           return true;
         },
         { maxRetries: 2, delayMs: 600 }
       );
 
-      setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      if (mode === 'permanent') {
+        setMembers((prev) => prev.filter((m) => m.id !== member.id));
+      } else {
+        setMembers((prev) =>
+          prev.map((m) => (m.id === member.id ? { ...m, status: 'suspended' } : m))
+        );
+      }
 
       logAuditAction({
-        actionType: 'DELETE_MEMBER',
-        description: `Deleted member ${member.full_name} (${member.membership_number ?? member.id})`,
+        actionType: mode === 'permanent' ? 'DELETE_MEMBER' : 'SUSPEND_MEMBER',
+        description:
+          mode === 'permanent'
+            ? `Permanently deleted member ${member.full_name} (${member.membership_number ?? member.id})`
+            : `Suspended member ${member.full_name} (${member.membership_number ?? member.id})`,
         entityType: 'profile',
         entityId: member.id,
-        metadata: { snapshot, actor_id: user?.id },
+        metadata: { snapshot, actor_id: user?.id, mode },
       });
 
       toast({
-        title: 'Member deleted',
-        description: `${member.full_name}'s account was removed (soft delete).`,
+        title: mode === 'permanent' ? 'Member permanently deleted' : 'Member suspended',
+        description:
+          mode === 'permanent'
+            ? `${member.full_name}'s account and data were removed.`
+            : `${member.full_name}'s account is now suspended.`,
       });
     } catch (err) {
       const errorMsg = getErrorMessage(err);
@@ -250,7 +266,7 @@ const MembersPage = () => {
         variant: 'destructive',
       });
     } finally {
-      setDeleteDialog({ step: 'idle', member: undefined, confirmText: '', isDeleting: false });
+      setDeleteDialog({ step: 'idle', member: undefined, mode: undefined, confirmText: '', isDeleting: false });
     }
   };
 
@@ -749,16 +765,31 @@ const MembersPage = () => {
           <DialogHeader>
             <DialogTitle>Delete Member</DialogTitle>
             <DialogDescription>
-              Do you really want to delete {deleteDialog.member?.full_name}? This action is sensitive.
+              Choose how to handle {deleteDialog.member?.full_name}. Suspension is reversible, permanent deletion is not.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDeleteDialog({ step: 'idle' })}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => setDeleteDialog((prev) => ({ ...prev, step: 'confirm', confirmText: '' }))}>
-              Yes, continue
+            <Button
+              variant="secondary"
+              onClick={() =>
+                setDeleteDialog((prev) => ({ ...prev, step: 'confirm', mode: 'suspend', confirmText: '' }))
+              }
+            >
+              Suspend Member
             </Button>
+            {canPermanentDelete && (
+              <Button
+                variant="destructive"
+                onClick={() =>
+                  setDeleteDialog((prev) => ({ ...prev, step: 'confirm', mode: 'permanent', confirmText: '' }))
+                }
+              >
+                Permanently Delete
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -767,9 +798,13 @@ const MembersPage = () => {
       <Dialog open={deleteDialog.step === 'confirm'} onOpenChange={(open) => !open && setDeleteDialog({ step: 'idle' })}>
         <DialogContent className="space-y-4">
           <DialogHeader>
-            <DialogTitle className="text-destructive">Final Confirmation</DialogTitle>
+            <DialogTitle className={deleteDialog.mode === 'permanent' ? 'text-destructive' : ''}>
+              {deleteDialog.mode === 'permanent' ? 'Permanent Deletion Confirmation' : 'Suspension Confirmation'}
+            </DialogTitle>
             <DialogDescription>
-              This will remove all records for this member (soft delete). Their membership number and history will be removed from active systems.
+              {deleteDialog.mode === 'permanent'
+                ? 'This will permanently remove the member account and linked records.'
+                : 'This will suspend the member account while preserving records for possible reinstatement.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -779,13 +814,15 @@ const MembersPage = () => {
               <Badge variant="outline">{deleteDialog.member?.membership_number || 'No Membership #'}</Badge>
             </div>
             <p className="text-muted-foreground">
-              Email: {deleteDialog.member?.email || 'N/A'} · Phone: {deleteDialog.member?.phone}
+              Email: {deleteDialog.member?.email || 'N/A'} | Phone: {deleteDialog.member?.phone}
             </p>
             <p className="text-muted-foreground">
               Current status: <strong className="text-foreground">{deleteDialog.member?.status}</strong>
             </p>
             <p className="text-[13px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2">
-              This is irreversible. All user details and operations history tied to this membership will be removed from active views.
+              {deleteDialog.mode === 'permanent'
+                ? 'This is irreversible and deletes profile/account data from Supabase.'
+                : 'Suspension is safer. You can reactivate this member later if needed.'}
             </p>
           </div>
 
@@ -805,7 +842,7 @@ const MembersPage = () => {
               Cancel
             </Button>
             <Button
-              variant="destructive"
+              variant={deleteDialog.mode === 'permanent' ? 'destructive' : 'secondary'}
               disabled={
                 deleteDialog.isDeleting ||
                 deleteDialog.confirmText?.trim() !== requiredPhrase(deleteDialog.member)
@@ -813,7 +850,7 @@ const MembersPage = () => {
               onClick={performDelete}
             >
               {deleteDialog.isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Permanently Delete
+              {deleteDialog.mode === 'permanent' ? 'Permanently Delete' : 'Confirm Suspension'}
             </Button>
           </DialogFooter>
         </DialogContent>
