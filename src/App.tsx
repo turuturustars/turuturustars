@@ -10,6 +10,7 @@ import { LocalOrganizationSchema } from "@/components/StructuredData";
 import { Logger } from "@/utils/errorHandler";
 import { ProtectedRoute, PublicRoute } from "@/components/auth/ProtectedRoute";
 import { AuthProvider } from "@/features/auth/AuthProvider";
+import PWAInstallPrompt from "@/components/pwa/PWAInstallPrompt";
 
 // Loading component for suspense fallback
 const PageLoader = () => (
@@ -113,6 +114,7 @@ const App = () => {
           <LocalOrganizationSchema />
           <Toaster />
           <Sonner />
+          <PWAInstallPrompt />
           <AuthProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Suspense fallback={<PageLoader />}>

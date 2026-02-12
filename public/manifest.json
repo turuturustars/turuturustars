@@ -1,76 +1,75 @@
 {
-  "name": "Turuturu Stars CBO - Community Organization Kenya",
+  "id": "/",
+  "name": "Turuturu Stars CBO",
   "short_name": "Turuturu Stars",
-  "description": "Turuturu Stars CBO: Community empowerment, welfare, contributions, and community development in Muranga County Kenya",
-  "start_url": "/",
+  "description": "Turuturu Stars CBO community platform for members, welfare, contributions, announcements, and mobile payments.",
+  "start_url": "/?source=pwa",
   "scope": "/",
+  "lang": "en",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
-  "theme_color": "#3b82f6",
+  "theme_color": "#0d4bb5",
   "background_color": "#ffffff",
+  "categories": ["community", "finance", "productivity"],
   "icons": [
     {
-      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
-      "sizes": "64x64",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     },
     {
-      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
-      "sizes": "256x256",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "https://turuturustars.co.ke/assets/img/turuturustarslogo-Di8HrtsU.png",
+      "src": "/pwa-maskable-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
     }
   ],
   "screenshots": [
     {
-      "src": "https://scontent-mba2-1.xx.fbcdn.net/v/t39.30808-6/612499098_122099308893201166_2637006158142019891_n.jpg",
-      "sizes": "540x720",
+      "src": "/pwa-screenshot-narrow.jpg",
+      "sizes": "720x1280",
       "type": "image/jpeg",
-      "form_factor": "narrow"
+      "form_factor": "narrow",
+      "label": "Member dashboard on mobile"
     },
     {
-      "src": "https://turuturustars.co.ke/assets/img/turuturustars_community_during_prize_giving_day-CA9maojf.jpg",
+      "src": "/pwa-screenshot-wide.jpg",
       "sizes": "1280x720",
       "type": "image/jpeg",
-      "form_factor": "wide"
+      "form_factor": "wide",
+      "label": "Turuturu Stars web app desktop view"
     }
   ],
-  "categories": ["productivity", "business", "lifestyle"],
   "shortcuts": [
     {
       "name": "Dashboard",
       "short_name": "Dashboard",
-      "description": "Access your member dashboard",
-      "url": "/dashboard",
+      "description": "Open your dashboard quickly",
+      "url": "/dashboard/home",
       "icons": [
         {
-          "src": "https://img.icons8.com/nolan/128/star.png",
-          "sizes": "128x128"
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     },
     {
       "name": "Contributions",
       "short_name": "Contributions",
-      "description": "View and manage contributions",
-      "url": "/dashboard/contributions",
+      "description": "Open contributions and payments",
+      "url": "/dashboard/finance/contributions",
       "icons": [
         {
-          "src": "https://img.icons8.com/nolan/128/star.png",
-          "sizes": "128x128"
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
         }
       ]
     }
