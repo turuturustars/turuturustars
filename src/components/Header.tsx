@@ -129,12 +129,11 @@ const Header = () => {
         >
           {/* Brand */}
           <a href="/" className="flex items-center gap-3 sm:gap-4 px-4 py-3 min-w-0">
-            <div className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/70 bg-white shadow-soft overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 via-cyan-400/10 to-transparent" />
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden">
               <img
                 src={logo}
                 alt="Turuturu Stars"
-                className="relative h-8 w-8 object-contain drop-shadow-sm"
+                className="h-11 w-11 object-contain"
               />
             </div>
             <div className="min-w-0 leading-tight">

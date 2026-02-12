@@ -73,7 +73,7 @@ const Footer = () => {
 
                 alt="Turuturu Stars Logo"
 
-                className="w-12 h-12 object-contain hover:scale-110 transition-all duration-300"
+                className="h-12 w-12 object-contain"
 
                 loading="lazy"
 
