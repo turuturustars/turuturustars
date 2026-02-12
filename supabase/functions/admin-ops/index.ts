@@ -74,6 +74,8 @@ const OFFICIAL_ROLES = [
   "committee_member",
 ] as const;
 
+const IGNORED_CLEANUP_ERROR_CODES = new Set(["42P01", "42703", "PGRST204", "PGRST205"]);
+
 function hasAnyRole(userRoles: string[], requiredRoles: readonly string[]): boolean {
   return userRoles.some((role) => requiredRoles.includes(role));
 }
@@ -233,6 +235,93 @@ async function suspendMemberProfile(
   }
 }
 
+function isIgnorableCleanupError(error: unknown): boolean {
+  const maybeError = error as { code?: string | null; message?: string | null } | null;
+  const code = maybeError?.code ?? "";
+  const message = `${maybeError?.message ?? ""}`.toLowerCase();
+
+  if (code && IGNORED_CLEANUP_ERROR_CODES.has(code)) {
+    return true;
+  }
+
+  return (
+    message.includes("does not exist") ||
+    message.includes("could not find the table") ||
+    message.includes("schema cache")
+  );
+}
+
+async function runCleanupStep(
+  step: string,
+  operation: () => Promise<{ error: { code?: string | null; message?: string | null } | null }>,
+): Promise<void> {
+  const { error } = await operation();
+  if (!error || isIgnorableCleanupError(error)) {
+    return;
+  }
+
+  throw new HttpError(500, "Failed to cleanup member data for hard delete", {
+    step,
+    code: error.code ?? null,
+    detail: error.message ?? null,
+  });
+}
+
+async function cleanupMemberReferences(
+  supabase: ReturnType<typeof createClient>,
+  memberId: string,
+): Promise<void> {
+  // Purge direct member-owned records first.
+  await runCleanupStep("approvals:approver", () =>
+    supabase.from("approvals").delete().eq("approver", memberId));
+  await runCleanupStep("payments:member_id", () =>
+    supabase.from("payments").delete().eq("member_id", memberId));
+  await runCleanupStep("till_submissions:member_id", () =>
+    supabase.from("till_submissions").delete().eq("member_id", memberId));
+  await runCleanupStep("pesapal_transactions:member_id", () =>
+    supabase.from("pesapal_transactions").delete().eq("member_id", memberId));
+  await runCleanupStep("mpesa_transactions:member_id", () =>
+    supabase.from("mpesa_transactions").delete().eq("member_id", memberId));
+  await runCleanupStep("mpesa_standing_orders:member_id", () =>
+    supabase.from("mpesa_standing_orders").delete().eq("member_id", memberId));
+  await runCleanupStep("welfare_transactions:recorded_by_id", () =>
+    supabase.from("welfare_transactions").delete().eq("recorded_by_id", memberId));
+  await runCleanupStep("discipline_records:member_id", () =>
+    supabase.from("discipline_records").delete().eq("member_id", memberId));
+  await runCleanupStep("meeting_attendance:member_id", () =>
+    supabase.from("meeting_attendance").delete().eq("member_id", memberId));
+  await runCleanupStep("membership_fee_contributions:member_id", () =>
+    supabase.from("membership_fee_contributions").delete().eq("member_id", memberId));
+  await runCleanupStep("notification_preferences:user_id", () =>
+    supabase.from("notification_preferences").delete().eq("user_id", memberId));
+  await runCleanupStep("notifications:user_id", () =>
+    supabase.from("notifications").delete().eq("user_id", memberId));
+  await runCleanupStep("contributions:member_id", () =>
+    supabase.from("contributions").delete().eq("member_id", memberId));
+  await runCleanupStep("contribution_tracking:member_id", () =>
+    supabase.from("contribution_tracking").delete().eq("member_id", memberId));
+
+  // Null-out optional foreign keys that may still point to this user.
+  await runCleanupStep("user_roles:assigned_by", () =>
+    supabase.from("user_roles").update({ assigned_by: null }).eq("assigned_by", memberId));
+  await runCleanupStep("welfare_cases:created_by", () =>
+    supabase.from("welfare_cases").update({ created_by: null }).eq("created_by", memberId));
+  await runCleanupStep("welfare_cases:beneficiary_id", () =>
+    supabase.from("welfare_cases").update({ beneficiary_id: null }).eq("beneficiary_id", memberId));
+  await runCleanupStep("announcements:created_by", () =>
+    supabase.from("announcements").update({ created_by: null }).eq("created_by", memberId));
+  await runCleanupStep("admin_audit_log:actor_id", () =>
+    supabase.from("admin_audit_log").update({ actor_id: null }).eq("actor_id", memberId));
+  await runCleanupStep("profiles:deleted_by", () =>
+    supabase.from("profiles").update({ deleted_by: null }).eq("deleted_by", memberId));
+  await runCleanupStep("pesapal_transactions:initiated_by", () =>
+    supabase.from("pesapal_transactions").update({ initiated_by: null }).eq("initiated_by", memberId));
+
+  // Remove role assignments owned by this member before deleting auth user.
+  await runCleanupStep("user_roles:user_id", () =>
+    supabase.from("user_roles").delete().eq("user_id", memberId));
+}
+
 async function permanentlyDeleteMember(
   supabase: ReturnType<typeof createClient>,
   actor: Actor,
@@ -268,11 +357,7 @@ async function permanentlyDeleteMember(
     );
   }
 
-  // Best-effort FK cleanup for nullable references.
-  await supabase.from("user_roles").update({ assigned_by: null }).eq("assigned_by", memberId);
-  await supabase.from("welfare_cases").update({ created_by: null }).eq("created_by", memberId);
-  await supabase.from("announcements").update({ created_by: null }).eq("created_by", memberId);
-  await supabase.from("admin_audit_log").update({ actor_id: null }).eq("actor_id", memberId);
+  await cleanupMemberReferences(supabase, memberId);
 
   const { error: deleteError } = await (supabase.auth.admin as any).deleteUser(memberId, false);
   if (deleteError) {
@@ -281,11 +366,27 @@ async function permanentlyDeleteMember(
     });
   }
 
+  // Defensive cleanup in case auth deletion cannot cascade into profiles.
+  await runCleanupStep("profiles:id", () =>
+    supabase.from("profiles").delete().eq("id", memberId));
+
   return profile;
 }
 
-function parseLifecycleMode(value: unknown): MemberLifecycleMode {
-  return value === "permanent" ? "permanent" : "suspend";
+function parseLifecycleMode(action: Action, value: unknown): MemberLifecycleMode {
+  if (action === "suspend_member") {
+    return "suspend";
+  }
+
+  if (value === "permanent") {
+    return "permanent";
+  }
+
+  if (action === "delete_member") {
+    return "permanent";
+  }
+
+  return "suspend";
 }
 
 serve(async (req) => {
@@ -336,7 +437,7 @@ serve(async (req) => {
         throw new HttpError(400, "Missing member_id");
       }
 
-      const mode = parseLifecycleMode(body.mode);
+      const mode = parseLifecycleMode(action, body.mode);
       if (mode === "permanent") {
         const profile = await permanentlyDeleteMember(
           supabase,
