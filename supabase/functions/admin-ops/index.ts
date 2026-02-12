@@ -131,11 +131,15 @@ async function getActor(
   const userId = authData.user.id;
   const { data: roles, error: roleError } = await supabase
     .from("user_roles")
-    .select("role, user_name, user_email")
+    .select("role")
     .eq("user_id", userId);
 
-  if (roleError || !roles?.length) {
-    throw new HttpError(401, "Unauthorized");
+  if (roleError) {
+    throw new HttpError(500, "Failed to resolve roles", { detail: roleError.message });
+  }
+
+  if (!roles?.length) {
+    throw new HttpError(403, "No roles assigned");
   }
 
   const roleList = roles.map((row) => row.role as string);
@@ -145,8 +149,8 @@ async function getActor(
     id: userId,
     roles: roleList,
     primaryRole: roleList[0] ?? "member",
-    name: roles[0]?.user_name ?? undefined,
-    email: roles[0]?.user_email ?? undefined,
+    name: (authData.user.user_metadata?.full_name as string | undefined) ?? undefined,
+    email: authData.user.email ?? undefined,
   };
 }
 
