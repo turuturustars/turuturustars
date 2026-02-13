@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { User } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 export type UserRoleRow = Database['public']['Tables']['user_roles']['Row'];
@@ -20,6 +21,7 @@ export interface SignUpPayload {
   password: string;
   fullName?: string;
   phone?: string;
+  phoneVerificationToken?: string;
   idNumber?: string;
   location?: string;
   occupation?: string;
@@ -66,6 +68,11 @@ export const isProfileComplete = (profile?: Partial<ProfileRow> | null) => {
 
 export async function signUpWithEmail(payload: SignUpPayload) {
   const { email, password, captchaToken } = payload;
+  const normalizedPhone = payload.phone ? normalizeKenyanPhone(payload.phone) : null;
+
+  if (payload.phone && !normalizedPhone) {
+    throw toAuthRequestError({ message: formatKenyanPhoneError(), status: 400, code: 'invalid_phone' });
+  }
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -75,7 +82,8 @@ export async function signUpWithEmail(payload: SignUpPayload) {
       captchaToken,
       data: {
         full_name: payload.fullName,
-        phone: payload.phone,
+        phone: normalizedPhone ?? undefined,
+        phone_verification_token: payload.phoneVerificationToken,
         id_number: payload.idNumber,
         location: payload.location,
         occupation: payload.occupation,
@@ -107,6 +115,106 @@ export async function signInWithEmail(payload: SignInPayload) {
 
   if (error) throw toAuthRequestError(error);
   return { user: data.user, session: data.session };
+}
+
+type SmsVerificationSendResponse = {
+  success: true;
+  message: string;
+  phone: string;
+  maskedPhone: string;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+};
+
+type SmsVerificationConfirmResponse = {
+  success: true;
+  message: string;
+  phone: string;
+  verificationToken: string;
+  expiresInSeconds: number;
+};
+
+async function extractFunctionError(error: unknown): Promise<string> {
+  if (error && typeof error === 'object') {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      try {
+        const payload = (await context.clone().json()) as { error?: string; details?: { error?: string } };
+        if (typeof payload.error === 'string' && payload.error.trim()) {
+          return payload.error;
+        }
+        if (payload.details && typeof payload.details.error === 'string' && payload.details.error.trim()) {
+          return payload.details.error;
+        }
+      } catch {
+        // Fall back to generic message extraction.
+      }
+    }
+
+    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
+      return (error as { message: string }).message;
+    }
+  }
+
+  return 'Request failed';
+}
+
+export async function sendSignupSmsCode(phone: string): Promise<SmsVerificationSendResponse> {
+  const normalizedPhone = normalizeKenyanPhone(phone);
+  if (!normalizedPhone) {
+    throw new Error(formatKenyanPhoneError());
+  }
+
+  const { data, error } = await supabase.functions.invoke('sms-verify', {
+    body: {
+      action: 'send',
+      purpose: 'signup',
+      phone: normalizedPhone,
+    },
+  });
+
+  if (error) {
+    throw new Error(await extractFunctionError(error));
+  }
+
+  const payload = data as Partial<SmsVerificationSendResponse> & { error?: string };
+  if (payload.success !== true) {
+    throw new Error(payload.error || 'Failed to send SMS code');
+  }
+
+  return payload as SmsVerificationSendResponse;
+}
+
+export async function verifySignupSmsCode(phone: string, code: string): Promise<SmsVerificationConfirmResponse> {
+  const normalizedPhone = normalizeKenyanPhone(phone);
+  if (!normalizedPhone) {
+    throw new Error(formatKenyanPhoneError());
+  }
+
+  const cleanCode = code.replace(/\D/g, '');
+  if (cleanCode.length !== 6) {
+    throw new Error('Enter the 6-digit verification code.');
+  }
+
+  const { data, error } = await supabase.functions.invoke('sms-verify', {
+    body: {
+      action: 'verify',
+      purpose: 'signup',
+      phone: normalizedPhone,
+      code: cleanCode,
+    },
+  });
+
+  if (error) {
+    throw new Error(await extractFunctionError(error));
+  }
+
+  const payload = data as Partial<SmsVerificationConfirmResponse> & { error?: string };
+  if (payload.success !== true) {
+    throw new Error(payload.error || 'Failed to verify SMS code');
+  }
+
+  return payload as SmsVerificationConfirmResponse;
 }
 
 export async function resendVerificationEmail(email: string) {
@@ -193,10 +301,11 @@ export async function ensureProfileForUser(user: User) {
   const membershipNumber = await generateMembershipNumber();
   const meta = (user.user_metadata || {}) as Record<string, unknown>;
 
+  const normalizedMetaPhone = typeof meta.phone === 'string' ? normalizeKenyanPhone(meta.phone) : null;
   const payload: Partial<ProfileRow> = {
     id: user.id,
     full_name: (meta.full_name as string) || (meta.name as string) || user.email || 'Member',
-    phone: (meta.phone as string) || null,
+    phone: normalizedMetaPhone || '',
     email: user.email,
     id_number: (meta.id_number as string) || null,
     location: (meta.location as string) || null,
@@ -212,6 +321,15 @@ export async function ensureProfileForUser(user: User) {
 
 export async function updateProfile(userId: string, updates: Partial<ProfileRow>) {
   const payload = { ...updates, updated_at: new Date().toISOString() };
+
+  if (typeof updates.phone === 'string') {
+    const normalizedPhone = normalizeKenyanPhone(updates.phone);
+    if (!normalizedPhone) {
+      throw toAuthRequestError({ message: formatKenyanPhoneError(), status: 400, code: 'invalid_phone' });
+    }
+    payload.phone = normalizedPhone;
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .upsert({ id: userId, ...payload }, { onConflict: 'id' })

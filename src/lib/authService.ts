@@ -6,6 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getEmailConfig } from '@/config/emailConfig';
 import { buildSiteUrl } from '@/utils/siteUrl';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 export interface AuthUser {
   id: string;
@@ -19,6 +20,7 @@ export interface SignUpData {
   password: string;
   fullName?: string;
   phone?: string;
+  phoneVerificationToken?: string;
   location?: string;
   idNumber?: string;
   occupation?: string;
@@ -98,6 +100,10 @@ export async function registerWithEmail(data: SignUpData) {
   if (!data.password || data.password.length < 8) {
     throw new Error('Password must be at least 8 characters');
   }
+  const normalizedPhone = data.phone ? normalizeKenyanPhone(data.phone) : null;
+  if (data.phone && !normalizedPhone) {
+    throw new Error(formatKenyanPhoneError());
+  }
 
   const { data: response, error } = await supabase.auth.signUp({
     email: data.email,
@@ -106,7 +112,8 @@ export async function registerWithEmail(data: SignUpData) {
       emailRedirectTo: redirectUrl,
       data: {
         full_name: data.fullName,
-        phone: data.phone,
+        phone: normalizedPhone ?? undefined,
+        phone_verification_token: data.phoneVerificationToken,
         id_number: data.idNumber,
         location: data.location,
         occupation: data.occupation,

@@ -9,9 +9,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Home, Loader2, Mail, Lock, ShieldCheck, KeyRound, PhoneCall } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { requestPasswordResetByIdentifier, signInWithEmail, signUpWithEmail } from '../authApi';
+import {
+  requestPasswordResetByIdentifier,
+  sendSignupSmsCode,
+  signInWithEmail,
+  signUpWithEmail,
+  verifySignupSmsCode,
+} from '../authApi';
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 type Mode = 'signin' | 'signup';
 
@@ -57,9 +64,50 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
   });
+  const [signupSmsCode, setSignupSmsCode] = useState('');
+  const [isSendingSignupCode, setIsSendingSignupCode] = useState(false);
+  const [isVerifyingSignupCode, setIsVerifyingSignupCode] = useState(false);
+  const [signupCodeCooldownSeconds, setSignupCodeCooldownSeconds] = useState(0);
+  const [signupVerificationToken, setSignupVerificationToken] = useState<string | null>(null);
+  const [signupVerifiedPhone, setSignupVerifiedPhone] = useState<string | null>(null);
+  const [signupSmsFeedback, setSignupSmsFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+
+  const normalizedSignupPhone = useMemo(
+    () => normalizeKenyanPhone(signupForm.phone),
+    [signupForm.phone]
+  );
+
+  const isSignupPhoneVerified = useMemo(
+    () => Boolean(signupVerificationToken && signupVerifiedPhone && normalizedSignupPhone === signupVerifiedPhone),
+    [normalizedSignupPhone, signupVerificationToken, signupVerifiedPhone]
+  );
+
+  useEffect(() => {
+    if (signupCodeCooldownSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setSignupCodeCooldownSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [signupCodeCooldownSeconds]);
+
+  const handleSignupPhoneChange = useCallback((value: string) => {
+    setSignupForm((prev) => ({ ...prev, phone: value }));
+
+    const normalized = normalizeKenyanPhone(value);
+    if (!normalized || normalized !== signupVerifiedPhone) {
+      setSignupVerificationToken(null);
+      setSignupVerifiedPhone(null);
+    }
+  }, [signupVerifiedPhone]);
 
   useEffect(() => {
     if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
@@ -180,6 +228,92 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     if (recoveryFeedback?.type === 'success') return 'Send another reset link';
     return 'Check account and send reset link';
   }, [isRecoverySubmitting, recoveryFeedback?.type]);
+
+  const handleSendSignupCode = async () => {
+    if (!normalizedSignupPhone) {
+      toast({
+        title: 'Invalid phone number',
+        description: formatKenyanPhoneError(),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSendingSignupCode(true);
+    try {
+      const response = await sendSignupSmsCode(normalizedSignupPhone);
+      setSignupCodeCooldownSeconds(Math.max(0, response.resendAfterSeconds ?? 0));
+      setSignupVerificationToken(null);
+      setSignupVerifiedPhone(null);
+      setSignupSmsCode('');
+      setSignupSmsFeedback({
+        type: 'success',
+        message: `Code sent to ${response.maskedPhone}. It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes.`,
+      });
+      toast({
+        title: 'Code sent',
+        description: `Verification code sent to ${response.maskedPhone}.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to send SMS code';
+      setSignupSmsFeedback({ type: 'error', message });
+      toast({
+        title: 'SMS send failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSendingSignupCode(false);
+    }
+  };
+
+  const handleVerifySignupCode = async () => {
+    if (!normalizedSignupPhone) {
+      toast({
+        title: 'Invalid phone number',
+        description: formatKenyanPhoneError(),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const cleanCode = signupSmsCode.replace(/\D/g, '');
+    if (cleanCode.length !== 6) {
+      toast({
+        title: 'Invalid code',
+        description: 'Enter the 6-digit verification code sent to your phone.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsVerifyingSignupCode(true);
+    try {
+      const response = await verifySignupSmsCode(normalizedSignupPhone, cleanCode);
+      setSignupVerificationToken(response.verificationToken);
+      setSignupVerifiedPhone(response.phone);
+      setSignupSmsFeedback({
+        type: 'success',
+        message: 'Phone verified successfully. You can now create your account.',
+      });
+      toast({
+        title: 'Phone verified',
+        description: 'Your phone number is verified and ready for account creation.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to verify code';
+      setSignupVerificationToken(null);
+      setSignupVerifiedPhone(null);
+      setSignupSmsFeedback({ type: 'error', message });
+      toast({
+        title: 'Verification failed',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifyingSignupCode(false);
+    }
+  };
 
   const handlePasswordRecovery = async () => {
     if (!recoveryIdentifier.trim()) {
@@ -342,6 +476,24 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
+    if (!signupForm.phone.trim() || !normalizedSignupPhone) {
+      toast({
+        title: 'Phone required',
+        description: formatKenyanPhoneError(),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isSignupPhoneVerified || !signupVerificationToken) {
+      toast({
+        title: 'Phone verification required',
+        description: 'Send and verify your SMS code before creating your account.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (signupForm.password !== signupForm.confirmPassword) {
       toast({
         title: 'Password mismatch',
@@ -373,6 +525,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     try {
       const { requiresEmailVerification, existingUserHint } = await signUpWithEmail({
         email: signupForm.email,
+        phone: normalizedSignupPhone,
+        phoneVerificationToken: signupVerificationToken,
         password: signupForm.password,
         captchaToken: signupCaptchaToken || undefined,
       });
@@ -392,6 +546,10 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       setRequiresManualCheck((prev) => ({ ...prev, signup: false }));
       setManualCheckPassed((prev) => ({ ...prev, signup: false }));
       setSignupAcknowledged(true);
+      setSignupVerificationToken(null);
+      setSignupVerifiedPhone(null);
+      setSignupSmsCode('');
+      setSignupSmsFeedback(null);
       if (requiresEmailVerification) {
         toast({
           title: 'Verify your email',
@@ -779,6 +937,95 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                   </div>
 
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="signup-phone" className="text-sm font-medium text-foreground/80">
+                      Phone Number (SMS Verification)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="signup-phone"
+                        type="tel"
+                        required
+                        placeholder="07XXXXXXXX or +2547XXXXXXXX"
+                        className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
+                        value={signupForm.phone}
+                        onChange={(e) => handleSignupPhoneChange(e.target.value)}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => void handleSendSignupCode()}
+                        disabled={isSendingSignupCode || signupCodeCooldownSeconds > 0 || !normalizedSignupPhone}
+                      >
+                        {isSendingSignupCode ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending
+                          </>
+                        ) : signupCodeCooldownSeconds > 0 ? (
+                          `Resend in ${signupCodeCooldownSeconds}s`
+                        ) : (
+                          'Send Code'
+                        )}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Accepted formats: 07..., 01..., 2547..., 2541..., +2547..., +2541...
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="signup-sms-code" className="text-sm font-medium text-foreground/80">
+                      Verification Code
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="signup-sms-code"
+                        inputMode="numeric"
+                        placeholder="Enter 6-digit code"
+                        className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
+                        value={signupSmsCode}
+                        onChange={(e) => setSignupSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        disabled={!normalizedSignupPhone}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="shrink-0"
+                        onClick={() => void handleVerifySignupCode()}
+                        disabled={isVerifyingSignupCode || signupSmsCode.replace(/\D/g, '').length !== 6}
+                      >
+                        {isVerifyingSignupCode ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Verifying
+                          </>
+                        ) : (
+                          'Verify Code'
+                        )}
+                      </Button>
+                    </div>
+                    {signupSmsFeedback && (
+                      <div
+                        className={`rounded-lg border px-3 py-2 text-xs ${
+                          signupSmsFeedback.type === 'success'
+                            ? 'border-emerald-300/70 bg-emerald-50 text-emerald-800'
+                            : signupSmsFeedback.type === 'info'
+                              ? 'border-blue-300/70 bg-blue-50 text-blue-800'
+                              : 'border-amber-300/70 bg-amber-50 text-amber-900'
+                        }`}
+                      >
+                        {signupSmsFeedback.message}
+                      </div>
+                    )}
+                    {isSignupPhoneVerified && (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Phone verified. Account creation is unlocked.
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-password" className="text-sm font-medium text-foreground/80">
                       Password
@@ -818,7 +1065,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                   <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
                     <p className="text-sm font-medium text-foreground">Profile details come next</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      After account creation, you will complete full name, phone, national ID, location, and student-member checkbox in your profile setup.
+                      After account creation, you will complete full name, national ID, location, and student-member checkbox in your profile setup.
                     </p>
                   </div>
 
@@ -869,6 +1116,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       isSubmitting ||
                       !hasCaptchaProtection ||
                       !signupCaptchaToken ||
+                      !isSignupPhoneVerified ||
                       (requiresManualCheck.signup && !manualCheckPassed.signup)
                     }
                   >
