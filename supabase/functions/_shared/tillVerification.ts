@@ -241,7 +241,7 @@ export async function verifyTillSubmission(
     merchant_request_id: null,
     mpesa_receipt: receipt,
     status: "awaiting_approval",
-    verified_at: new Date().toISOString(),
+    verified_at: null,
   };
 
   let paymentId: string | null = null;
@@ -296,7 +296,7 @@ export async function verifyTillSubmission(
     submissionId: submission.id,
     status: "verified",
     paymentId,
-    reason: "Receipt verified and queued for treasurer approval",
+    reason: "Receipt verified and queued for governance approval",
     source: evidence.source,
   };
 }

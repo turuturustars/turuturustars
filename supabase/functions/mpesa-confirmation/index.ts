@@ -51,7 +51,7 @@ serve(async (req) => {
         merchant_request_id: null,
         mpesa_receipt: receipt,
         status: "awaiting_approval",
-        verified_at: new Date().toISOString(),
+        verified_at: null,
       });
     }
 

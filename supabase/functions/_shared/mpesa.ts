@@ -338,6 +338,35 @@ export async function validateFinanceAccess(supabase: ReturnType<typeof createSe
   }
 }
 
+export const REQUIRED_FINANCE_APPROVAL_ROLES = ["chairperson", "admin", "secretary", "patron"] as const;
+export type FinanceApprovalRole = (typeof REQUIRED_FINANCE_APPROVAL_ROLES)[number];
+
+export function resolveFinanceApprovalRole(userRoles: string[]): FinanceApprovalRole | null {
+  for (const role of REQUIRED_FINANCE_APPROVAL_ROLES) {
+    if (userRoles.includes(role)) {
+      return role;
+    }
+  }
+  return null;
+}
+
+export async function requireFinanceApprovalRole(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+): Promise<{ roles: string[]; approvalRole: FinanceApprovalRole }> {
+  const roles = await getUserRoles(supabase, userId);
+  const approvalRole = resolveFinanceApprovalRole(roles);
+  if (!approvalRole) {
+    throw new HttpError(
+      403,
+      "Only chairman, admin, secretary, or patron can approve finance workflows",
+      { roles },
+    );
+  }
+
+  return { roles, approvalRole };
+}
+
 export async function ensureMemberCanInteract(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,

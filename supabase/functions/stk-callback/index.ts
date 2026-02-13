@@ -108,8 +108,8 @@ serve(async (req) => {
           checkout_request_id: checkoutRequestId,
           merchant_request_id: merchantRequestId,
           mpesa_receipt: receipt,
-          status: resultCode === 0 ? "completed" : "failed",
-          verified_at: resultCode === 0 ? new Date().toISOString() : null,
+          status: resultCode === 0 ? "awaiting_approval" : "failed",
+          verified_at: null,
         };
 
         const { error: orphanInsertError } = await supabase.from("payments").insert(insertPayload);
@@ -121,7 +121,7 @@ serve(async (req) => {
       return acceptedResponse();
     }
 
-    if (payment.status === "completed" || payment.status === "failed") {
+    if (payment.status === "completed" || payment.status === "failed" || payment.status === "awaiting_approval") {
       return acceptedResponse();
     }
 
@@ -163,9 +163,9 @@ serve(async (req) => {
       }
 
       const updatePayload = {
-        status: "completed",
+        status: "awaiting_approval",
         mpesa_receipt: receipt,
-        verified_at: new Date().toISOString(),
+        verified_at: null,
       };
 
       const { error: updateError } = await supabase
