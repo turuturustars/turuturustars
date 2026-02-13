@@ -96,7 +96,10 @@ export function normalizeKenyanPhone(phone: string): string {
   }
 
   if (!/^254[17]\d{8}$/.test(normalized)) {
-    throw new HttpError(400, "Invalid Kenyan phone number. Use format 07XXXXXXXX or 2547XXXXXXXX.");
+    throw new HttpError(
+      400,
+      "Invalid Kenyan phone number. Use format 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, or 2541XXXXXXXX.",
+    );
   }
 
   return normalized;
