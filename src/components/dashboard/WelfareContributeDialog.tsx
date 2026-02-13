@@ -73,7 +73,7 @@ const WelfareContributeDialog = ({
     const cleaned = value.replace(/\D/g, '');
     if (cleaned.length < 10) return 'Phone number must be at least 10 digits';
     if (cleaned.length > 13) return 'Phone number is too long';
-    if (!/^(254|0)?7\d{8}$/.test(cleaned)) return 'Use a valid M-Pesa line (07XXXXXXXX)';
+    if (!/^(254|0)?[17]\d{8}$/.test(cleaned)) return 'Use a valid M-Pesa line (07XXXXXXXX or 01XXXXXXXX)';
     return null;
   };
 
@@ -245,7 +245,7 @@ const WelfareContributeDialog = ({
               <Input
                 id="welfare-phone"
                 type="text"
-                placeholder="07XXXXXXXX"
+                placeholder="07XXXXXXXX or 01XXXXXXXX"
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 onBlur={() => handleBlur('phone')}
