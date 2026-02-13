@@ -1,0 +1,28 @@
+name: SMS Reminders
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  send-sms-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sms-reminders edge function
+        env:
+          SMS_REMINDERS_URL: https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/sms-reminders
+          SMS_REMINDERS_JOB_SECRET: ${{ secrets.SMS_REMINDERS_JOB_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${SMS_REMINDERS_JOB_SECRET}" ]; then
+            echo "Missing required GitHub secret: SMS_REMINDERS_JOB_SECRET"
+            exit 1
+          fi
+
+          curl -sS --fail-with-body \
+            -X POST "${SMS_REMINDERS_URL}" \
+            -H "Content-Type: application/json" \
+            -H "x-sms-job-secret: ${SMS_REMINDERS_JOB_SECRET}" \
+            -d '{"limit": 100}'
