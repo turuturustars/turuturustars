@@ -68,8 +68,8 @@ const PayWithMpesa = ({
     const cleaned = value.replace(/\D/g, '');
     if (cleaned.length < 10) return 'Phone number must be at least 10 digits';
     if (cleaned.length > 13) return 'Phone number is too long';
-    if (!cleaned.match(/^(254|0)?7\d{8}$/)) {
-      return 'Invalid Kenyan phone number format';
+    if (!cleaned.match(/^(254|0)?[17]\d{8}$/)) {
+      return 'Invalid Kenyan phone number format. Use 07XXXXXXXX or 01XXXXXXXX';
     }
     return null;
   };
@@ -409,7 +409,7 @@ const PayWithMpesa = ({
                   <Input
                     id="phone"
                     type="text"
-                    placeholder="+254 7xx xxx xxx"
+                    placeholder="+254 7xx xxx xxx or +254 1xx xxx xxx"
                     value={showPhone ? phone : phone.replace(/\d(?=.{4})/g, '*')}
                     onChange={handlePhoneChange}
                     onBlur={() => handleBlur('phone')}
