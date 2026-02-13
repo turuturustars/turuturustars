@@ -107,16 +107,25 @@ async function sendViaSmsLeopard(destination: string, message: string): Promise<
     parsed = raw;
   }
 
+  const payloadObj = parsed as Record<string, unknown> | null;
+  const providerMessage = typeof payloadObj?.message === "string" ? payloadObj.message : null;
+
   if (!response.ok) {
-    throw new HttpError(502, "SMSLeopard send failed", {
+    if (response.status >= 400 && response.status < 500 && providerMessage) {
+      throw new HttpError(400, providerMessage, {
+        status: response.status,
+        response: parsed,
+      });
+    }
+
+    throw new HttpError(502, providerMessage || "SMSLeopard send failed", {
       status: response.status,
       response: parsed,
     });
   }
 
-  const payloadObj = parsed as Record<string, unknown> | null;
   if (payloadObj?.success === false) {
-    throw new HttpError(502, "SMSLeopard rejected SMS request", payloadObj);
+    throw new HttpError(400, providerMessage || "SMSLeopard rejected SMS request", payloadObj);
   }
 
   const providerMessageId =

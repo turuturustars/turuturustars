@@ -139,12 +139,26 @@ async function extractFunctionError(error: unknown): Promise<string> {
     const context = (error as { context?: unknown }).context;
     if (context instanceof Response) {
       try {
-        const payload = (await context.clone().json()) as { error?: string; details?: { error?: string } };
+        const payload = (await context.clone().json()) as {
+          error?: string;
+          details?: { error?: string; message?: string; response?: { message?: string } };
+        };
         if (typeof payload.error === 'string' && payload.error.trim()) {
           return payload.error;
         }
         if (payload.details && typeof payload.details.error === 'string' && payload.details.error.trim()) {
           return payload.details.error;
+        }
+        if (payload.details && typeof payload.details.message === 'string' && payload.details.message.trim()) {
+          return payload.details.message;
+        }
+        if (
+          payload.details &&
+          payload.details.response &&
+          typeof payload.details.response.message === 'string' &&
+          payload.details.response.message.trim()
+        ) {
+          return payload.details.response.message;
         }
       } catch {
         // Fall back to generic message extraction.

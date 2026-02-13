@@ -155,16 +155,25 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
     parsed = raw;
   }
 
+  const payloadObj = parsed as Record<string, unknown> | null;
+  const providerMessage = typeof payloadObj?.message === "string" ? payloadObj.message : null;
+
   if (!response.ok) {
-    throw new HttpError(502, "Failed to send verification SMS", {
+    if (response.status >= 400 && response.status < 500 && providerMessage) {
+      throw new HttpError(400, providerMessage, {
+        status: response.status,
+        response: parsed,
+      });
+    }
+
+    throw new HttpError(502, providerMessage || "Failed to send verification SMS", {
       status: response.status,
       response: parsed,
     });
   }
 
-  const payloadObj = parsed as Record<string, unknown> | null;
   if (payloadObj?.success === false) {
-    throw new HttpError(502, "SMS provider rejected verification message", payloadObj);
+    throw new HttpError(400, providerMessage || "SMS provider rejected verification message", payloadObj);
   }
 
   return parsed;
