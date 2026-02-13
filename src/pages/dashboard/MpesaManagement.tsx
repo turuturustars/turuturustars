@@ -357,7 +357,7 @@ const MpesaManagement = () => {
                 <Input
                   value={stkPhone}
                   onChange={(e) => setStkPhone(e.target.value)}
-                  placeholder="0712345678"
+                  placeholder="0712345678 or 0112345678"
                 />
               </div>
               <div>
