@@ -12,6 +12,20 @@ Deno.test("normalizeKenyanPhone handles local format", () => {
   }
 });
 
+Deno.test("normalizeKenyanPhone handles 01 local format", () => {
+  const value = normalizeKenyanPhone("0112345678");
+  if (value !== "254112345678") {
+    throw new Error(`expected 254112345678, received ${value}`);
+  }
+});
+
+Deno.test("normalizeKenyanPhone handles +2541 format", () => {
+  const value = normalizeKenyanPhone("+254112345678");
+  if (value !== "254112345678") {
+    throw new Error(`expected 254112345678, received ${value}`);
+  }
+});
+
 Deno.test("normalizeReceipt uppercases and trims", () => {
   const value = normalizeReceipt("  qwe 123  ");
   if (value !== "QWE123") {
