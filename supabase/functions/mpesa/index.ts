@@ -38,13 +38,13 @@ function normalizeKenyanPhone(rawValue: unknown): string {
 
   if (normalized.startsWith("0")) {
     normalized = `254${normalized.slice(1)}`;
-  } else if (normalized.startsWith("7")) {
+  } else if (normalized.startsWith("7") || normalized.startsWith("1")) {
     normalized = `254${normalized}`;
   }
 
-  if (!/^2547\d{8}$/.test(normalized)) {
+  if (!/^254[17]\d{8}$/.test(normalized)) {
     throw new HttpError(400, "Invalid phone number format", {
-      expected: "2547XXXXXXXX",
+      expected: "2547XXXXXXXX or 2541XXXXXXXX",
       received: raw,
     });
   }
