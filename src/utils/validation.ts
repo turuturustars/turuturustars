@@ -1,12 +1,12 @@
 /**
  * Data validation utilities
  */
+import { normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 export const ValidationRules = {
-  // Phone validation - 10+ digits
+  // Kenyan mobile phone validation
   phone: (value: string): boolean => {
-    const phoneRegex = /^\d{10,15}$/;
-    return phoneRegex.test(value.replace(/\D/g, ''));
+    return normalizeKenyanPhone(value) !== null;
   },
 
   // Email validation
@@ -67,7 +67,7 @@ export const ValidationRules = {
 export const ValidationMessages = {
   required: 'This field is required',
   email: 'Please enter a valid email address',
-  phone: 'Please enter a valid phone number (10-15 digits)',
+  phone: 'Please enter a valid Kenyan mobile number',
   idNumber: 'Please enter a valid ID number',
   amount: 'Please enter a valid amount (must be greater than 0)',
   url: 'Please enter a valid URL',

@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Phone, Briefcase, Calendar, Save, Loader2, MapPin, ShieldCheck, IdCard, GraduationCap } from 'lucide-react';
 import ProfilePhotoUpload from '@/components/dashboard/ProfilePhotoUpload';
 import { MEMBER_LOCATIONS } from '@/constants/memberLocations';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 const ProfilePage = () => {
   const { profile, roles = [] } = useAuth();
@@ -52,13 +53,18 @@ const ProfilePage = () => {
     setIsSaving(true);
 
     try {
+      const normalizedPhone = normalizeKenyanPhone(formData.phone);
+      if (!normalizedPhone) {
+        throw new Error(formatKenyanPhoneError());
+      }
+
       const finalLocation = formData.location === 'Other' ? formData.otherLocation : formData.location;
       
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: formData.full_name,
-          phone: formData.phone,
+          phone: normalizedPhone,
           id_number: formData.id_number,
           location: finalLocation || null,
           occupation: formData.occupation || null,

@@ -10,8 +10,14 @@ import { z } from 'zod';
 
 export const phoneSchema = z
   .string()
-  .regex(/^(\+254|0)[17]\d{8}$/, 'Invalid phone number format')
-  .transform((val) => val.startsWith('+254') ? val : '+254' + val.slice(1));
+  .regex(/^(?:\+?254|0)[17]\d{8}$/, 'Invalid phone number format')
+  .transform((val) => {
+    const digits = val.replace(/\D/g, '');
+    if (digits.startsWith('0')) {
+      return `+254${digits.slice(1)}`;
+    }
+    return `+${digits}`;
+  });
 
 export const emailSchema = z
   .string()

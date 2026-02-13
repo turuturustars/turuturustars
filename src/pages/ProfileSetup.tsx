@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { resendVerificationEmail, updateProfile } from '@/features/auth/authApi';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { MEMBER_LOCATIONS } from '@/constants/memberLocations';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 const ProfileSetup = () => {
   usePageMeta({
@@ -85,10 +86,15 @@ const ProfileSetup = () => {
 
     setIsSaving(true);
     try {
+      const normalizedPhone = normalizeKenyanPhone(form.phone);
+      if (!normalizedPhone) {
+        throw new Error(formatKenyanPhoneError());
+      }
+
       const finalLocation = form.location === 'Other' ? form.otherLocation.trim() : form.location;
       await updateProfile(user.id, {
         full_name: form.fullName,
-        phone: form.phone,
+        phone: normalizedPhone,
         id_number: form.idNumber,
         location: finalLocation || null,
         occupation: form.occupation || null,

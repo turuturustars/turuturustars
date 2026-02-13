@@ -12,6 +12,7 @@ import {
   resendVerificationEmail as resendVerificationEmailFromAuth,
   sendPasswordResetEmail as sendPasswordResetViaAuthService,
 } from '@/lib/authService';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 /**
  * Send verification email after user signup
@@ -52,11 +53,16 @@ export async function signupWithEmailVerification(
   message?: string;
 }> {
   try {
+    const normalizedPhone = normalizeKenyanPhone(profileData.phone);
+    if (!normalizedPhone) {
+      return { success: false, error: formatKenyanPhoneError() };
+    }
+
     const response = await registerWithEmail({
       email,
       password,
       fullName: profileData.fullName,
-      phone: profileData.phone,
+      phone: normalizedPhone,
       idNumber: profileData.idNumber,
       location: profileData.location,
       redirectTo: buildSiteUrl('/auth/confirm'),
@@ -105,6 +111,11 @@ export async function verifyEmailAndCompleteProfile(
   message?: string;
 }> {
   try {
+    const normalizedPhone = normalizeKenyanPhone(profileData.phone);
+    if (!normalizedPhone) {
+      return { success: false, error: formatKenyanPhoneError() };
+    }
+
     // Step 1: Check if email is verified
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
@@ -125,7 +136,7 @@ export async function verifyEmailAndCompleteProfile(
       .upsert({
         id: user.id,
         full_name: profileData.fullName,
-        phone: profileData.phone,
+        phone: normalizedPhone,
         id_number: profileData.idNumber,
         email: user.email,
         location: profileData.location,

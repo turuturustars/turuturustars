@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 export interface RegistrationFormData {
   fullName: string;
@@ -36,11 +37,17 @@ export const useStepRegistration = () => {
     setError(null);
 
     try {
+      const normalizedPhone = options.data.phone ? normalizeKenyanPhone(options.data.phone) : null;
+      if (options.data.phone && !normalizedPhone) {
+        setError('Invalid phone number. Use 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, 2541XXXXXXXX, +2547XXXXXXXX, or +2541XXXXXXXX.');
+        return false;
+      }
+
       const profileData = {
         id: options.userId,
         full_name: options.data.fullName || undefined,
         id_number: options.data.idNumber || undefined,
-        phone: options.data.phone || undefined,
+        phone: normalizedPhone || undefined,
         location: options.data.location === 'Other' ? options.data.otherLocation : options.data.location,
         occupation: options.data.occupation || undefined,
         employment_status: options.data.employmentStatus || undefined,
@@ -85,8 +92,7 @@ export const useStepRegistration = () => {
   }, []);
 
   const validatePhone = useCallback((phone: string): boolean => {
-    const phoneRegex = /^(\+254|0)[0-9]{9}$/;
-    return phoneRegex.test(phone.replace(/\s/g, ''));
+    return normalizeKenyanPhone(phone) !== null;
   }, []);
 
   const validateIdNumber = useCallback((idNumber: string): boolean => {
