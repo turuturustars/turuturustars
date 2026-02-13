@@ -225,7 +225,7 @@ const CboMpesaMemberPanel = () => {
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="stk-phone">Phone Number</Label>
-              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX" disabled={!canInteract} />
+              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX or 01XXXXXXXX" disabled={!canInteract} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="stk-amount">Amount (KES)</Label>
@@ -255,7 +255,7 @@ const CboMpesaMemberPanel = () => {
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="till-phone">Phone Number</Label>
-              <Input id="till-phone" value={tillPhone} onChange={(event) => setTillPhone(event.target.value)} placeholder="07XXXXXXXX" disabled={!canInteract} />
+              <Input id="till-phone" value={tillPhone} onChange={(event) => setTillPhone(event.target.value)} placeholder="07XXXXXXXX or 01XXXXXXXX" disabled={!canInteract} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="till-amount">Amount (KES)</Label>
