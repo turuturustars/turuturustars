@@ -137,6 +137,9 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
     payload.source = sourceId;
   }
 
+  console.log("Sending SMS via SMSLeopard to:", destinationNumber.replace(/\d/g, 'X').slice(-4));
+  console.log("Payload:", JSON.stringify({ ...payload, destination: [{ number: '***' }] }));
+
   const response = await fetch(SMS_ENDPOINT, {
     method: "POST",
     headers: {
@@ -155,10 +158,14 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
     parsed = raw;
   }
 
+  console.log("SMSLeopard response status:", response.status);
+  console.log("SMSLeopard response body:", JSON.stringify(parsed));
+
   const payloadObj = parsed as Record<string, unknown> | null;
   const providerMessage = typeof payloadObj?.message === "string" ? payloadObj.message : null;
 
   if (!response.ok) {
+    console.error("SMS send failed with status", response.status);
     if (response.status >= 400 && response.status < 500 && providerMessage) {
       throw new HttpError(400, providerMessage, {
         status: response.status,
@@ -173,9 +180,11 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
   }
 
   if (payloadObj?.success === false) {
+    console.error("SMS provider returned success:false");
     throw new HttpError(400, providerMessage || "SMS provider rejected verification message", payloadObj);
   }
 
+  console.log("SMS sent successfully");
   return parsed;
 }
 
@@ -275,6 +284,8 @@ async function handleSendCode(
   const expiresAtIso = new Date(now + codeTtlSeconds * 1000).toISOString();
   const resendAtIso = new Date(now + resendSeconds * 1000).toISOString();
 
+  console.log("Generated verification code for phone:", phone.slice(-4), "Code:", code);
+
   const { error: invalidateError } = await supabase
     .from("sms_verification_sessions")
     .update({
@@ -315,14 +326,19 @@ async function handleSendCode(
     throw new HttpError(500, "Verification session could not be created");
   }
 
+  console.log("Created verification session:", sessionId);
+
   const expiresMinutes = Math.max(1, Math.ceil(codeTtlSeconds / 60));
   const message =
     `Your Turuturu Stars verification code is ${code}. ` +
     `It expires in ${expiresMinutes} minute${expiresMinutes === 1 ? "" : "s"}. Do not share this code.`;
 
+  console.log("Sending SMS message:", message);
+
   try {
     await sendViaSmsLeopard(phone, message);
   } catch (error) {
+    console.error("SMS sending failed, marking session as consumed:", error);
     await supabase
       .from("sms_verification_sessions")
       .update({
@@ -332,6 +348,8 @@ async function handleSendCode(
       .eq("id", sessionId);
     throw error;
   }
+
+  console.log("SMS send completed successfully for session:", sessionId);
 
   return jsonResponse({
     success: true,
