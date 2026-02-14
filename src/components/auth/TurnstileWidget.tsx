@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import { AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,36 +40,56 @@ let scriptPromise: Promise<void> | null = null;
 
 const ensureTurnstileScript = (): Promise<void> => {
   if (typeof window === 'undefined') return Promise.resolve();
-  if (window.turnstile) return Promise.resolve();
-  if (scriptPromise) return scriptPromise;
+  if (window.turnstile) {
+    console.log('Turnstile already loaded');
+    return Promise.resolve();
+  }
+  if (scriptPromise) {
+    console.log('Waiting for Turnstile script...');
+    return scriptPromise;
+  }
 
   scriptPromise = new Promise((resolve, reject) => {
     const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
+      console.log('Existing Turnstile script found');
       if (window.turnstile) {
         resolve();
         return;
       }
 
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load Turnstile script.')), { once: true });
+      existing.addEventListener('load', () => {
+        console.log('Turnstile script loaded');
+        resolve();
+      }, { once: true });
+      existing.addEventListener('error', () => {
+        console.error('Turnstile script error');
+        reject(new Error('Failed to load Turnstile script.'));
+      }, { once: true });
       return;
     }
 
+    console.log('Creating new Turnstile script');
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
     script.src = SCRIPT_SRC;
     script.async = true;
     script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Turnstile script.'));
+    script.onload = () => {
+      console.log('Turnstile script loaded successfully');
+      resolve();
+    };
+    script.onerror = () => {
+      console.error('Turnstile script error');
+      reject(new Error('Failed to load Turnstile script.'));
+    };
     document.head.appendChild(script);
   });
 
   return scriptPromise;
 };
 
-const TurnstileWidget = ({
+const TurnstileWidgetInner = ({
   siteKey,
   action,
   className,
@@ -228,4 +248,4 @@ const TurnstileWidget = ({
   );
 };
 
-export default TurnstileWidget;
+export default memo(TurnstileWidgetInner);
