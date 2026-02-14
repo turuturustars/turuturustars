@@ -47,8 +47,15 @@ export function errorResponse(error: unknown): Response {
 
 export async function readJsonBody<T>(req: Request): Promise<T> {
   try {
-    return (await req.json()) as T;
-  } catch {
-    throw new HttpError(400, "Invalid JSON payload");
+    const text = await req.text();
+    console.log("Raw request body:", text);
+    if (!text) {
+      throw new Error("Empty request body");
+    }
+    return JSON.parse(text) as T;
+  } catch (error) {
+    console.error("Body parsing error:", error);
+    throw new HttpError(400, `Invalid JSON payload: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+

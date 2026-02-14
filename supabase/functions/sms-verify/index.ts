@@ -467,13 +467,20 @@ serve(async (req) => {
     }
 
     const body = await readJsonBody<SmsVerifyRequest>(req);
+    console.log("sms-verify request body:", { action: body.action, purpose: body.purpose, phone: body.phone ? "***" : "missing", code: body.code ? "***" : "missing" });
+    
     const action = body.action;
     if (!action || (action !== "send" && action !== "verify")) {
+      console.error("Invalid action:", action);
       throw new HttpError(400, "Invalid action. Use 'send' or 'verify'.");
     }
 
+    console.log("Validating purpose:", body.purpose);
     const purpose = resolvePurpose(body.purpose);
+    
+    console.log("Normalizing phone:", body.phone ? "***" : "missing");
     const phone = normalizeKenyanPhone(body.phone);
+    
     const supabase = createServiceClient();
 
     if (action === "send") {
