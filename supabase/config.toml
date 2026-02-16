@@ -19,9 +19,6 @@ verify_jwt = false
 [functions.cloudinary-upload]
 verify_jwt = false
 
-[functions.twilio-verify]
-verify_jwt = false
- 
  [functions.send-verification-email]
  verify_jwt = false
  
