@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,13 @@ import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
 import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 type Mode = 'signin' | 'signup';
+type WebOtpCredential = { code?: string };
+type WebOtpCredentialContainer = {
+  get: (options?: {
+    otp?: { transport: string[] };
+    signal?: AbortSignal;
+  }) => Promise<WebOtpCredential | null>;
+};
 
 const SUPPORT_PHONE = '0700471113';
 
@@ -78,6 +85,14 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     type: 'success' | 'error' | 'info';
     message: string;
   } | null>(null);
+  const webOtpAbortRef = useRef<AbortController | null>(null);
+
+  const stopWebOtpListening = useCallback(() => {
+    if (webOtpAbortRef.current) {
+      webOtpAbortRef.current.abort();
+      webOtpAbortRef.current = null;
+    }
+  }, []);
 
   const normalizedSignupPhone = useMemo(
     () => normalizeKenyanPhone(signupForm.phone),
@@ -99,7 +114,14 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     return () => clearInterval(timer);
   }, [signupCodeCooldownSeconds]);
 
+  useEffect(() => {
+    return () => {
+      stopWebOtpListening();
+    };
+  }, [stopWebOtpListening]);
+
   const handleSignupPhoneChange = useCallback((value: string) => {
+    stopWebOtpListening();
     setSignupForm((prev) => ({ ...prev, phone: value }));
 
     const normalized = normalizeKenyanPhone(value);
@@ -107,7 +129,13 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       setSignupVerificationToken(null);
       setSignupVerifiedPhone(null);
     }
-  }, [signupVerifiedPhone]);
+  }, [signupVerifiedPhone, stopWebOtpListening]);
+
+  useEffect(() => {
+    if (mode !== 'signup') {
+      stopWebOtpListening();
+    }
+  }, [mode, stopWebOtpListening]);
 
   useEffect(() => {
     if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
@@ -242,8 +270,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     setIsSendingSignupCode(true);
     try {
       const response = await sendSignupSmsCode(normalizedSignupPhone);
+      const canAutoReadCode =
+        typeof window !== 'undefined' &&
+        window.isSecureContext &&
+        'OTPCredential' in window &&
+        typeof navigator !== 'undefined' &&
+        Boolean(navigator.credentials);
       const providerStatus = response.providerStatus ? response.providerStatus.toUpperCase() : null;
       const providerStatusHint = providerStatus ? ` Provider status: ${providerStatus}.` : '';
+      const autoReadHint = canAutoReadCode ? ' Keep this screen open for automatic code detection.' : '';
       setSignupCodeCooldownSeconds(Math.max(0, response.resendAfterSeconds ?? 0));
       setSignupVerificationToken(null);
       setSignupVerifiedPhone(null);
@@ -254,12 +289,42 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
           `Code request accepted for ${response.maskedPhone}. ` +
           `It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes. ` +
           `If it does not arrive in 30 seconds, tap resend.` +
+          autoReadHint +
           providerStatusHint,
       });
       toast({
         title: 'Code sent',
         description: `Verification code requested for ${response.maskedPhone}.${providerStatusHint}`,
       });
+
+      if (canAutoReadCode) {
+        stopWebOtpListening();
+        const controller = new AbortController();
+        webOtpAbortRef.current = controller;
+        const credentialContainer = navigator.credentials as unknown as WebOtpCredentialContainer;
+
+        void credentialContainer
+          .get({
+            otp: { transport: ['sms'] },
+            signal: controller.signal,
+          })
+          .then((credential) => {
+            if (controller.signal.aborted) return;
+            const detectedCode = (credential?.code || '').replace(/\D/g, '').slice(0, 6);
+            if (detectedCode.length !== 6) return;
+
+            setSignupSmsCode(detectedCode);
+            setSignupSmsFeedback({
+              type: 'info',
+              message: 'Verification code detected automatically. Verifying...',
+            });
+            void handleVerifySignupCode(detectedCode);
+          })
+          .catch((error: unknown) => {
+            if (error instanceof DOMException && error.name === 'AbortError') return;
+            console.warn('WebOTP auto-read failed', error);
+          });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send SMS code';
       setSignupSmsFeedback({ type: 'error', message });
@@ -273,7 +338,9 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     }
   };
 
-  const handleVerifySignupCode = async () => {
+  const handleVerifySignupCode = async (detectedCode?: string) => {
+    stopWebOtpListening();
+
     if (!normalizedSignupPhone) {
       toast({
         title: 'Invalid phone number',
@@ -283,7 +350,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
-    const cleanCode = signupSmsCode.replace(/\D/g, '');
+    const cleanCode = (detectedCode ?? signupSmsCode).replace(/\D/g, '');
     if (cleanCode.length !== 6) {
       toast({
         title: 'Invalid code',

@@ -19,6 +19,7 @@ type VerificationSessionRow = {
   max_verify_attempts: number;
   expires_at: string;
   resend_available_at: string;
+  created_at: string;
 };
 
 type SmsSendResult = {
@@ -38,6 +39,7 @@ const DEFAULT_TOKEN_TTL_SECONDS = 30 * 60;
 const DEFAULT_MAX_SENDS_PER_WINDOW = 4;
 const DEFAULT_SEND_WINDOW_SECONDS = 60 * 60;
 const CODE_LENGTH = 6;
+const DEFAULT_WEB_OTP_DOMAIN = "turuturustars.co.ke";
 
 function createServiceClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -95,6 +97,21 @@ function normalizeCode(rawCode: string | undefined): string {
 function maskPhone(phone: string): string {
   if (phone.length <= 8) return phone;
   return `${phone.slice(0, 7)}****${phone.slice(-2)}`;
+}
+
+function resolveWebOtpSuffix(code: string): string {
+  const configuredDomain = Deno.env.get("SMS_VERIFICATION_WEB_OTP_DOMAIN")?.trim() || DEFAULT_WEB_OTP_DOMAIN;
+  const domain = configuredDomain
+    .replace(/^https?:\/\//i, "")
+    .replace(/^@/, "")
+    .split("/")[0]
+    .trim();
+
+  if (!domain) {
+    return "";
+  }
+
+  return `\n@${domain} #${code}`;
 }
 
 function generateCode(): string {
@@ -362,9 +379,11 @@ async function handleSendCode(
   console.log("Created verification session:", sessionId);
 
   const expiresMinutes = Math.max(1, Math.ceil(codeTtlSeconds / 60));
+  const webOtpSuffix = resolveWebOtpSuffix(code);
   const message =
     `Your Turuturu Stars verification code is ${code}. ` +
-    `It expires in ${expiresMinutes} minute${expiresMinutes === 1 ? "" : "s"}. Do not share this code.`;
+    `It expires in ${expiresMinutes} minute${expiresMinutes === 1 ? "" : "s"}. Do not share this code.` +
+    webOtpSuffix;
 
   console.log("Sending SMS message:", message);
 
@@ -419,50 +438,55 @@ async function handleVerifyCode(
 
   const { data: sessionRows, error: sessionError } = await supabase
     .from("sms_verification_sessions")
-    .select("id, code_hash, verify_attempts, max_verify_attempts, expires_at, resend_available_at")
+    .select("id, code_hash, verify_attempts, max_verify_attempts, expires_at, resend_available_at, created_at")
     .eq("purpose", purpose)
     .eq("phone", phone)
     .is("verified_at", null)
     .is("consumed_at", null)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(5);
 
   if (sessionError) {
     throw new HttpError(500, "Failed to read verification session", sessionError);
   }
 
-  const session = (sessionRows?.[0] as VerificationSessionRow | undefined) ?? null;
-  if (!session) {
+  const sessions = (sessionRows || []) as VerificationSessionRow[];
+  if (sessions.length === 0) {
     throw new HttpError(400, "No active verification request found. Send a new code first.");
   }
 
-  const expiresAt = new Date(session.expires_at).getTime();
-  if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+  const eligibleSessions = sessions.filter((session) => {
+    const expiresAt = new Date(session.expires_at).getTime();
+    return Number.isFinite(expiresAt) && expiresAt > now && session.verify_attempts < session.max_verify_attempts;
+  });
+
+  if (eligibleSessions.length === 0) {
     await supabase
       .from("sms_verification_sessions")
       .update({
         consumed_at: nowIso,
         updated_at: nowIso,
       })
-      .eq("id", session.id);
+      .eq("purpose", purpose)
+      .eq("phone", phone)
+      .is("verified_at", null)
+      .is("consumed_at", null);
+
+    const hasAttemptsExceeded = sessions.some((session) => session.verify_attempts >= session.max_verify_attempts);
+    if (hasAttemptsExceeded) {
+      throw new HttpError(429, "Too many verification attempts. Request a new code.");
+    }
+
     throw new HttpError(400, "Verification code expired. Request a new code.");
   }
 
-  if (session.verify_attempts >= session.max_verify_attempts) {
-    await supabase
-      .from("sms_verification_sessions")
-      .update({
-        consumed_at: nowIso,
-        updated_at: nowIso,
-      })
-      .eq("id", session.id);
-    throw new HttpError(429, "Too many verification attempts. Request a new code.");
-  }
-
   const providedHash = await hashVerificationCode(phone, code);
-  if (providedHash !== session.code_hash) {
-    const nextAttempts = session.verify_attempts + 1;
-    const terminal = nextAttempts >= session.max_verify_attempts;
+  const matchedSession = eligibleSessions.find((session) => session.code_hash === providedHash) || null;
+
+  if (!matchedSession) {
+    const attemptSession = eligibleSessions[0];
+    const nextAttempts = attemptSession.verify_attempts + 1;
+    const terminal = nextAttempts >= attemptSession.max_verify_attempts;
     await supabase
       .from("sms_verification_sessions")
       .update({
@@ -470,13 +494,13 @@ async function handleVerifyCode(
         consumed_at: terminal ? nowIso : null,
         updated_at: nowIso,
       })
-      .eq("id", session.id);
+      .eq("id", attemptSession.id);
 
     if (terminal) {
       throw new HttpError(429, "Too many incorrect attempts. Request a new code.");
     }
 
-    const attemptsLeft = session.max_verify_attempts - nextAttempts;
+    const attemptsLeft = attemptSession.max_verify_attempts - nextAttempts;
     throw new HttpError(
       400,
       `Invalid verification code. ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} left.`,
@@ -493,10 +517,26 @@ async function handleVerifyCode(
       token_expires_at: tokenExpiresAtIso,
       updated_at: nowIso,
     })
-    .eq("id", session.id);
+    .eq("id", matchedSession.id);
 
   if (updateError) {
     throw new HttpError(500, "Failed to finalize phone verification", updateError);
+  }
+
+  const { error: consumeOtherError } = await supabase
+    .from("sms_verification_sessions")
+    .update({
+      consumed_at: nowIso,
+      updated_at: nowIso,
+    })
+    .eq("purpose", purpose)
+    .eq("phone", phone)
+    .is("verified_at", null)
+    .is("consumed_at", null)
+    .neq("id", matchedSession.id);
+
+  if (consumeOtherError) {
+    console.warn("Failed to consume sibling verification sessions", consumeOtherError);
   }
 
   return jsonResponse({
