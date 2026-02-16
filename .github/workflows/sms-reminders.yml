@@ -3,10 +3,15 @@ name: SMS Reminders
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
+
+concurrency:
+  group: sms-reminders
+  cancel-in-progress: false
 
 jobs:
   send-sms-reminders:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Trigger sms-reminders edge function
@@ -17,8 +22,8 @@ jobs:
           set -euo pipefail
 
           if [ -z "${SMS_REMINDERS_JOB_SECRET}" ]; then
-            echo "Missing required GitHub secret: SMS_REMINDERS_JOB_SECRET"
-            exit 1
+            echo "SMS_REMINDERS_JOB_SECRET is not configured; skipping run to avoid failure spam."
+            exit 0
           fi
 
           curl -sS --fail-with-body \
