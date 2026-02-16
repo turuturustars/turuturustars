@@ -1,416 +1,213 @@
-/**
- * HeroSection Animations
- * 
- * Ken Burns effect: gentle zoom, pan, and crossfade
- * Continuous carousel with seamless looping
- * 
- * 7 images × 8 seconds each = 56 second full loop
- * Images crossfade perfectly with zero visible transitions
- * 
- * Optimizations:
- * - First image loads immediately (LCP optimization)
- * - Images are preloaded during page load
- * - contain-layout prevents repaints during animations
- * - Reduced motion respects user preferences
- */
+.hero-shell {
+  position: relative;
+  overflow: hidden;
+  min-height: 78vh;
+  padding: clamp(3.75rem, 7vw, 6rem) 0;
+  background: #f3f8fc;
+}
 
-/* Base hero background image styling */
-.hero-bg-image {
-  will-change: transform, opacity;
+.hero-backdrop {
   position: absolute;
   inset: 0;
-  contain: layout style paint;
-  backface-visibility: hidden;
-  -webkit-font-smoothing: antialiased;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-color: rgba(10, 61, 98, 0.08);
-  transform: none !important;
+  background: linear-gradient(140deg, #f3f8fc 0%, #e7f1fb 54%, #deecfb 100%);
 }
 
-/* Foreground hero image panel */
-.hero-image-frame {
+.hero-glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(54px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.hero-glow-left {
+  width: clamp(220px, 34vw, 420px);
+  height: clamp(220px, 34vw, 420px);
+  left: -12%;
+  top: -18%;
+  background: rgba(31, 182, 255, 0.3);
+}
+
+.hero-glow-right {
+  width: clamp(240px, 38vw, 460px);
+  height: clamp(240px, 38vw, 460px);
+  right: -16%;
+  bottom: -20%;
+  background: rgba(10, 61, 98, 0.22);
+}
+
+.hero-content {
   position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border-radius: 24px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 24px 60px rgba(10, 61, 98, 0.35);
-  backdrop-filter: blur(10px);
+  z-index: 2;
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: clamp(1.5rem, 4vw, 3.25rem);
 }
 
-.hero-image {
-  width: 100%;
-  height: 100%;
+.hero-copy {
+  max-width: 620px;
+}
+
+.hero-brand {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(10, 61, 98, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0.38rem 0.8rem 0.38rem 0.44rem;
+  color: #0a3d62;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero-brand-logo {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
   object-fit: contain;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.85);
-  padding: 8px;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.hero-copy h1 {
+  margin-top: 1rem;
+  color: #072d49;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2rem, 6vw, 3.75rem);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+}
+
+.hero-copy > p {
+  margin-top: 1rem;
+  color: rgba(7, 45, 73, 0.88);
+  font-size: clamp(1rem, 2.6vw, 1.25rem);
+  line-height: 1.55;
+  max-width: 42ch;
+}
+
+.hero-actions {
+  margin-top: 1.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.hero-primary-button {
+  background: #0a7bcc;
+  color: #ffffff;
+  border: 1px solid #0a7bcc;
+  box-shadow: 0 14px 28px rgba(10, 61, 98, 0.2);
+}
+
+.hero-primary-button:hover {
+  background: #096fb9;
+  border-color: #096fb9;
+}
+
+.hero-secondary-button {
+  border-color: rgba(10, 61, 98, 0.28);
+  background: rgba(255, 255, 255, 0.68);
+  color: #0a3d62;
+}
+
+.hero-secondary-button:hover {
+  border-color: rgba(10, 61, 98, 0.44);
+  background: rgba(255, 255, 255, 0.92);
+  color: #0a3d62;
+}
+
+.hero-footnote {
+  margin-top: 1.2rem;
+  color: rgba(7, 45, 73, 0.7);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.hero-media-shell {
+  position: relative;
+  border-radius: 1.4rem;
+  border: 1px solid rgba(10, 61, 98, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 20px 44px rgba(10, 61, 98, 0.16);
+  padding: 0.72rem;
+  backdrop-filter: blur(5px);
+}
+
+.hero-media {
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  object-fit: cover;
+  border-radius: 0.95rem;
+  background: #dfeaf5;
+}
+
+.hero-media-fade {
+  animation: heroMediaFade 0.45s ease;
+}
+
+.hero-media-caption {
+  margin: 0.7rem 0.35rem 0.1rem;
+  color: rgba(7, 45, 73, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+@keyframes heroMediaFade {
+  from {
+    opacity: 0.45;
+    transform: scale(1.01);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @media (max-width: 1024px) {
-  .hero-image-frame {
-    aspect-ratio: 16 / 10;
+  .hero-shell {
+    min-height: auto;
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+  }
+
+  .hero-content {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .hero-copy {
+    max-width: none;
   }
 }
 
 @media (max-width: 640px) {
-  .hero-image-frame {
-    aspect-ratio: 1 / 1;
-    padding: 10px;
+  .hero-content {
+    width: min(1120px, calc(100% - 1.25rem));
+  }
+
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions > * {
+    width: 100%;
+  }
+
+  .hero-brand {
+    font-size: 0.72rem;
   }
 }
 
-/* Optimize first image for LCP (Largest Contentful Paint) */
-.hero-bg-image:nth-child(1) {
-  content-visibility: auto;
-}
-
-/**
- * Image 0 (Gallery Members)
- * Visible: 0% → 14.3% of cycle (0s → 8s)
- */
-.hero-bg-image:nth-child(1) {
-  animation: heroImageCarousel0 56s ease-in-out infinite;
-}
-
-/**
- * Image 1 (Veronica Event)
- * Visible: 14.3% → 28.6% of cycle (8s → 16s)
- */
-.hero-bg-image:nth-child(2) {
-  animation: heroImageCarousel1 56s ease-in-out infinite;
-}
-
-/**
- * Image 2 (Prize Giving Day)
- * Visible: 28.6% → 42.9% of cycle (16s → 24s)
- */
-.hero-bg-image:nth-child(3) {
-  animation: heroImageCarousel2 56s ease-in-out infinite;
-}
-
-/**
- * Image 3 (Best Students)
- * Visible: 42.9% → 57.1% of cycle (24s → 32s)
- */
-.hero-bg-image:nth-child(4) {
-  animation: heroImageCarousel3 56s ease-in-out infinite;
-}
-
-/**
- * Image 4 (Motivation Team)
- * Visible: 57.1% → 71.4% of cycle (32s → 40s)
- */
-.hero-bg-image:nth-child(5) {
-  animation: heroImageCarousel4 56s ease-in-out infinite;
-}
-
-/**
- * Image 5 (Veronica Addressing)
- * Visible: 71.4% → 85.7% of cycle (40s → 48s)
- */
-.hero-bg-image:nth-child(6) {
-  animation: heroImageCarousel5 56s ease-in-out infinite;
-}
-
-/**
- * Image 6 (Lower Grade Pupils)
- * Visible: 85.7% → 100% of cycle (48s → 56s)
- */
-.hero-bg-image:nth-child(7) {
-  animation: heroImageCarousel6 56s ease-in-out infinite;
-}
-
-/**
- * Ken Burns Effect for Image 0
- * Seamless fade in at start, Ken Burns motion, fade out at exact transition point
- */
-@keyframes heroImageCarousel0 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  /* Fade in: 0-0.7s (0%-1.25%) */
-  1.25% {
-    opacity: 1;
-  }
-  /* Ken Burns: zoom and pan throughout */
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(15px) translateY(-10px);
-  }
-  /* Start fade out just before transition: 7.5-8s */
-  13.4% {
-    opacity: 1;
-    transform: scale(1.12) translateX(30px) translateY(-20px);
-  }
-  14.3% {
-    opacity: 0;
-    transform: scale(1.12) translateX(30px) translateY(-20px);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.12) translateX(30px) translateY(-20px);
-  }
-}
-
-/**
- * Ken Burns Effect for Image 1
- * Hidden until 14.3%, then visible for 8 seconds, fade out at 28.6%
- */
-@keyframes heroImageCarousel1 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  /* Hidden until this image's turn */
-  14.3% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  /* Fade in: 14.3%-15.55% */
-  15.55% {
-    opacity: 1;
-  }
-  /* Ken Burns motion */
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(-15px) translateY(10px);
-  }
-  /* Start fade out: 27.75% */
-  27.75% {
-    opacity: 1;
-    transform: scale(1.12) translateX(-30px) translateY(20px);
-  }
-  28.6% {
-    opacity: 0;
-    transform: scale(1.12) translateX(-30px) translateY(20px);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.12) translateX(-30px) translateY(20px);
-  }
-}
-
-/**
- * Ken Burns Effect for Image 2
- * Visible: 28.6% → 42.9%
- */
-@keyframes heroImageCarousel2 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  28.6% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  29.85% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(20px) translateY(-15px);
-  }
-  42.1% {
-    opacity: 1;
-    transform: scale(1.12) translateX(35px) translateY(-25px);
-  }
-  42.9% {
-    opacity: 0;
-    transform: scale(1.12) translateX(35px) translateY(-25px);
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/**
- * Ken Burns Effect for Image 3
- * Visible: 42.9% → 57.1%
- */
-@keyframes heroImageCarousel3 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  42.9% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  44.15% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(-20px) translateY(15px);
-  }
-  56.4% {
-    opacity: 1;
-    transform: scale(1.12) translateX(-35px) translateY(25px);
-  }
-  57.1% {
-    opacity: 0;
-    transform: scale(1.12) translateX(-35px) translateY(25px);
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/**
- * Ken Burns Effect for Image 4
- * Visible: 57.1% → 71.4%
- */
-@keyframes heroImageCarousel4 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  57.1% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  58.35% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(18px) translateY(-12px);
-  }
-  70.6% {
-    opacity: 1;
-    transform: scale(1.12) translateX(32px) translateY(-22px);
-  }
-  71.4% {
-    opacity: 0;
-    transform: scale(1.12) translateX(32px) translateY(-22px);
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/**
- * Ken Burns Effect for Image 5
- * Visible: 71.4% → 85.7%
- */
-@keyframes heroImageCarousel5 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  71.4% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  72.65% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(-18px) translateY(12px);
-  }
-  84.9% {
-    opacity: 1;
-    transform: scale(1.12) translateX(-32px) translateY(22px);
-  }
-  85.7% {
-    opacity: 0;
-    transform: scale(1.12) translateX(-32px) translateY(22px);
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
-/**
- * Ken Burns Effect for Image 6
- * Visible: 85.7% → 100%, then loops seamlessly back to Image 0
- */
-@keyframes heroImageCarousel6 {
-  0% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  85.7% {
-    opacity: 0;
-    transform: scale(1) translateX(0) translateY(0);
-  }
-  86.95% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08) translateX(22px) translateY(-18px);
-  }
-  99.3% {
-    opacity: 1;
-    transform: scale(1.12) translateX(38px) translateY(-28px);
-  }
-  /* Fade out perfectly timed for Image 0 to fade in */
-  100% {
-    opacity: 0;
-    transform: scale(1.12) translateX(38px) translateY(-28px);
-  }
-}
-
-/**
- * Performance optimizations & Accessibility
- */
-
-/* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .hero-bg-image {
-    animation: none !important;
-    opacity: 0 !important;
-    transform: none !important;
+  .hero-media-fade {
+    animation: none;
   }
-  
-  /* Show only first image when motion is reduced */
-  .hero-bg-image:nth-child(1) {
-    opacity: 1 !important;
-  }
-}
-
-/* Mobile: maintain animation but lighter load */
-@media (max-width: 768px) {
-  .hero-bg-image {
-    /* Animations continue but browser handles optimization */
-    /* No changes needed - will-change handles it */
-  }
-}
-
-/**
- * Smooth fade transition between images
- * Applied by React's duration-1000 class
- */
-.transition-opacity {
-  transition-property: opacity;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/**
- * Text shadow for accessibility over animated background
- * Ensures headlines and body text remain readable
- */
-.drop-shadow-lg {
-  filter: drop-shadow(0 4px 6px rgba(10, 61, 98, 0.4));
-}
-
-.drop-shadow-md {
-  filter: drop-shadow(0 2px 4px rgba(10, 61, 98, 0.3));
-}
-
-/**
- * High-performance rendering hints
- */
-.hero-bg-image {
-  backface-visibility: hidden;
-  perspective: 1000px;
-  contain: layout style paint;
 }
