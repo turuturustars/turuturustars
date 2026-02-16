@@ -1,4 +1,4 @@
-import { ArrowRight, HeartHandshake } from 'lucide-react';
+import { ArrowRight, HeartHandshake, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,13 +8,13 @@ import galleryMembers from '@/assets/gallery-members.png';
 import veronikaEvent from '@/assets/turuturu_stars_community_togther_with_senator_veronica_maina.jpg';
 import prizeGivingDay from '@/assets/turuturustars_community_during_prize_giving_day.jpg';
 import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
-import logo from '@/assets/turuturustarslogo.png';
 
-const HERO_IMAGES = [
-  galleryMembers,
-  veronikaEvent,
-  prizeGivingDay,
-  bestStudents,
+const HERO_IMAGES = [galleryMembers, veronikaEvent, prizeGivingDay, bestStudents];
+
+const TRUST_MARKERS = [
+  'Member-led decisions',
+  'Secure contribution records',
+  'Fast welfare coordination',
 ];
 
 const HeroSection = () => {
@@ -47,7 +47,7 @@ const HeroSection = () => {
 
     const intervalId = window.setInterval(() => {
       setActiveImageIndex((currentIndex) => (currentIndex + 1) % HERO_IMAGES.length);
-    }, 9000);
+    }, 8000);
 
     return () => window.clearInterval(intervalId);
   }, [isReducedMotion]);
@@ -55,25 +55,24 @@ const HeroSection = () => {
   return (
     <section id="home" className="hero-shell">
       <div className="hero-backdrop" aria-hidden="true" />
+      <div className="hero-mesh" aria-hidden="true" />
       <div className="hero-glow hero-glow-left" aria-hidden="true" />
       <div className="hero-glow hero-glow-right" aria-hidden="true" />
 
       <div className="hero-content">
         <div className="hero-copy">
-          <div className="hero-brand">
-            <img src={logo} alt="Turuturu Stars logo" className="hero-brand-logo" loading="eager" />
-            <span>Turuturu Stars CBO</span>
-          </div>
+          <p className="hero-kicker">Turuturu Stars Community Platform</p>
 
-          <h1>Community first. Progress together.</h1>
-          <p>
-            Membership, contributions, and welfare in one trusted space built for local families.
+          <h1>One clean home for every member activity.</h1>
+
+          <p className="hero-lead">
+            Manage contributions, welfare support, and community updates from one trusted place designed for speed and clarity.
           </p>
 
           <div className="hero-actions">
             <Button asChild size="lg" className="hero-primary-button">
               <Link to="/auth">
-                Get started
+                Member login
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
@@ -86,22 +85,31 @@ const HeroSection = () => {
             </Button>
           </div>
 
-          <p className="hero-footnote">
-            Serving Turuturu, Githima, Kigumo, and nearby communities.
-          </p>
+          <ul className="hero-trust-list" aria-label="Platform highlights">
+            {TRUST_MARKERS.map((marker) => (
+              <li key={marker}>
+                <ShieldCheck className="h-4 w-4" />
+                <span>{marker}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="hero-media-shell">
-          <img
-            key={activeImageIndex}
-            src={HERO_IMAGES[activeImageIndex]}
-            alt="Turuturu Stars community program"
-            className={`hero-media ${isReducedMotion ? '' : 'hero-media-fade'}`}
-            loading="eager"
-          />
-          <p className="hero-media-caption">
-            Real moments from member activities and support programs.
-          </p>
+          <div className="hero-media-frame">
+            <img
+              key={activeImageIndex}
+              src={HERO_IMAGES[activeImageIndex]}
+              alt="Turuturu Stars community activities"
+              className={`hero-media ${isReducedMotion ? '' : 'hero-media-fade'}`}
+              loading="eager"
+            />
+          </div>
+
+          <div className="hero-media-caption">
+            <span>Real community moments</span>
+            <span>Turuturu, Githima, Kigumo and nearby areas</span>
+          </div>
         </div>
       </div>
     </section>
