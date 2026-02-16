@@ -1,4 +1,4 @@
-import { ArrowRight, HeartHandshake, ShieldCheck } from 'lucide-react';
+import { ArrowRight, HeartHandshake } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -10,12 +10,6 @@ import prizeGivingDay from '@/assets/turuturustars_community_during_prize_giving
 import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
 
 const HERO_IMAGES = [galleryMembers, veronikaEvent, prizeGivingDay, bestStudents];
-
-const TRUST_MARKERS = [
-  'Member-led decisions',
-  'Secure contribution records',
-  'Fast welfare coordination',
-];
 
 const HeroSection = () => {
   const [isReducedMotion, setIsReducedMotion] = useState(false);
@@ -61,12 +55,10 @@ const HeroSection = () => {
 
       <div className="hero-content">
         <div className="hero-copy">
-          <p className="hero-kicker">Turuturu Stars Community Platform</p>
-
-          <h1>One clean home for every member activity.</h1>
+          <h1>KARIBU NYUMBANI.</h1>
 
           <p className="hero-lead">
-            Manage contributions, welfare support, and community updates from one trusted place designed for speed and clarity.
+            TURUTURU NI HOME, TUKUZE NYUMBANI, TUJENGE NA TUINUANE.
           </p>
 
           <div className="hero-actions">
@@ -84,15 +76,6 @@ const HeroSection = () => {
               </Link>
             </Button>
           </div>
-
-          <ul className="hero-trust-list" aria-label="Platform highlights">
-            {TRUST_MARKERS.map((marker) => (
-              <li key={marker}>
-                <ShieldCheck className="h-4 w-4" />
-                <span>{marker}</span>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className="hero-media-shell">
@@ -104,11 +87,6 @@ const HeroSection = () => {
               className={`hero-media ${isReducedMotion ? '' : 'hero-media-fade'}`}
               loading="eager"
             />
-          </div>
-
-          <div className="hero-media-caption">
-            <span>Real community moments</span>
-            <span>Turuturu, Githima, Kigumo and nearby areas</span>
           </div>
         </div>
       </div>
