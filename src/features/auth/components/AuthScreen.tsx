@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, Home, Loader2, Mail, Lock, ShieldCheck, KeyRound, PhoneCall } from 'lucide-react';
+import { ArrowLeft, Home, Loader2, Mail, Lock, KeyRound, PhoneCall } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -19,6 +19,7 @@ import {
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
 import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
+import logo from '@/assets/turuturustarslogo.png';
 
 type Mode = 'signin' | 'signup';
 type WebOtpCredential = { code?: string };
@@ -288,13 +289,13 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         message:
           `Code request accepted for ${response.maskedPhone}. ` +
           `It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes. ` +
-          `If it does not arrive in 30 seconds, tap resend.` +
+          `SMS may take up to 10 minutes to arrive. If it still does not arrive, tap resend.` +
           autoReadHint +
           providerStatusHint,
       });
       toast({
         title: 'Code sent',
-        description: `Verification code requested for ${response.maskedPhone}.${providerStatusHint}`,
+        description: `Verification code requested for ${response.maskedPhone}. SMS may take up to 10 minutes.${providerStatusHint}`,
       });
 
       if (canAutoReadCode) {
@@ -673,116 +674,86 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
   };
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-primary/5 to-blue-50/60 flex items-center justify-center px-4 py-10">
-      <div className="pointer-events-none absolute -top-40 right-[-10%] h-[420px] w-[420px] rounded-full bg-gradient-to-br from-primary/30 via-blue-500/25 to-cyan-500/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-48 left-[-5%] h-[360px] w-[360px] rounded-full bg-gradient-to-br from-primary/20 via-blue-500/15 to-transparent blur-3xl" />
+    <div className="relative min-h-[100dvh] overflow-hidden bg-gradient-to-br from-background via-primary/5 to-blue-50/40 px-3 py-6 sm:px-4 sm:py-10">
+      <div className="pointer-events-none absolute -top-40 right-[-12%] h-[320px] w-[320px] rounded-full bg-gradient-to-br from-primary/30 via-blue-500/20 to-cyan-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-44 left-[-10%] h-[280px] w-[280px] rounded-full bg-gradient-to-br from-primary/20 via-blue-500/10 to-transparent blur-3xl" />
 
-      <Card className="relative w-full max-w-5xl overflow-hidden border-border/60 bg-gradient-to-br from-card via-card to-card/95 shadow-2xl backdrop-blur-xl">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-blue-500/10" />
+      <Card className="relative mx-auto w-full max-w-xl overflow-hidden border-border/60 bg-card/95 shadow-xl backdrop-blur">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-blue-500/5" />
 
-        <div className="relative grid md:grid-cols-[0.95fr_1.05fr]">
-          <div className="relative hidden flex-col justify-between gap-10 border-r border-border/50 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-10 md:flex">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.22),_transparent_60%)]" />
-            <div className="relative z-10 space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <ShieldCheck className="h-4 w-4" />
-                Trusted member access
-              </div>
-              <h1 className="font-serif text-4xl leading-tight text-transparent bg-gradient-to-r from-foreground via-primary to-blue-600 bg-clip-text">
-                Hello, welcome back
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Sign in to manage your contributions, profile, and community updates with the same
-                premium look as your dashboard.
-              </p>
+        <div className="relative p-4 sm:p-6">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <Button asChild type="button" variant="outline" size="sm" className="rounded-full border-border/60 bg-background/70">
+              <Link to="/" className="inline-flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                Home
+              </Link>
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="rounded-full"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+          </div>
+
+          <div className="mb-4 flex items-center gap-3 rounded-xl border border-border/60 bg-background/70 px-3 py-2.5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden">
+              <img src={logo} alt="Turuturu Stars logo" className="h-10 w-10 object-contain" />
             </div>
-            <div className="relative z-10 space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-3">
-                <span className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-cyan-500" />
-                Secure email authentication powered by your Supabase stack.
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-cyan-500" />
-                Streamlined onboarding with profile setup after sign up.
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="h-2 w-2 rounded-full bg-gradient-to-r from-primary to-cyan-500" />
-                Consistent color gradients that mirror the dashboard experience.
-              </div>
+            <div className="min-w-0 leading-tight">
+              <p className="text-sm font-semibold text-foreground">Turuturu Stars</p>
+              <p className="text-xs text-muted-foreground">Member Portal</p>
             </div>
           </div>
 
-          <div className="relative p-6 sm:p-8 md:p-10">
-            <div className="mb-5 flex items-center justify-between gap-2">
-              <Button asChild type="button" variant="outline" size="sm" className="rounded-full border-border/60 bg-background/60">
-                <Link to="/" className="inline-flex items-center gap-2">
-                  <Home className="h-4 w-4" />
-                  Home
-                </Link>
-              </Button>
+          <div className="mb-5">
+            <h2 className="text-2xl font-semibold text-transparent bg-gradient-to-r from-foreground via-primary to-blue-600 bg-clip-text sm:text-3xl">
+              Account Access
+            </h2>
+          </div>
 
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="rounded-full"
-                onClick={() => navigate(-1)}
+          {!hasCaptchaProtection && (
+            <Alert className="mb-4 border-amber-400/50 bg-amber-50/80 text-amber-900">
+              <AlertDescription>
+                Bot protection is not configured. Add `VITE_CLOUDFLARE_SITE_KEY` to enable Turnstile verification.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Tabs
+            value={mode}
+            onValueChange={(val) => {
+              const nextMode = val as Mode;
+              setMode(nextMode);
+              if (nextMode === 'signup' && showRecoveryPanel) {
+                closeRecoveryPanel();
+              }
+            }}
+            className="space-y-5"
+          >
+            <TabsList className="grid grid-cols-2 rounded-full border border-border/60 bg-muted/60 p-1">
+              <TabsTrigger
+                value="signin"
+                className="rounded-full data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:via-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg"
               >
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back
-              </Button>
-            </div>
+                Sign In
+              </TabsTrigger>
+              <TabsTrigger
+                value="signup"
+                className="rounded-full data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:via-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg"
+              >
+                Create Account
+              </TabsTrigger>
+            </TabsList>
 
-            <div className="mb-6 space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary md:hidden">
-                <ShieldCheck className="h-4 w-4" />
-                Account access
-              </div>
-              <h2 className="text-3xl font-semibold text-transparent bg-gradient-to-r from-foreground via-primary to-blue-600 bg-clip-text">
-                Account Access
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Securely sign in or create your Turuturu Stars account. Email delivery is powered by
-                your Supabase + Brevo setup.
-              </p>
-            </div>
-
-            {!hasCaptchaProtection && (
-              <Alert className="mb-5 border-amber-400/50 bg-amber-50/80 text-amber-900">
-                <AlertDescription>
-                  Bot protection is not configured. Add `VITE_CLOUDFLARE_SITE_KEY` to enable Turnstile verification.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <Tabs
-              value={mode}
-              onValueChange={(val) => {
-                const nextMode = val as Mode;
-                setMode(nextMode);
-                if (nextMode === 'signup' && showRecoveryPanel) {
-                  closeRecoveryPanel();
-                }
-              }}
-              className="space-y-6"
-            >
-              <TabsList className="grid grid-cols-2 rounded-full border border-border/60 bg-muted/60 p-1">
-                <TabsTrigger
-                  value="signin"
-                  className="rounded-full data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:via-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg"
-                >
-                  Sign In
-                </TabsTrigger>
-                <TabsTrigger
-                  value="signup"
-                  className="rounded-full data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:via-blue-600 data-[state=active]:to-cyan-600 data-[state=active]:text-white data-[state=active]:shadow-lg"
-                >
-                  Create Account
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
-                <form className="space-y-5" onSubmit={handleLogin}>
+            <TabsContent value="signin">
+              <form className="space-y-5" onSubmit={handleLogin}>
                   <div className="space-y-2">
                     <Label htmlFor="login-identifier" className="text-sm font-medium text-foreground/80">
                       Email/Phone
@@ -980,10 +951,10 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       'Sign In'
                     )}
                   </Button>
-                </form>
-              </TabsContent>
+              </form>
+            </TabsContent>
 
-              <TabsContent value="signup">
+            <TabsContent value="signup">
                 {signupAcknowledged && (
                   <Alert className="mb-5 border-primary/20 bg-primary/5">
                     <AlertDescription>
@@ -993,8 +964,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                   </Alert>
                 )}
 
-                <form className="grid grid-cols-1 md:grid-cols-2 gap-4" onSubmit={handleSignup}>
-                  <div className="space-y-2 md:col-span-2">
+                <form className="grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSignup}>
+                  <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="signup-email" className="text-sm font-medium text-foreground/80">
                       Email
                     </Label>
@@ -1011,7 +982,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="signup-phone" className="text-sm font-medium text-foreground/80">
                       Phone Number (SMS Verification)
                     </Label>
@@ -1045,14 +1016,11 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Accepted formats: 07..., 01..., 2547..., 2541..., +2547..., +2541...
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Delivery can take a few seconds. If no SMS appears after 30 seconds, use resend.
+                      SMS may take up to 10 minutes to arrive. Keep this page open while waiting.
                     </p>
                   </div>
 
-                  <div className="space-y-2 md:col-span-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="signup-sms-code" className="text-sm font-medium text-foreground/80">
                       Verification Code
                     </Label>
@@ -1139,25 +1107,18 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                   </div>
 
-                  <div className="md:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-                    <p className="text-sm font-medium text-foreground">Profile details come next</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      After account creation, you will complete full name, national ID, location, and student-member checkbox in your profile setup.
-                    </p>
-                  </div>
-
                   {hasCaptchaProtection && (
                     <TurnstileWidget
                       siteKey={turnstileSiteKey}
                       action="signup"
                       resetSignal={signupCaptchaResetSignal}
                       onTokenChange={handleSignupCaptchaChange}
-                      className="md:col-span-2"
+                      className="sm:col-span-2"
                     />
                   )}
 
                   {requiresManualCheck.signup && (
-                    <Alert className="md:col-span-2 border-amber-400/50 bg-amber-50/80 text-amber-900">
+                    <Alert className="sm:col-span-2 border-amber-400/50 bg-amber-50/80 text-amber-900">
                       <AlertDescription className="space-y-3">
                         <p className="text-sm">
                           Automatic Turnstile validation failed. Run a manual Cloudflare check, then submit again.
@@ -1188,7 +1149,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
                   <Button
                     type="submit"
-                    className="w-full md:col-span-2 bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
+                    className="w-full sm:col-span-2 bg-gradient-to-r from-primary via-blue-600 to-cyan-600 text-white shadow-lg shadow-primary/20 hover:from-blue-700 hover:via-blue-700 hover:to-cyan-700"
                     disabled={
                       isSubmitting ||
                       !hasCaptchaProtection ||
@@ -1207,9 +1168,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     )}
                   </Button>
                 </form>
-              </TabsContent>
-            </Tabs>
-          </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </Card>
     </div>

@@ -184,7 +184,7 @@ const TurnstileWidgetInner = ({
   const status = useMemo(() => {
     if (isLoading) return 'Loading security check...';
     if (error) return error;
-    if (isVerified) return 'Verified';
+    if (isVerified) return 'Check complete';
     return 'Complete the check to continue';
   }, [error, isLoading, isVerified]);
 
@@ -205,15 +205,15 @@ const TurnstileWidgetInner = ({
   }
 
   return (
-    <div className={cn('rounded-xl border border-border/60 bg-background/70 p-3', className)}>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground/90">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Human Verification
+    <div className={cn('rounded-xl border border-border/60 bg-background/70 p-2.5 sm:p-3', className)}>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/90 sm:text-sm">
+          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+          Security Check
         </div>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
+            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide sm:text-[11px]',
             isVerified ? 'bg-emerald-500/15 text-emerald-700' : 'bg-muted text-muted-foreground'
           )}
         >
@@ -221,9 +221,9 @@ const TurnstileWidgetInner = ({
         </span>
       </div>
 
-      <div ref={containerRef} className="min-h-[72px]" />
+      <div ref={containerRef} className="min-h-[64px]" />
 
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] sm:text-xs">
         <div className="flex items-center gap-2">
           {isLoading ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
@@ -237,7 +237,7 @@ const TurnstileWidgetInner = ({
         {!isLoading && (
           <button
             type="button"
-            className="rounded-full border border-border/60 px-2 py-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground sm:text-[11px]"
             onClick={retryCheck}
           >
             Retry
