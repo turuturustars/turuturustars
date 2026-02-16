@@ -242,17 +242,23 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     setIsSendingSignupCode(true);
     try {
       const response = await sendSignupSmsCode(normalizedSignupPhone);
+      const providerStatus = response.providerStatus ? response.providerStatus.toUpperCase() : null;
+      const providerStatusHint = providerStatus ? ` Provider status: ${providerStatus}.` : '';
       setSignupCodeCooldownSeconds(Math.max(0, response.resendAfterSeconds ?? 0));
       setSignupVerificationToken(null);
       setSignupVerifiedPhone(null);
       setSignupSmsCode('');
       setSignupSmsFeedback({
         type: 'success',
-        message: `Code sent to ${response.maskedPhone}. It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes.`,
+        message:
+          `Code request accepted for ${response.maskedPhone}. ` +
+          `It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes. ` +
+          `If it does not arrive in 30 seconds, tap resend.` +
+          providerStatusHint,
       });
       toast({
         title: 'Code sent',
-        description: `Verification code sent to ${response.maskedPhone}.`,
+        description: `Verification code requested for ${response.maskedPhone}.${providerStatusHint}`,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to send SMS code';
@@ -972,6 +978,9 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Accepted formats: 07..., 01..., 2547..., 2541..., +2547..., +2541...
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Delivery can take a few seconds. If no SMS appears after 30 seconds, use resend.
                     </p>
                   </div>
 

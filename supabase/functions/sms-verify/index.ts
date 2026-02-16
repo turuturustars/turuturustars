@@ -21,6 +21,12 @@ type VerificationSessionRow = {
   resend_available_at: string;
 };
 
+type SmsSendResult = {
+  raw: unknown;
+  providerMessageId: string | null;
+  providerStatus: string | null;
+};
+
 const SMS_ENDPOINT = Deno.env.get("SMS_LEOPARD_SEND_URL")?.trim() || "https://api.smsleopard.com/v1/sms/send";
 const DEFAULT_PURPOSE: VerifyPurpose = "signup";
 const SUPPORTED_PURPOSES = new Set<VerifyPurpose>(["signup"]);
@@ -122,7 +128,7 @@ async function hashVerificationCode(phone: string, code: string): Promise<string
   return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function sendViaSmsLeopard(destinationPhone: string, message: string): Promise<unknown> {
+async function sendViaSmsLeopard(destinationPhone: string, message: string): Promise<SmsSendResult> {
   const accessToken = resolveAccessToken();
   const sourceId = Deno.env.get("SMS_LEOPARD_SOURCE_ID")?.trim();
   const destinationNumber = destinationPhone.startsWith("+")
@@ -184,8 +190,35 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
     throw new HttpError(400, providerMessage || "SMS provider rejected verification message", payloadObj);
   }
 
+  const recipients = Array.isArray(payloadObj?.recipients)
+    ? (payloadObj?.recipients as Array<Record<string, unknown>>)
+    : [];
+  const primaryRecipient = recipients[0] || null;
+  const providerStatus = typeof primaryRecipient?.status === "string" ? primaryRecipient.status : null;
+  const providerMessageId = typeof primaryRecipient?.id === "string"
+    ? primaryRecipient.id
+    : typeof payloadObj?.message_id === "string"
+      ? payloadObj.message_id
+      : typeof payloadObj?.id === "string"
+        ? payloadObj.id
+        : null;
+
+  if (providerStatus) {
+    const statusLower = providerStatus.toLowerCase();
+    if (["failed", "rejected", "invalid", "undelivered"].includes(statusLower)) {
+      throw new HttpError(502, `SMS provider returned ${providerStatus} status`, {
+        status: response.status,
+        response: parsed,
+      });
+    }
+  }
+
   console.log("SMS sent successfully");
-  return parsed;
+  return {
+    raw: parsed,
+    providerMessageId,
+    providerStatus,
+  };
 }
 
 async function ensurePhoneNotRegistered(supabase: ReturnType<typeof createServiceClient>, phone: string) {
@@ -335,8 +368,9 @@ async function handleSendCode(
 
   console.log("Sending SMS message:", message);
 
+  let smsSendResult: SmsSendResult | null = null;
   try {
-    await sendViaSmsLeopard(phone, message);
+    smsSendResult = await sendViaSmsLeopard(phone, message);
   } catch (error) {
     console.error("SMS sending failed, marking session as consumed:", error);
     await supabase
@@ -349,6 +383,10 @@ async function handleSendCode(
     throw error;
   }
 
+  if (!smsSendResult) {
+    throw new HttpError(500, "SMS provider response missing");
+  }
+
   console.log("SMS send completed successfully for session:", sessionId);
 
   return jsonResponse({
@@ -359,6 +397,8 @@ async function handleSendCode(
     maskedPhone: maskPhone(phone),
     expiresInSeconds: codeTtlSeconds,
     resendAfterSeconds: resendSeconds,
+    providerMessageId: smsSendResult.providerMessageId,
+    providerStatus: smsSendResult.providerStatus,
   });
 }
 

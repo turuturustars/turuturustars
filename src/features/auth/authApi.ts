@@ -124,6 +124,8 @@ type SmsVerificationSendResponse = {
   maskedPhone: string;
   expiresInSeconds: number;
   resendAfterSeconds: number;
+  providerMessageId?: string | null;
+  providerStatus?: string | null;
 };
 
 type SmsVerificationConfirmResponse = {
