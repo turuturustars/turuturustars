@@ -69,6 +69,31 @@
   letter-spacing: -0.025em;
 }
 
+.hero-rotating-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.12em;
+}
+
+.hero-word-window {
+  display: inline-flex;
+  min-width: 11.5ch;
+  overflow: hidden;
+}
+
+.hero-changing-word {
+  display: inline-block;
+}
+
+.hero-changing-word-drop {
+  animation: heroWordDropIn 1s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.hero-fixed-word {
+  color: #0a3d62;
+}
+
 .hero-lead {
   margin-top: 1rem;
   max-width: 45ch;
@@ -144,6 +169,21 @@
   }
 }
 
+@keyframes heroWordDropIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-1.2em);
+  }
+  75% {
+    opacity: 1;
+    transform: translateY(0.08em);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1100px) {
   .hero-shell {
     min-height: auto;
@@ -180,10 +220,18 @@
   .hero-actions > * {
     width: 100%;
   }
+
+  .hero-word-window {
+    min-width: 10.4ch;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .hero-media-fade {
+    animation: none;
+  }
+
+  .hero-changing-word-drop {
     animation: none;
   }
 }

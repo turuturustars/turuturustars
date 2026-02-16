@@ -10,10 +10,12 @@ import prizeGivingDay from '@/assets/turuturustars_community_during_prize_giving
 import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
 
 const HERO_IMAGES = [galleryMembers, veronikaEvent, prizeGivingDay, bestStudents];
+const HERO_WORDS = ['KARIBU', 'TUJENGE', 'TUKUZE', 'TURUTURU NI'];
 
 const HeroSection = () => {
   const [isReducedMotion, setIsReducedMotion] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [activeWordIndex, setActiveWordIndex] = useState(0);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -46,6 +48,18 @@ const HeroSection = () => {
     return () => window.clearInterval(intervalId);
   }, [isReducedMotion]);
 
+  useEffect(() => {
+    if (isReducedMotion) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setActiveWordIndex((currentIndex) => (currentIndex + 1) % HERO_WORDS.length);
+    }, 3200);
+
+    return () => window.clearInterval(intervalId);
+  }, [isReducedMotion]);
+
   return (
     <section id="home" className="hero-shell">
       <div className="hero-backdrop" aria-hidden="true" />
@@ -55,10 +69,20 @@ const HeroSection = () => {
 
       <div className="hero-content">
         <div className="hero-copy">
-          <h1>KARIBU NYUMBANI.</h1>
+          <h1 className="hero-rotating-title">
+            <span className="hero-word-window">
+              <span
+                key={activeWordIndex}
+                className={`hero-changing-word ${isReducedMotion ? '' : 'hero-changing-word-drop'}`}
+              >
+                {HERO_WORDS[activeWordIndex]}
+              </span>
+            </span>
+            <span className="hero-fixed-word"> NYUMBANI.</span>
+          </h1>
 
           <p className="hero-lead">
-            TURUTURU NI HOME, TUKUZE NYUMBANI, TUJENGE NA TUINUANE.
+            TUJENGE NA TUINUANE.
           </p>
 
           <div className="hero-actions">
