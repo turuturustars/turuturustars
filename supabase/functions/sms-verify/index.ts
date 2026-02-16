@@ -160,8 +160,7 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
     payload.source = sourceId;
   }
 
-  console.log("Sending SMS via SMSLeopard to:", destinationNumber.replace(/\d/g, 'X').slice(-4));
-  console.log("Payload:", JSON.stringify({ ...payload, destination: [{ number: '***' }] }));
+  console.log("Sending SMS via SMSLeopard to:", destinationNumber.replace(/\d/g, "X").slice(-4));
 
   const response = await fetch(SMS_ENDPOINT, {
     method: "POST",
@@ -182,7 +181,6 @@ async function sendViaSmsLeopard(destinationPhone: string, message: string): Pro
   }
 
   console.log("SMSLeopard response status:", response.status);
-  console.log("SMSLeopard response body:", JSON.stringify(parsed));
 
   const payloadObj = parsed as Record<string, unknown> | null;
   const providerMessage = typeof payloadObj?.message === "string" ? payloadObj.message : null;
@@ -334,7 +332,7 @@ async function handleSendCode(
   const expiresAtIso = new Date(now + codeTtlSeconds * 1000).toISOString();
   const resendAtIso = new Date(now + resendSeconds * 1000).toISOString();
 
-  console.log("Generated verification code for phone:", phone.slice(-4), "Code:", code);
+  console.log("Generated verification session for phone ending:", phone.slice(-2));
 
   const { error: invalidateError } = await supabase
     .from("sms_verification_sessions")
@@ -385,7 +383,7 @@ async function handleSendCode(
     `It expires in ${expiresMinutes} minute${expiresMinutes === 1 ? "" : "s"}. Do not share this code.` +
     webOtpSuffix;
 
-  console.log("Sending SMS message:", message);
+  console.log("Dispatching verification SMS message");
 
   let smsSendResult: SmsSendResult | null = null;
   try {
