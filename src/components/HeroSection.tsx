@@ -9,13 +9,29 @@ import veronikaEvent from '@/assets/turuturu_stars_community_togther_with_senato
 import prizeGivingDay from '@/assets/turuturustars_community_during_prize_giving_day.jpg';
 import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
 
-const HERO_IMAGES = [galleryMembers, veronikaEvent, prizeGivingDay, bestStudents];
-const HERO_WORDS = ['KARIBU', 'TUJENGE', 'TUKUZE', 'TURUTURU NI'];
+const HERO_SEQUENCE = [
+  { image: galleryMembers, word: 'KARIBU' },
+  { image: veronikaEvent, word: 'TUJENGE' },
+  { image: prizeGivingDay, word: 'TUKUZE' },
+  { image: bestStudents, word: 'TURUTURU NI' },
+];
+
+const WORD_COLORS = ['#8ed4ff', '#ffd66e', '#ff8a8a', '#8dffcf', '#d5b4ff', '#ffba6c'];
+
+const pickRandomColor = (currentColor: string) => {
+  if (WORD_COLORS.length < 2) {
+    return WORD_COLORS[0] ?? '#8ed4ff';
+  }
+
+  const filteredColors = WORD_COLORS.filter((color) => color !== currentColor);
+  const randomIndex = Math.floor(Math.random() * filteredColors.length);
+  return filteredColors[randomIndex];
+};
 
 const HeroSection = () => {
   const [isReducedMotion, setIsReducedMotion] = useState(false);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const [activeWordIndex, setActiveWordIndex] = useState(0);
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [activeWordColor, setActiveWordColor] = useState(WORD_COLORS[0]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -30,9 +46,9 @@ const HeroSection = () => {
   }, []);
 
   useEffect(() => {
-    HERO_IMAGES.forEach((image) => {
+    HERO_SEQUENCE.forEach((step) => {
       const preloadImage = new Image();
-      preloadImage.src = image;
+      preloadImage.src = step.image;
     });
   }, []);
 
@@ -42,46 +58,25 @@ const HeroSection = () => {
     }
 
     const intervalId = window.setInterval(() => {
-      setActiveImageIndex((currentIndex) => (currentIndex + 1) % HERO_IMAGES.length);
-    }, 8000);
+      setActiveStepIndex((currentIndex) => (currentIndex + 1) % HERO_SEQUENCE.length);
+      setActiveWordColor((currentColor) => pickRandomColor(currentColor));
+    }, 4200);
 
     return () => window.clearInterval(intervalId);
   }, [isReducedMotion]);
 
-  useEffect(() => {
-    if (isReducedMotion) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setActiveWordIndex((currentIndex) => (currentIndex + 1) % HERO_WORDS.length);
-    }, 3200);
-
-    return () => window.clearInterval(intervalId);
-  }, [isReducedMotion]);
+  const activeStep = HERO_SEQUENCE[activeStepIndex];
 
   return (
     <section id="home" className="hero-shell">
       <div className="hero-image-stage" aria-hidden="true">
-        {HERO_IMAGES.map((image, index) => (
-          <div
-            key={image}
-            className={`hero-image-layer ${index === activeImageIndex ? 'is-active' : ''}`}
-          >
-            <img
-              src={image}
-              alt=""
-              className="hero-image-blur"
-              loading={index === 0 ? 'eager' : 'lazy'}
-            />
-            <img
-              src={image}
-              alt=""
-              className="hero-image-main"
-              loading={index === 0 ? 'eager' : 'lazy'}
-            />
-          </div>
-        ))}
+        <img
+          key={activeStepIndex}
+          src={activeStep.image}
+          alt="Turuturu Stars community activities"
+          className={`hero-image-main ${isReducedMotion ? '' : 'hero-image-main-enter'}`}
+          loading="eager"
+        />
       </div>
       <div className="hero-image-overlay" aria-hidden="true" />
 
@@ -90,10 +85,11 @@ const HeroSection = () => {
           <h1 className="hero-rotating-title">
             <span className="hero-word-window">
               <span
-                key={activeWordIndex}
+                key={activeStepIndex}
                 className={`hero-changing-word ${isReducedMotion ? '' : 'hero-changing-word-drop'}`}
+                style={{ color: activeWordColor }}
               >
-                {HERO_WORDS[activeWordIndex]}
+                {activeStep.word}
               </span>
             </span>
             <span className="hero-fixed-word"> NYUMBANI.</span>
@@ -117,18 +113,6 @@ const HeroSection = () => {
                 <HeartHandshake className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-          </div>
-        </div>
-
-        <div className="hero-media-shell">
-          <div className="hero-media-frame">
-            <img
-              key={activeImageIndex}
-              src={HERO_IMAGES[activeImageIndex]}
-              alt="Turuturu Stars community activities"
-              className={`hero-media ${isReducedMotion ? '' : 'hero-media-fade'}`}
-              loading="eager"
-            />
           </div>
         </div>
       </div>
