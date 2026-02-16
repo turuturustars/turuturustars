@@ -29,7 +29,7 @@ export interface SignUpPayload {
 }
 
 export interface SignInPayload {
-  email: string;
+  identifier: string;
   password: string;
   captchaToken?: string;
 }
@@ -105,16 +105,51 @@ export async function signUpWithEmail(payload: SignUpPayload) {
 }
 
 export async function signInWithEmail(payload: SignInPayload) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: payload.email,
-    password: payload.password,
-    options: {
+  const normalizedIdentifier = payload.identifier.trim();
+  if (!normalizedIdentifier) {
+    throw new Error('Enter your email or phone.');
+  }
+
+  const { data, error } = await supabase.functions.invoke('auth-signin', {
+    body: {
+      identifier: normalizedIdentifier,
+      password: payload.password,
       captchaToken: payload.captchaToken,
     },
   });
 
-  if (error) throw toAuthRequestError(error);
-  return { user: data.user, session: data.session };
+  if (error) {
+    throw new Error(await extractFunctionError(error));
+  }
+
+  const payloadData = data as {
+    success?: boolean;
+    error?: string;
+    accessToken?: string;
+    refreshToken?: string;
+    identifierType?: 'email' | 'phone' | 'membership_number';
+    usedIdNumberPassword?: boolean;
+  };
+
+  if (payloadData.success !== true || !payloadData.accessToken || !payloadData.refreshToken) {
+    throw new Error(payloadData.error || 'Unable to sign in');
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+    access_token: payloadData.accessToken,
+    refresh_token: payloadData.refreshToken,
+  });
+
+  if (sessionError) {
+    throw new Error(sessionError.message || 'Unable to start your session.');
+  }
+
+  return {
+    user: sessionData.user,
+    session: sessionData.session,
+    identifierType: payloadData.identifierType || 'email',
+    usedIdNumberPassword: payloadData.usedIdNumberPassword === true,
+  };
 }
 
 type SmsVerificationSendResponse = {

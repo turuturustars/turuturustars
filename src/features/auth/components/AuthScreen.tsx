@@ -68,7 +68,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     emailHint?: string | null;
   } | null>(null);
 
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ identifier: '', password: '' });
   const [signupForm, setSignupForm] = useState({
     email: '',
     phone: '',
@@ -606,7 +606,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
       if (existingUserHint) {
         setMode('signin');
-        setLoginForm((prev) => ({ ...prev, email: signupForm.email }));
+        setLoginForm((prev) => ({ ...prev, identifier: signupForm.email }));
         openRecoveryPanel(signupForm.email);
         toast({
           title: 'Account already exists',
@@ -639,7 +639,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       const message = error instanceof Error ? error.message : 'Sign up failed';
       if (looksLikeExistingAccountError(message)) {
         setMode('signin');
-        setLoginForm((prev) => ({ ...prev, email: signupForm.email }));
+        setLoginForm((prev) => ({ ...prev, identifier: signupForm.email }));
         openRecoveryPanel(signupForm.email);
         toast({
           title: 'Account already exists',
@@ -784,19 +784,20 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
               <TabsContent value="signin">
                 <form className="space-y-5" onSubmit={handleLogin}>
                   <div className="space-y-2">
-                    <Label htmlFor="login-email" className="text-sm font-medium text-foreground/80">
-                      Email
+                    <Label htmlFor="login-identifier" className="text-sm font-medium text-foreground/80">
+                      Email/Phone
                     </Label>
                     <div className="relative">
                       <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                       <Input
-                        id="login-email"
-                        type="email"
-                        autoComplete="email"
+                        id="login-identifier"
+                        type="text"
+                        autoComplete="username"
+                        placeholder="Email or phone"
                         required
                         className="pl-9 border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm((prev) => ({ ...prev, email: e.target.value }))}
+                        value={loginForm.identifier}
+                        onChange={(e) => setLoginForm((prev) => ({ ...prev, identifier: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -809,7 +810,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       <button
                         type="button"
                         className="text-xs font-medium text-primary hover:underline"
-                        onClick={() => openRecoveryPanel(loginForm.email)}
+                        onClick={() => openRecoveryPanel(loginForm.identifier)}
                       >
                         Forgot password?
                       </button>
