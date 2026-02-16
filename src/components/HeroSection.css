@@ -1,72 +1,79 @@
 .hero-shell {
   position: relative;
   overflow: hidden;
-  min-height: min(880px, 100vh);
-  padding: clamp(7rem, 10vw, 8.5rem) 0 clamp(3rem, 5vw, 4.75rem);
-  background: #f7fbff;
+  min-height: clamp(720px, 100vh, 980px);
+  padding: clamp(7rem, 10vw, 8.8rem) 0 clamp(3rem, 6vw, 4.8rem);
+  background: #0a2d48;
 }
 
-.hero-backdrop {
+.hero-image-stage {
   position: absolute;
   inset: 0;
-  background: linear-gradient(140deg, #f8fbff 0%, #ebf4fd 45%, #e2eefb 100%);
 }
 
-.hero-mesh {
+.hero-image-layer {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(10, 61, 98, 0.08) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.4), transparent 86%);
-  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.15s ease;
 }
 
-.hero-glow {
+.hero-image-layer.is-active {
+  opacity: 1;
+}
+
+.hero-image-blur,
+.hero-image-main {
   position: absolute;
-  border-radius: 999px;
-  filter: blur(62px);
-  opacity: 0.42;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-image-blur {
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.08);
+  filter: blur(24px) brightness(0.56) saturate(1.05);
+}
+
+.hero-image-main {
+  object-fit: contain;
+  object-position: center;
+  padding: clamp(0.65rem, 1.8vw, 1.2rem);
+}
+
+.hero-image-overlay {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-}
-
-.hero-glow-left {
-  width: clamp(240px, 38vw, 460px);
-  height: clamp(240px, 38vw, 460px);
-  left: -10%;
-  top: -16%;
-  background: rgba(48, 174, 255, 0.35);
-}
-
-.hero-glow-right {
-  width: clamp(260px, 42vw, 520px);
-  height: clamp(260px, 42vw, 520px);
-  right: -14%;
-  bottom: -22%;
-  background: rgba(10, 61, 98, 0.3);
+  background:
+    linear-gradient(120deg, rgba(5, 26, 44, 0.78) 0%, rgba(8, 35, 58, 0.62) 36%, rgba(9, 40, 66, 0.44) 62%, rgba(10, 43, 72, 0.58) 100%),
+    radial-gradient(circle at 76% 24%, rgba(66, 186, 255, 0.16), transparent 46%);
 }
 
 .hero-content {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   width: min(1160px, calc(100% - 2rem));
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
+  min-height: clamp(470px, 68vh, 640px);
+  display: flex;
   align-items: center;
-  gap: clamp(1.3rem, 3.6vw, 3rem);
 }
 
 .hero-copy {
-  max-width: 640px;
+  max-width: 700px;
 }
 
 .hero-copy h1 {
   margin-top: 0.25rem;
-  color: #072d49;
+  color: #ffffff;
   font-family: Fraunces, Georgia, 'Times New Roman', serif;
-  font-size: clamp(2rem, 6vw, 4rem);
+  font-size: clamp(2rem, 6vw, 4.1rem);
   line-height: 1.03;
   letter-spacing: -0.025em;
+  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
 }
 
 .hero-rotating-title {
@@ -78,7 +85,7 @@
 
 .hero-word-window {
   display: inline-flex;
-  min-width: 11.5ch;
+  min-width: 11.7ch;
   overflow: hidden;
 }
 
@@ -91,13 +98,13 @@
 }
 
 .hero-fixed-word {
-  color: #0a3d62;
+  color: #8ed4ff;
 }
 
 .hero-lead {
   margin-top: 1rem;
-  max-width: 45ch;
-  color: rgba(7, 45, 73, 0.84);
+  max-width: 40ch;
+  color: rgba(241, 249, 255, 0.95);
   font-size: clamp(1rem, 2.2vw, 1.2rem);
   line-height: 1.65;
 }
@@ -110,63 +117,28 @@
 }
 
 .hero-primary-button {
-  background: #095faa;
-  color: #fff;
-  border: 1px solid #095faa;
-  box-shadow: 0 16px 30px rgba(10, 61, 98, 0.22);
+  background: #21adff;
+  color: #062840;
+  border: 1px solid #21adff;
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
 }
 
 .hero-primary-button:hover {
-  background: #084f8e;
-  border-color: #084f8e;
+  background: #0f9cf0;
+  border-color: #0f9cf0;
+  color: #05243a;
 }
 
 .hero-secondary-button {
-  border-color: rgba(10, 61, 98, 0.32);
-  background: rgba(255, 255, 255, 0.85);
-  color: #0a3d62;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: rgba(3, 25, 42, 0.44);
+  color: #ffffff;
 }
 
 .hero-secondary-button:hover {
-  border-color: rgba(10, 61, 98, 0.48);
-  background: #fff;
-  color: #0a3d62;
-}
-
-.hero-media-shell {
-  border-radius: 1.35rem;
-  border: 1px solid rgba(10, 61, 98, 0.16);
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow: 0 24px 50px rgba(10, 61, 98, 0.18);
-  padding: 0.76rem;
-  backdrop-filter: blur(8px);
-}
-
-.hero-media-frame {
-  border-radius: 1rem;
-  overflow: hidden;
-  background: #d8e8f8;
-}
-
-.hero-media {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-}
-
-.hero-media-fade {
-  animation: heroMediaFade 0.5s ease;
-}
-
-@keyframes heroMediaFade {
-  from {
-    opacity: 0.46;
-    transform: scale(1.012);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  border-color: #ffffff;
+  background: rgba(3, 25, 42, 0.66);
+  color: #ffffff;
 }
 
 @keyframes heroWordDropIn {
@@ -190,16 +162,11 @@
   }
 
   .hero-content {
-    grid-template-columns: 1fr;
-    gap: 1.3rem;
+    min-height: clamp(420px, 62vh, 540px);
   }
 
-  .hero-copy {
-    max-width: none;
-  }
-
-  .hero-media {
-    aspect-ratio: 16 / 10;
+  .hero-image-main {
+    padding: 0.75rem;
   }
 }
 
@@ -210,6 +177,15 @@
 
   .hero-content {
     width: min(1160px, calc(100% - 1.2rem));
+    min-height: clamp(390px, 58vh, 500px);
+  }
+
+  .hero-word-window {
+    min-width: 10.5ch;
+  }
+
+  .hero-lead {
+    max-width: 28ch;
   }
 
   .hero-actions {
@@ -220,15 +196,11 @@
   .hero-actions > * {
     width: 100%;
   }
-
-  .hero-word-window {
-    min-width: 10.4ch;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-media-fade {
-    animation: none;
+  .hero-image-layer {
+    transition: none;
   }
 
   .hero-changing-word-drop {

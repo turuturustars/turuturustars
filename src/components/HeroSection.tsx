@@ -62,10 +62,28 @@ const HeroSection = () => {
 
   return (
     <section id="home" className="hero-shell">
-      <div className="hero-backdrop" aria-hidden="true" />
-      <div className="hero-mesh" aria-hidden="true" />
-      <div className="hero-glow hero-glow-left" aria-hidden="true" />
-      <div className="hero-glow hero-glow-right" aria-hidden="true" />
+      <div className="hero-image-stage" aria-hidden="true">
+        {HERO_IMAGES.map((image, index) => (
+          <div
+            key={image}
+            className={`hero-image-layer ${index === activeImageIndex ? 'is-active' : ''}`}
+          >
+            <img
+              src={image}
+              alt=""
+              className="hero-image-blur"
+              loading={index === 0 ? 'eager' : 'lazy'}
+            />
+            <img
+              src={image}
+              alt=""
+              className="hero-image-main"
+              loading={index === 0 ? 'eager' : 'lazy'}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="hero-image-overlay" aria-hidden="true" />
 
       <div className="hero-content">
         <div className="hero-copy">
