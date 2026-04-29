@@ -486,13 +486,24 @@ export default function DisciplinePage() {
                         <TableCell>{format(new Date(record.incident_date), 'PP')}</TableCell>
                         <TableCell>KES {Number(record.fine_amount).toLocaleString()}</TableCell>
                         <TableCell>
-                          {record.fine_paid ? (
-                            <Badge className="bg-green-100 text-green-800">Paid</Badge>
-                          ) : record.fine_amount > 0 ? (
-                            <Badge className="bg-red-100 text-red-800">Unpaid</Badge>
-                          ) : (
-                            <Badge className="bg-gray-100 text-gray-800">N/A</Badge>
-                          )}
+                          <div className="space-y-2">
+                            {record.fine_paid ? (
+                              <Badge className="bg-green-100 text-green-800">Paid</Badge>
+                            ) : record.fine_amount > 0 ? (
+                              <Badge className="bg-red-100 text-red-800">Unpaid</Badge>
+                            ) : (
+                              <Badge className="bg-gray-100 text-gray-800">N/A</Badge>
+                            )}
+                            {!record.fine_paid && record.fine_amount > 0 && record.member_id === user?.id && (
+                              <PayWithWalletButton
+                                amount={Number(record.fine_amount)}
+                                type="fine"
+                                disciplineId={record.id}
+                                description={`Fine: ${record.incident_type}`}
+                                onAfterPay={fetchRecords}
+                              />
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>{getStatusBadge(record.status)}</TableCell>
                         {canManage && (
