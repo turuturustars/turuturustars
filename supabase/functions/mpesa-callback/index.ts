@@ -9,6 +9,8 @@ interface MpesaTransaction {
   status: string;
   contribution_id: string | null;
   member_id: string | null;
+  transaction_type: string | null;
+  amount: number | null;
 }
 
 serve(async (req) => {
