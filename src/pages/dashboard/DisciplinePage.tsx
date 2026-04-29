@@ -15,6 +15,7 @@ import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { AlertTriangle, Plus, DollarSign, CheckCircle, Clock, Loader2, Gavel } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import PayWithWalletButton from '@/components/wallet/PayWithWalletButton';
 
 interface DisciplineRecord {
   id: string;
