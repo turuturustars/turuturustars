@@ -15,6 +15,7 @@ import {
   UserCheck,
   TrendingUp,
   PiggyBank,
+  Wallet,
   ClipboardList,
   Smartphone,
   ChevronDown,
@@ -109,6 +110,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     { label: 'Website Home', href: '/', icon: Home, badge: null },
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
+    { label: 'My Wallet', href: '/dashboard/finance/wallet', icon: Wallet, badge: null },
     { label: 'Membership Fees', href: '/dashboard/finance/membership-fees', icon: PiggyBank, badge: null },
     { label: 'Welfare Cases', href: '/dashboard/members/welfare', icon: HandHeart, badge: null },
     {
