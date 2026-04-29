@@ -65,7 +65,7 @@ serve(async (req) => {
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
-      .select("id, status, contribution_id, member_id")
+      .select("id, status, contribution_id, member_id, transaction_type, amount")
       .eq("checkout_request_id", CheckoutRequestID)
       .single();
     
@@ -89,7 +89,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("checkout_request_id", CheckoutRequestID)
-        .select("id, status, contribution_id, member_id")
+        .select("id, status, contribution_id, member_id, transaction_type, amount")
         .single();
       
       if (updateError) {
