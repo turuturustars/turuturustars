@@ -109,6 +109,7 @@ const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
 const RoleHandoverPage = lazy(() => import("./pages/dashboard/RoleHandoverPage"));
 const PrivateMessagesPage = lazy(() => import("./pages/dashboard/PrivateMessagesPage"));
 const NotificationsPage = lazy(() => import("./pages/dashboard/NotificationsPage"));
+const WalletPage = lazy(() => import("./pages/dashboard/WalletPage"));
 
 // QueryClient configuration with better defaults
 const queryClient = new QueryClient({
@@ -282,6 +283,7 @@ const App = () => {
                     <Route path="contributions" element={<ContributionsPage />} />
                     <Route path="all-contributions" element={<AllContributionsPage />} />
                     <Route path="treasurer-dashboard" element={<TreasurerDashboard />} />
+                    <Route path="wallet" element={<WalletPage />} />
                     <Route
                       path="mpesa"
                       element={

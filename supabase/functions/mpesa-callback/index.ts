@@ -9,6 +9,8 @@ interface MpesaTransaction {
   status: string;
   contribution_id: string | null;
   member_id: string | null;
+  transaction_type: string | null;
+  amount: number | null;
 }
 
 serve(async (req) => {
@@ -63,7 +65,7 @@ serve(async (req) => {
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
-      .select("id, status, contribution_id, member_id")
+      .select("id, status, contribution_id, member_id, transaction_type, amount")
       .eq("checkout_request_id", CheckoutRequestID)
       .single();
     
@@ -87,7 +89,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("checkout_request_id", CheckoutRequestID)
-        .select("id, status, contribution_id, member_id")
+        .select("id, status, contribution_id, member_id, transaction_type, amount")
         .single();
       
       if (updateError) {
@@ -103,6 +105,28 @@ serve(async (req) => {
       console.log(`Transaction ${CheckoutRequestID} already processed with status: ${transaction.status}`);
     }
     
+    // Wallet top-up: credit member wallet on success
+    if (ResultCode === 0 && transaction?.transaction_type === "wallet_topup" && transaction.member_id) {
+      try {
+        const { error: walletErr } = await supabase.rpc("process_wallet_transaction", {
+          _user_id: transaction.member_id,
+          _type: "topup",
+          _direction: "credit",
+          _amount: Number(amount || transaction.amount || 0),
+          _description: `M-Pesa wallet top-up (${mpesaReceiptNumber})`,
+          _reference: mpesaReceiptNumber || CheckoutRequestID,
+          _mpesa_transaction_id: transaction.id,
+          _contribution_id: null,
+          _welfare_case_id: null,
+          _discipline_id: null,
+        });
+        if (walletErr) console.error("Wallet credit failed:", walletErr);
+        else console.log(`Wallet credited for member ${transaction.member_id}: ${amount}`);
+      } catch (e) {
+        console.error("Wallet credit exception:", e);
+      }
+    }
+
     // If payment successful and transaction exists, update contribution status
     if (ResultCode === 0 && transaction?.contribution_id) {
       try {

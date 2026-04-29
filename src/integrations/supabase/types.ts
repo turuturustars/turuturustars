@@ -1157,6 +1157,101 @@ export type Database = {
           },
         ]
       }
+      wallet_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          contribution_id: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          direction: string
+          discipline_id: string | null
+          id: string
+          mpesa_transaction_id: string | null
+          reference: string | null
+          status: string
+          type: string
+          user_id: string
+          wallet_id: string
+          welfare_case_id: string | null
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          direction: string
+          discipline_id?: string | null
+          id?: string
+          mpesa_transaction_id?: string | null
+          reference?: string | null
+          status?: string
+          type: string
+          user_id: string
+          wallet_id: string
+          welfare_case_id?: string | null
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          contribution_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          direction?: string
+          discipline_id?: string | null
+          id?: string
+          mpesa_transaction_id?: string | null
+          reference?: string | null
+          status?: string
+          type?: string
+          user_id?: string
+          wallet_id?: string
+          welfare_case_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_wallet_id_fkey"
+            columns: ["wallet_id"]
+            isOneToOne: false
+            referencedRelation: "wallets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       welfare_cases: {
         Row: {
           beneficiary_id: string | null
@@ -1234,6 +1329,7 @@ export type Database = {
     }
     Functions: {
       delete_expired_jobs: { Args: never; Returns: number }
+      ensure_wallet: { Args: { _user_id: string }; Returns: string }
       generate_membership_number: { Args: never; Returns: string }
       has_role: {
         Args: {
@@ -1251,6 +1347,21 @@ export type Database = {
           p_entity_id?: string
           p_entity_type: string
           p_metadata?: Json
+        }
+        Returns: string
+      }
+      process_wallet_transaction: {
+        Args: {
+          _amount: number
+          _contribution_id?: string
+          _description?: string
+          _direction: string
+          _discipline_id?: string
+          _mpesa_transaction_id?: string
+          _reference?: string
+          _type: string
+          _user_id: string
+          _welfare_case_id?: string
         }
         Returns: string
       }
