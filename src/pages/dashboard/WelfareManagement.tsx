@@ -18,6 +18,7 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import WelfareContributeDialog from '@/components/dashboard/WelfareContributeDialog';
+import PayWithWalletButton from '@/components/wallet/PayWithWalletButton';
 
 interface WelfareCase {
   id: string;
@@ -286,8 +287,8 @@ const WelfareManagement = () => {
                       />
                     </div>
                   )}
-                  {/* Contribute Button */}
-                  <div className="mt-3 pt-2 border-t border-border">
+                  {/* Contribute Buttons */}
+                  <div className="mt-3 pt-2 border-t border-border space-y-2">
                     <WelfareContributeDialog
                       welfareCaseId={welfareCase.id}
                       welfareCaseTitle={welfareCase.title}
@@ -296,6 +297,23 @@ const WelfareManagement = () => {
                       onContributionSuccess={() => {
                         fetchWelfareCases();
                         setSelectedCase(welfareCase);
+                      }}
+                    />
+                    <PayWithWalletButton
+                      amount={Math.min(
+                        100,
+                        welfareCase.target_amount
+                          ? Math.max(1, welfareCase.target_amount - (welfareCase.collected_amount || 0))
+                          : 100
+                      )}
+                      type="welfare"
+                      welfareCaseId={welfareCase.id}
+                      description={`Welfare: ${welfareCase.title}`}
+                      buttonLabel="Contribute KES 100 with Wallet"
+                      fullWidth
+                      onAfterPay={() => {
+                        fetchWelfareCases();
+                        if (selectedCase?.id === welfareCase.id) fetchContributions(welfareCase.id);
                       }}
                     />
                   </div>
