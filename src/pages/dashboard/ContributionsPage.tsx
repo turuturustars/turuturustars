@@ -27,6 +27,7 @@ import {
   AccessibleStatus,
 } from '@/components/accessible';
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
+import PayWithWalletButton from '@/components/wallet/PayWithWalletButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useInteractionGuard } from '@/hooks/useInteractionGuard';
@@ -447,11 +448,21 @@ const ContributionsPage = () => {
 
                       <div className="pt-2 border-t">
                         {contribution.status !== 'paid' ? (
-                          <PayWithMpesa
-                            contributionId={contribution.id}
-                            defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
-                          />
+                          <div className="space-y-2">
+                            <PayWithMpesa
+                              contributionId={contribution.id}
+                              defaultAmount={contribution.amount}
+                              trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
+                            />
+                            <PayWithWalletButton
+                              amount={contribution.amount}
+                              type="dues"
+                              contributionId={contribution.id}
+                              description={`${contribution.contribution_type} payment`}
+                              fullWidth
+                              onAfterPay={fetchContributions}
+                            />
+                          </div>
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
                         )}
@@ -500,11 +511,20 @@ const ContributionsPage = () => {
                       </TableCell>
                       <TableCell>
                         {contribution.status !== 'paid' ? (
-                          <PayWithMpesa
-                            contributionId={contribution.id}
-                            defaultAmount={contribution.amount}
-                            trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay now</AccessibleButton>}
-                          />
+                          <div className="flex flex-col gap-1">
+                            <PayWithMpesa
+                              contributionId={contribution.id}
+                              defaultAmount={contribution.amount}
+                              trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>M-Pesa</AccessibleButton>}
+                            />
+                            <PayWithWalletButton
+                              amount={contribution.amount}
+                              type="dues"
+                              contributionId={contribution.id}
+                              description={`${contribution.contribution_type} payment`}
+                              onAfterPay={fetchContributions}
+                            />
+                          </div>
                         ) : (
                           <span className="text-sm text-green-600">Paid</span>
                         )}
@@ -619,15 +639,22 @@ const ContributionsPage = () => {
                         </p>
                       )}
 
-                      {/* Pay Button */}
-                      <div className="flex justify-end">
+                      {/* Pay Buttons */}
+                      <div className="flex justify-end gap-2">
+                        <PayWithWalletButton
+                          amount={contribution.amount}
+                          type="dues"
+                          contributionId={contribution.id}
+                          description={`${contribution.contribution_type} payment`}
+                          onAfterPay={fetchContributions}
+                        />
                         <PayWithMpesa
                           contributionId={contribution.id}
                           defaultAmount={contribution.amount}
                           trigger={
                             <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
                               <DollarSign className="w-4 h-4 mr-2" />
-                              Pay Now
+                              Pay with M-Pesa
                             </Button>
                           }
                         />
