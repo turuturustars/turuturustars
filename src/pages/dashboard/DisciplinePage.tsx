@@ -397,6 +397,19 @@ export default function DisciplinePage() {
                           </div>
                         </div>
 
+                        {!record.fine_paid && record.fine_amount > 0 && record.member_id === user?.id && (
+                          <div className="pt-2 border-t">
+                            <PayWithWalletButton
+                              amount={Number(record.fine_amount)}
+                              type="fine"
+                              disciplineId={record.id}
+                              description={`Fine: ${record.incident_type}`}
+                              fullWidth
+                              onAfterPay={fetchRecords}
+                            />
+                          </div>
+                        )}
+
                         {canManage && (
                           <div className="pt-2 border-t space-y-2">
                             {!record.fine_paid && record.fine_amount > 0 && (
