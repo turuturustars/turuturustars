@@ -10,8 +10,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Wallet, Loader2 } from 'lucide-react';
+import { Wallet, Loader2, CheckCircle2, Copy } from 'lucide-react';
 import useWallet from '@/hooks/useWallet';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
