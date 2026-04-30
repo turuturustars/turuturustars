@@ -786,6 +786,7 @@ export type Database = {
           created_at: string
           id: string
           initiated_by: string
+          kitty_id: string | null
           member_id: string | null
           merchant_request_id: string | null
           mpesa_receipt_number: string | null
@@ -807,6 +808,7 @@ export type Database = {
           created_at?: string
           id?: string
           initiated_by: string
+          kitty_id?: string | null
           member_id?: string | null
           merchant_request_id?: string | null
           mpesa_receipt_number?: string | null
@@ -828,6 +830,7 @@ export type Database = {
           created_at?: string
           id?: string
           initiated_by?: string
+          kitty_id?: string | null
           member_id?: string | null
           merchant_request_id?: string | null
           mpesa_receipt_number?: string | null
@@ -848,6 +851,13 @@ export type Database = {
             columns: ["contribution_id"]
             isOneToOne: false
             referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mpesa_transactions_kitty_id_fkey"
+            columns: ["kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
             referencedColumns: ["id"]
           },
           {
