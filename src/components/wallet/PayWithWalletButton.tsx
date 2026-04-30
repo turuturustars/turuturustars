@@ -224,6 +224,54 @@ const PayWithWalletButton = ({
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
+
+      {/* Success receipt with reference number */}
+      <Dialog open={receiptOpen} onOpenChange={setReceiptOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              Payment Successful
+            </DialogTitle>
+            <DialogDescription>
+              Your wallet payment for{' '}
+              {lastType === 'dues' ? 'monthly dues' : lastType === 'welfare' ? 'welfare contribution' : 'fine'} was completed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount paid</span>
+                <span className="font-semibold">KES {lastAmount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Reference</span>
+                <button
+                  type="button"
+                  onClick={copyRef}
+                  className="font-mono text-xs font-semibold text-primary inline-flex items-center gap-1 hover:underline"
+                  title="Copy reference"
+                >
+                  {lastReference}
+                  <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">New balance</span>
+                <span className="font-semibold">KES {Number(wallet?.balance || 0).toLocaleString()}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Save this reference for your records. You can also find it in your wallet transactions.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setReceiptOpen(false)} className="w-full">
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AlertDialog>
   );
 };
