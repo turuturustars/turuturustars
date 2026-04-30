@@ -91,15 +91,23 @@ export const useWallet = (userId?: string) => {
       contribution_id?: string;
       welfare_case_id?: string;
       discipline_id?: string;
+      reference?: string;
     }) => {
       if (!targetId) throw new Error('Not signed in');
+      // Generate a unique wallet reference (e.g. WLT-FIN-XXXXXXXX)
+      const prefix =
+        params.type === 'dues' ? 'DUE' : params.type === 'welfare' ? 'WLF' : 'FIN';
+      const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
+      const ts = Date.now().toString(36).slice(-4).toUpperCase();
+      const reference = params.reference ?? `WLT-${prefix}-${ts}${rand}`;
+
       const { data, error } = await supabase.rpc('process_wallet_transaction', {
         _user_id: targetId,
         _type: params.type,
         _direction: 'debit',
         _amount: params.amount,
         _description: params.description ?? null,
-        _reference: null,
+        _reference: reference,
         _mpesa_transaction_id: null,
         _contribution_id: params.contribution_id ?? null,
         _welfare_case_id: params.welfare_case_id ?? null,
@@ -107,7 +115,7 @@ export const useWallet = (userId?: string) => {
       } as never);
       if (error) throw error;
       await fetchAll();
-      return data;
+      return { transactionId: data as unknown as string, reference };
     },
     [targetId, fetchAll]
   );

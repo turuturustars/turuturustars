@@ -64,8 +64,13 @@ const WalletTransactionList = ({ transactions }: Props) => {
                     )}
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
-                    {t.description || t.reference || new Date(t.created_at).toLocaleString()}
+                    {t.description || new Date(t.created_at).toLocaleString()}
                   </p>
+                  {t.reference && (
+                    <p className="truncate text-[10px] font-mono text-muted-foreground/80">
+                      Ref: {t.reference}
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p
