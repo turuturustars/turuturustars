@@ -11,6 +11,7 @@ interface MpesaTransaction {
   member_id: string | null;
   transaction_type: string | null;
   amount: number | null;
+  kitty_id: string | null;
 }
 
 serve(async (req) => {
@@ -65,7 +66,7 @@ serve(async (req) => {
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
-      .select("id, status, contribution_id, member_id, transaction_type, amount")
+      .select("id, status, contribution_id, member_id, transaction_type, amount, kitty_id")
       .eq("checkout_request_id", CheckoutRequestID)
       .single();
     
@@ -89,7 +90,7 @@ serve(async (req) => {
           updated_at: new Date().toISOString(),
         })
         .eq("checkout_request_id", CheckoutRequestID)
-        .select("id, status, contribution_id, member_id, transaction_type, amount")
+        .select("id, status, contribution_id, member_id, transaction_type, amount, kitty_id")
         .single();
       
       if (updateError) {
@@ -124,6 +125,28 @@ serve(async (req) => {
         else console.log(`Wallet credited for member ${transaction.member_id}: ${amount}`);
       } catch (e) {
         console.error("Wallet credit exception:", e);
+      }
+    }
+
+    // Kitty M-Pesa contribution: credit kitty balance on success
+    if (
+      ResultCode === 0 &&
+      transaction?.transaction_type === "kitty_contribution" &&
+      transaction.kitty_id &&
+      transaction.member_id
+    ) {
+      try {
+        const { error: kittyErr } = await supabase.rpc("credit_kitty_from_mpesa", {
+          _kitty_id: transaction.kitty_id,
+          _member_id: transaction.member_id,
+          _amount: Number(amount || transaction.amount || 0),
+          _mpesa_transaction_id: transaction.id,
+          _reference: mpesaReceiptNumber || CheckoutRequestID,
+        });
+        if (kittyErr) console.error("Kitty credit failed:", kittyErr);
+        else console.log(`Kitty ${transaction.kitty_id} credited: ${amount}`);
+      } catch (e) {
+        console.error("Kitty credit exception:", e);
       }
     }
 
