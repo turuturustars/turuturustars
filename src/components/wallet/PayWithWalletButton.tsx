@@ -59,6 +59,10 @@ const PayWithWalletButton = ({
   const { wallet, spend, refresh } = useWallet();
   const [open, setOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [lastReference, setLastReference] = useState<string | null>(null);
+  const [lastAmount, setLastAmount] = useState<number>(0);
+  const [lastType, setLastType] = useState<SpendType>('dues');
 
   const balance = Number(wallet?.balance || 0);
   const insufficient = balance < amount;
@@ -71,7 +75,7 @@ const PayWithWalletButton = ({
     }
     setProcessing(true);
     try {
-      await spend({
+      const { reference } = await spend({
         type,
         amount,
         description: description ?? `${type} payment`,
@@ -80,7 +84,7 @@ const PayWithWalletButton = ({
         discipline_id: disciplineId,
       });
 
-      // Side-effects per type — keep entities in sync
+      // Side-effects per type — keep entities in sync (store wallet ref so it's traceable)
       try {
         if (type === 'dues' && contributionId) {
           await supabase
@@ -88,11 +92,10 @@ const PayWithWalletButton = ({
             .update({
               status: 'paid',
               paid_at: new Date().toISOString(),
-              reference_number: 'WALLET',
+              reference_number: reference,
             })
             .eq('id', contributionId);
         } else if (type === 'welfare' && welfareCaseId) {
-          // Record contribution + bump collected amount
           const { data: userRes } = await supabase.auth.getUser();
           const memberId = userRes.user?.id;
           if (memberId) {
@@ -103,7 +106,7 @@ const PayWithWalletButton = ({
               contribution_type: 'welfare',
               status: 'paid',
               paid_at: new Date().toISOString(),
-              reference_number: 'WALLET',
+              reference_number: reference,
               notes: description ?? 'Wallet contribution',
             });
             const { data: wc } = await supabase
@@ -125,19 +128,32 @@ const PayWithWalletButton = ({
         }
       } catch (sideErr) {
         console.error('Wallet side-effect error:', sideErr);
-        // Wallet was debited but related entity update failed — surface but don't roll back here.
         toast.error('Payment debited but entity update failed. Contact treasurer.');
       }
 
-      toast.success(`Paid KES ${amount.toLocaleString()} from wallet`);
+      setLastReference(reference);
+      setLastAmount(amount);
+      setLastType(type);
+      toast.success(`Paid KES ${amount.toLocaleString()} • Ref: ${reference}`);
       await refresh();
       await onAfterPay?.();
       setOpen(false);
+      setReceiptOpen(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Payment failed';
       toast.error(msg);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const copyRef = async () => {
+    if (!lastReference) return;
+    try {
+      await navigator.clipboard.writeText(lastReference);
+      toast.success('Reference copied');
+    } catch {
+      toast.error('Could not copy');
     }
   };
 
