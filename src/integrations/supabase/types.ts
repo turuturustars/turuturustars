@@ -352,6 +352,145 @@ export type Database = {
         }
         Relationships: []
       }
+      kitties: {
+        Row: {
+          balance: number
+          category: Database["public"]["Enums"]["kitty_category"]
+          created_at: string
+          created_by: string
+          deadline: string | null
+          description: string | null
+          id: string
+          status: Database["public"]["Enums"]["kitty_status"]
+          target_amount: number
+          title: string
+          total_contributed: number
+          total_disbursed: number
+          updated_at: string
+        }
+        Insert: {
+          balance?: number
+          category?: Database["public"]["Enums"]["kitty_category"]
+          created_at?: string
+          created_by: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["kitty_status"]
+          target_amount: number
+          title: string
+          total_contributed?: number
+          total_disbursed?: number
+          updated_at?: string
+        }
+        Update: {
+          balance?: number
+          category?: Database["public"]["Enums"]["kitty_category"]
+          created_at?: string
+          created_by?: string
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          status?: Database["public"]["Enums"]["kitty_status"]
+          target_amount?: number
+          title?: string
+          total_contributed?: number
+          total_disbursed?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      kitty_contributions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          kitty_id: string
+          member_id: string
+          mpesa_transaction_id: string | null
+          notes: string | null
+          reference: string | null
+          source: Database["public"]["Enums"]["kitty_source"]
+          status: string
+          wallet_transaction_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          kitty_id: string
+          member_id: string
+          mpesa_transaction_id?: string | null
+          notes?: string | null
+          reference?: string | null
+          source: Database["public"]["Enums"]["kitty_source"]
+          status?: string
+          wallet_transaction_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          kitty_id?: string
+          member_id?: string
+          mpesa_transaction_id?: string | null
+          notes?: string | null
+          reference?: string | null
+          source?: Database["public"]["Enums"]["kitty_source"]
+          status?: string
+          wallet_transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitty_contributions_kitty_id_fkey"
+            columns: ["kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kitty_disbursements: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          kitty_id: string
+          purpose: string
+          recipient: string | null
+          recorded_by: string
+          reference: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          kitty_id: string
+          purpose: string
+          recipient?: string | null
+          recorded_by: string
+          reference?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          kitty_id?: string
+          purpose?: string
+          recipient?: string | null
+          recorded_by?: string
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitty_disbursements_kitty_id_fkey"
+            columns: ["kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       meeting_attendance: {
         Row: {
           apology_reason: string | null
@@ -1328,6 +1467,20 @@ export type Database = {
       }
     }
     Functions: {
+      contribute_to_kitty_from_wallet: {
+        Args: { _amount: number; _kitty_id: string; _notes?: string }
+        Returns: Json
+      }
+      credit_kitty_from_mpesa: {
+        Args: {
+          _amount: number
+          _kitty_id: string
+          _member_id: string
+          _mpesa_transaction_id: string
+          _reference: string
+        }
+        Returns: string
+      }
       delete_expired_jobs: { Args: never; Returns: number }
       ensure_wallet: { Args: { _user_id: string }; Returns: string }
       generate_membership_number: { Args: never; Returns: string }
@@ -1365,6 +1518,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_kitty_disbursement: {
+        Args: {
+          _amount: number
+          _kitty_id: string
+          _purpose: string
+          _recipient?: string
+          _reference?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role:
@@ -1380,6 +1543,14 @@ export type Database = {
         | "committee_member"
         | "patron"
       contribution_status: "paid" | "pending" | "missed"
+      kitty_category:
+        | "emergency"
+        | "education"
+        | "welfare"
+        | "project"
+        | "other"
+      kitty_source: "mpesa" | "wallet" | "manual"
+      kitty_status: "active" | "paused" | "completed" | "closed"
       member_status: "active" | "dormant" | "pending" | "suspended"
     }
     CompositeTypes: {
@@ -1522,6 +1693,9 @@ export const Constants = {
         "patron",
       ],
       contribution_status: ["paid", "pending", "missed"],
+      kitty_category: ["emergency", "education", "welfare", "project", "other"],
+      kitty_source: ["mpesa", "wallet", "manual"],
+      kitty_status: ["active", "paused", "completed", "closed"],
       member_status: ["active", "dormant", "pending", "suspended"],
     },
   },
