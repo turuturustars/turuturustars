@@ -78,7 +78,7 @@ export const useOfficialDashboardStats = () => {
 
   const safeCount = async (
     label: string,
-    runner: () => Promise<{ count: number | null; error: unknown }>
+    runner: () => PromiseLike<{ count: number | null; error: unknown }>
   ) => {
     try {
       const { count, error: queryError } = await runner();
@@ -95,7 +95,7 @@ export const useOfficialDashboardStats = () => {
 
   const safeRows = async <TRow extends Record<string, unknown>>(
     label: string,
-    runner: () => Promise<{ data: TRow[] | null; error: unknown }>
+    runner: () => PromiseLike<{ data: TRow[] | null; error: unknown }>
   ) => {
     try {
       const { data, error: queryError } = await runner();

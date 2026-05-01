@@ -177,9 +177,9 @@ export function usePrivateMessages(conversationId?: string) {
 
         // Mark messages as read
         if (canInteract) {
-          const { error: markReadError } = await supabase.rpc('mark_private_conversation_read', {
+          const { error: markReadError } = await supabase.rpc('mark_private_conversation_read' as never, {
             _conversation_id: conversationId,
-          });
+          } as never);
 
           if (markReadError) {
             console.error('Error marking private messages as read:', markReadError);
