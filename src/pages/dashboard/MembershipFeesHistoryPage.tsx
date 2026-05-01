@@ -63,38 +63,44 @@ const MembershipFeesHistoryPage = () => {
     const fetchAll = async () => {
       setLoading(true);
       try {
-        const { data: contribs, error } = await supabase
+        // Single joined query via PostgREST embedding (FK: contributions.member_id -> profiles.id)
+        const { data, error } = await supabase
           .from('contributions')
-          .select('*')
+          .select(`
+            id,
+            member_id,
+            amount,
+            status,
+            reference_number,
+            due_date,
+            paid_at,
+            created_at,
+            notes,
+            member:profiles!contributions_member_id_fkey (
+              full_name,
+              membership_number,
+              phone
+            )
+          `)
           .eq('contribution_type', 'membership_fee')
           .order('created_at', { ascending: false })
           .limit(1000);
         if (error) throw error;
 
-        const memberIds = Array.from(new Set((contribs ?? []).map((c) => c.member_id)));
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, membership_number, phone')
-          .in('id', memberIds.length ? memberIds : ['00000000-0000-0000-0000-000000000000']);
-
-        const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-        const merged: FeeRow[] = (contribs ?? []).map((c) => {
-          const p = profileMap.get(c.member_id);
-          return {
-            id: c.id,
-            member_id: c.member_id,
-            amount: Number(c.amount),
-            status: c.status ?? 'pending',
-            reference_number: c.reference_number,
-            due_date: c.due_date,
-            paid_at: c.paid_at,
-            created_at: c.created_at,
-            notes: c.notes,
-            member_name: p?.full_name ?? 'Unknown member',
-            membership_number: p?.membership_number ?? null,
-            member_phone: p?.phone ?? null,
-          };
-        });
+        const merged: FeeRow[] = (data ?? []).map((c: any) => ({
+          id: c.id,
+          member_id: c.member_id,
+          amount: Number(c.amount),
+          status: c.status ?? 'pending',
+          reference_number: c.reference_number,
+          due_date: c.due_date,
+          paid_at: c.paid_at,
+          created_at: c.created_at,
+          notes: c.notes,
+          member_name: c.member?.full_name ?? 'Unknown member',
+          membership_number: c.member?.membership_number ?? null,
+          member_phone: c.member?.phone ?? null,
+        }));
         setRows(merged);
       } catch (err) {
         console.error('Failed to load membership fee history', err);
