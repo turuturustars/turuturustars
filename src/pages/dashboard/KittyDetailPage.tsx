@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine } from 'lucide-react';
 import { useKittyDetail } from '@/hooks/useKitties';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import KittyContributeDialog from '@/components/kitty/KittyContributeDialog';
 import KittyDisburseDialog from '@/components/kitty/KittyDisburseDialog';
 
@@ -15,6 +17,30 @@ const KittyDetailPage = () => {
   const { hasRole } = useAuth();
   const { kitty, contributions, disbursements, loading, contributeFromWallet, recordDisbursement } =
     useKittyDetail(id);
+
+  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const ids = Array.from(new Set(contributions.map((c) => c.member_id))).filter(
+      (mid) => mid && !memberNames[mid]
+    );
+    if (ids.length === 0) return;
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, membership_number')
+        .in('id', ids);
+      if (data) {
+        setMemberNames((prev) => {
+          const next = { ...prev };
+          for (const p of data as Array<{ id: string; full_name: string | null; membership_number: string | null }>) {
+            next[p.id] = p.full_name || p.membership_number || 'Member';
+          }
+          return next;
+        });
+      }
+    })();
+  }, [contributions, memberNames]);
 
   const canDisburse = hasRole('admin') || hasRole('treasurer');
 
@@ -127,10 +153,10 @@ const KittyDetailPage = () => {
                     )}
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">
-                        KES {Number(c.amount).toLocaleString()}
+                        {memberNames[c.member_id] || 'Loading…'} • KES {Number(c.amount).toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {c.reference || c.source} • {new Date(c.created_at).toLocaleString()}
+                        Ref: {c.reference || '—'} • {new Date(c.created_at).toLocaleString()}
                       </p>
                     </div>
                   </div>
