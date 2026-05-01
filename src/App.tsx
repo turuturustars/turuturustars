@@ -103,6 +103,7 @@ const TreasurerDashboard = lazy(() => import("./pages/dashboard/TreasurerDashboa
 const SecretaryDashboard = lazy(() => import("./pages/dashboard/SecretaryDashboard"));
 const PaymentsManagement = lazy(() => import("./pages/dashboard/PaymentsManagement"));
 const MembershipFeesPage = lazy(() => import("./pages/dashboard/MembershipFeesPage"));
+const MembershipFeesHistoryPage = lazy(() => import("./pages/dashboard/MembershipFeesHistoryPage"));
 const MeetingsPage = lazy(() => import("./pages/dashboard/MeetingsPage"));
 const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
 const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
@@ -297,6 +298,14 @@ const App = () => {
                       }
                     />
                     <Route path="membership-fees" element={<MembershipFeesPage />} />
+                    <Route
+                      path="membership-fees/history"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'treasurer', 'chairperson', 'secretary']} stealth>
+                          <MembershipFeesHistoryPage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>
 
