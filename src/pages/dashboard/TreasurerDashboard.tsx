@@ -45,6 +45,7 @@ interface ContributionWithMember {
   paid_at: string | null;
   reference_number: string | null;
   notes: string | null;
+  member_id: string;
   member: {
     full_name: string;
     membership_number: string | null;
