@@ -298,6 +298,14 @@ const App = () => {
                       }
                     />
                     <Route path="membership-fees" element={<MembershipFeesPage />} />
+                    <Route
+                      path="membership-fees/history"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'treasurer', 'chairperson', 'secretary']} stealth>
+                          <MembershipFeesHistoryPage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>
 
