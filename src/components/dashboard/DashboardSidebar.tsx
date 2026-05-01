@@ -147,6 +147,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     if (userRoles.includes('admin')) {
       links.push(
         { label: 'M-Pesa', href: '/dashboard/finance/mpesa', icon: Smartphone },
+        { label: 'Fee Payment History', href: '/dashboard/finance/membership-fees/history', icon: PiggyBank },
         { label: 'Operations Center', href: '/dashboard/admin-panel/operations', icon: ActivitySquare },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
         { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
