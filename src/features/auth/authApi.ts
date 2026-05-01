@@ -366,7 +366,7 @@ export async function ensureProfileForUser(user: User) {
     updated_at: new Date().toISOString(),
   };
 
-  await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
+  await supabase.from('profiles').upsert(payload as never, { onConflict: 'id' });
   return fetchProfile(user.id);
 }
 
@@ -383,7 +383,7 @@ export async function updateProfile(userId: string, updates: Partial<ProfileRow>
 
   const { data, error } = await supabase
     .from('profiles')
-    .upsert({ id: userId, ...payload }, { onConflict: 'id' })
+    .upsert({ id: userId, ...payload } as never, { onConflict: 'id' })
     .select()
     .maybeSingle();
 

@@ -165,7 +165,7 @@ const MembershipFeeManagement = () => {
   const pendingContribution = contributions.find((c) => c.status === 'pending');
   const membershipFeeAmount = (() => {
     if (pendingContribution?.amount) return pendingContribution.amount;
-    const profileAmount = Number(profile?.membership_fee_amount);
+    const profileAmount = Number((profile as unknown as Record<string, unknown>)?.membership_fee_amount);
     if (Number.isFinite(profileAmount) && profileAmount > 0) return profileAmount;
     return 200;
   })();

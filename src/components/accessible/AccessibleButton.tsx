@@ -5,7 +5,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 
-interface AccessibleButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface AccessibleButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   ariaLabel?: string;
   ariaDescribedBy?: string;
   ariaPressed?: boolean;
@@ -16,6 +16,7 @@ interface AccessibleButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEle
   asChild?: boolean;
   isLoading?: boolean;
   loadingText?: string;
+  icon?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -33,6 +34,7 @@ export const AccessibleButton = React.forwardRef<HTMLButtonElement, AccessibleBu
       children,
       size,
       asChild,
+      icon,
       ...props
     },
     ref
@@ -56,7 +58,10 @@ export const AccessibleButton = React.forwardRef<HTMLButtonElement, AccessibleBu
             <span className="sr-only">{loadingText}</span>
           </>
         ) : (
-          children
+          <>
+            {icon}
+            {children}
+          </>
         )}
       </Button>
     );

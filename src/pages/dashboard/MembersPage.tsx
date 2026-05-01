@@ -349,7 +349,7 @@ const MembersPage = () => {
           status: addDialog.status,
           is_student: addDialog.isStudent === 'yes',
           registration_fee_paid: addDialog.feePaid === 'yes',
-        })
+        } as never)
         .select('id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at')
         .single();
 
