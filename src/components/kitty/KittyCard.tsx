@@ -64,7 +64,14 @@ const KittyCard = ({ kitty }: Props) => {
             </span>
           </div>
           <Progress value={pct} className="h-2" />
-          <div className="text-xs text-muted-foreground pt-1">{pct.toFixed(1)}% funded</div>
+          <div className="flex justify-between text-xs text-muted-foreground pt-1">
+            <span>{pct.toFixed(1)}% funded</span>
+            <span>
+              {balance >= target
+                ? '🎉 Target reached'
+                : `KES ${Math.max(0, target - balance).toLocaleString()} remaining`}
+            </span>
+          </div>
         </div>
         <Button asChild size="sm" variant="outline" className="w-full gap-2">
           <Link to={`/dashboard/finance/kitties/${kitty.id}`}>
