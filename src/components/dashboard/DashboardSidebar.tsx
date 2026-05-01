@@ -180,6 +180,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     if (userRoles.includes('treasurer')) {
       links.push(
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
+        { label: 'Fee Payment History', href: '/dashboard/finance/membership-fees/history', icon: PiggyBank },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },
         { label: 'Approvals', href: '/dashboard/admin-panel/approvals', icon: UserCheck },
         { label: 'Jobs Moderation', href: '/dashboard/admin-panel/jobs', icon: ClipboardList },
