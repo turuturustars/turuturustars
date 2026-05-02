@@ -159,12 +159,10 @@ async function getAccessToken(): Promise<string> {
       const errorCode = typeof data.error === "string" ? data.error : undefined;
       const errorDesc = typeof data.error_description === "string" ? data.error_description : undefined;
       console.error(`[${errorTime}] mpesa: access token failed status=${response.status} code=${errorCode ?? "unknown"} desc=${errorDesc ?? "n/a"}`);
-      const errorDescription =
-        typeof data.error_description === "string" ? data.error_description : undefined;
-      throw new HttpError(502, `M-Pesa auth failed: ${errorDescription || errorCode || "Unknown error"}`, {
+      throw new HttpError(502, `M-Pesa auth failed: ${errorDesc || errorCode || "Unknown error"}`, {
         httpStatus: response.status,
         mpesaErrorCode: errorCode,
-        mpesaErrorDescription: errorDescription,
+        mpesaErrorDescription: errorDesc,
       });
     }
     
