@@ -1,0 +1,1 @@
+ALTER VIEW public.membership_fee_history_v SET (security_invoker = true);
