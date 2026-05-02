@@ -116,17 +116,15 @@ const getFunctionsBaseUrl = () => {
   return `https://${ref}.functions.supabase.co`;
 };
 
-// Log loaded credentials (without exposing full secrets)
+// Log only that the function is initialized and which environment is targeted.
+// NEVER log credentials (even partially) or full payment payloads.
 const logInitialization = () => {
   const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] M-Pesa Edge Function Initialized`);
-  console.log("📋 Credentials Status:");
-  console.log(`  ✓ MPESA_CONSUMER_KEY: ${MPESA_CONSUMER_KEY ? `${MPESA_CONSUMER_KEY.substring(0, 10)}...` : "❌ NOT SET"}`);
-  console.log(`  ✓ MPESA_CONSUMER_SECRET: ${MPESA_CONSUMER_SECRET ? `${MPESA_CONSUMER_SECRET.substring(0, 10)}...` : "❌ NOT SET"}`);
-  console.log(`  ✓ MPESA_SHORTCODE: ${MPESA_SHORTCODE || "❌ NOT SET"}`);
-  console.log(`  ✓ MPESA_PASSKEY: ${MPESA_PASSKEY ? `${MPESA_PASSKEY.substring(0, 10)}...` : "❌ NOT SET"}`);
-  console.log(`  ✓ MPESA_BASE_URL: ${MPESA_BASE_URL}`);
-  console.log(`  ✓ Environment: ${MPESA_BASE_URL.includes("sandbox") ? "SANDBOX (Testing)" : "PRODUCTION"}`);
+  const env = MPESA_BASE_URL.includes("sandbox") ? "sandbox" : "production";
+  const allSet = Boolean(
+    MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPESA_SHORTCODE && MPESA_PASSKEY && MPESA_BASE_URL,
+  );
+  console.log(`[${timestamp}] mpesa: initialized env=${env} credentials_configured=${allSet}`);
 };
 logInitialization();
 
@@ -135,9 +133,7 @@ async function getAccessToken(): Promise<string> {
   const credentials = btoa(`${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`);
   const timestamp = new Date().toISOString();
   
-  console.log(`[${timestamp}] 🔐 Fetching M-Pesa access token...`);
-  console.log(`  Consumer Key: ${MPESA_CONSUMER_KEY.substring(0, 15)}...`);
-  console.log(`  Base64 Credentials: ${credentials.substring(0, 20)}...`);
+  console.log(`[${timestamp}] mpesa: requesting access token`);
   
   try {
     const response = await fetch(
@@ -160,12 +156,9 @@ async function getAccessToken(): Promise<string> {
     
     if (!response.ok || !data.access_token) {
       const errorTime = new Date().toISOString();
-      console.error(`[${errorTime}] [ERROR] M-Pesa Access Token Request Failed`);
-      console.error(`  HTTP Status: ${response.status}`);
-      console.error(`  Error Code: ${data.error}`);
-      console.error(`  Error Description: ${data.error_description}`);
-      console.error(`  Full Response: ${JSON.stringify(data, null, 2)}`);
       const errorCode = typeof data.error === "string" ? data.error : undefined;
+      const errorDesc = typeof data.error_description === "string" ? data.error_description : undefined;
+      console.error(`[${errorTime}] mpesa: access token failed status=${response.status} code=${errorCode ?? "unknown"} desc=${errorDesc ?? "n/a"}`);
       const errorDescription =
         typeof data.error_description === "string" ? data.error_description : undefined;
       throw new HttpError(502, `M-Pesa auth failed: ${errorDescription || errorCode || "Unknown error"}`, {
@@ -175,11 +168,11 @@ async function getAccessToken(): Promise<string> {
       });
     }
     
-    console.log(`[${new Date().toISOString()}] [OK] Access token obtained successfully`);
-    console.log(`  Token Expires In: ${data.expires_in} seconds`);
+    console.log(`[${new Date().toISOString()}] mpesa: access token obtained`);
     return String(data.access_token);
   } catch (error) {
-    console.error(`[${new Date().toISOString()}] ❌ Access token fetch error:`, error);
+    const msg = error instanceof Error ? error.message : "unknown";
+    console.error(`[${new Date().toISOString()}] mpesa: access token error: ${msg}`);
     throw error;
   }
 }
