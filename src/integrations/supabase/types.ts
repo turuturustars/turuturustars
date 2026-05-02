@@ -854,6 +854,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mpesa_transactions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "membership_fee_history_v"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "mpesa_transactions_kitty_id_fkey"
             columns: ["kitty_id"]
             isOneToOne: false
@@ -1453,6 +1460,31 @@ export type Database = {
       }
     }
     Views: {
+      membership_fee_history_v: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          due_date: string | null
+          id: string | null
+          member_id: string | null
+          member_name: string | null
+          member_phone: string | null
+          membership_number: string | null
+          notes: string | null
+          paid_at: string | null
+          reference_number: string | null
+          status: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       voting_motions_with_vote_breakdown: {
         Row: {
           created_at: string | null
@@ -1494,6 +1526,37 @@ export type Database = {
       delete_expired_jobs: { Args: never; Returns: number }
       ensure_wallet: { Args: { _user_id: string }; Returns: string }
       generate_membership_number: { Args: never; Returns: string }
+      get_membership_fee_history: {
+        Args: {
+          _cursor_created_at?: string
+          _cursor_id?: string
+          _from_date?: string
+          _limit?: number
+          _search?: string
+          _status?: string
+          _to_date?: string
+        }
+        Returns: {
+          amount: number | null
+          created_at: string | null
+          due_date: string | null
+          id: string | null
+          member_id: string | null
+          member_name: string | null
+          member_phone: string | null
+          membership_number: string | null
+          notes: string | null
+          paid_at: string | null
+          reference_number: string | null
+          status: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "membership_fee_history_v"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
