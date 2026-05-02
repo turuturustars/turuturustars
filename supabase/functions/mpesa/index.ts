@@ -239,10 +239,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[${new Date().toISOString()}] Incoming M-Pesa request`, {
-      action,
-      keys: Object.keys(params),
-    });
+    console.log(`[${new Date().toISOString()}] mpesa: incoming request action=${(payload as any)?.action ?? "unknown"}`);
 
     // Some actions require financial roles (members are allowed to initiate STK pushes)
     const financialActions = ["register_urls", "generate_qr", "create_standing_order", "simulate_c2b"];

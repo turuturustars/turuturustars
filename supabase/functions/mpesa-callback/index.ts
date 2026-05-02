@@ -19,14 +19,14 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json();
     
-    console.log("M-Pesa Callback received:", JSON.stringify(body, null, 2));
+    // Do not log full payload (PII + payment data); only log non-sensitive identifiers below.
     
     const { Body } = body;
     const { stkCallback } = Body;
     const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
     
     // Log callback result details
-    console.log(`Callback ResultCode: ${ResultCode}, ResultDesc: ${ResultDesc}`);
+    console.log(`mpesa-callback: checkout=${CheckoutRequestID} resultCode=${ResultCode}`);
     
     // Extract callback metadata
     let mpesaReceiptNumber = "";
@@ -61,7 +61,7 @@ serve(async (req) => {
       }
     }
     
-    console.log(`Parsed Callback: Receipt=${mpesaReceiptNumber}, Amount=${amount}, Phone=${phoneNumber}`);
+    console.log(`mpesa-callback: parsed checkout=${CheckoutRequestID} amount=${amount}`);
     
     // Check if transaction already exists to ensure idempotency
     const { data: existingTransaction, error: checkError } = await supabase
