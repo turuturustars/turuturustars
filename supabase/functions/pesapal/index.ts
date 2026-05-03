@@ -189,6 +189,27 @@ serve(async (req) => {
         throw new Error("Billing email is required");
       }
 
+      // SECURITY: Validate the caller-supplied amount against the donation record
+      // to prevent payment-amount tampering (paying KES 1 for a large pledge).
+      const { data: donationRow, error: donationErr } = await supabase
+        .from("donations")
+        .select("id, amount, status")
+        .eq("id", donationId)
+        .maybeSingle();
+      if (donationErr) {
+        throw new Error(`Failed to verify donation: ${donationErr.message}`);
+      }
+      if (!donationRow) {
+        throw new Error("Donation not found");
+      }
+      const expectedAmount = Number(donationRow.amount);
+      if (!Number.isFinite(expectedAmount) || Math.abs(expectedAmount - amount) > 0.01) {
+        throw new Error("Amount does not match donation record");
+      }
+      if (donationRow.status === "paid") {
+        throw new Error("Donation is already paid");
+      }
+
       const accessToken = await getAccessToken();
       const payload = {
         id: merchantReference,
