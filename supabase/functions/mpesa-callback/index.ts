@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { verifyCallbackSignature } from "../_shared/mpesa.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SIGNATURE_SECRET = Deno.env.get("MPESA_CALLBACK_SIGNATURE_SECRET");
 
 interface MpesaTransaction {
   id: string;
@@ -17,23 +19,52 @@ interface MpesaTransaction {
 serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const body = await req.json();
-    
-    // Do not log full payload (PII + payment data); only log non-sensitive identifiers below.
-    
+
+    // Read raw body so we can verify the HMAC signature before trusting any field.
+    const rawBody = await req.text();
+
+    // Require signature secret to be configured. Without it, refuse callbacks
+    // to prevent forged webhooks from crediting wallets/kitties/contributions.
+    if (!SIGNATURE_SECRET) {
+      console.error("mpesa-callback: rejected — MPESA_CALLBACK_SIGNATURE_SECRET not configured");
+      return new Response(
+        JSON.stringify({ ResultCode: 1, ResultDesc: "Callback signature not configured" }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const signatureHeader =
+      req.headers.get("x-mpesa-signature") ?? req.headers.get("x-signature");
+    const signatureValid = await verifyCallbackSignature(rawBody, signatureHeader);
+    if (!signatureValid) {
+      console.error("mpesa-callback: rejected — invalid signature");
+      return new Response(
+        JSON.stringify({ ResultCode: 1, ResultDesc: "Invalid signature" }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      return new Response(
+        JSON.stringify({ ResultCode: 1, ResultDesc: "Invalid JSON" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const { Body } = body;
     const { stkCallback } = Body;
     const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
-    
-    // Log callback result details
+
     console.log(`mpesa-callback: checkout=${CheckoutRequestID} resultCode=${ResultCode}`);
-    
-    // Extract callback metadata
+
     let mpesaReceiptNumber = "";
     let amount = 0;
     let phoneNumber = "";
     let transactionDate: Date | null = null;
-    
+
     if (CallbackMetadata?.Item) {
       for (const item of CallbackMetadata.Item) {
         switch (item.Name) {
@@ -60,23 +91,21 @@ serve(async (req) => {
         }
       }
     }
-    
-    console.log(`mpesa-callback: parsed checkout=${CheckoutRequestID} amount=${amount}`);
-    
-    // Check if transaction already exists to ensure idempotency
+
+    console.log(`mpesa-callback: parsed checkout=${CheckoutRequestID}`);
+
     const { data: existingTransaction, error: checkError } = await supabase
       .from("mpesa_transactions")
       .select("id, status, contribution_id, member_id, transaction_type, amount, kitty_id")
       .eq("checkout_request_id", CheckoutRequestID)
       .single();
-    
+
     if (checkError && checkError.code !== "PGRST116") {
       console.error("Error checking existing transaction:", checkError);
     }
-    
+
     let transaction: MpesaTransaction | null = existingTransaction as MpesaTransaction | null;
-    
-    // Handle both successful and failed transactions
+
     if (transaction && transaction.status !== "completed" && transaction.status !== "failed") {
       const { data: updatedTx, error: updateError } = await supabase
         .from("mpesa_transactions")
@@ -92,20 +121,41 @@ serve(async (req) => {
         .eq("checkout_request_id", CheckoutRequestID)
         .select("id, status, contribution_id, member_id, transaction_type, amount, kitty_id")
         .single();
-      
+
       if (updateError) {
         console.error("Error updating transaction:", updateError);
         transaction = null;
       } else {
         transaction = updatedTx as MpesaTransaction;
-        console.log(`Transaction status updated to: ${ResultCode === 0 ? "completed" : "failed"}`);
       }
     } else if (!transaction) {
       console.warn(`Transaction not found for checkout request ${CheckoutRequestID}`);
-    } else {
-      console.log(`Transaction ${CheckoutRequestID} already processed with status: ${transaction.status}`);
     }
-    
+
+    // Use the *server-stored* expected amount (set when STK push was initiated)
+    // rather than trusting the callback's amount field.
+    const expectedAmount = Number(transaction?.amount ?? 0);
+    const callbackAmount = Number(amount || 0);
+    const amountMatches =
+      expectedAmount > 0 &&
+      callbackAmount > 0 &&
+      Math.abs(expectedAmount - callbackAmount) < 0.01;
+
+    if (ResultCode === 0 && transaction && !amountMatches) {
+      console.error(
+        `mpesa-callback: amount mismatch checkout=${CheckoutRequestID} — refusing to credit`,
+      );
+      // Mark as failed so it does not get re-processed.
+      await supabase
+        .from("mpesa_transactions")
+        .update({ status: "failed", updated_at: new Date().toISOString() })
+        .eq("checkout_request_id", CheckoutRequestID);
+      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     // Wallet top-up: credit member wallet on success
     if (ResultCode === 0 && transaction?.transaction_type === "wallet_topup" && transaction.member_id) {
       try {
@@ -113,7 +163,7 @@ serve(async (req) => {
           _user_id: transaction.member_id,
           _type: "topup",
           _direction: "credit",
-          _amount: Number(amount || transaction.amount || 0),
+          _amount: expectedAmount,
           _description: `M-Pesa wallet top-up (${mpesaReceiptNumber})`,
           _reference: mpesaReceiptNumber || CheckoutRequestID,
           _mpesa_transaction_id: transaction.id,
@@ -122,7 +172,6 @@ serve(async (req) => {
           _discipline_id: null,
         });
         if (walletErr) console.error("Wallet credit failed:", walletErr);
-        else console.log(`Wallet credited for member ${transaction.member_id}: ${amount}`);
       } catch (e) {
         console.error("Wallet credit exception:", e);
       }
@@ -139,28 +188,24 @@ serve(async (req) => {
         const { error: kittyErr } = await supabase.rpc("credit_kitty_from_mpesa", {
           _kitty_id: transaction.kitty_id,
           _member_id: transaction.member_id,
-          _amount: Number(amount || transaction.amount || 0),
+          _amount: expectedAmount,
           _mpesa_transaction_id: transaction.id,
           _reference: mpesaReceiptNumber || CheckoutRequestID,
         });
         if (kittyErr) console.error("Kitty credit failed:", kittyErr);
-        else console.log(`Kitty ${transaction.kitty_id} credited: ${amount}`);
       } catch (e) {
         console.error("Kitty credit exception:", e);
       }
     }
 
-    // If payment successful and transaction exists, update contribution status
     if (ResultCode === 0 && transaction?.contribution_id) {
       try {
-        // Get current contribution status
         const { data: currentContribution } = await supabase
           .from("contributions")
           .select("status, paid_at")
           .eq("id", transaction.contribution_id)
           .single();
-        
-        // Only update if not already marked as paid
+
         if (currentContribution?.status !== "paid") {
           await supabase
             .from("contributions")
@@ -170,18 +215,15 @@ serve(async (req) => {
               reference_number: mpesaReceiptNumber,
             })
             .eq("id", transaction.contribution_id);
-          
-          console.log(`Updated contribution ${transaction.contribution_id} to paid status`);
         }
-        
-        // Update contribution tracking if member exists
+
         if (transaction.member_id) {
           const { data: existingTracking } = await supabase
             .from("contribution_tracking")
             .select("id")
             .eq("member_id", transaction.member_id)
             .single();
-          
+
           if (existingTracking) {
             await supabase
               .from("contribution_tracking")
@@ -191,49 +233,36 @@ serve(async (req) => {
                 last_checked_at: new Date().toISOString(),
               })
               .eq("member_id", transaction.member_id);
-            
-            console.log(`Updated contribution tracking for member ${transaction.member_id}`);
           }
         }
       } catch (error) {
         console.error("Error updating contribution:", error);
-        // Don't fail the callback response even if contribution update fails
       }
     }
-    
-    // Log audit action
+
     try {
       await supabase.rpc("log_audit_action", {
         p_action_type: "MPESA_CALLBACK_PROCESSED",
-        p_action_description: `M-Pesa callback processed for ${CheckoutRequestID} - ${ResultDesc}`,
+        p_action_description: `M-Pesa callback processed for ${CheckoutRequestID}`,
         p_entity_type: "mpesa_transaction",
         p_metadata: {
           checkoutRequestId: CheckoutRequestID,
           resultCode: ResultCode,
-          amount: amount,
-          mpesaReceipt: mpesaReceiptNumber,
         },
       });
     } catch (auditError) {
       console.error("Error logging audit action:", auditError);
-      // Don't fail if audit logging fails
     }
-    
-    // Always respond with success to M-Pesa to confirm receipt
+
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     });
   } catch (error: unknown) {
-    console.error("Callback error:", error);
-    
-    // Still return 200 to acknowledge receipt, but log the error
+    console.error("Callback error:", error instanceof Error ? error.message : "unknown");
     return new Response(
       JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 200,
-      }
+      { headers: { "Content-Type": "application/json" }, status: 200 },
     );
   }
 });
