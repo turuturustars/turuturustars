@@ -338,32 +338,34 @@ const MembersPage = () => {
 
     setAddDialog((prev) => ({ ...prev, isSubmitting: true }));
     try {
-      const membershipNumber = await generateMembershipNumber();
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({
+      const { data, error } = await supabase.functions.invoke('admin-ops', {
+        body: {
+          action: 'create_member',
           full_name: addDialog.fullName,
           email: addDialog.email || null,
           phone: addDialog.phone,
-          membership_number: membershipNumber,
           status: addDialog.status,
           is_student: addDialog.isStudent === 'yes',
           registration_fee_paid: addDialog.feePaid === 'yes',
-        } as never)
-        .select('id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at')
-        .single();
+        },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
-      if (data) {
-        setMembers((prev) => [data as Member, ...prev]);
+      const member = data?.member as Member | undefined;
+      if (member) {
+        setMembers((prev) => [member, ...prev]);
         logAuditAction({
           actionType: 'CREATE_MEMBER',
-          description: `Admin added member ${data.full_name} (${membershipNumber ?? 'no number'})`,
+          description: `Admin added member ${member.full_name} (${member.membership_number ?? 'no number'})`,
           entityType: 'profile',
-          entityId: data.id,
+          entityId: member.id,
           metadata: { actor_id: user?.id },
         });
+      } else {
+        // refresh list as a fallback
+        fetchMembers();
       }
 
       toast({ title: 'Member created', description: 'New member profile added successfully' });
@@ -379,6 +381,7 @@ const MembersPage = () => {
       });
     } catch (err) {
       const msg = getErrorMessage(err);
+      logError(err, 'MembersPage.handleAddMember');
       toast({ title: 'Create failed', description: msg, variant: 'destructive' });
       setAddDialog((prev) => ({ ...prev, isSubmitting: false }));
     }

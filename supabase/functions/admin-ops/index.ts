@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 type Action =
   | "log_action"
+  | "create_member"
   | "delete_member"
   | "suspend_member"
   | "reject_member"
@@ -516,6 +517,74 @@ serve(async (req) => {
 
     if (!action) {
       throw new HttpError(400, "Missing action");
+    }
+
+    if (action === "create_member") {
+      const fullName = (body.full_name as string | undefined)?.trim();
+      const phone = (body.phone as string | undefined)?.trim();
+      const email = (body.email as string | undefined)?.trim() || null;
+      const password = (body.password as string | undefined) || crypto.randomUUID().slice(0, 12) + "Aa1!";
+      const status = (body.status as string | undefined) || "active";
+      const isStudent = Boolean(body.is_student);
+      const feePaid = Boolean(body.registration_fee_paid);
+
+      if (!fullName || !phone) {
+        throw new HttpError(400, "Full name and phone are required");
+      }
+
+      // Synthesize an email if none provided so auth.admin.createUser works
+      const effectiveEmail = email || `member-${Date.now()}-${Math.floor(Math.random() * 1000)}@turuturustars.local`;
+
+      const { data: created, error: createErr } = await (supabase.auth.admin as any).createUser({
+        email: effectiveEmail,
+        password,
+        email_confirm: true,
+        phone: phone.replace(/[^0-9+]/g, "") || undefined,
+        user_metadata: { full_name: fullName, phone, created_by_admin: true },
+      });
+
+      if (createErr || !created?.user?.id) {
+        throw new HttpError(500, "Failed to create user", { detail: createErr?.message ?? "no user returned" });
+      }
+
+      const newUserId = created.user.id as string;
+
+      // The handle_new_user trigger creates a profile + member role.
+      // Patch profile with admin-supplied fields.
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: fullName,
+          phone,
+          email,
+          status,
+          is_student: isStudent,
+          registration_fee_paid: feePaid,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", newUserId);
+
+      if (profErr) {
+        // best-effort cleanup
+        await (supabase.auth.admin as any).deleteUser(newUserId, false);
+        throw new HttpError(500, "Failed to finalize profile", { detail: profErr.message });
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at")
+        .eq("id", newUserId)
+        .maybeSingle();
+
+      await logAdminAction(supabase, actor.id, actor.primaryRole, "member_created", "member", newUserId, {
+        full_name: fullName,
+        email: email ?? null,
+        phone,
+      });
+
+      return new Response(JSON.stringify({ ok: true, member: profile, user_id: newUserId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     if (action === "log_action") {
