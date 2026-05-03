@@ -1142,6 +1142,48 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_notifications_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          message: string
+          phone: string
+          processed_at: string | null
+          provider_message_id: string | null
+          provider_response: Json | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message: string
+          phone: string
+          processed_at?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          message?: string
+          phone?: string
+          processed_at?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       typing_indicators: {
         Row: {
           is_typing: boolean
@@ -1576,6 +1618,7 @@ export type Database = {
         }
         Returns: string
       }
+      normalize_ke_phone: { Args: { _raw: string }; Returns: string }
       process_wallet_transaction: {
         Args: {
           _amount: number
