@@ -284,14 +284,29 @@ serve(async (req) => {
 
       if (normalizedStatus === "completed") {
         if (transaction?.donation_id) {
-          await supabase
+          const { data: donationRow } = await supabase
             .from("donations")
-            .update({
-              status: "paid",
-              paid_at: new Date().toISOString(),
-              reference_number: status.confirmation_code ?? null,
-            })
-            .eq("id", transaction.donation_id);
+            .select("amount, status")
+            .eq("id", transaction.donation_id)
+            .maybeSingle();
+          const expected = Number(donationRow?.amount ?? NaN);
+          const paid = Number(status.amount ?? NaN);
+          const matches =
+            Number.isFinite(expected) &&
+            Number.isFinite(paid) &&
+            Math.abs(expected - paid) < 0.01;
+          if (matches && donationRow?.status !== "paid") {
+            await supabase
+              .from("donations")
+              .update({
+                status: "paid",
+                paid_at: new Date().toISOString(),
+                reference_number: status.confirmation_code ?? null,
+              })
+              .eq("id", transaction.donation_id);
+          } else if (!matches) {
+            console.error(`pesapal: amount mismatch tracking=${orderTrackingId}`);
+          }
         }
       }
 
