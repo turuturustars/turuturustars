@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 type Action =
   | "log_action"
+  | "create_member"
   | "delete_member"
   | "suspend_member"
   | "reject_member"
