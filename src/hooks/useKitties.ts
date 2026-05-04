@@ -20,6 +20,11 @@ export type KittyRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  beneficiary_name: string | null;
+  beneficiary_phone: string | null;
+  beneficiary_relationship: string | null;
+  beneficiary_details: string | null;
+  beneficiary_member_id: string | null;
 };
 
 export type KittyContributionRow = {
