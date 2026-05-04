@@ -56,7 +56,7 @@ const corsHeaders = (origin: string | null) => ({
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': pickOrigin(origin),
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-supabase-api-version',
 });
 
 const json = (origin: string | null, body: RecoveryResponse, status = 200) =>
