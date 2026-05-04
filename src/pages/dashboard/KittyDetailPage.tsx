@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine } from 'lucide-react';
+import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine, HeartHandshake, Phone, Users } from 'lucide-react';
 import { useKittyDetail } from '@/hooks/useKitties';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -95,6 +95,38 @@ const KittyDetailPage = () => {
           </div>
         </div>
       </div>
+
+      {kitty.beneficiary_name && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <HeartHandshake className="w-5 h-5 text-primary" />
+              Beneficiary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div>
+              <p className="text-lg font-semibold">{kitty.beneficiary_name}</p>
+              {kitty.beneficiary_relationship && (
+                <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5" /> {kitty.beneficiary_relationship}
+                </p>
+              )}
+            </div>
+            {kitty.beneficiary_phone && (
+              <p className="text-sm inline-flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                <a href={`tel:${kitty.beneficiary_phone}`} className="text-primary hover:underline">
+                  {kitty.beneficiary_phone}
+                </a>
+              </p>
+            )}
+            {kitty.beneficiary_details && (
+              <p className="text-sm whitespace-pre-line pt-1 border-t">{kitty.beneficiary_details}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {kitty.description && (
         <Card>

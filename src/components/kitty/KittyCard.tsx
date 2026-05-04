@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, Target, ArrowRight } from 'lucide-react';
+import { Calendar, Target, ArrowRight, HeartHandshake } from 'lucide-react';
 import type { KittyRow } from '@/hooks/useKitties';
 import { Button } from '@/components/ui/button';
 
@@ -53,6 +53,17 @@ const KittyCard = ({ kitty }: Props) => {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {kitty.beneficiary_name && (
+          <div className="rounded-md border border-primary/20 bg-primary/5 p-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+              <HeartHandshake className="w-3.5 h-3.5" /> Beneficiary
+            </div>
+            <p className="text-sm font-semibold leading-tight mt-0.5">{kitty.beneficiary_name}</p>
+            {kitty.beneficiary_relationship && (
+              <p className="text-xs text-muted-foreground">{kitty.beneficiary_relationship}</p>
+            )}
+          </div>
+        )}
         {kitty.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{kitty.description}</p>
         )}

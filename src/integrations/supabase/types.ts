@@ -355,6 +355,11 @@ export type Database = {
       kitties: {
         Row: {
           balance: number
+          beneficiary_details: string | null
+          beneficiary_member_id: string | null
+          beneficiary_name: string | null
+          beneficiary_phone: string | null
+          beneficiary_relationship: string | null
           category: Database["public"]["Enums"]["kitty_category"]
           created_at: string
           created_by: string
@@ -370,6 +375,11 @@ export type Database = {
         }
         Insert: {
           balance?: number
+          beneficiary_details?: string | null
+          beneficiary_member_id?: string | null
+          beneficiary_name?: string | null
+          beneficiary_phone?: string | null
+          beneficiary_relationship?: string | null
           category?: Database["public"]["Enums"]["kitty_category"]
           created_at?: string
           created_by: string
@@ -385,6 +395,11 @@ export type Database = {
         }
         Update: {
           balance?: number
+          beneficiary_details?: string | null
+          beneficiary_member_id?: string | null
+          beneficiary_name?: string | null
+          beneficiary_phone?: string | null
+          beneficiary_relationship?: string | null
           category?: Database["public"]["Enums"]["kitty_category"]
           created_at?: string
           created_by?: string
