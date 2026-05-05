@@ -132,48 +132,10 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
             />
           </div>
 
-          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
-            <div>
-              <p className="text-sm font-semibold">Beneficiary (transparency)</p>
-              <p className="text-xs text-muted-foreground">
-                Members will see who this fund is for before contributing.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Beneficiary name *</Label>
-              <Input
-                value={beneficiaryName}
-                onChange={(e) => setBeneficiaryName(e.target.value)}
-                placeholder="e.g. Jane Wanjiku Mwangi"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={beneficiaryPhone}
-                  onChange={(e) => setBeneficiaryPhone(e.target.value)}
-                  placeholder="07XXXXXXXX"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Relationship</Label>
-                <Input
-                  value={beneficiaryRelationship}
-                  onChange={(e) => setBeneficiaryRelationship(e.target.value)}
-                  placeholder="Member / Spouse / Child"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Situation / details</Label>
-              <Textarea
-                value={beneficiaryDetails}
-                onChange={(e) => setBeneficiaryDetails(e.target.value)}
-                placeholder="Brief background so members understand the need"
-                rows={2}
-              />
-            </div>
+          <div className="rounded-lg border border-dashed bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              💡 Beneficiaries can be added later from the kitty page once the purpose is clear or funds are collected. Members will see them under the Beneficiaries tab.
+            </p>
           </div>
         </div>
         <DialogFooter>
