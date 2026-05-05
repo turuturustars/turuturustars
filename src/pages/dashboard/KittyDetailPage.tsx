@@ -1,24 +1,30 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine, HeartHandshake, Phone, Users } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine, RotateCw } from 'lucide-react';
 import { useKittyDetail } from '@/hooks/useKitties';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import KittyContributeDialog from '@/components/kitty/KittyContributeDialog';
 import KittyDisburseDialog from '@/components/kitty/KittyDisburseDialog';
+import KittyBeneficiariesTab from '@/components/kitty/KittyBeneficiariesTab';
+import KittyTopContributors from '@/components/kitty/KittyTopContributors';
 
 const KittyDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const { hasRole } = useAuth();
+  const navigate = useNavigate();
+  const { user, hasRole } = useAuth();
   const { kitty, contributions, disbursements, loading, contributeFromWallet, recordDisbursement } =
     useKittyDetail(id);
 
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const [startingRound, setStartingRound] = useState(false);
 
   useEffect(() => {
     const ids = Array.from(new Set(contributions.map((c) => c.member_id))).filter(
@@ -43,6 +49,34 @@ const KittyDetailPage = () => {
   }, [contributions, memberNames]);
 
   const canDisburse = hasRole('admin') || hasRole('treasurer');
+  const canManage = hasRole('admin') || hasRole('treasurer') || hasRole('chairperson');
+
+  const startNewRound = async () => {
+    if (!kitty || !user?.id) return;
+    if (!confirm(`Start Round ${kitty.round_number + 1} for "${kitty.title}"? This creates a fresh kitty linked to this one.`)) return;
+    setStartingRound(true);
+    const { data, error } = await supabase
+      .from('kitties' as never)
+      .insert({
+        title: kitty.title,
+        description: kitty.description,
+        category: kitty.category,
+        target_amount: kitty.target_amount,
+        created_by: user.id,
+        round_number: kitty.round_number + 1,
+        parent_kitty_id: kitty.parent_kitty_id || kitty.id,
+      } as never)
+      .select('id')
+      .single();
+    setStartingRound(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(`Round ${kitty.round_number + 1} started`);
+    const newId = (data as unknown as { id: string })?.id;
+    if (newId) navigate(`/dashboard/finance/kitties/${newId}`);
+  };
 
   if (loading || !kitty) {
     return (
@@ -68,11 +102,16 @@ const KittyDetailPage = () => {
         </Button>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{kitty.title}</h1>
-            <div className="flex items-center gap-2 pt-1">
-              <Badge variant="secondary" className="capitalize">
-                {kitty.category}
-              </Badge>
+            <h1 className="text-2xl font-bold tracking-tight">
+              {kitty.title}
+              {kitty.round_number > 1 && (
+                <span className="ml-2 text-base font-normal text-muted-foreground">
+                  Round {kitty.round_number}
+                </span>
+              )}
+            </h1>
+            <div className="flex items-center gap-2 pt-1 flex-wrap">
+              <Badge variant="secondary" className="capitalize">{kitty.category}</Badge>
               <Badge variant={kitty.status === 'active' ? 'default' : 'outline'} className="capitalize">
                 {kitty.status}
               </Badge>
@@ -83,7 +122,7 @@ const KittyDetailPage = () => {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <KittyContributeDialog
               kitty={kitty}
               onContribute={async (amount, notes) => {
@@ -92,41 +131,14 @@ const KittyDetailPage = () => {
               }}
             />
             {canDisburse && <KittyDisburseDialog kitty={kitty} onDisburse={recordDisbursement} />}
+            {canManage && (
+              <Button variant="outline" size="sm" className="gap-1" onClick={startNewRound} disabled={startingRound}>
+                <RotateCw className="w-4 h-4" /> Start Round {kitty.round_number + 1}
+              </Button>
+            )}
           </div>
         </div>
       </div>
-
-      {kitty.beneficiary_name && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <HeartHandshake className="w-5 h-5 text-primary" />
-              Beneficiary
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div>
-              <p className="text-lg font-semibold">{kitty.beneficiary_name}</p>
-              {kitty.beneficiary_relationship && (
-                <p className="text-sm text-muted-foreground inline-flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5" /> {kitty.beneficiary_relationship}
-                </p>
-              )}
-            </div>
-            {kitty.beneficiary_phone && (
-              <p className="text-sm inline-flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-                <a href={`tel:${kitty.beneficiary_phone}`} className="text-primary hover:underline">
-                  {kitty.beneficiary_phone}
-                </a>
-              </p>
-            )}
-            {kitty.beneficiary_details && (
-              <p className="text-sm whitespace-pre-line pt-1 border-t">{kitty.beneficiary_details}</p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {kitty.description && (
         <Card>
@@ -166,65 +178,83 @@ const KittyDetailPage = () => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Recent Contributions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
-            {contributions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No contributions yet.</p>
-            ) : (
-              contributions.map((c) => (
-                <div key={c.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    {c.source === 'mpesa' ? (
-                      <Smartphone className="w-4 h-4 text-green-600 shrink-0" />
-                    ) : (
-                      <WalletIcon className="w-4 h-4 text-primary shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {memberNames[c.member_id] || 'Loading…'} • KES {Number(c.amount).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        Ref: {c.reference || '—'} • {new Date(c.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
+      <Tabs defaultValue="activity" className="w-full">
+        <TabsList className="grid grid-cols-3 w-full max-w-md">
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="beneficiaries">Beneficiaries</TabsTrigger>
+          <TabsTrigger value="top">Top Givers</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Disbursements</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
-            {disbursements.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No disbursements yet.</p>
-            ) : (
-              disbursements.map((d) => (
-                <div key={d.id} className="flex items-start justify-between gap-2 py-2 border-b last:border-0">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <ArrowDownToLine className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium">KES {Number(d.amount).toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{d.purpose}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {d.recipient ? `→ ${d.recipient} • ` : ''}
-                        {new Date(d.created_at).toLocaleString()}
-                      </p>
+        <TabsContent value="activity" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Recent Contributions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
+                {contributions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No contributions yet.</p>
+                ) : (
+                  contributions.map((c) => (
+                    <div key={c.id} className="flex items-center justify-between gap-2 py-2 border-b last:border-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {c.source === 'mpesa' ? (
+                          <Smartphone className="w-4 h-4 text-green-600 shrink-0" />
+                        ) : (
+                          <WalletIcon className="w-4 h-4 text-primary shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {memberNames[c.member_id] || 'Loading…'} • KES {Number(c.amount).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            Ref: {c.reference || '—'} • {new Date(c.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Disbursements</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 max-h-[420px] overflow-y-auto">
+                {disbursements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-6">No disbursements yet.</p>
+                ) : (
+                  disbursements.map((d) => (
+                    <div key={d.id} className="flex items-start justify-between gap-2 py-2 border-b last:border-0">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <ArrowDownToLine className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">KES {Number(d.amount).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{d.purpose}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {d.recipient ? `→ ${d.recipient} • ` : ''}
+                            {new Date(d.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="beneficiaries">
+          {id && <KittyBeneficiariesTab kittyId={id} />}
+        </TabsContent>
+
+        <TabsContent value="top">
+          {id && <KittyTopContributors kittyId={id} limit={20} />}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

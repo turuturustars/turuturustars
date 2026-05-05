@@ -32,10 +32,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
   const [category, setCategory] = useState<KittyCategory>('emergency');
   const [target, setTarget] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [beneficiaryName, setBeneficiaryName] = useState('');
-  const [beneficiaryPhone, setBeneficiaryPhone] = useState('');
-  const [beneficiaryRelationship, setBeneficiaryRelationship] = useState('');
-  const [beneficiaryDetails, setBeneficiaryDetails] = useState('');
 
   const reset = () => {
     setTitle('');
@@ -43,10 +39,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
     setCategory('emergency');
     setTarget('');
     setDeadline('');
-    setBeneficiaryName('');
-    setBeneficiaryPhone('');
-    setBeneficiaryRelationship('');
-    setBeneficiaryDetails('');
   };
 
   const submit = async () => {
@@ -56,10 +48,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
     if (!user?.id) return toast.error('Not signed in');
 
     setSubmitting(true);
-    if (!beneficiaryName.trim()) {
-      setSubmitting(false);
-      return toast.error('Beneficiary name is required for transparency');
-    }
     const { error } = await supabase.from('kitties' as never).insert({
       title: title.trim(),
       description: description.trim() || null,
@@ -67,10 +55,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
       target_amount: t,
       deadline: deadline || null,
       created_by: user.id,
-      beneficiary_name: beneficiaryName.trim(),
-      beneficiary_phone: beneficiaryPhone.trim() || null,
-      beneficiary_relationship: beneficiaryRelationship.trim() || null,
-      beneficiary_details: beneficiaryDetails.trim() || null,
     } as never);
     setSubmitting(false);
 
@@ -148,48 +132,10 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
             />
           </div>
 
-          <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
-            <div>
-              <p className="text-sm font-semibold">Beneficiary (transparency)</p>
-              <p className="text-xs text-muted-foreground">
-                Members will see who this fund is for before contributing.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label>Beneficiary name *</Label>
-              <Input
-                value={beneficiaryName}
-                onChange={(e) => setBeneficiaryName(e.target.value)}
-                placeholder="e.g. Jane Wanjiku Mwangi"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={beneficiaryPhone}
-                  onChange={(e) => setBeneficiaryPhone(e.target.value)}
-                  placeholder="07XXXXXXXX"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Relationship</Label>
-                <Input
-                  value={beneficiaryRelationship}
-                  onChange={(e) => setBeneficiaryRelationship(e.target.value)}
-                  placeholder="Member / Spouse / Child"
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Situation / details</Label>
-              <Textarea
-                value={beneficiaryDetails}
-                onChange={(e) => setBeneficiaryDetails(e.target.value)}
-                placeholder="Brief background so members understand the need"
-                rows={2}
-              />
-            </div>
+          <div className="rounded-lg border border-dashed bg-muted/20 p-3">
+            <p className="text-xs text-muted-foreground">
+              💡 Beneficiaries can be added later from the kitty page once the purpose is clear or funds are collected. Members will see them under the Beneficiaries tab.
+            </p>
           </div>
         </div>
         <DialogFooter>

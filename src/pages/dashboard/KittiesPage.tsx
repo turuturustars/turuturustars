@@ -7,6 +7,7 @@ import { useKitties } from '@/hooks/useKitties';
 import { useAuth } from '@/hooks/useAuth';
 import KittyCard from '@/components/kitty/KittyCard';
 import KittyCreateDialog from '@/components/kitty/KittyCreateDialog';
+import KittyTopContributors from '@/components/kitty/KittyTopContributors';
 
 const FILTERS = [
   { value: 'all', label: 'All' },
@@ -104,10 +105,15 @@ const KittiesPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((k) => (
-            <KittyCard key={k.id} kitty={k} />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {filtered.map((k) => (
+              <KittyCard key={k.id} kitty={k} />
+            ))}
+          </div>
+          <div>
+            <KittyTopContributors limit={10} />
+          </div>
         </div>
       )}
     </div>
