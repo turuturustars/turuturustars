@@ -32,10 +32,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
   const [category, setCategory] = useState<KittyCategory>('emergency');
   const [target, setTarget] = useState('');
   const [deadline, setDeadline] = useState('');
-  const [beneficiaryName, setBeneficiaryName] = useState('');
-  const [beneficiaryPhone, setBeneficiaryPhone] = useState('');
-  const [beneficiaryRelationship, setBeneficiaryRelationship] = useState('');
-  const [beneficiaryDetails, setBeneficiaryDetails] = useState('');
 
   const reset = () => {
     setTitle('');
@@ -43,10 +39,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
     setCategory('emergency');
     setTarget('');
     setDeadline('');
-    setBeneficiaryName('');
-    setBeneficiaryPhone('');
-    setBeneficiaryRelationship('');
-    setBeneficiaryDetails('');
   };
 
   const submit = async () => {
@@ -56,10 +48,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
     if (!user?.id) return toast.error('Not signed in');
 
     setSubmitting(true);
-    if (!beneficiaryName.trim()) {
-      setSubmitting(false);
-      return toast.error('Beneficiary name is required for transparency');
-    }
     const { error } = await supabase.from('kitties' as never).insert({
       title: title.trim(),
       description: description.trim() || null,
@@ -67,10 +55,6 @@ const KittyCreateDialog = ({ onCreated }: Props) => {
       target_amount: t,
       deadline: deadline || null,
       created_by: user.id,
-      beneficiary_name: beneficiaryName.trim(),
-      beneficiary_phone: beneficiaryPhone.trim() || null,
-      beneficiary_relationship: beneficiaryRelationship.trim() || null,
-      beneficiary_details: beneficiaryDetails.trim() || null,
     } as never);
     setSubmitting(false);
 

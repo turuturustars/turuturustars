@@ -25,6 +25,33 @@ export type KittyRow = {
   beneficiary_relationship: string | null;
   beneficiary_details: string | null;
   beneficiary_member_id: string | null;
+  round_number: number;
+  parent_kitty_id: string | null;
+};
+
+export type KittyBeneficiaryRow = {
+  id: string;
+  kitty_id: string;
+  member_id: string | null;
+  name: string;
+  phone: string | null;
+  relationship: string | null;
+  details: string | null;
+  allocated_amount: number;
+  disbursed_amount: number;
+  status: 'pending' | 'partial' | 'paid';
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type KittyTopContributorRow = {
+  member_id: string;
+  full_name: string | null;
+  membership_number: string | null;
+  photo_url: string | null;
+  contribution_count: number;
+  total_amount: number;
 };
 
 export type KittyContributionRow = {
