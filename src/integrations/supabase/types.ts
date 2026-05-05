@@ -366,6 +366,8 @@ export type Database = {
           deadline: string | null
           description: string | null
           id: string
+          parent_kitty_id: string | null
+          round_number: number
           status: Database["public"]["Enums"]["kitty_status"]
           target_amount: number
           title: string
@@ -386,6 +388,8 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          parent_kitty_id?: string | null
+          round_number?: number
           status?: Database["public"]["Enums"]["kitty_status"]
           target_amount: number
           title: string
@@ -406,6 +410,8 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           id?: string
+          parent_kitty_id?: string | null
+          round_number?: number
           status?: Database["public"]["Enums"]["kitty_status"]
           target_amount?: number
           title?: string
@@ -413,7 +419,78 @@ export type Database = {
           total_disbursed?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "kitties_parent_kitty_id_fkey"
+            columns: ["parent_kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kitty_beneficiaries: {
+        Row: {
+          allocated_amount: number
+          created_at: string
+          created_by: string
+          details: string | null
+          disbursed_amount: number
+          id: string
+          kitty_id: string
+          member_id: string | null
+          name: string
+          phone: string | null
+          relationship: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          allocated_amount?: number
+          created_at?: string
+          created_by: string
+          details?: string | null
+          disbursed_amount?: number
+          id?: string
+          kitty_id: string
+          member_id?: string | null
+          name: string
+          phone?: string | null
+          relationship?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          allocated_amount?: number
+          created_at?: string
+          created_by?: string
+          details?: string | null
+          disbursed_amount?: number
+          id?: string
+          kitty_id?: string
+          member_id?: string | null
+          name?: string
+          phone?: string | null
+          relationship?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitty_beneficiaries_kitty_id_fkey"
+            columns: ["kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "kitty_beneficiaries_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       kitty_contributions: {
         Row: {
@@ -1517,6 +1594,37 @@ export type Database = {
       }
     }
     Views: {
+      kitty_top_contributors_per_kitty_v: {
+        Row: {
+          contribution_count: number | null
+          full_name: string | null
+          kitty_id: string | null
+          member_id: string | null
+          membership_number: string | null
+          photo_url: string | null
+          total_amount: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitty_contributions_kitty_id_fkey"
+            columns: ["kitty_id"]
+            isOneToOne: false
+            referencedRelation: "kitties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      kitty_top_contributors_v: {
+        Row: {
+          contribution_count: number | null
+          full_name: string | null
+          member_id: string | null
+          membership_number: string | null
+          photo_url: string | null
+          total_amount: number | null
+        }
+        Relationships: []
+      }
       membership_fee_history_v: {
         Row: {
           amount: number | null
