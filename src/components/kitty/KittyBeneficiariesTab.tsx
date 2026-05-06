@@ -265,6 +265,7 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };
 
