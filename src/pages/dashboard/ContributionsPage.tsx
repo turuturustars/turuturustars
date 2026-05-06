@@ -35,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { amountSchema } from '@/lib/validation';
-import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X, ChevronLeft, ChevronRight, AlertCircle, Smartphone } from 'lucide-react';
 
 interface Contribution {
   id: string;
