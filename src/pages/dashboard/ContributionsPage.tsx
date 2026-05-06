@@ -264,13 +264,24 @@ const ContributionsPage = () => {
           <h2 className="text-2xl font-serif font-bold text-foreground">My Contributions</h2>
           <p className="text-muted-foreground">Track your welfare and project contributions</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <AccessibleButton className="btn-primary" ariaLabel="Record a new contribution" disabled={!canInteract}>
-              <Plus className="w-4 h-4 mr-2" />
-              Record Contribution
-            </AccessibleButton>
-          </DialogTrigger>
+        <div className="flex flex-wrap items-center gap-2">
+          <PayWithMpesa
+            paymentType="welfare"
+            onPaymentSuccess={() => fetchContributions()}
+            trigger={
+              <Button className="btn-primary gap-2" disabled={!canInteract}>
+                <Smartphone className="w-4 h-4" />
+                Contribute via M-Pesa
+              </Button>
+            }
+          />
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <AccessibleButton variant="outline" ariaLabel="Manually record a contribution" disabled={!canInteract}>
+                <Plus className="w-4 h-4 mr-2" />
+                Record Manually
+              </AccessibleButton>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record New Contribution</DialogTitle>
