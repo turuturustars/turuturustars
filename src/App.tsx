@@ -113,6 +113,7 @@ const NotificationsPage = lazy(() => import("./pages/dashboard/NotificationsPage
 const WalletPage = lazy(() => import("./pages/dashboard/WalletPage"));
 const KittiesPage = lazy(() => import("./pages/dashboard/KittiesPage"));
 const KittyDetailPage = lazy(() => import("./pages/dashboard/KittyDetailPage"));
+const InsuranceBenefitsPage = lazy(() => import("./pages/dashboard/InsuranceBenefitsPage"));
 
 // QueryClient configuration with better defaults
 const queryClient = new QueryClient({
