@@ -49,12 +49,20 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('kitty_beneficiaries' as never)
-      .select('*')
-      .eq('kitty_id', kittyId)
-      .order('created_at', { ascending: false });
+    const [{ data }, { data: t }] = await Promise.all([
+      supabase
+        .from('kitty_beneficiaries' as never)
+        .select('*')
+        .eq('kitty_id', kittyId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('kitty_group_totals_v' as never)
+        .select('*')
+        .eq('kitty_id', kittyId)
+        .maybeSingle(),
+    ]);
     setRows((data as unknown as KittyBeneficiaryRow[]) || []);
+    setTotals((t as unknown as GroupTotals) || null);
     setLoading(false);
   }, [kittyId]);
 
