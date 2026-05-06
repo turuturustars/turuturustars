@@ -24,6 +24,7 @@ import {
   Menu,
   MessageCircle,
   Vote,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -114,6 +115,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     { label: 'Community Kitties', href: '/dashboard/finance/kitties', icon: HandHeart, badge: null },
     { label: 'Membership Fees', href: '/dashboard/finance/membership-fees', icon: PiggyBank, badge: null },
     { label: 'Welfare Cases', href: '/dashboard/members/welfare', icon: HandHeart, badge: null },
+    { label: 'Insurance Benefits', href: '/dashboard/insurance', icon: ShieldCheck, badge: 'Soon' },
     {
       label: 'Announcements',
       href: '/dashboard/communication/announcements',
