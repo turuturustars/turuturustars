@@ -9,13 +9,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Plus, HeartHandshake, Phone, Loader2, Trash2 } from 'lucide-react';
+import { Plus, HeartHandshake, Phone, Loader2, Trash2, Target, Coins, Layers } from 'lucide-react';
 import { toast } from 'sonner';
-import type { KittyBeneficiaryRow } from '@/hooks/useKitties';
+import type { KittyBeneficiaryRow, KittyRow } from '@/hooks/useKitties';
 
 interface Props {
   kittyId: string;
+  kitty?: KittyRow | null;
 }
+
+type GroupTotals = {
+  rounds_count: number;
+  total_contributed_all_rounds: number;
+  total_disbursed_all_rounds: number;
+  combined_balance: number;
+};
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   pending: 'secondary',
