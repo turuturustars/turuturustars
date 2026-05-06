@@ -399,6 +399,7 @@ const App = () => {
 
                   {/* User profile */}
                   <Route path="profile" element={<ProfilePage />} />
+                  <Route path="insurance" element={<InsuranceBenefitsPage />} />
 
                   {/* Legacy routes - redirect to new structure */}
                   <Route path="contributions" element={<Navigate to="/dashboard/finance/contributions" replace />} />
