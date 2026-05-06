@@ -31,9 +31,10 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   paid: 'default',
 };
 
-const KittyBeneficiariesTab = ({ kittyId }: Props) => {
+const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
   const { user, hasRole } = useAuth();
   const [rows, setRows] = useState<KittyBeneficiaryRow[]>([]);
+  const [totals, setTotals] = useState<GroupTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
