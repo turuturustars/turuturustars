@@ -9,13 +9,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
-import { Plus, HeartHandshake, Phone, Loader2, Trash2 } from 'lucide-react';
+import { Plus, HeartHandshake, Phone, Loader2, Trash2, Target, Coins, Layers } from 'lucide-react';
 import { toast } from 'sonner';
-import type { KittyBeneficiaryRow } from '@/hooks/useKitties';
+import type { KittyBeneficiaryRow, KittyRow } from '@/hooks/useKitties';
 
 interface Props {
   kittyId: string;
+  kitty?: KittyRow | null;
 }
+
+type GroupTotals = {
+  rounds_count: number;
+  total_contributed_all_rounds: number;
+  total_disbursed_all_rounds: number;
+  combined_balance: number;
+};
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   pending: 'secondary',
@@ -23,9 +31,10 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   paid: 'default',
 };
 
-const KittyBeneficiariesTab = ({ kittyId }: Props) => {
+const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
   const { user, hasRole } = useAuth();
   const [rows, setRows] = useState<KittyBeneficiaryRow[]>([]);
+  const [totals, setTotals] = useState<GroupTotals | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -40,12 +49,20 @@ const KittyBeneficiariesTab = ({ kittyId }: Props) => {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('kitty_beneficiaries' as never)
-      .select('*')
-      .eq('kitty_id', kittyId)
-      .order('created_at', { ascending: false });
+    const [{ data }, { data: t }] = await Promise.all([
+      supabase
+        .from('kitty_beneficiaries' as never)
+        .select('*')
+        .eq('kitty_id', kittyId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('kitty_group_totals_v' as never)
+        .select('*')
+        .eq('kitty_id', kittyId)
+        .maybeSingle(),
+    ]);
     setRows((data as unknown as KittyBeneficiaryRow[]) || []);
+    setTotals((t as unknown as GroupTotals) || null);
     setLoading(false);
   }, [kittyId]);
 
@@ -107,6 +124,44 @@ const KittyBeneficiariesTab = ({ kittyId }: Props) => {
   };
 
   return (
+    <div className="space-y-4">
+      {(kitty || totals) && (
+        <Card className="bg-muted/30">
+          <CardContent className="p-4 space-y-3">
+            {kitty && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Funding purpose</p>
+                <p className="font-semibold">{kitty.title}</p>
+                {kitty.description && (
+                  <p className="text-sm text-muted-foreground whitespace-pre-line mt-1">{kitty.description}</p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Coins className="w-3 h-3" /> Contributed (all rounds)</p>
+                <p className="text-sm font-bold text-primary">KES {Number(totals?.total_contributed_all_rounds ?? kitty?.total_contributed ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground">Disbursed</p>
+                <p className="text-sm font-bold">KES {Number(totals?.total_disbursed_all_rounds ?? kitty?.total_disbursed ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Target className="w-3 h-3" /> Target / round</p>
+                <p className="text-sm font-bold">KES {Number(kitty?.target_amount ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Layers className="w-3 h-3" /> Rounds</p>
+                <p className="text-sm font-bold">{totals?.rounds_count ?? 1}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Beneficiaries below are revealed for <span className="font-semibold">Round {kitty?.round_number ?? 1}</span>. Each new round opens its own beneficiary list once funds are contributed.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
         <CardTitle className="text-base flex items-center gap-2">
@@ -210,6 +265,7 @@ const KittyBeneficiariesTab = ({ kittyId }: Props) => {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };
 

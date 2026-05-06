@@ -1594,6 +1594,23 @@ export type Database = {
       }
     }
     Views: {
+      kitty_group_totals_v: {
+        Row: {
+          combined_balance: number | null
+          kitty_id: string | null
+          rounds_count: number | null
+          total_contributed_all_rounds: number | null
+          total_disbursed_all_rounds: number | null
+        }
+        Relationships: []
+      }
+      kitty_roots_v: {
+        Row: {
+          kitty_id: string | null
+          root_id: string | null
+        }
+        Relationships: []
+      }
       kitty_top_contributors_per_kitty_v: {
         Row: {
           contribution_count: number | null
@@ -1604,15 +1621,7 @@ export type Database = {
           photo_url: string | null
           total_amount: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "kitty_contributions_kitty_id_fkey"
-            columns: ["kitty_id"]
-            isOneToOne: false
-            referencedRelation: "kitties"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       kitty_top_contributors_v: {
         Row: {

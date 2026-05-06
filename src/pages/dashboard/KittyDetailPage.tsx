@@ -248,7 +248,7 @@ const KittyDetailPage = () => {
         </TabsContent>
 
         <TabsContent value="beneficiaries">
-          {id && <KittyBeneficiariesTab kittyId={id} />}
+          {id && <KittyBeneficiariesTab kittyId={id} kitty={kitty} />}
         </TabsContent>
 
         <TabsContent value="top">
