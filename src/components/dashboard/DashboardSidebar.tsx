@@ -24,7 +24,7 @@ import {
   Menu,
   MessageCircle,
   Vote,
-} from 'lucide-react';
+  ShieldCheck,
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
