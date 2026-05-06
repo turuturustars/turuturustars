@@ -124,6 +124,44 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
   };
 
   return (
+    <div className="space-y-4">
+      {(kitty || totals) && (
+        <Card className="bg-muted/30">
+          <CardContent className="p-4 space-y-3">
+            {kitty && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Funding purpose</p>
+                <p className="font-semibold">{kitty.title}</p>
+                {kitty.description && (
+                  <p className="text-sm text-muted-foreground whitespace-pre-line mt-1">{kitty.description}</p>
+                )}
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Coins className="w-3 h-3" /> Contributed (all rounds)</p>
+                <p className="text-sm font-bold text-primary">KES {Number(totals?.total_contributed_all_rounds ?? kitty?.total_contributed ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground">Disbursed</p>
+                <p className="text-sm font-bold">KES {Number(totals?.total_disbursed_all_rounds ?? kitty?.total_disbursed ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Target className="w-3 h-3" /> Target / round</p>
+                <p className="text-sm font-bold">KES {Number(kitty?.target_amount ?? 0).toLocaleString()}</p>
+              </div>
+              <div className="rounded-md border bg-background p-2">
+                <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Layers className="w-3 h-3" /> Rounds</p>
+                <p className="text-sm font-bold">{totals?.rounds_count ?? 1}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Beneficiaries below are revealed for <span className="font-semibold">Round {kitty?.round_number ?? 1}</span>. Each new round opens its own beneficiary list once funds are contributed.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
     <Card>
       <CardHeader className="pb-2 flex-row items-center justify-between">
         <CardTitle className="text-base flex items-center gap-2">
