@@ -36,7 +36,7 @@ const KittyBeneficiariesTab = ({ kittyId }: Props) => {
   const [details, setDetails] = useState('');
   const [allocated, setAllocated] = useState('');
 
-  const canManage = hasRole('admin') || hasRole('treasurer') || hasRole('chairperson');
+  const canManage = hasRole('admin');
 
   const load = useCallback(async () => {
     setLoading(true);
