@@ -41,25 +41,21 @@ let scriptPromise: Promise<void> | null = null;
 const ensureTurnstileScript = (): Promise<void> => {
   if (typeof window === 'undefined') return Promise.resolve();
   if (window.turnstile) {
-    console.log('Turnstile already loaded');
     return Promise.resolve();
   }
   if (scriptPromise) {
-    console.log('Waiting for Turnstile script...');
     return scriptPromise;
   }
 
   scriptPromise = new Promise((resolve, reject) => {
     const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
     if (existing) {
-      console.log('Existing Turnstile script found');
       if (window.turnstile) {
         resolve();
         return;
       }
 
       existing.addEventListener('load', () => {
-        console.log('Turnstile script loaded');
         resolve();
       }, { once: true });
       existing.addEventListener('error', () => {
@@ -69,14 +65,12 @@ const ensureTurnstileScript = (): Promise<void> => {
       return;
     }
 
-    console.log('Creating new Turnstile script');
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
     script.src = SCRIPT_SRC;
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('Turnstile script loaded successfully');
       resolve();
     };
     script.onerror = () => {

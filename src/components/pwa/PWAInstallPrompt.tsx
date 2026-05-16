@@ -3,11 +3,6 @@ import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
 import { Download, MonitorSmartphone, Pin, RefreshCw, WifiOff, X } from "lucide-react";
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
-}
-
 const INSTALL_DISMISS_KEY = "pwa_install_prompt_dismissed_at";
 const DISMISS_DURATION_MS = 1000 * 60 * 60 * 24 * 3;
 
@@ -16,7 +11,6 @@ const isStandaloneMode = () =>
   (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 export const PWAInstallPrompt = () => {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallInfo, setShowInstallInfo] = useState(false);
   const [isInstalled, setIsInstalled] = useState<boolean>(() => isStandaloneMode());
   const [isDismissed, setIsDismissed] = useState(false);
@@ -43,14 +37,14 @@ export const PWAInstallPrompt = () => {
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
-      const promptEvent = event as BeforeInstallPromptEvent;
-      promptEvent.preventDefault();
-      setDeferredPrompt(promptEvent);
+      // Let the browser show its native install banner/icon. The custom card
+      // below stays as a gentle fallback with platform-specific steps.
+      if (event.defaultPrevented) return;
+      setShowInstallInfo(false);
     };
 
     const onInstalled = () => {
       setIsInstalled(true);
-      setDeferredPrompt(null);
       setShowInstallInfo(false);
     };
 
@@ -73,10 +67,9 @@ export const PWAInstallPrompt = () => {
     return { isIOS, isAndroid, isWindows, isDesktop };
   }, []);
 
-  const supportsNativePrompt = !!deferredPrompt;
   const canShowManualInstall = !isInstalled && (deviceFlags.isIOS || deviceFlags.isAndroid || deviceFlags.isDesktop);
 
-  const showInstallPrompt = !isInstalled && !isDismissed && (supportsNativePrompt || canShowManualInstall);
+  const showInstallPrompt = !isInstalled && !isDismissed && canShowManualInstall;
 
   const dismissInstallPrompt = () => {
     setIsDismissed(true);
@@ -88,19 +81,6 @@ export const PWAInstallPrompt = () => {
   };
 
   const handleInstall = async () => {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-
-      if (choice.outcome === "accepted") {
-        setIsInstalled(true);
-        setShowInstallInfo(false);
-      }
-
-      setDeferredPrompt(null);
-      return;
-    }
-
     setShowInstallInfo((open) => !open);
   };
 
@@ -166,7 +146,7 @@ export const PWAInstallPrompt = () => {
           <div className="mt-3 flex items-center gap-2">
             <Button size="sm" className="h-9" onClick={handleInstall}>
               <Download className="h-4 w-4" />
-              {supportsNativePrompt ? "Install now" : "Show install steps"}
+              Show install steps
             </Button>
             {deviceFlags.isWindows && (
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-700">
