@@ -2,7 +2,7 @@ name: Daily Jobs Scrape
 
 on:
   schedule:
-    - cron: "0 4 * * *" # 04:00 UTC daily
+    - cron: "0 4 * * *" # 04:00 UTC daily; processes one slice of a 3-day source sequence
   workflow_dispatch:
 
 env:
@@ -18,7 +18,7 @@ jobs:
           RESP=$(curl -sS -w "\n%{http_code}" -X POST "$FUNCTIONS_BASE_URL/jobs-scrape" \
             -H "x-cron-key: ${{ secrets.JOBS_CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            -d '{"reason":"github-schedule"}')
+            -d '{"reason":"github-schedule","sequence_days":3}')
           BODY=$(echo "$RESP" | head -n1)
           STATUS=$(echo "$RESP" | tail -n1)
           echo "HTTP $STATUS"

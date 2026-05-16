@@ -1,7 +1,6 @@
 ﻿import { useNavigate } from 'react-router-dom';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import {
-  OfficialDashboardHero,
   OfficialMetricCard,
   OfficialQuickActionCard,
   OfficialResponsibilityCard,
@@ -34,14 +33,6 @@ const AdminDashboard = () => {
         message={statusMessage.message}
         type={statusMessage.type}
         isVisible={statusMessage.isVisible}
-      />
-
-      <OfficialDashboardHero
-        title="Admin Control Center"
-        subtitle="Unified command dashboard for all roles. Monitor governance, finance, communication, and member operations from one place."
-        icon={Shield}
-        badgeLabel="Administrator"
-        gradientClassName="bg-gradient-to-br from-slate-900 via-sky-800 to-cyan-700"
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

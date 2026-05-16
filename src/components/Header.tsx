@@ -24,6 +24,7 @@ const Header = () => {
 
   useEffect(() => {
     setIsMenuOpen(false);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [location.pathname]);
 
   useEffect(() => {
@@ -39,6 +40,17 @@ const Header = () => {
   const isActive = (href: string) =>
     href === '/' ? location.pathname === '/' : location.pathname.startsWith(href);
 
+  const handleNavClick = (href: string) => {
+    setIsMenuOpen(false);
+    if (location.pathname === href) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      return;
+    }
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  };
+
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div
@@ -49,25 +61,26 @@ const Header = () => {
             : 'border-[#1f5f89]/60 bg-[#07243a]/88 shadow-[0_10px_30px_-20px_rgba(6,22,39,0.48)]'
         )}
       >
-        <div className="flex h-16 items-center justify-between gap-3 px-3 sm:px-4 md:px-5">
+        <div className="flex h-[4.5rem] items-center justify-between gap-3 px-3 sm:h-20 sm:px-4 md:px-5">
           <Link to="/" className="flex min-w-0 items-center">
             <img
               src={logo}
               alt="Turuturu Stars"
-              className="h-11 w-auto object-contain sm:h-12"
+              className="h-14 w-auto object-contain sm:h-16"
             />
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-[#2a6f9b]/70 bg-[#0a314d]/70 p-1">
+          <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-[#4e88af]/75 bg-[#0a2d46]/80 p-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
+                onClick={() => handleNavClick(item.href)}
                 className={cn(
                   'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
                   isActive(item.href)
-                    ? 'bg-[#21adff] text-[#05243a]'
-                    : 'text-[#d4ecff] hover:bg-[#15547d]/60 hover:text-white'
+                    ? 'bg-[#f0f9ff] text-[#093351]'
+                    : 'text-[#eff7ff] hover:bg-[#1a5a83] hover:text-white'
                 )}
               >
                 {item.label}
@@ -108,11 +121,12 @@ const Header = () => {
                 <Link
                   key={item.href}
                   to={item.href}
+                  onClick={() => handleNavClick(item.href)}
                   className={cn(
                     'rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors',
                     isActive(item.href)
-                      ? 'bg-[#21adff] text-[#05243a]'
-                      : 'text-[#d4ecff] hover:bg-[#15547d]/60 hover:text-white'
+                      ? 'bg-[#f0f9ff] text-[#093351]'
+                      : 'text-[#eff7ff] hover:bg-[#1a5a83] hover:text-white'
                   )}
                 >
                   {item.label}

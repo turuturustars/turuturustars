@@ -20,7 +20,6 @@ export interface SignUpData {
   password: string;
   fullName?: string;
   phone?: string;
-  phoneVerificationToken?: string;
   location?: string;
   idNumber?: string;
   occupation?: string;
@@ -113,7 +112,6 @@ export async function registerWithEmail(data: SignUpData) {
       data: {
         full_name: data.fullName,
         phone: normalizedPhone ?? undefined,
-        phone_verification_token: data.phoneVerificationToken,
         id_number: data.idNumber,
         location: data.location,
         occupation: data.occupation,

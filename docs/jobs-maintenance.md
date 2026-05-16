@@ -34,4 +34,21 @@ JOB_SOURCES="MyGov Job Adverts,Public Service Commission,Murang'a County Governm
 node scripts/jobs/scrape-basic.mjs
 ```
 
+To spread scraping across a 3-day sequence, set `SOURCE_SEQUENCE_DAYS=3`.
+If `SOURCE_SEQUENCE_DAY` is omitted, the script picks the current UTC day in the sequence:
+
+```
+SOURCE_SEQUENCE_DAYS=3 node scripts/jobs/scrape-basic.mjs
+```
+
+To replay a specific slice manually, pass `SOURCE_SEQUENCE_DAY` from `1` to `3`:
+
+```
+SOURCE_SEQUENCE_DAYS=3 SOURCE_SEQUENCE_DAY=2 node scripts/jobs/scrape-basic.mjs
+```
+
 Note: Pending listings must be approved in the admin dashboard before they appear publicly.
+
+## Scheduled scrape
+The GitHub Actions scrape calls the `jobs-scrape` Supabase function daily with `sequence_days: 3`.
+That means each run processes one deterministic slice of the active source list, then the next slice runs the following day.

@@ -293,7 +293,7 @@ const App = () => {
                     <Route
                       path="mpesa"
                       element={
-                        <ProtectedRoute requiredRoles={['admin', 'treasurer']} stealth>
+                        <ProtectedRoute requiredRoles={['admin', 'treasurer', 'chairperson', 'secretary', 'patron']} stealth>
                           <PaymentsManagement />
                         </ProtectedRoute>
                       }

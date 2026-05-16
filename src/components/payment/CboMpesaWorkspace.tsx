@@ -6,21 +6,21 @@ import CboTreasurerApprovalPanel from '@/components/payment/CboTreasurerApproval
 
 const CboMpesaWorkspace = () => {
   const { hasRole } = useAuth();
-  const canApprove = hasRole('treasurer') || hasRole('admin');
+  const canApprove = hasRole('chairperson') || hasRole('admin') || hasRole('secretary') || hasRole('patron');
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>CBO M-Pesa Contributions</CardTitle>
         <CardDescription>
-          STK push and till receipt workflows with callback verification and treasurer approvals.
+          STK push and till receipt workflows with callback verification and finance approvals.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="member" className="space-y-4">
           <TabsList>
             <TabsTrigger value="member">Member Payments</TabsTrigger>
-            {canApprove && <TabsTrigger value="approvals">Treasurer Approvals</TabsTrigger>}
+            {canApprove && <TabsTrigger value="approvals">Finance Approvals</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="member">

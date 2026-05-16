@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card } from '@/components/ui/card';
@@ -11,10 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
   requestPasswordResetByIdentifier,
-  sendSignupSmsCode,
   signInWithEmail,
   signUpWithEmail,
-  verifySignupSmsCode,
 } from '../authApi';
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
@@ -22,13 +20,6 @@ import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhon
 import logo from '@/assets/turuturustarslogo.png';
 
 type Mode = 'signin' | 'signup';
-type WebOtpCredential = { code?: string };
-type WebOtpCredentialContainer = {
-  get: (options?: {
-    otp?: { transport: string[] };
-    signal?: AbortSignal;
-  }) => Promise<WebOtpCredential | null>;
-};
 
 const SUPPORT_PHONE = '0700471113';
 
@@ -76,67 +67,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     password: '',
     confirmPassword: '',
   });
-  const [signupSmsCode, setSignupSmsCode] = useState('');
-  const [isSendingSignupCode, setIsSendingSignupCode] = useState(false);
-  const [isVerifyingSignupCode, setIsVerifyingSignupCode] = useState(false);
-  const [signupCodeCooldownSeconds, setSignupCodeCooldownSeconds] = useState(0);
-  const [signupVerificationToken, setSignupVerificationToken] = useState<string | null>(null);
-  const [signupVerifiedPhone, setSignupVerifiedPhone] = useState<string | null>(null);
-  const [signupSmsFeedback, setSignupSmsFeedback] = useState<{
-    type: 'success' | 'error' | 'info';
-    message: string;
-  } | null>(null);
-  const webOtpAbortRef = useRef<AbortController | null>(null);
-
-  const stopWebOtpListening = useCallback(() => {
-    if (webOtpAbortRef.current) {
-      webOtpAbortRef.current.abort();
-      webOtpAbortRef.current = null;
-    }
-  }, []);
 
   const normalizedSignupPhone = useMemo(
     () => normalizeKenyanPhone(signupForm.phone),
     [signupForm.phone]
   );
 
-  const isSignupPhoneVerified = useMemo(
-    () => Boolean(signupVerificationToken && signupVerifiedPhone && normalizedSignupPhone === signupVerifiedPhone),
-    [normalizedSignupPhone, signupVerificationToken, signupVerifiedPhone]
-  );
-
-  useEffect(() => {
-    if (signupCodeCooldownSeconds <= 0) return;
-
-    const timer = setInterval(() => {
-      setSignupCodeCooldownSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [signupCodeCooldownSeconds]);
-
-  useEffect(() => {
-    return () => {
-      stopWebOtpListening();
-    };
-  }, [stopWebOtpListening]);
-
   const handleSignupPhoneChange = useCallback((value: string) => {
-    stopWebOtpListening();
     setSignupForm((prev) => ({ ...prev, phone: value }));
-
-    const normalized = normalizeKenyanPhone(value);
-    if (!normalized || normalized !== signupVerifiedPhone) {
-      setSignupVerificationToken(null);
-      setSignupVerifiedPhone(null);
-    }
-  }, [signupVerifiedPhone, stopWebOtpListening]);
-
-  useEffect(() => {
-    if (mode !== 'signup') {
-      stopWebOtpListening();
-    }
-  }, [mode, stopWebOtpListening]);
+  }, []);
 
   useEffect(() => {
     if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
@@ -257,137 +196,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     if (recoveryFeedback?.type === 'success') return 'Send another reset link';
     return 'Check account and send reset link';
   }, [isRecoverySubmitting, recoveryFeedback?.type]);
-
-  const handleSendSignupCode = async () => {
-    if (!normalizedSignupPhone) {
-      toast({
-        title: 'Invalid phone number',
-        description: formatKenyanPhoneError(),
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsSendingSignupCode(true);
-    try {
-      const response = await sendSignupSmsCode(normalizedSignupPhone);
-      const canAutoReadCode =
-        typeof window !== 'undefined' &&
-        window.isSecureContext &&
-        'OTPCredential' in window &&
-        typeof navigator !== 'undefined' &&
-        Boolean(navigator.credentials);
-      const providerStatus = response.providerStatus ? response.providerStatus.toUpperCase() : null;
-      const providerStatusHint = providerStatus ? ` Provider status: ${providerStatus}.` : '';
-      const autoReadHint = canAutoReadCode ? ' Keep this screen open for automatic code detection.' : '';
-      setSignupCodeCooldownSeconds(Math.max(0, response.resendAfterSeconds ?? 0));
-      setSignupVerificationToken(null);
-      setSignupVerifiedPhone(null);
-      setSignupSmsCode('');
-      setSignupSmsFeedback({
-        type: 'success',
-        message:
-          `Code request accepted for ${response.maskedPhone}. ` +
-          `It expires in ${Math.ceil((response.expiresInSeconds || 600) / 60)} minutes. ` +
-          `SMS may take up to 10 minutes to arrive. If it still does not arrive, tap resend.` +
-          autoReadHint +
-          providerStatusHint,
-      });
-      toast({
-        title: 'Code sent',
-        description: `Verification code requested for ${response.maskedPhone}. SMS may take up to 10 minutes.${providerStatusHint}`,
-      });
-
-      if (canAutoReadCode) {
-        stopWebOtpListening();
-        const controller = new AbortController();
-        webOtpAbortRef.current = controller;
-        const credentialContainer = navigator.credentials as unknown as WebOtpCredentialContainer;
-
-        void credentialContainer
-          .get({
-            otp: { transport: ['sms'] },
-            signal: controller.signal,
-          })
-          .then((credential) => {
-            if (controller.signal.aborted) return;
-            const detectedCode = (credential?.code || '').replace(/\D/g, '').slice(0, 6);
-            if (detectedCode.length !== 6) return;
-
-            setSignupSmsCode(detectedCode);
-            setSignupSmsFeedback({
-              type: 'info',
-              message: 'Verification code detected automatically. Verifying...',
-            });
-            void handleVerifySignupCode(detectedCode);
-          })
-          .catch((error: unknown) => {
-            if (error instanceof DOMException && error.name === 'AbortError') return;
-            console.warn('WebOTP auto-read failed', error);
-          });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to send SMS code';
-      setSignupSmsFeedback({ type: 'error', message });
-      toast({
-        title: 'SMS send failed',
-        description: message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSendingSignupCode(false);
-    }
-  };
-
-  const handleVerifySignupCode = async (detectedCode?: string) => {
-    stopWebOtpListening();
-
-    if (!normalizedSignupPhone) {
-      toast({
-        title: 'Invalid phone number',
-        description: formatKenyanPhoneError(),
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const cleanCode = (detectedCode ?? signupSmsCode).replace(/\D/g, '');
-    if (cleanCode.length !== 6) {
-      toast({
-        title: 'Invalid code',
-        description: 'Enter the 6-digit verification code sent to your phone.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsVerifyingSignupCode(true);
-    try {
-      const response = await verifySignupSmsCode(normalizedSignupPhone, cleanCode);
-      setSignupVerificationToken(response.verificationToken);
-      setSignupVerifiedPhone(response.phone);
-      setSignupSmsFeedback({
-        type: 'success',
-        message: 'Phone verified successfully. You can now create your account.',
-      });
-      toast({
-        title: 'Phone verified',
-        description: 'Your phone number is verified and ready for account creation.',
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to verify code';
-      setSignupVerificationToken(null);
-      setSignupVerifiedPhone(null);
-      setSignupSmsFeedback({ type: 'error', message });
-      toast({
-        title: 'Verification failed',
-        description: message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsVerifyingSignupCode(false);
-    }
-  };
 
   const handlePasswordRecovery = async () => {
     if (!recoveryIdentifier.trim()) {
@@ -559,15 +367,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       return;
     }
 
-    if (!isSignupPhoneVerified || !signupVerificationToken) {
-      toast({
-        title: 'Phone verification required',
-        description: 'Send and verify your SMS code before creating your account.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     if (signupForm.password !== signupForm.confirmPassword) {
       toast({
         title: 'Password mismatch',
@@ -600,7 +399,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       const { requiresEmailVerification, existingUserHint } = await signUpWithEmail({
         email: signupForm.email,
         phone: normalizedSignupPhone,
-        phoneVerificationToken: signupVerificationToken,
         password: signupForm.password,
         captchaToken: signupCaptchaToken || undefined,
       });
@@ -620,10 +418,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       setRequiresManualCheck((prev) => ({ ...prev, signup: false }));
       setManualCheckPassed((prev) => ({ ...prev, signup: false }));
       setSignupAcknowledged(true);
-      setSignupVerificationToken(null);
-      setSignupVerifiedPhone(null);
-      setSignupSmsCode('');
-      setSignupSmsFeedback(null);
       if (requiresEmailVerification) {
         toast({
           title: 'Verify your email',
@@ -984,91 +778,17 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="signup-phone" className="text-sm font-medium text-foreground/80">
-                      Phone Number (SMS Verification)
+                      Phone Number
                     </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="signup-phone"
-                        type="tel"
-                        required
-                        placeholder="07XXXXXXXX or +2547XXXXXXXX"
-                        className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={signupForm.phone}
-                        onChange={(e) => handleSignupPhoneChange(e.target.value)}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() => void handleSendSignupCode()}
-                        disabled={isSendingSignupCode || signupCodeCooldownSeconds > 0 || !normalizedSignupPhone}
-                      >
-                        {isSendingSignupCode ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Sending
-                          </>
-                        ) : signupCodeCooldownSeconds > 0 ? (
-                          `Resend in ${signupCodeCooldownSeconds}s`
-                        ) : (
-                          'Send Code'
-                        )}
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      SMS may take up to 10 minutes to arrive. Keep this page open while waiting.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="signup-sms-code" className="text-sm font-medium text-foreground/80">
-                      Verification Code
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="signup-sms-code"
-                        inputMode="numeric"
-                        placeholder="Enter 6-digit code"
-                        className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
-                        value={signupSmsCode}
-                        onChange={(e) => setSignupSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        disabled={!normalizedSignupPhone}
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="shrink-0"
-                        onClick={() => void handleVerifySignupCode()}
-                        disabled={isVerifyingSignupCode || signupSmsCode.replace(/\D/g, '').length !== 6}
-                      >
-                        {isVerifyingSignupCode ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Verifying
-                          </>
-                        ) : (
-                          'Verify Code'
-                        )}
-                      </Button>
-                    </div>
-                    {signupSmsFeedback && (
-                      <div
-                        className={`rounded-lg border px-3 py-2 text-xs ${
-                          signupSmsFeedback.type === 'success'
-                            ? 'border-emerald-300/70 bg-emerald-50 text-emerald-800'
-                            : signupSmsFeedback.type === 'info'
-                              ? 'border-blue-300/70 bg-blue-50 text-blue-800'
-                              : 'border-amber-300/70 bg-amber-50 text-amber-900'
-                        }`}
-                      >
-                        {signupSmsFeedback.message}
-                      </div>
-                    )}
-                    {isSignupPhoneVerified && (
-                      <p className="text-xs font-semibold text-emerald-700">
-                        Phone verified. Account creation is unlocked.
-                      </p>
-                    )}
+                    <Input
+                      id="signup-phone"
+                      type="tel"
+                      required
+                      placeholder="07XXXXXXXX or +2547XXXXXXXX"
+                      className="border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
+                      value={signupForm.phone}
+                      onChange={(e) => handleSignupPhoneChange(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -1154,7 +874,6 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                       isSubmitting ||
                       !hasCaptchaProtection ||
                       !signupCaptchaToken ||
-                      !isSignupPhoneVerified ||
                       (requiresManualCheck.signup && !manualCheckPassed.signup)
                     }
                   >

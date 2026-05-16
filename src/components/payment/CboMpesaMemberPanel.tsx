@@ -89,16 +89,24 @@ const CboMpesaMemberPanel = () => {
         }
 
         setActiveStatus(payment.status);
-        if (payment.status === 'completed' || payment.status === 'failed') {
+        if (payment.status === 'completed' || payment.status === 'awaiting_approval' || payment.status === 'failed') {
           setActiveCheckoutId(null);
           await loadPayments();
+          const paymentReceived = payment.status === 'completed' || payment.status === 'awaiting_approval';
           toast({
-            title: payment.status === 'completed' ? 'Payment completed' : 'Payment failed',
+            title:
+              payment.status === 'completed'
+                ? 'Payment completed'
+                : payment.status === 'awaiting_approval'
+                  ? 'Payment received'
+                  : 'Payment failed',
             description:
               payment.status === 'completed'
                 ? `Receipt: ${payment.mpesa_receipt || 'Captured'}`
+                : payment.status === 'awaiting_approval'
+                  ? `Receipt captured${payment.mpesa_receipt ? `: ${payment.mpesa_receipt}` : ''}. Awaiting finance approval.`
                 : 'The M-Pesa request did not complete. You can retry.',
-            variant: payment.status === 'completed' ? 'default' : 'destructive',
+            variant: paymentReceived ? 'default' : 'destructive',
           });
         }
       } catch (error) {

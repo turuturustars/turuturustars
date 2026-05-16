@@ -25,7 +25,7 @@ const CboTreasurerApprovalPanel = () => {
   const [actingPaymentId, setActingPaymentId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
 
-  const canApprove = hasRole('treasurer') || hasRole('admin');
+  const canApprove = hasRole('chairperson') || hasRole('admin') || hasRole('secretary') || hasRole('patron');
 
   const loadData = async () => {
     if (!canApprove) {
@@ -103,9 +103,9 @@ const CboTreasurerApprovalPanel = () => {
           <div className="flex items-start gap-3">
             <ShieldX className="w-5 h-5 mt-0.5 text-muted-foreground" />
             <div>
-              <h3 className="font-medium">Treasurer Approval Access Required</h3>
+              <h3 className="font-medium">Finance Approval Access Required</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Only treasurer and admin roles can approve or reject till-verified payments.
+                Only chairperson, admin, secretary, and patron roles can approve or reject finance items.
               </p>
             </div>
           </div>
@@ -154,8 +154,8 @@ const CboTreasurerApprovalPanel = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
-            <CardTitle className="text-lg">Awaiting Treasurer Approval</CardTitle>
-            <CardDescription>Approve valid till payments or reject suspicious submissions.</CardDescription>
+            <CardTitle className="text-lg">Awaiting Finance Approval</CardTitle>
+            <CardDescription>Submit your finance approval for verified M-Pesa payments.</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void loadData()}>
             <RefreshCw className="w-4 h-4 mr-2" />

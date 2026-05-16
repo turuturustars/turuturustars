@@ -6,7 +6,12 @@ import { AlertCircle, CheckCircle2, Smartphone } from 'lucide-react';
 
 const PaymentsManagement = () => {
   const { hasRole } = useAuth();
-  const canManageMpesa = hasRole('admin') || hasRole('treasurer');
+  const canManageMpesa =
+    hasRole('admin') ||
+    hasRole('treasurer') ||
+    hasRole('chairperson') ||
+    hasRole('secretary') ||
+    hasRole('patron');
 
   if (!canManageMpesa) {
     return (
@@ -17,7 +22,7 @@ const PaymentsManagement = () => {
             <div>
               <h3 className="font-medium">Access Restricted</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                M-Pesa management is available to Admin and Treasurer roles only.
+                M-Pesa management is available to finance and approval roles only.
               </p>
             </div>
           </div>
@@ -60,11 +65,11 @@ const PaymentsManagement = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Approval Control</CardTitle>
             <CardDescription>
-              <Badge variant="outline" className="font-normal">Treasurer/Admin</Badge>
+              <Badge variant="outline" className="font-normal">Finance approval</Badge>
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Till receipts can be approved or rejected with decision notes.</p>
+            <p className="text-sm text-muted-foreground">Verified payments move through the configured finance approval workflow.</p>
           </CardContent>
         </Card>
       </div>

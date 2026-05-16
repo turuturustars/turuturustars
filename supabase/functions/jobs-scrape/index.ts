@@ -10,6 +10,8 @@ export const config = {
 const DEFAULT_MAX_PER_SOURCE = 20;
 const DEFAULT_REQUEST_DELAY_MS = 1200;
 const DEFAULT_MAX_PRIORITY = 2;
+const DEFAULT_SEQUENCE_DAYS = 1;
+const MAX_SEQUENCE_DAYS = 31;
 
 const JOBS_INGEST_URL =
   Deno.env.get("JOBS_INGEST_URL") ||
@@ -256,6 +258,30 @@ const asNumber = (value: unknown, fallback: number) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const asIntegerInRange = (value: unknown, fallback: number, min: number, max: number) => {
+  const parsed = asNumber(value, fallback);
+  if (!Number.isInteger(parsed)) return fallback;
+  if (parsed < min || parsed > max) return fallback;
+  return parsed;
+};
+
+const currentUtcDayNumber = () => {
+  const now = new Date();
+  return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 86400000);
+};
+
+const resolveSequenceDayIndex = (value: unknown, sequenceDays: number) => {
+  if (sequenceDays <= 1) return 0;
+  if (value !== null && value !== undefined && value !== "") {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) {
+      if (parsed >= 1 && parsed <= sequenceDays) return parsed - 1;
+      if (parsed >= 0 && parsed < sequenceDays) return parsed;
+    }
+  }
+  return currentUtcDayNumber() % sequenceDays;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -317,12 +343,32 @@ serve(async (req) => {
     runtime.requestDelayMs,
   );
 
-  const selected = runtime.availableSources
+  const sequenceDays = asIntegerInRange(
+    payload.sequence_days ?? payload.source_sequence_days ?? query.get("sequence_days") ?? query.get("source_sequence_days"),
+    DEFAULT_SEQUENCE_DAYS,
+    1,
+    MAX_SEQUENCE_DAYS,
+  );
+
+  const sequenceDayIndex = resolveSequenceDayIndex(
+    payload.sequence_day ?? payload.source_sequence_day ?? query.get("sequence_day") ?? query.get("source_sequence_day"),
+    sequenceDays,
+  );
+
+  const eligibleSources = runtime.availableSources
     .filter((source) => {
       if (overrideSources.length > 0) return overrideSources.includes(source.name);
       return (source.priority ?? 99) <= priorityCutoff;
     })
-    .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
+    .sort((a, b) => {
+      const priorityDiff = (a.priority ?? 99) - (b.priority ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.name.localeCompare(b.name);
+    });
+
+  const selected = sequenceDays > 1
+    ? eligibleSources.filter((_, index) => index % sequenceDays === sequenceDayIndex)
+    : eligibleSources;
 
   const defaultDeadline = (() => {
     const d = new Date();
@@ -394,8 +440,11 @@ serve(async (req) => {
       request_delay_ms: requestDelayMs,
       job_max_priority: priorityCutoff,
       source_mode: runtime.sourceMode,
+      sequence_days: sequenceDays,
+      sequence_day: sequenceDayIndex + 1,
     },
     sources_requested: overrideSources.length > 0 ? overrideSources : undefined,
+    eligible_sources: eligibleSources.length,
     selected_sources: selected.length,
     summary,
   }), {

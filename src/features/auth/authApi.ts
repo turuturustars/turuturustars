@@ -21,7 +21,6 @@ export interface SignUpPayload {
   password: string;
   fullName?: string;
   phone?: string;
-  phoneVerificationToken?: string;
   idNumber?: string;
   location?: string;
   occupation?: string;
@@ -74,33 +73,48 @@ export async function signUpWithEmail(payload: SignUpPayload) {
     throw toAuthRequestError({ message: formatKenyanPhoneError(), status: 400, code: 'invalid_phone' });
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: buildSiteUrl('/auth/callback'),
+  const { data, error } = await supabase.functions.invoke('auth-signup', {
+    body: {
+      email,
+      password,
       captchaToken,
-      data: {
-        full_name: payload.fullName,
-        phone: normalizedPhone ?? undefined,
-        phone_verification_token: payload.phoneVerificationToken,
-        id_number: payload.idNumber,
-        location: payload.location,
-        occupation: payload.occupation,
-      },
+      fullName: payload.fullName,
+      phone: normalizedPhone ?? undefined,
+      idNumber: payload.idNumber,
+      location: payload.location,
+      occupation: payload.occupation,
+      redirectTo: buildSiteUrl('/auth/callback'),
     },
   });
 
   if (error) {
-    throw toAuthRequestError(error);
+    throw toAuthRequestError({
+      message: await extractFunctionError(error),
+      status: error.status,
+      code: error.code,
+    });
   }
 
-  const existingUserHint = Boolean(data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
+  const response = data as {
+    success?: boolean;
+    user?: User | null;
+    requiresEmailVerification?: boolean;
+    existingUserHint?: boolean;
+    error?: string;
+  };
+
+  if (response.success !== true) {
+    throw toAuthRequestError({
+      message: response.error || 'Unable to create account.',
+      status: 400,
+      code: 'signup_failed',
+    });
+  }
 
   return {
-    user: data.user,
-    requiresEmailVerification: !data.session,
-    existingUserHint,
+    user: response.user ?? null,
+    requiresEmailVerification: response.requiresEmailVerification !== false,
+    existingUserHint: response.existingUserHint === true,
   };
 }
 

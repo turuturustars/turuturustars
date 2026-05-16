@@ -20,10 +20,36 @@ const SOURCE_FILTER = process.env.JOB_SOURCES
 
 const MAX_PER_SOURCE = Number(process.env.MAX_PER_SOURCE || 20);
 const REQUEST_DELAY_MS = Number(process.env.REQUEST_DELAY_MS || 1200);
+const MAX_SEQUENCE_DAYS = 31;
+const SOURCE_SEQUENCE_DAYS = Number(process.env.SOURCE_SEQUENCE_DAYS || process.env.SEQUENCE_DAYS || 1);
+const SOURCE_SEQUENCE_DAY = process.env.SOURCE_SEQUENCE_DAY || process.env.SEQUENCE_DAY || "";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const stripTags = (value) => value.replace(/<[^>]+>/g, "");
+
+const integerInRange = (value, fallback, min, max) => {
+  if (!Number.isInteger(value)) return fallback;
+  if (value < min || value > max) return fallback;
+  return value;
+};
+
+const currentUtcDayNumber = () => {
+  const now = new Date();
+  return Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 86400000);
+};
+
+const resolveSequenceDayIndex = (value, sequenceDays) => {
+  if (sequenceDays <= 1) return 0;
+  if (value !== null && value !== undefined && value !== "") {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) {
+      if (parsed >= 1 && parsed <= sequenceDays) return parsed - 1;
+      if (parsed >= 0 && parsed < sequenceDays) return parsed;
+    }
+  }
+  return currentUtcDayNumber() % sequenceDays;
+};
 
 const extractLinks = (html, baseUrl) => {
   const links = [];
@@ -66,13 +92,31 @@ const main = async () => {
 
   const registryRaw = await fs.readFile("data/job-sources.json", "utf8");
   const registry = JSON.parse(registryRaw);
-  const sources = registry.sources.filter((source) =>
-    SOURCE_FILTER.includes(source.name)
+  const sequenceDays = integerInRange(SOURCE_SEQUENCE_DAYS, 1, 1, MAX_SEQUENCE_DAYS);
+  const sequenceDayIndex = resolveSequenceDayIndex(SOURCE_SEQUENCE_DAY, sequenceDays);
+  const matchingSources = registry.sources
+    .filter((source) => SOURCE_FILTER.includes(source.name))
+    .sort((a, b) => {
+      const priorityDiff = (a.priority ?? 99) - (b.priority ?? 99);
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.name.localeCompare(b.name);
+    });
+  const sources = sequenceDays > 1
+    ? matchingSources.filter((_, index) => index % sequenceDays === sequenceDayIndex)
+    : matchingSources;
+
+  if (!matchingSources.length) {
+    console.error("No matching sources found. Check JOB_SOURCES env.");
+    process.exit(1);
+  }
+
+  console.log(
+    `Running source sequence day ${sequenceDayIndex + 1}/${sequenceDays}: ${sources.length} of ${matchingSources.length} matching sources.`
   );
 
   if (!sources.length) {
-    console.error("No matching sources found. Check JOB_SOURCES env.");
-    process.exit(1);
+    console.log("No sources selected for this sequence day.");
+    return;
   }
 
   for (const source of sources) {

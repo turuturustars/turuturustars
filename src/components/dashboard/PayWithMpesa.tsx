@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { initiateSTKPush, formatPhoneNumber } from '@/lib/mpesa';
 import { MpesaTransactionService } from '@/lib/mpesaTransactionService';
+import { getFriendlyMpesaError, type UserFriendlyPaymentError } from '@/lib/paymentErrorMessages';
 import { useAuth } from '@/hooks/useAuth';
 import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +18,8 @@ import {
   Info,
   Eye,
   EyeOff,
+  Mail,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +30,8 @@ interface Props {
   trigger?: React.ReactNode;
   onPaymentSuccess?: (referenceId: string) => void;
 }
+
+const SUPPORT_EMAIL = 'support@turuturu.co.ke';
 
 const PayWithMpesa = ({
   contributionId,
@@ -44,6 +49,7 @@ const PayWithMpesa = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<UserFriendlyPaymentError | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [showPhone, setShowPhone] = useState(false);
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
@@ -93,6 +99,7 @@ const PayWithMpesa = ({
     // Allow only numbers, +, and spaces
     value = value.replace(/[^\d+\s]/g, '');
     setPhone(value);
+    setSubmitError(null);
     if (touched.phone) {
       const { phone: _, ...otherErrors } = errors;
       setErrors({
@@ -107,6 +114,7 @@ const PayWithMpesa = ({
     // Allow only numbers
     const numericValue = value.replace(/[^\d]/g, '');
     setAmount(numericValue);
+    setSubmitError(null);
     if (touched.amount) {
       const { amount: _, ...otherErrors } = errors;
       setErrors({
@@ -142,6 +150,7 @@ const PayWithMpesa = ({
 
     setIsProcessing(true);
     setPaymentStep('processing');
+    setSubmitError(null);
     setStatusMessage('Initiating M-Pesa payment...');
     
     try {
@@ -212,20 +221,12 @@ const PayWithMpesa = ({
         setStatusMessage('');
       }, 3000);
     } catch (err) {
-      let errorMessage = 'Payment initiation failed';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'string') {
-        errorMessage = err;
-      }
+      const friendlyError = getFriendlyMpesaError(err);
       console.error('Payment error:', err);
-      setErrors(prev => ({
-        ...prev,
-        submit: errorMessage
-      }));
+      setSubmitError(friendlyError);
       toast({
-        title: '✗ Payment Failed',
-        description: errorMessage,
+        title: friendlyError.title,
+        description: friendlyError.message,
         variant: 'destructive',
       });
       setPaymentStep('form');
@@ -246,6 +247,7 @@ const PayWithMpesa = ({
     if (!newOpen) {
       setSuccess(false);
       setErrors({});
+      setSubmitError(null);
       setTouched({});
     }
   };
@@ -297,25 +299,30 @@ const PayWithMpesa = ({
 
   const renderFormState = () => (
     <>
-      <DialogHeader className="p-6 pb-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+      <DialogHeader className="p-6 pb-5 border-b border-slate-200 bg-gradient-to-br from-sky-50 via-white to-emerald-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+          <div className="w-11 h-11 rounded-xl bg-white shadow-sm border border-sky-100 flex items-center justify-center">
             <Smartphone className="w-5 h-5 text-blue-600" />
           </div>
           <div>
-            <DialogTitle className="text-lg">Pay with M-Pesa</DialogTitle>
+            <DialogTitle className="text-lg text-slate-950">Pay with M-Pesa</DialogTitle>
             <p className="text-xs text-gray-500 mt-1">Secure mobile money transfer</p>
           </div>
         </div>
       </DialogHeader>
 
-      <div className="p-6 space-y-5">
+      <div className="p-6 space-y-5 bg-white">
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex gap-3">
-          <Info className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-blue-700">
-            You'll receive an M-Pesa prompt on your registered phone number. Enter your PIN to complete the payment.
-          </p>
+        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 flex gap-3 shadow-sm">
+          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+            <Info className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-sky-950">Approve on your phone</p>
+            <p className="text-xs leading-relaxed text-sky-800">
+              We'll send an M-Pesa prompt to this number. Enter your PIN on your phone to complete the payment.
+            </p>
+          </div>
         </div>
 
         {/* Phone Field */}
@@ -327,16 +334,18 @@ const PayWithMpesa = ({
           <div className="relative">
             <Input
               id="phone"
-              type="tel"
+              type={showPhone ? 'tel' : 'password'}
+              inputMode="tel"
+              autoComplete="tel"
               value={phone}
               onChange={handlePhoneChange}
               onBlur={() => handleBlur('phone')}
-              placeholder="254712345678, 254112345678, 07XXXXXXXX or 01XXXXXXXX"
+              placeholder="07XXXXXXXX or 01XXXXXXXX"
               className={cn(
-                'pr-10 text-base transition-all',
+                'h-12 pr-10 text-base transition-all rounded-xl',
                 phoneError && touched.phone
                   ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                  : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                  : 'border-slate-200 bg-slate-50/70 focus:border-blue-500 focus:ring-blue-200'
               )}
             />
             {phone && (
@@ -356,8 +365,9 @@ const PayWithMpesa = ({
             </div>
           )}
           {phone && !phoneError && touched.phone && (
-            <p className="text-xs text-green-600 flex items-center gap-1">
-              ✓ Valid phone number
+            <p className="text-xs text-emerald-700 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3" />
+              Valid phone number
             </p>
           )}
         </div>
@@ -375,15 +385,16 @@ const PayWithMpesa = ({
             <Input
               id="amount"
               type="text"
+              inputMode="numeric"
               value={amount}
               onChange={handleAmountChange}
               onBlur={() => handleBlur('amount')}
               placeholder="1000"
               className={cn(
-                'pl-12 text-base transition-all',
+                'h-12 pl-12 text-base transition-all rounded-xl',
                 amountError && touched.amount
                   ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                  : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                  : 'border-slate-200 bg-slate-50/70 focus:border-blue-500 focus:ring-blue-200'
               )}
             />
           </div>
@@ -395,7 +406,10 @@ const PayWithMpesa = ({
           )}
           {amount && !amountError && touched.amount && (
             <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-green-600">✓ Valid amount</p>
+              <p className="text-xs text-emerald-700 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Valid amount
+              </p>
               {amount && <p className="text-xs font-semibold text-gray-900">KES {Number.parseInt(amount).toLocaleString()}</p>}
             </div>
           )}
@@ -403,10 +417,29 @@ const PayWithMpesa = ({
         </div>
 
         {/* Submit Error */}
-        {errors.submit && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex gap-3">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{errors.submit}</p>
+        {submitError && (
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm">
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-red-950">{submitError.title}</p>
+                <p className="text-sm leading-relaxed text-red-800 mt-1">{submitError.message}</p>
+                {submitError.reassurance && (
+                  <p className="text-xs leading-relaxed text-red-700 mt-2 bg-white/70 rounded-lg px-3 py-2">
+                    {submitError.reassurance}
+                  </p>
+                )}
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-red-700 hover:text-red-900 hover:underline mt-3"
+                >
+                  <Mail className="w-3 h-3" />
+                  Contact support
+                </a>
+              </div>
+            </div>
           </div>
         )}
 
@@ -425,8 +458,8 @@ const PayWithMpesa = ({
           >
             {!isProcessing && (
               <>
-                <Smartphone className="w-4 h-4" />
-                Send M-Pesa Prompt
+                {submitError ? <RefreshCw className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
+                {submitError ? 'Try Again' : 'Send M-Pesa Prompt'}
               </>
             )}
           </AccessibleButton>
@@ -445,8 +478,8 @@ const PayWithMpesa = ({
         <div className="pt-4 border-t border-gray-100">
           <p className="text-xs text-gray-500 text-center">
             Having trouble? Contact support at{' '}
-            <a href="mailto:support@turuturu.co.ke" className="text-blue-600 hover:underline">
-              support@turuturu.co.ke
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 hover:underline">
+              {SUPPORT_EMAIL}
             </a>
           </p>
         </div>
@@ -464,7 +497,7 @@ const PayWithMpesa = ({
           </AccessibleButton>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-sm p-0 overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0 overflow-hidden border-0 shadow-2xl sm:rounded-2xl">
         <DialogDescription className="sr-only">
           M-Pesa payment dialog for Turuturu Stars contributions
         </DialogDescription>
