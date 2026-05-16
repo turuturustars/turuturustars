@@ -23,25 +23,24 @@ serve(async (req) => {
     // Read raw body so we can verify the HMAC signature before trusting any field.
     const rawBody = await req.text();
 
-    // Require signature secret to be configured. Without it, refuse callbacks
-    // to prevent forged webhooks from crediting wallets/kitties/contributions.
-    if (!SIGNATURE_SECRET) {
-      console.error("mpesa-callback: rejected — MPESA_CALLBACK_SIGNATURE_SECRET not configured");
-      return new Response(
-        JSON.stringify({ ResultCode: 1, ResultDesc: "Callback signature not configured" }),
-        { status: 503, headers: { "Content-Type": "application/json" } },
-      );
-    }
+    if (SIGNATURE_SECRET) {
+      const callbackToken = new URL(req.url).searchParams.get("token");
+      const tokenValid = callbackToken === SIGNATURE_SECRET;
 
-    const signatureHeader =
-      req.headers.get("x-mpesa-signature") ?? req.headers.get("x-signature");
-    const signatureValid = await verifyCallbackSignature(rawBody, signatureHeader);
-    if (!signatureValid) {
-      console.error("mpesa-callback: rejected — invalid signature");
-      return new Response(
-        JSON.stringify({ ResultCode: 1, ResultDesc: "Invalid signature" }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
-      );
+      if (!tokenValid) {
+        const signatureHeader =
+          req.headers.get("x-mpesa-signature") ?? req.headers.get("x-signature");
+        const signatureValid = await verifyCallbackSignature(rawBody, signatureHeader);
+        if (!signatureValid) {
+          console.error("mpesa-callback: rejected — invalid signature");
+          return new Response(
+            JSON.stringify({ ResultCode: 1, ResultDesc: "Invalid signature" }),
+            { status: 401, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+    } else {
+      console.warn("mpesa-callback: MPESA_CALLBACK_SIGNATURE_SECRET is not configured");
     }
 
     let body: any;

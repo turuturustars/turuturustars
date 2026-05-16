@@ -105,6 +105,12 @@ serve(async (req) => {
     }
 
     const nowIso = new Date().toISOString();
+    const defaultDeadline = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().split("T")[0];
+    })();
+
     const cleaned = rawJobs
       .map((job: JobPayload) => {
         const title = normalizeText(job.title);
@@ -113,7 +119,7 @@ serve(async (req) => {
         const county = normalizeText(job.county, "Kenya");
         const sourceName = normalizeText(job.source_name);
         const sourceUrl = normalizeText(job.source_url);
-        const deadline = normalizeOptionalText(job.deadline);
+        const deadline = normalizeOptionalText(job.deadline) ?? defaultDeadline;
         const postedAt = normalizeText(job.posted_at ?? nowIso);
         if (!title || !organization || !sourceName || !sourceUrl) {
           return null;
@@ -123,7 +129,7 @@ serve(async (req) => {
           job.is_priority_location ??
           (isMuranga(county) || isMuranga(location));
 
-        const requestedStatus = job.status ?? (deadline ? "approved" : "pending");
+        const requestedStatus = job.status ?? "approved";
         const status = requestedStatus === "approved" && !deadline
           ? "pending"
           : requestedStatus;
@@ -144,6 +150,8 @@ serve(async (req) => {
           is_government: Boolean(job.is_government),
           is_priority_location: Boolean(priority),
           status,
+          approved_at: status === "approved" ? nowIso : null,
+          approved_by: null,
           rejected_reason: normalizeOptionalText(job.rejected_reason),
         };
       })
@@ -158,8 +166,36 @@ serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const withExternalId = cleaned.filter((job) => job.external_id);
-    const withoutExternalId = cleaned.filter((job) => !job.external_id);
+    const sourceUrls = [
+      ...new Set(cleaned.map((job) => String(job.source_url || "")).filter(Boolean)),
+    ];
+    const { data: rejectedRows, error: rejectedError } = sourceUrls.length > 0
+      ? await supabase
+        .from("jobs")
+        .select("source_url")
+        .eq("status", "rejected")
+        .in("source_url", sourceUrls)
+      : { data: [], error: null };
+
+    if (rejectedError) throw rejectedError;
+
+    const rejectedSourceUrls = new Set(
+      (rejectedRows || []).map((row: { source_url: string }) => row.source_url),
+    );
+    const publishable = cleaned.filter((job) => !rejectedSourceUrls.has(String(job.source_url)));
+
+    if (publishable.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        inserted: [],
+        skipped_rejected: cleaned.length,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const withExternalId = publishable.filter((job) => job.external_id);
+    const withoutExternalId = publishable.filter((job) => !job.external_id);
 
     const results = [];
 
@@ -179,7 +215,11 @@ serve(async (req) => {
       results.push({ group: "source_url", count: withoutExternalId.length });
     }
 
-    return new Response(JSON.stringify({ success: true, inserted: results }), {
+    return new Response(JSON.stringify({
+      success: true,
+      inserted: results,
+      skipped_rejected: cleaned.length - publishable.length,
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

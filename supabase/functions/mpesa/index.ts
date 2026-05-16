@@ -13,6 +13,7 @@ const MPESA_PASSKEY = Deno.env.get("MPESA_PASSKEY")!;
 const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const MPESA_CALLBACK_SIGNATURE_SECRET = Deno.env.get("MPESA_CALLBACK_SIGNATURE_SECRET");
 
 // Use edge function secret to choose sandbox vs production endpoint.
 const MPESA_BASE_URL = Deno.env.get("MPESA_BASE_URL") || "https://sandbox.safaricom.co.ke";
@@ -240,7 +241,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[${new Date().toISOString()}] mpesa: incoming request action=${(payload as any)?.action ?? "unknown"}`);
+    console.log(`[${new Date().toISOString()}] mpesa: incoming request action=${action}`);
 
     // Some actions require financial roles (members are allowed to initiate STK pushes)
     const financialActions = ["register_urls", "generate_qr", "create_standing_order", "simulate_c2b"];
@@ -264,6 +265,8 @@ serve(async (req) => {
           transactionDesc,
           memberId: rawMemberId,
           contributionId,
+          transactionType: rawTransactionType,
+          kittyId: rawKittyId,
         } = params;
         const memberId =
           typeof rawMemberId === "string" && rawMemberId.trim().length > 0
@@ -272,6 +275,50 @@ serve(async (req) => {
         if (memberId !== user.id && !hasFinancialRole) {
           throw new HttpError(403, "You can only initiate payments for your own account");
         }
+        const transactionType =
+          typeof rawTransactionType === "string" && rawTransactionType.trim().length > 0
+            ? rawTransactionType.trim()
+            : "stk_push";
+        const allowedTransactionTypes = new Set(["stk_push", "wallet_topup", "kitty_contribution"]);
+        if (!allowedTransactionTypes.has(transactionType)) {
+          throw new HttpError(400, "Unsupported M-Pesa transaction type", {
+            transactionType,
+            allowed: Array.from(allowedTransactionTypes),
+          });
+        }
+
+        const kittyId =
+          typeof rawKittyId === "string" && rawKittyId.trim().length > 0
+            ? rawKittyId.trim()
+            : null;
+        if (transactionType === "kitty_contribution") {
+          if (!kittyId) {
+            throw new HttpError(400, "kittyId is required for kitty contributions");
+          }
+
+          const { data: kitty, error: kittyError } = await supabase
+            .from("kitties")
+            .select("id, status")
+            .eq("id", kittyId)
+            .maybeSingle();
+
+          if (kittyError) {
+            throw new HttpError(500, "Failed to validate kitty", { detail: kittyError.message });
+          }
+
+          if (!kitty) {
+            throw new HttpError(404, "Kitty not found");
+          }
+
+          if (kitty.status !== "active") {
+            throw new HttpError(400, "This kitty is not accepting contributions", {
+              kittyStatus: kitty.status,
+            });
+          }
+        } else if (kittyId) {
+          throw new HttpError(400, "kittyId can only be used with kitty contributions");
+        }
+
         const phoneNumber = normalizeKenyanPhone(rawPhone);
         const amount = parseAmount(rawAmount);
         const timestamp = generateTimestamp();
@@ -279,7 +326,10 @@ serve(async (req) => {
         const requestTime = new Date().toISOString();
         
         console.log(`[${requestTime}] mpesa: stk_push initiated amount=${amount}`);
-        const callbackUrl = `${getFunctionsBaseUrl()}/functions/v1/mpesa-callback`;
+        const callbackBaseUrl = `${getFunctionsBaseUrl()}/functions/v1/mpesa-callback`;
+        const callbackUrl = MPESA_CALLBACK_SIGNATURE_SECRET
+          ? `${callbackBaseUrl}?token=${encodeURIComponent(MPESA_CALLBACK_SIGNATURE_SECRET)}`
+          : callbackBaseUrl;
         
         const stkPayload = {
           BusinessShortCode: MPESA_SHORTCODE,
@@ -346,13 +396,14 @@ serve(async (req) => {
         // Log the transaction
 
         await supabase.from("mpesa_transactions").insert({
-          transaction_type: "stk_push",
+          transaction_type: transactionType,
           merchant_request_id: result.MerchantRequestID,
           checkout_request_id: result.CheckoutRequestID,
           amount: amount,
           phone_number: phoneNumber,
           member_id: memberId,
           contribution_id: contributionId,
+          kitty_id: transactionType === "kitty_contribution" ? kittyId : null,
           status: result.ResponseCode === "0" ? "pending" : "failed",
           initiated_by: user.id,
         });
@@ -436,16 +487,69 @@ serve(async (req) => {
           };
           const newStatus = statusMap[result.ResultCode as number | string] || "unknown";
           
-          await supabase
+          const { data: reconciledTransaction, error: reconcileUpdateError } = await supabase
             .from("mpesa_transactions")
             .update({
               result_code: result.ResultCode,
               result_desc: result.ResultDesc,
               status: newStatus,
             })
-            .eq("checkout_request_id", checkoutRequestId);
+            .eq("checkout_request_id", checkoutRequestId)
+            .select("id, member_id, transaction_type, amount, kitty_id, checkout_request_id")
+            .maybeSingle();
+
+          if (reconcileUpdateError) {
+            console.error(`[${new Date().toISOString()}] mpesa: query_status update failed`, reconcileUpdateError);
+          }
           
           console.log(`[${updateTime}] mpesa: transaction status=${newStatus}`);
+
+          if (Number(result.ResultCode) === 0 && reconciledTransaction) {
+            const expectedAmount = Number(reconciledTransaction.amount ?? 0);
+            const reference = String(reconciledTransaction.checkout_request_id ?? checkoutRequestId);
+
+            if (
+              reconciledTransaction.transaction_type === "wallet_topup" &&
+              reconciledTransaction.member_id &&
+              expectedAmount > 0
+            ) {
+              const { error: walletErr } = await supabase.rpc("process_wallet_transaction", {
+                _user_id: reconciledTransaction.member_id,
+                _type: "topup",
+                _direction: "credit",
+                _amount: expectedAmount,
+                _description: "M-Pesa wallet top-up",
+                _reference: reference,
+                _mpesa_transaction_id: reconciledTransaction.id,
+                _contribution_id: null,
+                _welfare_case_id: null,
+                _discipline_id: null,
+              });
+
+              if (walletErr) {
+                console.error(`[${new Date().toISOString()}] mpesa: wallet reconciliation failed`, walletErr);
+              }
+            }
+
+            if (
+              reconciledTransaction.transaction_type === "kitty_contribution" &&
+              reconciledTransaction.member_id &&
+              reconciledTransaction.kitty_id &&
+              expectedAmount > 0
+            ) {
+              const { error: kittyErr } = await supabase.rpc("credit_kitty_from_mpesa", {
+                _kitty_id: reconciledTransaction.kitty_id,
+                _member_id: reconciledTransaction.member_id,
+                _amount: expectedAmount,
+                _mpesa_transaction_id: reconciledTransaction.id,
+                _reference: reference,
+              });
+
+              if (kittyErr) {
+                console.error(`[${new Date().toISOString()}] mpesa: kitty reconciliation failed`, kittyErr);
+              }
+            }
+          }
         }
         
         break;

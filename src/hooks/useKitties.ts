@@ -2,6 +2,15 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = String((error as { message?: unknown }).message || '');
+    return message || fallback;
+  }
+  return fallback;
+}
+
 export type KittyCategory = 'emergency' | 'education' | 'welfare' | 'project' | 'other';
 export type KittyStatus = 'active' | 'paused' | 'completed' | 'closed';
 export type KittySource = 'mpesa' | 'wallet' | 'manual';
@@ -79,15 +88,23 @@ export type KittyDisbursementRow = {
 export const useKitties = () => {
   const [kitties, setKitties] = useState<KittyRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('kitties' as never)
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (!error && data) setKitties(data as unknown as KittyRow[]);
-    setLoading(false);
+    setError(null);
+    try {
+      const { data, error: queryError } = await supabase
+        .from('kitties' as never)
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (queryError) throw queryError;
+      setKitties((data as unknown as KittyRow[]) || []);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, 'Failed to load kitties'));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -109,7 +126,7 @@ export const useKitties = () => {
     };
   }, [fetchAll]);
 
-  return { kitties, loading, refresh: fetchAll };
+  return { kitties, loading, error, refresh: fetchAll };
 };
 
 export const useKittyDetail = (kittyId: string | undefined) => {
@@ -118,29 +135,50 @@ export const useKittyDetail = (kittyId: string | undefined) => {
   const [contributions, setContributions] = useState<KittyContributionRow[]>([]);
   const [disbursements, setDisbursements] = useState<KittyDisbursementRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
-    if (!kittyId) return;
+    if (!kittyId) {
+      setKitty(null);
+      setContributions([]);
+      setDisbursements([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const [{ data: k }, { data: c }, { data: d }] = await Promise.all([
-      supabase.from('kitties' as never).select('*').eq('id', kittyId).maybeSingle(),
-      supabase
-        .from('kitty_contributions' as never)
-        .select('*')
-        .eq('kitty_id', kittyId)
-        .order('created_at', { ascending: false })
-        .limit(200),
-      supabase
-        .from('kitty_disbursements' as never)
-        .select('*')
-        .eq('kitty_id', kittyId)
-        .order('created_at', { ascending: false })
-        .limit(200),
-    ]);
-    setKitty((k as unknown as KittyRow) || null);
-    setContributions((c as unknown as KittyContributionRow[]) || []);
-    setDisbursements((d as unknown as KittyDisbursementRow[]) || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const [kittyResult, contributionsResult, disbursementsResult] = await Promise.all([
+        supabase.from('kitties' as never).select('*').eq('id', kittyId).maybeSingle(),
+        supabase
+          .from('kitty_contributions' as never)
+          .select('*')
+          .eq('kitty_id', kittyId)
+          .order('created_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('kitty_disbursements' as never)
+          .select('*')
+          .eq('kitty_id', kittyId)
+          .order('created_at', { ascending: false })
+          .limit(200),
+      ]);
+
+      if (kittyResult.error) throw kittyResult.error;
+      if (contributionsResult.error) throw contributionsResult.error;
+      if (disbursementsResult.error) throw disbursementsResult.error;
+
+      setKitty((kittyResult.data as unknown as KittyRow) || null);
+      setContributions((contributionsResult.data as unknown as KittyContributionRow[]) || []);
+      setDisbursements((disbursementsResult.data as unknown as KittyDisbursementRow[]) || []);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, 'Failed to load kitty details'));
+      setKitty(null);
+      setContributions([]);
+      setDisbursements([]);
+    } finally {
+      setLoading(false);
+    }
   }, [kittyId]);
 
   useEffect(() => {
@@ -209,6 +247,7 @@ export const useKittyDetail = (kittyId: string | undefined) => {
     contributions,
     disbursements,
     loading,
+    error,
     refresh: fetchAll,
     contributeFromWallet,
     recordDisbursement,

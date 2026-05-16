@@ -6,7 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Calendar, Smartphone, Wallet as WalletIcon, ArrowDownToLine, RotateCw } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ArrowDownToLine, ArrowLeft, Calendar, Layers, RefreshCw, RotateCw, Smartphone, Target, Wallet as WalletIcon } from 'lucide-react';
 import { useKittyDetail } from '@/hooks/useKitties';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,12 +16,21 @@ import KittyContributeDialog from '@/components/kitty/KittyContributeDialog';
 import KittyDisburseDialog from '@/components/kitty/KittyDisburseDialog';
 import KittyBeneficiariesTab from '@/components/kitty/KittyBeneficiariesTab';
 import KittyTopContributors from '@/components/kitty/KittyTopContributors';
+import { cn } from '@/lib/utils';
+import {
+  formatDeadline,
+  formatKes,
+  getKittyProgress,
+  getKittyRemaining,
+  KITTY_CATEGORY_META,
+  KITTY_STATUS_LABELS,
+} from '@/lib/kittyUtils';
 
 const KittyDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, hasRole } = useAuth();
-  const { kitty, contributions, disbursements, loading, contributeFromWallet, recordDisbursement } =
+  const { kitty, contributions, disbursements, loading, error, refresh, contributeFromWallet, recordDisbursement } =
     useKittyDetail(id);
 
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
@@ -53,7 +63,7 @@ const KittyDetailPage = () => {
 
   const startNewRound = async () => {
     if (!kitty || !user?.id) return;
-    if (!confirm(`Start Round ${kitty.round_number + 1} for "${kitty.title}"? This creates a fresh kitty linked to this one.`)) return;
+    if (!window.confirm(`Start Round ${kitty.round_number + 1} for "${kitty.title}"? This creates a fresh kitty linked to this one.`)) return;
     setStartingRound(true);
     const { data, error } = await supabase
       .from('kitties' as never)
@@ -78,7 +88,7 @@ const KittyDetailPage = () => {
     if (newId) navigate(`/dashboard/finance/kitties/${newId}`);
   };
 
-  if (loading || !kitty) {
+  if (loading || (!kitty && !error)) {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-8 w-64" />
@@ -88,9 +98,45 @@ const KittyDetailPage = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <Button asChild variant="ghost" size="sm" className="gap-1">
+          <Link to="/dashboard/finance/kitties">
+            <ArrowLeft className="h-4 w-4" /> Back to Kitties
+          </Link>
+        </Button>
+        <Alert variant="destructive">
+          <AlertTitle>Could not load kitty</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!kitty) {
+    return (
+      <div className="space-y-4 p-4 sm:p-6">
+        <Button asChild variant="ghost" size="sm" className="gap-1">
+          <Link to="/dashboard/finance/kitties">
+            <ArrowLeft className="h-4 w-4" /> Back to Kitties
+          </Link>
+        </Button>
+        <Alert>
+          <AlertTitle>Kitty not found</AlertTitle>
+          <AlertDescription>This kitty may have been removed or you may not have access.</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   const target = Number(kitty.target_amount);
   const balance = Number(kitty.balance);
-  const pct = target > 0 ? Math.min(100, (balance / target) * 100) : 0;
+  const pct = getKittyProgress(balance, target);
+  const remaining = getKittyRemaining(balance, target);
+  const groupKittyId = kitty.parent_kitty_id || kitty.id;
+  const meta = KITTY_CATEGORY_META[kitty.category] || KITTY_CATEGORY_META.other;
+  const CategoryIcon = meta.Icon;
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -111,18 +157,27 @@ const KittyDetailPage = () => {
               )}
             </h1>
             <div className="flex items-center gap-2 pt-1 flex-wrap">
-              <Badge variant="secondary" className="capitalize">{kitty.category}</Badge>
-              <Badge variant={kitty.status === 'active' ? 'default' : 'outline'} className="capitalize">
-                {kitty.status}
+              <Badge variant="outline" className={cn('gap-1 capitalize', meta.className)}>
+                <CategoryIcon className="h-3.5 w-3.5" />
+                {meta.label}
               </Badge>
-              {kitty.deadline && (
+              <Badge variant={kitty.status === 'active' ? 'default' : 'outline'} className="capitalize">
+                {KITTY_STATUS_LABELS[kitty.status] || kitty.status}
+              </Badge>
+              <span className="text-sm text-muted-foreground inline-flex items-center gap-1">
+                <Calendar className="w-3 h-3" /> {formatDeadline(kitty.deadline)}
+              </span>
+              {kitty.parent_kitty_id && (
                 <span className="text-sm text-muted-foreground inline-flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> Deadline {new Date(kitty.deadline).toLocaleDateString()}
+                  <Layers className="w-3 h-3" /> Linked rounds
                 </span>
               )}
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" className="gap-1" onClick={refresh}>
+              <RefreshCw className="w-4 h-4" /> Refresh
+            </Button>
             <KittyContributeDialog
               kitty={kitty}
               onContribute={async (amount, notes) => {
@@ -153,24 +208,30 @@ const KittyDetailPage = () => {
           <CardTitle className="text-base">Funding Progress</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-2 gap-3 text-center md:grid-cols-4">
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Balance</p>
-              <p className="text-lg font-bold text-primary">KES {balance.toLocaleString()}</p>
+              <p className="text-lg font-bold text-primary">{formatKes(balance)}</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Contributed</p>
-              <p className="text-lg font-bold">KES {Number(kitty.total_contributed).toLocaleString()}</p>
+              <p className="text-lg font-bold">{formatKes(kitty.total_contributed)}</p>
             </div>
             <div className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Disbursed</p>
-              <p className="text-lg font-bold">KES {Number(kitty.total_disbursed).toLocaleString()}</p>
+              <p className="text-lg font-bold">{formatKes(kitty.total_disbursed)}</p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-xs text-muted-foreground">Remaining</p>
+              <p className="text-lg font-bold">{formatKes(remaining)}</p>
             </div>
           </div>
           <div>
             <div className="flex justify-between text-sm mb-1">
-              <span>Target</span>
-              <span className="font-semibold">KES {target.toLocaleString()}</span>
+              <span className="inline-flex items-center gap-1">
+                <Target className="h-3.5 w-3.5" /> Target
+              </span>
+              <span className="font-semibold">{formatKes(target)}</span>
             </div>
             <Progress value={pct} className="h-3" />
             <p className="text-xs text-muted-foreground pt-1">{pct.toFixed(1)}% funded</p>
@@ -205,10 +266,10 @@ const KittyDetailPage = () => {
                         )}
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {memberNames[c.member_id] || 'Loading…'} • KES {Number(c.amount).toLocaleString()}
+                            {memberNames[c.member_id] || 'Loading...'} - {formatKes(c.amount)}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            Ref: {c.reference || '—'} • {new Date(c.created_at).toLocaleString()}
+                            Ref: {c.reference || 'Pending'} - {new Date(c.created_at).toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -231,10 +292,10 @@ const KittyDetailPage = () => {
                       <div className="flex items-start gap-2 min-w-0">
                         <ArrowDownToLine className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-sm font-medium">KES {Number(d.amount).toLocaleString()}</p>
+                          <p className="text-sm font-medium">{formatKes(d.amount)}</p>
                           <p className="text-xs text-muted-foreground line-clamp-2">{d.purpose}</p>
                           <p className="text-xs text-muted-foreground">
-                            {d.recipient ? `→ ${d.recipient} • ` : ''}
+                            {d.recipient ? `To ${d.recipient} - ` : ''}
                             {new Date(d.created_at).toLocaleString()}
                           </p>
                         </div>
@@ -252,7 +313,7 @@ const KittyDetailPage = () => {
         </TabsContent>
 
         <TabsContent value="top">
-          {id && <KittyTopContributors kittyId={id} limit={20} />}
+          <KittyTopContributors kittyId={groupKittyId} limit={20} />
         </TabsContent>
       </Tabs>
     </div>

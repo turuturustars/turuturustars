@@ -7,6 +7,8 @@ export interface STKPushParams {
   transactionDesc?: string;
   memberId?: string;
   contributionId?: string;
+  transactionType?: "stk_push" | "wallet_topup" | "kitty_contribution";
+  kittyId?: string;
 }
 
 export interface STKPushResponse {

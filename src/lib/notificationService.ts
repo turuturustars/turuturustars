@@ -347,8 +347,8 @@ export const BrowserNotificationService = {
 
       const notificationOptions: any = {
         body: truncatedMessage,
-        icon: '/icon-192x192.png',
-        badge: '/icon-192x192.png',
+        icon: '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
         tag: `private-message-${options?.conversationId || 'general'}`,
         requireInteraction: false,
         actions: [
@@ -414,8 +414,8 @@ export const BrowserNotificationService = {
     try {
       const notificationOptions: any = {
         body: options?.body,
-        icon: options?.icon || '/icon-192x192.png',
-        badge: options?.badge || '/icon-192x192.png',
+        icon: options?.icon || '/pwa-192x192.png',
+        badge: options?.badge || '/pwa-192x192.png',
         tag: options?.tag,
         requireInteraction: false,
       };

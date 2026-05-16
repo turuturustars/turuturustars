@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, ArrowDownToLine } from 'lucide-react';
 import { toast } from 'sonner';
 import type { KittyRow } from '@/hooks/useKitties';
+import { formatKes } from '@/lib/kittyUtils';
 
 interface Props {
   kitty: KittyRow;
@@ -25,7 +26,7 @@ const KittyDisburseDialog = ({ kitty, onDisburse }: Props) => {
 
   const submit = async () => {
     const amt = Number(amount);
-    if (!amt || amt <= 0) return toast.error('Enter a valid amount');
+    if (!Number.isFinite(amt) || amt <= 0) return toast.error('Enter a valid amount');
     if (amt > balance) return toast.error('Amount exceeds kitty balance');
     if (!purpose.trim()) return toast.error('Purpose is required');
     setBusy(true);
@@ -36,7 +37,7 @@ const KittyDisburseDialog = ({ kitty, onDisburse }: Props) => {
         recipient: recipient.trim() || undefined,
         reference: reference.trim() || undefined,
       });
-      toast.success(`Disbursed KES ${amt.toLocaleString()}`);
+      toast.success(`Disbursed ${formatKes(amt)}`);
       setAmount('');
       setPurpose('');
       setRecipient('');
@@ -52,7 +53,7 @@ const KittyDisburseDialog = ({ kitty, onDisburse }: Props) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
+        <Button variant="outline" className="gap-2" disabled={balance <= 0}>
           <ArrowDownToLine className="w-4 h-4" /> Disburse
         </Button>
       </DialogTrigger>
@@ -60,25 +61,49 @@ const KittyDisburseDialog = ({ kitty, onDisburse }: Props) => {
         <DialogHeader>
           <DialogTitle>Record a Disbursement</DialogTitle>
           <DialogDescription>
-            Available balance: <span className="font-semibold">KES {balance.toLocaleString()}</span>
+            Available balance: <span className="font-semibold">{formatKes(balance)}</span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Amount (KES)</Label>
-            <Input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Label htmlFor="kitty-disburse-amount">Amount (KES)</Label>
+            <Input
+              id="kitty-disburse-amount"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={balance}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
-            <Label>Purpose</Label>
-            <Textarea value={purpose} onChange={(e) => setPurpose(e.target.value)} rows={2} placeholder="What is this payout for?" />
+            <Label htmlFor="kitty-disburse-purpose">Purpose</Label>
+            <Textarea
+              id="kitty-disburse-purpose"
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+              rows={2}
+              placeholder="What is this payout for?"
+            />
           </div>
           <div className="space-y-2">
-            <Label>Recipient (optional)</Label>
-            <Input value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="Name or M-Pesa number" />
+            <Label htmlFor="kitty-disburse-recipient">Recipient</Label>
+            <Input
+              id="kitty-disburse-recipient"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="Name or M-Pesa number"
+            />
           </div>
           <div className="space-y-2">
-            <Label>External reference (optional)</Label>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="M-Pesa code or cheque #" />
+            <Label htmlFor="kitty-disburse-reference">External reference</Label>
+            <Input
+              id="kitty-disburse-reference"
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="M-Pesa code or cheque number"
+            />
           </div>
         </div>
         <DialogFooter>

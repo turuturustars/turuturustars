@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trophy, Medal, Award } from 'lucide-react';
 import type { KittyTopContributorRow } from '@/hooks/useKitties';
+import { formatKes } from '@/lib/kittyUtils';
 
 interface Props {
-  kittyId?: string; // when undefined → all kitties
+  kittyId?: string;
   limit?: number;
   title?: string;
 }
@@ -20,10 +21,12 @@ const RANK_ICON = (i: number) => {
 const KittyTopContributors = ({ kittyId, limit = 10, title }: Props) => {
   const [rows, setRows] = useState<KittyTopContributorRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
+      setError(null);
       const view = kittyId ? 'kitty_top_contributors_per_kitty_v' : 'kitty_top_contributors_v';
       let q = supabase
         .from(view as never)
@@ -31,8 +34,13 @@ const KittyTopContributors = ({ kittyId, limit = 10, title }: Props) => {
         .order('total_amount', { ascending: false })
         .limit(limit);
       if (kittyId) q = q.eq('kitty_id', kittyId);
-      const { data } = await q;
-      setRows((data as unknown as KittyTopContributorRow[]) || []);
+      const { data, error: queryError } = await q;
+      if (queryError) {
+        setError(queryError.message || 'Could not load contributors');
+        setRows([]);
+      } else {
+        setRows((data as unknown as KittyTopContributorRow[]) || []);
+      }
       setLoading(false);
     })();
   }, [kittyId, limit]);
@@ -47,7 +55,9 @@ const KittyTopContributors = ({ kittyId, limit = 10, title }: Props) => {
       </CardHeader>
       <CardContent className="space-y-2">
         {loading ? (
-          <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+          <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
+        ) : error ? (
+          <p className="text-sm text-destructive py-4 text-center">{error}</p>
         ) : rows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">No contributions yet.</p>
         ) : (
@@ -68,7 +78,7 @@ const KittyTopContributors = ({ kittyId, limit = 10, title }: Props) => {
                 </p>
               </div>
               <p className="text-sm font-bold text-primary whitespace-nowrap">
-                KES {Number(r.total_amount).toLocaleString()}
+                {formatKes(r.total_amount)}
               </p>
             </div>
           ))

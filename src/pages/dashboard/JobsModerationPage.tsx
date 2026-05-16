@@ -89,7 +89,7 @@ const JobsModerationPage = () => {
 
   const [jobs, setJobs] = useState<JobRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'pending' | 'rejected' | 'all'>('pending');
+  const [view, setView] = useState<'approved' | 'pending' | 'rejected' | 'all'>('approved');
   const [drafts, setDrafts] = useState<Record<string, DraftState>>({});
 
   const [scraping, setScraping] = useState(false);
@@ -97,7 +97,14 @@ const JobsModerationPage = () => {
     | null
     | {
         ran_at: string;
-        summary: { source: string; found: number; sent: number; error?: string }[];
+        summary: {
+          source: string;
+          found: number;
+          sent: number;
+          ingested?: number;
+          skipped_rejected?: number;
+          error?: string;
+        }[];
       }
   >(null);
 
@@ -134,7 +141,9 @@ const JobsModerationPage = () => {
       )
       .order('posted_at', { ascending: false });
 
-    if (view === 'pending') {
+    if (view === 'approved') {
+      query.eq('status', 'approved');
+    } else if (view === 'pending') {
       query.eq('status', 'pending');
     } else if (view === 'rejected') {
       query.eq('status', 'rejected');
@@ -398,6 +407,35 @@ const JobsModerationPage = () => {
     fetchJobs();
   };
 
+  const handleDeleteJob = async (job: JobRecord) => {
+    if (!canControlScraper) {
+      showError('Only admins can delete scraped jobs.', 3000);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${job.title}" from public jobs? It will also be blocked from automatic re-posting.`
+    );
+    if (!confirmed) return;
+
+    const { error } = await (supabase.from('jobs' as never) as any)
+      .update({
+        status: 'rejected',
+        rejected_reason: 'Deleted by admin.',
+        approved_at: null,
+        approved_by: null,
+      })
+      .eq('id', job.id);
+
+    if (error) {
+      showError('Failed to delete job.', 3000);
+      return;
+    }
+
+    showSuccess('Job deleted and blocked from auto-posting.', 2500);
+    fetchJobs();
+  };
+
   const triggerScrape = async () => {
     if (!canControlScraper) {
       showError('Only admins can run scraping manually.', 3000);
@@ -429,6 +467,7 @@ const JobsModerationPage = () => {
 
   const summary = useMemo(() => {
     return {
+      approved: jobs.filter((job) => job.status === 'approved').length,
       pending: jobs.filter((job) => job.status === 'pending').length,
       rejected: jobs.filter((job) => job.status === 'rejected').length,
       total: jobs.length,
@@ -459,7 +498,7 @@ const JobsModerationPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Jobs Moderation</h1>
           <p className="text-sm text-muted-foreground">
-            Review incoming job listings and manage scraping controls.
+            Scraped jobs publish automatically. Delete unwanted listings and manage scraping controls.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -468,6 +507,7 @@ const JobsModerationPage = () => {
               {scraping ? 'Running scrape...' : 'Run scraping now'}
             </Button>
           )}
+          <Badge variant="secondary">Approved: {summary.approved}</Badge>
           <Badge variant="secondary">Pending: {summary.pending}</Badge>
           <Badge variant="secondary">Rejected: {summary.rejected}</Badge>
           <Badge variant="secondary">Loaded: {summary.total}</Badge>
@@ -608,6 +648,13 @@ const JobsModerationPage = () => {
 
       <div className="flex flex-wrap gap-2">
         <Button
+          variant={view === 'approved' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setView('approved')}
+        >
+          Approved
+        </Button>
+        <Button
           variant={view === 'pending' ? 'default' : 'outline'}
           size="sm"
           onClick={() => setView('pending')}
@@ -634,7 +681,7 @@ const JobsModerationPage = () => {
 
       {!loading && jobs.length === 0 && (
         <Card>
-          <CardContent className="py-6 text-sm text-muted-foreground">No jobs to review right now.</CardContent>
+          <CardContent className="py-6 text-sm text-muted-foreground">No jobs found in this view.</CardContent>
         </Card>
       )}
 
@@ -652,6 +699,8 @@ const JobsModerationPage = () => {
                 <span className="font-medium">{row.source}</span>
                 <span className="text-muted-foreground">
                   found {row.found} - sent {row.sent}
+                  {typeof row.ingested === 'number' ? ` - posted ${row.ingested}` : ''}
+                  {row.skipped_rejected ? ` - blocked ${row.skipped_rejected}` : ''}
                   {row.error ? ` - error: ${row.error}` : ''}
                 </span>
               </div>
@@ -719,14 +768,24 @@ const JobsModerationPage = () => {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" className="gap-2" onClick={() => handleApprove(job)}>
-                  <CheckCircle2 className="w-4 h-4" />
-                  Approve
-                </Button>
-                <Button size="sm" variant="outline" className="gap-2" onClick={() => handleReject(job)}>
-                  <XCircle className="w-4 h-4" />
-                  Reject
-                </Button>
+                {job.status !== 'approved' && (
+                  <Button size="sm" className="gap-2" onClick={() => handleApprove(job)}>
+                    <CheckCircle2 className="w-4 h-4" />
+                    Approve
+                  </Button>
+                )}
+                {job.status !== 'rejected' && (
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => handleReject(job)}>
+                    <XCircle className="w-4 h-4" />
+                    Reject
+                  </Button>
+                )}
+                {canControlScraper && job.status !== 'rejected' && (
+                  <Button size="sm" variant="destructive" className="gap-2" onClick={() => handleDeleteJob(job)}>
+                    <Trash2 className="w-4 h-4" />
+                    Delete
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="ghost"

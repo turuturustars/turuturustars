@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-type TransactionStatusType = 'pending' | 'completed' | 'failed' | 'timeout';
+type TransactionStatusType =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'timeout'
+  | 'request_timeout'
+  | 'user_cancelled'
+  | 'incomplete'
+  | 'unknown';
 
 export interface TransactionStatus {
   checkoutRequestId: string;
@@ -53,7 +61,7 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
           createdAt: data.created_at,
           updatedAt: data.updated_at,
           isComplete: status === 'completed',
-          isFailed: status === 'failed',
+          isFailed: ['failed', 'request_timeout', 'user_cancelled', 'timeout'].includes(status),
         });
       }
     } catch (err) {
@@ -107,7 +115,7 @@ export function useTransactionStatus(checkoutRequestId: string | null) {
               createdAt: newData.created_at as string,
               updatedAt: newData.updated_at as string,
               isComplete: status === 'completed',
-              isFailed: status === 'failed',
+              isFailed: ['failed', 'request_timeout', 'user_cancelled', 'timeout'].includes(status),
             });
           }
         }

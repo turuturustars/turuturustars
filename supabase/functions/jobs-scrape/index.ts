@@ -72,8 +72,8 @@ type RuntimeSettings = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
-const keywordRegex = /(job|vacan|career|recruit|opportunit|internship|position|employment)/i;
-const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|vacancies?|job adverts?)$/i;
+const keywordRegex = /(job|vacan|career|recruit|internship|position|employment)/i;
+const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|careers?|jobs?|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|apply|apply now|application|application portal|online application|opportunities?|investment opportunities|tenders?|procurement|downloads?)$/i;
 
 const createServiceClient = () => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
@@ -202,7 +202,7 @@ const buildJobs = (links: Array<{ url: string; text: string }>, source: Source, 
       source.category === "county" ||
       source.category === "government_portal" ||
       source.category === "state_corporation",
-    status: "pending",
+    status: "approved",
   }));
 };
 
@@ -376,7 +376,14 @@ serve(async (req) => {
     return d.toISOString().split("T")[0];
   })();
 
-  const summary: Array<{ source: string; found: number; sent: number; error?: string }> = [];
+  const summary: Array<{
+    source: string;
+    found: number;
+    sent: number;
+    ingested?: number;
+    skipped_rejected?: number;
+    error?: string;
+  }> = [];
 
   for (const source of selected) {
     try {
@@ -421,7 +428,17 @@ serve(async (req) => {
         const text = await ingestResp.text();
         summary.push({ source: source.name, found: links.length, sent: 0, error: text });
       } else {
-        summary.push({ source: source.name, found: links.length, sent: jobs.length });
+        const body = await ingestResp.json();
+        const ingested = Array.isArray(body?.inserted)
+          ? body.inserted.reduce((total: number, row: { count?: number }) => total + Number(row.count || 0), 0)
+          : jobs.length;
+        summary.push({
+          source: source.name,
+          found: links.length,
+          sent: jobs.length,
+          ingested,
+          skipped_rejected: Number(body?.skipped_rejected || 0),
+        });
       }
 
       await sleep(requestDelayMs);

@@ -27,6 +27,7 @@ const SOURCE_SEQUENCE_DAY = process.env.SOURCE_SEQUENCE_DAY || process.env.SEQUE
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const stripTags = (value) => value.replace(/<[^>]+>/g, "");
+const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|careers?|jobs?|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|apply|apply now|application|application portal|online application|opportunities?|investment opportunities|tenders?|procurement|downloads?)$/i;
 
 const integerInRange = (value, fallback, min, max) => {
   if (!Number.isInteger(value)) return fallback;
@@ -74,14 +75,26 @@ const extractLinks = (html, baseUrl) => {
 };
 
 const looksLikeJob = (text, url) => {
+  const normalizedText = text.trim().toLowerCase();
+  if (utilityTextRegex.test(normalizedText)) return false;
+
   const haystack = `${text} ${url}`.toLowerCase();
   return (
     haystack.includes("job") ||
     haystack.includes("vacan") ||
     haystack.includes("advert") ||
     haystack.includes("career") ||
-    haystack.includes("recruit")
+    haystack.includes("recruit") ||
+    haystack.includes("internship") ||
+    haystack.includes("position") ||
+    haystack.includes("employment")
   );
+};
+
+const defaultDeadline = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().split("T")[0];
 };
 
 const main = async () => {
@@ -144,13 +157,14 @@ const main = async () => {
       continue;
     }
 
+    const deadline = defaultDeadline();
     const jobs = links.map((link) => ({
       title: link.text,
       organization: source.name,
       location: "Kenya",
       county: "Kenya",
       job_type: "other",
-      deadline: null,
+      deadline,
       posted_at: new Date().toISOString(),
       source_name: source.name,
       source_url: link.url,
@@ -161,7 +175,7 @@ const main = async () => {
         source.category === "county" ||
         source.category === "government_portal" ||
         source.category === "state_corporation",
-      status: "pending",
+      status: "approved",
     }));
 
     const response = await fetch(JOBS_INGEST_URL, {

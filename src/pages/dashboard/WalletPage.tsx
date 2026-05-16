@@ -1,14 +1,52 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
 import WalletTopUpDialog from '@/components/wallet/WalletTopUpDialog';
 import WalletTransactionList from '@/components/wallet/WalletTransactionList';
 import { useWallet } from '@/hooks/useWallet';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Shield, Smartphone, HandHeart, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Clock3, Loader2, RefreshCw, Shield } from 'lucide-react';
 
 const WalletPage = () => {
-  const { wallet, transactions, loading } = useWallet();
+  const { wallet, transactions, topUps, loading, refresh } = useWallet();
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const balance = Number(wallet?.balance ?? 0);
+  const pendingTopUps = topUps.filter((topUp) =>
+    ['pending', 'incomplete', 'unknown'].includes(topUp.status || 'pending')
+  );
+  const failedTopUps = topUps.filter((topUp) =>
+    ['failed', 'request_timeout', 'user_cancelled'].includes(topUp.status || '')
+  );
+  const totals = useMemo(
+    () =>
+      transactions.reduce(
+        (summary, transaction) => {
+          if (transaction.direction === 'credit') {
+            summary.credit += Number(transaction.amount || 0);
+          } else {
+            summary.debit += Number(transaction.amount || 0);
+          }
+
+          return summary;
+        },
+        { credit: 0, debit: 0 }
+      ),
+    [transactions]
+  );
+  const lastUpdated = wallet?.updated_at
+    ? new Date(wallet.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : undefined;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (loading && !wallet) {
     return (
@@ -18,15 +56,19 @@ const WalletPage = () => {
     );
   }
 
-  const balance = Number(wallet?.balance ?? 0);
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold sm:text-3xl">My Wallet</h1>
-        <p className="text-sm text-muted-foreground">
-          Save money for dues, welfare contributions, and fines. Top up via M-Pesa anytime.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold sm:text-3xl">My Wallet</h1>
+          <p className="text-sm text-muted-foreground">
+            Top up, track confirmations, and pay CBO obligations from one balance.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+          <RefreshCw className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          Refresh
+        </Button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -35,54 +77,81 @@ const WalletPage = () => {
           currency={wallet?.currency || 'KES'}
           status={wallet?.status || 'active'}
           onTopUp={() => setTopUpOpen(true)}
+          onRefresh={handleRefresh}
+          pendingTopUps={pendingTopUps.length}
+          lastUpdated={lastUpdated}
+          refreshing={refreshing}
           className="lg:col-span-2"
         />
 
         <Card>
-          <CardContent className="space-y-3 p-5 text-sm">
-            <div className="flex items-start gap-2">
-              <Shield className="mt-0.5 h-4 w-4 text-primary shrink-0" />
-              <div>
-                <p className="font-semibold">Safe & Audited</p>
-                <p className="text-xs text-muted-foreground">
-                  Every credit and debit is recorded on a tamper-proof ledger visible to the Treasurer.
-                </p>
+          <CardContent className="space-y-4 p-5 text-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-primary" />
+                <p className="font-semibold">Wallet status</p>
+              </div>
+              <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium capitalize text-primary">
+                {wallet?.status || 'active'}
+              </span>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Clock3 className="h-4 w-4 text-amber-600" />
+                  <span className="text-muted-foreground">Pending top-ups</span>
+                </div>
+                <span className="font-semibold tabular-nums">{pendingTopUps.length}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <ArrowDownLeft className="h-4 w-4 text-green-600" />
+                  <span className="text-muted-foreground">Money in</span>
+                </div>
+                <span className="font-semibold tabular-nums">KES {totals.credit.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <ArrowUpRight className="h-4 w-4 text-rose-600" />
+                  <span className="text-muted-foreground">Money out</span>
+                </div>
+                <span className="font-semibold tabular-nums">KES {totals.debit.toLocaleString()}</span>
               </div>
             </div>
-            <div className="flex items-start gap-2">
-              <Smartphone className="mt-0.5 h-4 w-4 text-primary shrink-0" />
-              <div>
-                <p className="font-semibold">Instant top-up</p>
-                <p className="text-xs text-muted-foreground">
-                  Funds appear automatically once your M-Pesa payment is confirmed.
-                </p>
+
+            {failedTopUps.length > 0 && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">Some top-ups need attention</p>
+                  <p className="text-xs opacity-80">Check the activity list for failed or timed-out M-Pesa prompts.</p>
+                </div>
               </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <HandHeart className="mt-0.5 h-4 w-4 text-primary shrink-0" />
-              <div>
-                <p className="font-semibold">Spend inside the CBO</p>
-                <p className="text-xs text-muted-foreground">
-                  Pay monthly dues, donate to welfare cases, or settle fines — all from one balance.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 text-amber-500 shrink-0" />
-              <div>
-                <p className="font-semibold">No external withdrawals</p>
-                <p className="text-xs text-muted-foreground">
-                  Wallet funds stay inside the CBO. Contact the Treasurer for refunds.
-                </p>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <WalletTransactionList transactions={transactions} />
+      {pendingTopUps.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">Waiting for M-Pesa confirmation</p>
+              <p className="text-xs opacity-80">Your wallet will update automatically after Safaricom confirms the prompt.</p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 bg-background/70">
+            <RefreshCw className={refreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            Refresh
+          </Button>
+        </div>
+      )}
 
-      <WalletTopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} />
+      <WalletTransactionList transactions={transactions} topUps={topUps} />
+
+      <WalletTopUpDialog open={topUpOpen} onOpenChange={setTopUpOpen} onSuccess={refresh} />
     </div>
   );
 };

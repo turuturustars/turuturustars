@@ -19,7 +19,7 @@ select
 ```
 
 ## Ingestion (basic script)
-The basic scraper script inserts pending listings that need moderation:
+The basic scraper script inserts approved listings by default so they appear on the public jobs page automatically:
 
 ```
 JOBS_INGEST_URL=https://<project>.supabase.co/functions/v1/jobs-ingest
@@ -47,7 +47,7 @@ To replay a specific slice manually, pass `SOURCE_SEQUENCE_DAY` from `1` to `3`:
 SOURCE_SEQUENCE_DAYS=3 SOURCE_SEQUENCE_DAY=2 node scripts/jobs/scrape-basic.mjs
 ```
 
-Note: Pending listings must be approved in the admin dashboard before they appear publicly.
+Note: Admin-deleted jobs are kept as rejected records so future scrapes do not post the same unwanted source URL again.
 
 ## Scheduled scrape
 The GitHub Actions scrape calls the `jobs-scrape` Supabase function daily with `sequence_days: 3`.

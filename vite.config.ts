@@ -57,7 +57,7 @@ export default defineConfig(({ mode }) => ({
         orientation: "portrait-primary",
         display: "standalone",
         display_override: ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
-        background_color: "#ffffff",
+        background_color: "transparent",
         theme_color: "#0d4bb5",
         categories: ["community", "finance", "productivity"],
         icons: [

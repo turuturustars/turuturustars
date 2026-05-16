@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Plus, HeartHandshake, Phone, Loader2, Trash2, Target, Coins, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import type { KittyBeneficiaryRow, KittyRow } from '@/hooks/useKitties';
+import { formatKes } from '@/lib/kittyUtils';
 
 interface Props {
   kittyId: string;
@@ -45,7 +46,8 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
   const [details, setDetails] = useState('');
   const [allocated, setAllocated] = useState('');
 
-  const canManage = hasRole('admin');
+  const canManage = hasRole('admin') || hasRole('treasurer') || hasRole('chairperson');
+  const groupKittyId = kitty?.parent_kitty_id || kitty?.id || kittyId;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,13 +60,13 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
       supabase
         .from('kitty_group_totals_v' as never)
         .select('*')
-        .eq('kitty_id', kittyId)
+        .eq('kitty_id', groupKittyId)
         .maybeSingle(),
     ]);
     setRows((data as unknown as KittyBeneficiaryRow[]) || []);
     setTotals((t as unknown as GroupTotals) || null);
     setLoading(false);
-  }, [kittyId]);
+  }, [groupKittyId, kittyId]);
 
   useEffect(() => {
     load();
@@ -87,6 +89,7 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
 
   const submit = async () => {
     if (!name.trim()) return toast.error('Name is required');
+    if (allocated && Number(allocated) < 0) return toast.error('Allocated amount cannot be negative');
     if (!user?.id) return toast.error('Not signed in');
     setSubmitting(true);
     const { error } = await supabase.from('kitty_beneficiaries' as never).insert({
@@ -117,7 +120,7 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Remove this beneficiary?')) return;
+    if (!window.confirm('Remove this beneficiary?')) return;
     const { error } = await supabase.from('kitty_beneficiaries' as never).delete().eq('id', id);
     if (error) toast.error(error.message);
     else toast.success('Removed');
@@ -140,15 +143,15 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="rounded-md border bg-background p-2">
                 <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Coins className="w-3 h-3" /> Contributed (all rounds)</p>
-                <p className="text-sm font-bold text-primary">KES {Number(totals?.total_contributed_all_rounds ?? kitty?.total_contributed ?? 0).toLocaleString()}</p>
+                <p className="text-sm font-bold text-primary">{formatKes(totals?.total_contributed_all_rounds ?? kitty?.total_contributed ?? 0)}</p>
               </div>
               <div className="rounded-md border bg-background p-2">
                 <p className="text-[10px] uppercase text-muted-foreground">Disbursed</p>
-                <p className="text-sm font-bold">KES {Number(totals?.total_disbursed_all_rounds ?? kitty?.total_disbursed ?? 0).toLocaleString()}</p>
+                <p className="text-sm font-bold">{formatKes(totals?.total_disbursed_all_rounds ?? kitty?.total_disbursed ?? 0)}</p>
               </div>
               <div className="rounded-md border bg-background p-2">
                 <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Target className="w-3 h-3" /> Target / round</p>
-                <p className="text-sm font-bold">KES {Number(kitty?.target_amount ?? 0).toLocaleString()}</p>
+                <p className="text-sm font-bold">{formatKes(kitty?.target_amount ?? 0)}</p>
               </div>
               <div className="rounded-md border bg-background p-2">
                 <p className="text-[10px] uppercase text-muted-foreground flex items-center justify-center gap-1"><Layers className="w-3 h-3" /> Rounds</p>
@@ -239,7 +242,7 @@ const KittyBeneficiariesTab = ({ kittyId, kitty }: Props) => {
               {Number(b.allocated_amount) > 0 && (
                 <p className="text-sm">
                   <span className="text-muted-foreground">Allocated:</span>{' '}
-                  <span className="font-semibold">KES {Number(b.allocated_amount).toLocaleString()}</span>
+                  <span className="font-semibold">{formatKes(b.allocated_amount)}</span>
                 </p>
               )}
               {b.details && <p className="text-sm whitespace-pre-line text-muted-foreground">{b.details}</p>}

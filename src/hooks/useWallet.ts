@@ -23,10 +23,23 @@ export type WalletTxn = {
   status: string;
   reference: string | null;
   description: string | null;
+  mpesa_transaction_id?: string | null;
   created_at: string;
   contribution_id?: string | null;
   welfare_case_id?: string | null;
   discipline_id?: string | null;
+};
+
+export type WalletTopUp = {
+  id: string;
+  checkout_request_id: string | null;
+  phone_number: string;
+  amount: number;
+  status: string | null;
+  result_desc: string | null;
+  mpesa_receipt_number: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export const useWallet = (userId?: string) => {
@@ -34,28 +47,51 @@ export const useWallet = (userId?: string) => {
   const targetId = userId || user?.id;
   const [wallet, setWallet] = useState<WalletRow | null>(null);
   const [transactions, setTransactions] = useState<WalletTxn[]>([]);
+  const [topUps, setTopUps] = useState<WalletTopUp[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
-    if (!targetId) return;
+    if (!targetId) {
+      setWallet(null);
+      setTransactions([]);
+      setTopUps([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    try {
+      // Ensure wallet exists
+      await supabase.rpc('ensure_wallet', { _user_id: targetId } as never);
 
-    // Ensure wallet exists
-    await supabase.rpc('ensure_wallet', { _user_id: targetId } as never);
+      const [{ data: w, error: walletError }, { data: tx, error: txError }, { data: mpesaTopUps, error: topUpError }] =
+        await Promise.all([
+          supabase.from('wallets' as never).select('*').eq('user_id', targetId).maybeSingle(),
+          supabase
+            .from('wallet_transactions' as never)
+            .select('*')
+            .eq('user_id', targetId)
+            .order('created_at', { ascending: false })
+            .limit(100),
+          supabase
+            .from('mpesa_transactions')
+            .select('id, checkout_request_id, phone_number, amount, status, result_desc, mpesa_receipt_number, created_at, updated_at')
+            .eq('member_id', targetId)
+            .eq('transaction_type', 'wallet_topup')
+            .order('created_at', { ascending: false })
+            .limit(25),
+        ]);
 
-    const [{ data: w }, { data: tx }] = await Promise.all([
-      supabase.from('wallets' as never).select('*').eq('user_id', targetId).maybeSingle(),
-      supabase
-        .from('wallet_transactions' as never)
-        .select('*')
-        .eq('user_id', targetId)
-        .order('created_at', { ascending: false })
-        .limit(100),
-    ]);
+      if (walletError) console.error('Error loading wallet:', walletError);
+      if (txError) console.error('Error loading wallet transactions:', txError);
+      if (topUpError) console.error('Error loading wallet top-ups:', topUpError);
 
-    setWallet((w as WalletRow) || null);
-    setTransactions((tx as WalletTxn[]) || []);
-    setLoading(false);
+      setWallet((w as WalletRow) || null);
+      setTransactions((tx as WalletTxn[]) || []);
+      setTopUps((mpesaTopUps as WalletTopUp[]) || []);
+    } finally {
+      setLoading(false);
+    }
   }, [targetId]);
 
   useEffect(() => {
@@ -75,6 +111,11 @@ export const useWallet = (userId?: string) => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'wallet_transactions', filter: `user_id=eq.${targetId}` },
+        () => fetchAll()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mpesa_transactions', filter: `member_id=eq.${targetId}` },
         () => fetchAll()
       )
       .subscribe();
@@ -120,7 +161,7 @@ export const useWallet = (userId?: string) => {
     [targetId, fetchAll]
   );
 
-  return { wallet, transactions, loading, refresh: fetchAll, spend };
+  return { wallet, transactions, topUps, loading, refresh: fetchAll, spend };
 };
 
 export default useWallet;

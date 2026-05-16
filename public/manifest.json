@@ -10,7 +10,7 @@
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
   "orientation": "portrait-primary",
   "theme_color": "#0d4bb5",
-  "background_color": "#ffffff",
+  "background_color": "transparent",
   "categories": ["community", "finance", "productivity"],
   "icons": [
     {
