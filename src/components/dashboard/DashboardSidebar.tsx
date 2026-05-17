@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home,
+import {
   LayoutDashboard, 
   Users, 
   HandHeart, 
@@ -10,7 +9,6 @@ import {
   BellRing,
   Settings,
   LogOut,
-  Star,
   FileText,
   UserCheck,
   TrendingUp,
@@ -21,7 +19,6 @@ import {
   ChevronDown,
   ActivitySquare,
   X,
-  Menu,
   MessageCircle,
   Vote,
   ShieldCheck,
@@ -47,20 +44,13 @@ type RecentAnnouncement = {
 
 const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   const location = useLocation();
-  const { profile, roles = [], isOfficial, signOut, isLoading } = useAuth();
+  const { roles = [], signOut, isLoading } = useAuth();
   const userRoles = roles;
   const primaryRole = getPrimaryRole(userRoles);
   const isUserOfficial = userRoles.some(r => ['admin', 'treasurer', 'secretary', 'chairperson', 'vice_chairman', 'vice_secretary', 'organizing_secretary', 'committee_member', 'patron', 'coordinator'].includes(r));
   
   const [expandedRole, setExpandedRole] = useState<string | null>(primaryRole);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [recentAnnouncements, setRecentAnnouncements] = useState<RecentAnnouncement[]>([]);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     const fetchRecentAnnouncements = async () => {
@@ -108,7 +98,6 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   };
 
   const memberLinks: Array<{ label: string; href: string; icon: any; badge: string | number | null }> = [
-    { label: 'Website Home', href: '/', icon: Home, badge: null },
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
     { label: 'My Wallet', href: '/dashboard/finance/wallet', icon: Wallet, badge: null },
@@ -271,35 +260,6 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
             <span className="text-xs text-muted-foreground/80">Member Portal</span>
           </div>
         </Link>
-      </div>
-
-      {/* Member Info Card - Compact & Beautiful */}
-      <div className="px-4 py-3 lg:px-5 lg:py-4 border-b border-border/20">
-        <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-primary/8 via-primary/4 to-transparent border border-primary/10 p-3.5 hover:border-primary/20 transition-all duration-300">
-          <div className="absolute inset-0 bg-gradient-to-t from-white/3 to-transparent" />
-          
-          <div className="relative flex items-center gap-2.5">
-            <div className="relative flex-shrink-0">
-              <div className="absolute inset-0 bg-primary/25 rounded-lg blur group-hover:blur-md transition-all duration-300" />
-              <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary to-primary/70 flex items-center justify-center text-sm font-bold text-primary-foreground shadow-sm">
-                {profile?.full_name?.charAt(0) || 'M'}
-              </div>
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-semibold text-foreground truncate leading-tight">
-                {profile?.full_name?.split(' ')[0] || 'Member'}
-              </p>
-              <p className="text-xs text-muted-foreground/70 truncate">
-                {profile?.status === 'pending'
-                  ? 'Pending approval (read-only)'
-                  : profile?.membership_number
-                    ? `ID: ${profile.membership_number}`
-                    : 'No Membership ID'}
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Navigation */}

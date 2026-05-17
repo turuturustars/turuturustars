@@ -1,4 +1,4 @@
-import { Home, Menu, MessageSquare, Sparkles } from 'lucide-react';
+import { Menu, MessageSquare, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,7 +6,6 @@ import NotificationBell from './NotificationBell';
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import turuturuLogo from '@/assets/turuturustarslogo.png';
-import { Link } from 'react-router-dom';
 
 const ChatSidebar = lazy(() => import('@/components/chat/ChatSidebar'));
 
@@ -94,14 +93,17 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
     }
   };
 
-  const firstName = profile?.full_name?.split(' ')[0] || 'Member';
+  const displayName = profile?.full_name?.trim() || 'Member';
+  const firstName = displayName.split(' ')[0] || 'Member';
+  const memberInitial = displayName.charAt(0).toUpperCase();
+  const memberNumber = profile?.membership_number;
   const statusConfig = getStatusConfig(profile?.status);
 
   return (
     <>
       <header 
         className={cn(
-          'fixed top-0 inset-x-0 z-50 w-full transition-all duration-300',
+          'fixed top-0 inset-x-0 z-50 w-full transition-all duration-300 lg:left-64 lg:w-auto xl:left-72',
           'bg-gradient-to-r from-white/92 via-blue-50/85 to-white/90 dark:from-background/85 dark:via-card/85 dark:to-background/85',
           'backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-card/85',
           'border-b',
@@ -197,20 +199,19 @@ const DashboardHeader = ({ onMenuToggle }: DashboardHeaderProps) => {
 
           {/* Right Section */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              className={cn(
-                'h-10 w-10 rounded-xl transition-all duration-200 relative group',
-                'bg-card/60 border border-border/50 hover:border-primary/40',
-                'hover:bg-accent active:scale-95'
-              )}
-            >
-              <Link to="/" aria-label="Go to public home page">
-                <Home className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
-              </Link>
-            </Button>
+            <div className="hidden md:flex items-center gap-2.5 rounded-2xl border border-border/50 bg-card/65 px-3 py-2 shadow-sm shadow-primary/5 backdrop-blur">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-sm">
+                {memberInitial}
+              </div>
+              <div className="min-w-0 leading-tight">
+                <p className="max-w-[10rem] truncate text-sm font-semibold text-foreground">
+                  {displayName}
+                </p>
+                <p className="max-w-[12rem] truncate text-xs text-muted-foreground">
+                  {memberNumber ? `Member Number: ${memberNumber}` : 'Member Number Pending'}
+                </p>
+              </div>
+            </div>
 
             <Button 
               variant="ghost" 
