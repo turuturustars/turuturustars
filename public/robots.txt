@@ -1,173 +1,51 @@
 # Turuturu Stars CBO - robots.txt
-# Last Updated: 2026-01-19
+# Last Updated: 2026-05-17
 # Website: https://turuturustars.co.ke
-# This robots.txt helps search engines crawl important content while protecting private areas
-
-# ====================
-# GENERAL RULES FOR ALL BOTS
-# ====================
 
 User-agent: *
 Allow: /
+Allow: /jobs
+Allow: /government-jobs
+Allow: /public-jobs
+Allow: /muranga-jobs
 
-# Disallow authentication pages (users can access via direct links)
+# Private or low-value crawl paths
 Disallow: /auth
 Disallow: /login
 Disallow: /register
 Disallow: /forgot-password
 Disallow: /reset-password
-
-# Disallow private dashboard pages
+Disallow: /profile-setup
 Disallow: /dashboard/
-Disallow: /dashboard/roles/
-Disallow: /dashboard/finance/
-Disallow: /dashboard/members/
-Disallow: /dashboard/governance/
-Disallow: /dashboard/communication/
-Disallow: /dashboard/admin-panel/
-Disallow: /dashboard/profile
-
-# Disallow internal system paths
 Disallow: /admin/
 Disallow: /api/
 Disallow: /backend/
 Disallow: /node_modules/
 Disallow: /src/
-Disallow: /_redirects
-
-# Disallow specific file types to save crawl budget
-Disallow: /*.json$
-Disallow: /*.js$
-Disallow: /*.map$
 Disallow: /dist/
 Disallow: /build/
+Disallow: /_redirects
+Disallow: /*.map$
 
-# ====================
-# SPECIFIC BOT RULES
-# ====================
+Sitemap: https://turuturustars.co.ke/sitemap.xml
+Sitemap: https://turuturustars.co.ke/jobs-sitemap.xml
 
-# Google Bot - Aggressive crawling allowed
 User-agent: Googlebot
 Allow: /
-
-# Prioritize important pages
-# Crawl delay: 0 means no delay
 Crawl-delay: 0
-Request-rate: 200/1h
 
-# Bing/MSN Bot
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
-Request-rate: 50/1h
 
-# Yandex Bot
-User-agent: YandexBot
-Allow: /
-Crawl-delay: 1
-Request-rate: 40/1h
-
-# DuckDuckGo Bot
-User-agent: DuckDuckBot
-Allow: /
-Crawl-delay: 0
-
-# Baidu Bot (Chinese search engine)
-User-agent: Baiduspider
-Allow: /
-Crawl-delay: 1
-
-# ====================
-# SITEMAP LOCATIONS
-# ====================
-
-Sitemap: https://turuturustars.co.ke/sitemap.xml
-Sitemap: https://turuturustars.co.ke/sitemap-locations.xml
-Sitemap: https://turuturustars.co.ke/sitemap-landmarks.xml
-Sitemap: https://turuturustars.co.ke/jobs-sitemap.xml
-Sitemap: https://turuturustars.co.ke/jobs-atom.xml
-
-# ====================
-# ADDITIONAL DIRECTIVES
-# ====================
-
-# Uncomment to set crawl delay globally
-# Crawl-delay: 1
-
-# Set visit timeout (optional)
-# Visit-time: 06:00-23:00
-
-# Allow specific paths for important bots if needed
-User-agent: AdsBot-Google
-Allow: /
-
-User-agent: MJ12bot
-Allow: /
-Crawl-delay: 1
-
-User-agent: SemrushBot
-Allow: /
-Crawl-delay: 10
-
-User-agent: AhrefsBot
-Allow: /
-Crawl-delay: 10
-
-# DuckDuckGo
-User-agent: DuckDuckBot
-Allow: /
-Crawl-delay: 1
-
-# Baidu Bot
-User-agent: Baiduspider
-Allow: /
-Crawl-delay: 2
-
-# Twitter/X Bot
 User-agent: Twitterbot
 Allow: /
-Crawl-delay: 0
 
-# Facebook Bot
 User-agent: facebookexternalhit
 Allow: /
 
-# LinkedIn Bot
 User-agent: LinkedInBot
 Allow: /
 
-# WhatsApp Bot
 User-agent: whatsapp
 Allow: /
-
-# Slack Bot
-User-agent: Slackbot
-Allow: /
-
-# ====================
-# SITEMAP LOCATIONS
-# ====================
-
-# Main sitemap
-Sitemap: https://turuturustars.co.ke/sitemap.xml
-
-# Location-specific sitemap
-Sitemap: https://turuturustars.co.ke/sitemap-locations.xml
-
-# Landmark-specific sitemap
-Sitemap: https://turuturustars.co.ke/sitemap-landmarks.xml
-
-# ====================
-# OTHER CRAWLERS
-# ====================
-
-# Archive crawlers
-User-agent: archive.org_bot
-Allow: /
-
-# Duplicate content detection
-User-agent: MJ12bot
-Allow: /
-Crawl-delay: 1
-
-

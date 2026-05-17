@@ -180,6 +180,10 @@ export const LocalOrganizationSchema: FC = () => {
         'Mutual Assistance',
         'Community Activities',
         'Emergency Relief',
+        'Government of Kenya Jobs',
+        'Public Jobs in Kenya',
+        "Murang'a Jobs",
+        'County Government Jobs',
       ],
     };
 

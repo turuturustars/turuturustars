@@ -14,7 +14,7 @@ const navItems: NavItem[] = [
   { label: 'About', href: '/about' },
   { label: 'Pillars', href: '/pillars' },
   { label: 'Leadership', href: '/leadership' },
-  { label: 'Careers', href: '/careers' },
+  { label: 'Jobs', href: '/jobs' },
 ];
 
 const Header = () => {
@@ -37,8 +37,15 @@ const Header = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const isActive = (href: string) =>
-    href === '/' ? location.pathname === '/' : location.pathname.startsWith(href);
+  const isActive = (href: string) => {
+    if (href === '/') return location.pathname === '/';
+    if (href === '/jobs') {
+      return ['/jobs', '/government-jobs', '/public-jobs', '/muranga-jobs'].some((path) =>
+        location.pathname.startsWith(path)
+      );
+    }
+    return location.pathname.startsWith(href);
+  };
 
   const handleNavClick = (href: string) => {
     setIsMenuOpen(false);
@@ -55,32 +62,48 @@ const Header = () => {
     <header className="fixed inset-x-0 top-0 z-50">
       <div
         className={cn(
-          'mx-auto mt-3 w-[min(1160px,calc(100%-1rem))] rounded-2xl border backdrop-blur-xl transition-all duration-300',
+          'mx-auto mt-3 w-[min(1180px,calc(100%-1rem))] overflow-hidden rounded-[1.15rem] border backdrop-blur-xl transition-all duration-300',
           isScrolled
-            ? 'border-[#1f5f89]/75 bg-[#07243a]/95 shadow-[0_16px_40px_-20px_rgba(6,22,39,0.55)]'
-            : 'border-[#1f5f89]/60 bg-[#07243a]/88 shadow-[0_10px_30px_-20px_rgba(6,22,39,0.48)]'
+            ? 'border-slate-200/80 bg-white/[0.94] shadow-[0_18px_42px_-28px_rgba(6,22,39,0.62)]'
+            : 'border-white/20 bg-[#061c2c]/60 shadow-[0_16px_42px_-28px_rgba(0,0,0,0.75)]'
         )}
       >
-        <div className="flex h-[4.5rem] items-center justify-between gap-3 px-3 sm:h-20 sm:px-4 md:px-5">
-          <Link to="/" className="flex min-w-0 items-center">
+        <div className="flex h-16 items-center justify-between gap-3 px-3 sm:h-[4.35rem] sm:px-4 md:px-5">
+          <Link to="/" className="flex min-w-0 items-center gap-3" aria-label="Turuturu Stars home">
             <img
               src={logo}
               alt="Turuturu Stars"
-              className="h-14 w-auto object-contain sm:h-16"
+              className="h-11 w-auto object-contain sm:h-12"
             />
+            <span
+              className={cn(
+                'hidden leading-tight sm:block',
+                isScrolled ? 'text-[#0a263b]' : 'text-white'
+              )}
+            >
+              <span className="block text-sm font-black tracking-normal">Turuturu Stars</span>
+              <span
+                className={cn(
+                  'block text-[11px] font-semibold tracking-normal',
+                  isScrolled ? 'text-[#617286]' : 'text-white/70'
+                )}
+              >
+                Community Based Organization
+              </span>
+            </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-[#4e88af]/75 bg-[#0a2d46]/80 p-1">
+          <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary navigation">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
                 onClick={() => handleNavClick(item.href)}
                 className={cn(
-                  'rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
+                  "relative px-0.5 py-2 text-sm font-bold tracking-normal transition-colors after:absolute after:bottom-1 after:left-0 after:h-[2px] after:w-full after:origin-left after:rounded-full after:bg-[#f1c762] after:transition-transform after:content-['']",
                   isActive(item.href)
-                    ? 'bg-[#f0f9ff] text-[#093351]'
-                    : 'text-[#eff7ff] hover:bg-[#1a5a83] hover:text-white'
+                    ? cn('after:scale-x-100', isScrolled ? 'text-[#0a263b]' : 'text-white')
+                    : cn('after:scale-x-0', isScrolled ? 'text-[#556b7f] hover:text-[#0a263b]' : 'text-white/76 hover:text-white')
                 )}
               >
                 {item.label}
@@ -91,13 +114,18 @@ const Header = () => {
           <div className="hidden items-center gap-2 md:flex">
             <Link
               to="/donate"
-              className="rounded-xl border border-[#7cc8ff]/70 px-3.5 py-2 text-sm font-semibold text-[#d4ecff] transition hover:border-[#a8ddff] hover:bg-[#114564]/55"
+              className={cn(
+                'rounded-xl border px-3.5 py-2 text-sm font-bold tracking-normal transition',
+                isScrolled
+                  ? 'border-slate-300 text-[#0a314d] hover:border-[#0a314d] hover:bg-slate-50'
+                  : 'border-white/35 text-white hover:border-[#f1c762] hover:bg-white/10'
+              )}
             >
               Donate
             </Link>
             <Link
               to="/auth"
-              className="inline-flex items-center gap-2 rounded-xl bg-[#21adff] px-4 py-2 text-sm font-semibold text-[#05243a] transition hover:bg-[#3db8ff]"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#36b8ff] px-4 py-2 text-sm font-black tracking-normal text-[#05243a] transition hover:bg-[#8fdcff]"
             >
               <LogIn className="h-4 w-4" />
               Member login
@@ -107,7 +135,12 @@ const Header = () => {
           <button
             type="button"
             aria-label="Toggle menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#2a6f9b]/70 bg-[#0a314d]/70 text-[#d4ecff] transition hover:text-white md:hidden"
+            className={cn(
+              'inline-flex h-10 w-10 items-center justify-center rounded-xl border transition md:hidden',
+              isScrolled
+                ? 'border-slate-300 bg-white text-[#0a314d]'
+                : 'border-white/25 bg-white/[0.08] text-white'
+            )}
             onClick={() => setIsMenuOpen((open) => !open)}
           >
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -115,7 +148,12 @@ const Header = () => {
         </div>
 
         {isMenuOpen && (
-          <div className="border-t border-[#2a6f9b]/65 bg-[#07243a]/96 p-2 md:hidden">
+          <div
+            className={cn(
+              'border-t p-2 md:hidden',
+              isScrolled ? 'border-slate-200 bg-white' : 'border-white/15 bg-[#061c2c]/96'
+            )}
+          >
             <nav className="flex flex-col gap-1">
               {navItems.map((item) => (
                 <Link
@@ -123,10 +161,12 @@ const Header = () => {
                   to={item.href}
                   onClick={() => handleNavClick(item.href)}
                   className={cn(
-                    'rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors',
+                    'rounded-lg px-3 py-2.5 text-sm font-bold tracking-normal transition-colors',
                     isActive(item.href)
-                      ? 'bg-[#f0f9ff] text-[#093351]'
-                      : 'text-[#eff7ff] hover:bg-[#1a5a83] hover:text-white'
+                      ? 'bg-[#f6d77b] text-[#081f31]'
+                      : isScrolled
+                        ? 'text-[#445b70] hover:bg-slate-100 hover:text-[#0a263b]'
+                        : 'text-white/78 hover:bg-white/10 hover:text-white'
                   )}
                 >
                   {item.label}
@@ -134,16 +174,24 @@ const Header = () => {
               ))}
             </nav>
 
-            <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#2a6f9b]/65 pt-2">
+            <div
+              className={cn(
+                'mt-2 grid grid-cols-2 gap-2 border-t pt-2',
+                isScrolled ? 'border-slate-200' : 'border-white/15'
+              )}
+            >
               <Link
                 to="/donate"
-                className="rounded-lg border border-[#7cc8ff]/70 px-3 py-2 text-center text-sm font-semibold text-[#d4ecff]"
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-center text-sm font-bold',
+                  isScrolled ? 'border-slate-300 text-[#0a314d]' : 'border-white/35 text-white'
+                )}
               >
                 Donate
               </Link>
               <Link
                 to="/auth"
-                className="rounded-lg bg-[#21adff] px-3 py-2 text-center text-sm font-semibold text-[#05243a]"
+                className="rounded-lg bg-[#36b8ff] px-3 py-2 text-center text-sm font-black text-[#05243a]"
               >
                 Member login
               </Link>

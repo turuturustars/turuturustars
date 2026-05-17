@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, 
   Users, 
@@ -22,6 +23,7 @@ import {
   MessageCircle,
   Vote,
   ShieldCheck,
+  Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -97,7 +99,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     setExpandedRole(expandedRole ? null : primaryRole);
   };
 
-  const memberLinks: Array<{ label: string; href: string; icon: any; badge: string | number | null }> = [
+  const memberLinks: Array<{ label: string; href: string; icon: LucideIcon; badge: string | number | null }> = [
     { label: 'Dashboard', href: '/dashboard/home', icon: LayoutDashboard, badge: null },
     { label: 'Contributions', href: '/dashboard/finance/contributions', icon: DollarSign, badge: null },
     { label: 'My Wallet', href: '/dashboard/finance/wallet', icon: Wallet, badge: null },
@@ -118,7 +120,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
   ];
 
   const roleSpecificLinks = () => {
-    const links: Array<{ label: string; href: string; icon: any }> = [];
+    const links: Array<{ label: string; href: string; icon: LucideIcon }> = [];
     const dashboardPathByRole: Record<string, string> = {
       admin: '/dashboard/admin',
       chairperson: '/dashboard/chairperson',
@@ -137,6 +139,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
 
     if (userRoles.includes('admin')) {
       links.push(
+        { label: 'Accounting Suite', href: '/dashboard/finance/accounting', icon: Calculator },
         { label: 'M-Pesa', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Fee Payment History', href: '/dashboard/finance/membership-fees/history', icon: PiggyBank },
         { label: 'Operations Center', href: '/dashboard/admin-panel/operations', icon: ActivitySquare },
@@ -170,6 +173,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
 
     if (userRoles.includes('treasurer')) {
       links.push(
+        { label: 'Accounting Suite', href: '/dashboard/finance/accounting', icon: Calculator },
         { label: 'Payments', href: '/dashboard/finance/mpesa', icon: Smartphone },
         { label: 'Fee Payment History', href: '/dashboard/finance/membership-fees/history', icon: PiggyBank },
         { label: 'Reports', href: '/dashboard/finance/reports', icon: TrendingUp },

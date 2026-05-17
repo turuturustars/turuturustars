@@ -123,6 +123,23 @@ async function resolveProfile(
   return (data as ProfileLookupRow | null) ?? null;
 }
 
+async function resolveProfileAuthEmail(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  profile: ProfileLookupRow | null,
+): Promise<string> {
+  const profileEmail = profile?.email?.trim().toLowerCase();
+  if (profileEmail) return profileEmail;
+  if (!profile?.id) return "";
+
+  const { data, error } = await (supabaseAdmin.auth.admin as any).getUserById(profile.id);
+  if (error) {
+    console.warn("Failed to resolve auth email for profile", profile.id, error.message);
+    return "";
+  }
+
+  return (data?.user?.email || "").trim().toLowerCase();
+}
+
 async function tryPasswordSignIn(
   supabaseAnon: ReturnType<typeof createAnonClient>,
   email: string,
@@ -152,9 +169,10 @@ async function tryIdNumberFallbackSignIn(
   supabaseAdmin: ReturnType<typeof createAdminClient>,
   supabaseAnon: ReturnType<typeof createAnonClient>,
   profile: ProfileLookupRow | null,
+  email: string,
   providedPassword: string,
 ) {
-  if (!profile || !profile.email) return null;
+  if (!profile || !email) return null;
 
   const expectedIdPassword = normalizeSecret(profile.id_number);
   if (!expectedIdPassword) return null;
@@ -163,7 +181,7 @@ async function tryIdNumberFallbackSignIn(
   const redirectTo = Deno.env.get("SITE_URL")?.trim() || DEFAULT_SITE_URL;
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",
-    email: profile.email,
+    email,
     options: { redirectTo },
   });
 
@@ -235,7 +253,7 @@ serve(async (req) => {
     const profile = await resolveProfile(supabaseAdmin, lookup);
     const resolvedEmail = lookup.kind === "email"
       ? lookup.normalized
-      : (profile?.email || "").trim().toLowerCase();
+      : await resolveProfileAuthEmail(supabaseAdmin, profile);
 
     if (!resolvedEmail) {
       throw new HttpError(400, INVALID_CREDENTIALS_MESSAGE);
@@ -256,7 +274,7 @@ serve(async (req) => {
       });
     }
 
-    const idFallbackSignIn = await tryIdNumberFallbackSignIn(supabaseAdmin, supabaseAnon, profile, password);
+    const idFallbackSignIn = await tryIdNumberFallbackSignIn(supabaseAdmin, supabaseAnon, profile, resolvedEmail, password);
     if (idFallbackSignIn) {
       return jsonResponse({
         success: true,

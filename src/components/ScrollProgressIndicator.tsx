@@ -5,7 +5,7 @@ const sections = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'about', label: 'About Us', icon: Info },
   { id: 'pillars', label: 'Our Pillars', icon: Target },
-  { id: 'careers', label: 'Careers', icon: Briefcase },
+  { id: 'careers', label: 'Jobs', icon: Briefcase },
   { id: 'leadership', label: 'Leadership', icon: Users },
   { id: 'register', label: 'Join Us', icon: UserPlus },
 ];

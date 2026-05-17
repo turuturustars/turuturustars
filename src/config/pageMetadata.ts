@@ -55,6 +55,25 @@ export const PAGE_METADATA: Record<string, PageMetaData> = {
     robots: 'index,follow',
   },
 
+  JOBS: {
+    title: "Jobs in Kenya, Government & Murang'a Jobs - Turuturu Stars",
+    description:
+      "Find verified Kenya jobs, Government of Kenya jobs, public jobs, casual work, county jobs, and Murang'a opportunities from trusted sources.",
+    keywords: [
+      'jobs in Kenya',
+      'Government of Kenya jobs',
+      'government jobs Kenya',
+      'public jobs Kenya',
+      "Murang'a jobs",
+      'Muranga jobs',
+      'casual jobs Kenya',
+      'county government jobs',
+      'job search Kenya',
+    ],
+    canonicalUrl: 'https://turuturustars.co.ke/jobs',
+    robots: 'index,follow',
+  },
+
   // Dashboard Pages
   DASHBOARD_HOME: {
     title: 'Dashboard - Turuturu Stars CBO',

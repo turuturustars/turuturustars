@@ -72,8 +72,17 @@ type RuntimeSettings = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
+const decodeEntities = (value: string) =>
+  value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+const cleanHtmlText = (value: string) => stripTags(decodeEntities(value)).replace(/\s+/g, " ").trim();
 const keywordRegex = /(job|vacan|career|recruit|internship|position|employment)/i;
-const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|careers?|jobs?|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|apply|apply now|application|application portal|online application|opportunities?|investment opportunities|tenders?|procurement|downloads?)$/i;
+const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|share on facebook|share on twitter|work with us|careers?|visit un careers|jobs?|all jobs|view all jobs|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|job application process|creating your job application|apply|apply now|application|application process|application portal|online application|at your interview|opportunities?|investment opportunities|recruitment portal|tenders?|procurement|downloads?)$/i;
 
 const createServiceClient = () => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
@@ -130,7 +139,7 @@ const extractLinks = (html: string, baseUrl: string) => {
   while ((match = regex.exec(html))) {
     const href = match[1];
     if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) continue;
-    const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
+    const text = cleanHtmlText(match[2]);
     if (!text) continue;
     let absolute = href;
     try {
@@ -167,18 +176,15 @@ const isSameDocumentLink = (candidateUrl: string, sourceUrl: string) => {
 };
 
 const looksLikeJob = (text: string, url: string, sourceUrl: string) => {
-  const normalizedText = text.trim().toLowerCase();
+  const normalizedText = text.replace(/\s+learn more$/i, "").trim().toLowerCase();
   if (!normalizedText || normalizedText.length < 3) return false;
+  if (normalizedText.includes("@")) return false;
+  if (/^(next|previous) post\b/.test(normalizedText)) return false;
   if (utilityTextRegex.test(normalizedText)) return false;
   if (isSameDocumentLink(url, sourceUrl)) return false;
 
   const haystack = `${normalizedText} ${url}`.toLowerCase();
   if (keywordRegex.test(haystack)) return true;
-
-  // Dedicated jobs/careers pages often link to job PDF adverts with non-keyword titles.
-  const sourceHintsJobs = /(job|vacan|career|recruit)/i.test(sourceUrl);
-  const isLikelyAdDocument = /\.(pdf|doc|docx)$/i.test(url);
-  if (sourceHintsJobs && isLikelyAdDocument && normalizedText.length >= 8) return true;
 
   return false;
 };
@@ -366,8 +372,11 @@ serve(async (req) => {
       return a.name.localeCompare(b.name);
     });
 
+  const effectiveSequenceDays = Math.min(sequenceDays, Math.max(eligibleSources.length, 1));
+  const effectiveSequenceDayIndex = sequenceDayIndex % effectiveSequenceDays;
+
   const selected = sequenceDays > 1
-    ? eligibleSources.filter((_, index) => index % sequenceDays === sequenceDayIndex)
+    ? eligibleSources.filter((_, index) => index % effectiveSequenceDays === effectiveSequenceDayIndex)
     : eligibleSources;
 
   const defaultDeadline = (() => {
@@ -459,6 +468,8 @@ serve(async (req) => {
       source_mode: runtime.sourceMode,
       sequence_days: sequenceDays,
       sequence_day: sequenceDayIndex + 1,
+      effective_sequence_days: effectiveSequenceDays,
+      effective_sequence_day: effectiveSequenceDayIndex + 1,
     },
     sources_requested: overrideSources.length > 0 ? overrideSources : undefined,
     eligible_sources: eligibleSources.length,

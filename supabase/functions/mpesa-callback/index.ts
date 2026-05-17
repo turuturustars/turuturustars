@@ -16,6 +16,25 @@ interface MpesaTransaction {
   kitty_id: string | null;
 }
 
+interface StkCallbackMetadataItem {
+  Name: string;
+  Value?: string | number;
+}
+
+interface StkCallbackPayload {
+  Body?: {
+    stkCallback?: {
+      MerchantRequestID: string;
+      CheckoutRequestID: string;
+      ResultCode: number;
+      ResultDesc: string;
+      CallbackMetadata?: {
+        Item?: StkCallbackMetadataItem[];
+      };
+    };
+  };
+}
+
 serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -43,9 +62,9 @@ serve(async (req) => {
       console.warn("mpesa-callback: MPESA_CALLBACK_SIGNATURE_SECRET is not configured");
     }
 
-    let body: any;
+    let body: StkCallbackPayload;
     try {
-      body = JSON.parse(rawBody);
+      body = JSON.parse(rawBody) as StkCallbackPayload;
     } catch {
       return new Response(
         JSON.stringify({ ResultCode: 1, ResultDesc: "Invalid JSON" }),
@@ -54,7 +73,14 @@ serve(async (req) => {
     }
 
     const { Body } = body;
-    const { stkCallback } = Body;
+    const { stkCallback } = Body ?? {};
+    if (!stkCallback) {
+      return new Response(
+        JSON.stringify({ ResultCode: 1, ResultDesc: "Missing STK callback" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
     const { MerchantRequestID, CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = stkCallback;
 
     console.log(`mpesa-callback: checkout=${CheckoutRequestID} resultCode=${ResultCode}`);
@@ -68,15 +94,15 @@ serve(async (req) => {
       for (const item of CallbackMetadata.Item) {
         switch (item.Name) {
           case "MpesaReceiptNumber":
-            mpesaReceiptNumber = item.Value;
+            mpesaReceiptNumber = String(item.Value ?? "");
             break;
           case "Amount":
-            amount = item.Value;
+            amount = Number(item.Value ?? 0);
             break;
           case "PhoneNumber":
             phoneNumber = String(item.Value);
             break;
-          case "TransactionDate":
+          case "TransactionDate": {
             const dateStr = String(item.Value);
             transactionDate = new Date(
               parseInt(dateStr.substring(0, 4)),
@@ -87,6 +113,7 @@ serve(async (req) => {
               parseInt(dateStr.substring(12, 14))
             );
             break;
+          }
         }
       }
     }

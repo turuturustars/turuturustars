@@ -8,7 +8,7 @@ import {
 } from '@/components/dashboard/officials/OfficialDashboardPrimitives';
 import { formatKES, useOfficialDashboardStats } from '@/hooks/useOfficialDashboardStats';
 import {
-  BarChart3,
+  Calculator,
   CheckCircle2,
   Download,
   DollarSign,
@@ -94,15 +94,15 @@ const TreasurerRole = () => {
             onClick={() => navigate('/dashboard/finance/all-contributions')}
           />
           <OfficialQuickActionCard
-            title="Treasury Reports"
-            description="View export-ready reports for committee approvals."
-            icon={BarChart3}
+            title="Accounting Suite"
+            description="Record expenditures and review balance sheet, income, and analytics."
+            icon={Calculator}
             tone="violet"
-            onClick={() => navigate('/dashboard/finance/reports')}
+            onClick={() => navigate('/dashboard/finance/accounting')}
           />
           <OfficialQuickActionCard
-            title="Export Statements"
-            description="Generate downloadable monthly and annual statements."
+            title="Treasury Reports"
+            description="View export-ready reports for committee approvals."
             icon={Download}
             tone="amber"
             onClick={() => navigate('/dashboard/finance/reports')}
@@ -133,4 +133,3 @@ const TreasurerRole = () => {
 };
 
 export default TreasurerRole;
-

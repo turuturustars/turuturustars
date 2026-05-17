@@ -21,6 +21,8 @@ const Footer = () => {
 
     { label: 'Leadership', href: '/leadership' },
 
+    { label: 'Jobs', href: '/jobs' },
+
     { label: 'How It Works', href: '/how-it-works' },
 
     { label: 'Join Us', href: '/register' },

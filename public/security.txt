@@ -3,4 +3,4 @@ Expires: 2027-01-19T00:00:00Z
 Preferred-Languages: en
 Canonical: https://turuturustars.co.ke/.well-known/security.txt
 Policy: https://turuturustars.co.ke/privacy-policy
-Hiring: https://turuturustars.co.ke/careers
+Hiring: https://turuturustars.co.ke/jobs

@@ -16,6 +16,7 @@ import {
   Gavel,
   MessageSquare,
   CreditCard,
+  Calculator,
 } from 'lucide-react';
 
 type AppRole = 'admin' | 'treasurer' | 'secretary' | 'chairperson' | 'vice_chairman' | 'vice_secretary' | 'organizing_secretary' | 'committee_member' | 'patron' | 'coordinator' | 'member';
@@ -55,6 +56,12 @@ const RoleBasedNav = () => {
       title: 'Financial Reports',
       href: '/dashboard/finance/reports',
       icon: <BarChart3 className="w-4 h-4" />,
+      roles: ['treasurer', 'admin'],
+    },
+    {
+      title: 'Accounting',
+      href: '/dashboard/finance/accounting',
+      icon: <Calculator className="w-4 h-4" />,
       roles: ['treasurer', 'admin'],
     },
     {

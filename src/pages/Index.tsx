@@ -11,8 +11,9 @@ import { usePageMeta } from '@/hooks/usePageMeta';
 
 const Index = () => {
   usePageMeta({
-    title: 'Turuturu Stars CBO - Community Organization in Muranga, Kenya | Turuturu, Githima, Kigumo',
-    description: 'Turuturu Stars Community Based Organization serving Turuturu, Muranga County. Manage contributions, welfare assistance, and community events. Join our united family in Turuturu, Githima, Kigumo, and surrounding areas.',
+    title: "Turuturu Stars CBO - Murang'a Community Support & Kenya Jobs",
+    description:
+      "Turuturu Stars CBO serves Turuturu, Murang'a County with welfare support, community programs, and verified Kenya jobs including government, public, casual, and Murang'a jobs.",
     keywords: [
       'Turuturu Stars',
       'CBO Kenya',
@@ -42,6 +43,14 @@ const Index = () => {
       'Kigumo bendera high school',
       'Turuturu well wishers',
       'turuturu community welfare',
+      'jobs in Kenya',
+      'Government of Kenya jobs',
+      'government jobs Kenya',
+      'public jobs Kenya',
+      "Murang'a jobs",
+      'Muranga jobs',
+      'casual jobs Kenya',
+      'county government jobs',
     ],
     ogImage: 'https://img.icons8.com/nolan/256/star.png',
     ogType: 'website',
@@ -51,7 +60,8 @@ const Index = () => {
   const organizationData = {
     name: 'Turuturu Stars CBO',
     url: 'https://turuturustars.co.ke',
-    description: 'Community Based Organization managing contributions, welfare, and member engagement in Muranga County',
+    description:
+      "Community Based Organization managing contributions, welfare, member engagement, and verified job opportunities in Murang'a County",
     foundingDate: '2024',
     location: {
       '@type': 'Place',

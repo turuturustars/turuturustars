@@ -27,7 +27,16 @@ const SOURCE_SEQUENCE_DAY = process.env.SOURCE_SEQUENCE_DAY || process.env.SEQUE
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const stripTags = (value) => value.replace(/<[^>]+>/g, "");
-const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|careers?|jobs?|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|apply|apply now|application|application portal|online application|opportunities?|investment opportunities|tenders?|procurement|downloads?)$/i;
+const decodeEntities = (value) =>
+  value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+const cleanHtmlText = (value) => stripTags(decodeEntities(value)).replace(/\s+/g, " ").trim();
+const utilityTextRegex = /^(skip|increase text|decrease text|search|menu|close|open|read more|click here|home|share on facebook|share on twitter|work with us|careers?|visit un careers|jobs?|all jobs|view all jobs|latest jobs?|current jobs?|available jobs?|vacancies?|job adverts?|job application|job application portal|job application process|creating your job application|apply|apply now|application|application process|application portal|online application|at your interview|opportunities?|investment opportunities|recruitment portal|tenders?|procurement|downloads?)$/i;
 
 const integerInRange = (value, fallback, min, max) => {
   if (!Number.isInteger(value)) return fallback;
@@ -61,7 +70,7 @@ const extractLinks = (html, baseUrl) => {
     if (!href || href.startsWith("mailto:") || href.startsWith("javascript:")) {
       continue;
     }
-    const text = stripTags(match[2]).replace(/\s+/g, " ").trim();
+    const text = cleanHtmlText(match[2]);
     if (!text) continue;
     let absolute = href;
     try {
@@ -75,10 +84,12 @@ const extractLinks = (html, baseUrl) => {
 };
 
 const looksLikeJob = (text, url) => {
-  const normalizedText = text.trim().toLowerCase();
+  const normalizedText = text.replace(/\s+learn more$/i, "").trim().toLowerCase();
+  if (normalizedText.includes("@")) return false;
+  if (/^(next|previous) post\b/.test(normalizedText)) return false;
   if (utilityTextRegex.test(normalizedText)) return false;
 
-  const haystack = `${text} ${url}`.toLowerCase();
+  const haystack = `${normalizedText} ${url}`.toLowerCase();
   return (
     haystack.includes("job") ||
     haystack.includes("vacan") ||
@@ -114,8 +125,10 @@ const main = async () => {
       if (priorityDiff !== 0) return priorityDiff;
       return a.name.localeCompare(b.name);
     });
+  const effectiveSequenceDays = Math.min(sequenceDays, Math.max(matchingSources.length, 1));
+  const effectiveSequenceDayIndex = sequenceDayIndex % effectiveSequenceDays;
   const sources = sequenceDays > 1
-    ? matchingSources.filter((_, index) => index % sequenceDays === sequenceDayIndex)
+    ? matchingSources.filter((_, index) => index % effectiveSequenceDays === effectiveSequenceDayIndex)
     : matchingSources;
 
   if (!matchingSources.length) {
@@ -124,7 +137,7 @@ const main = async () => {
   }
 
   console.log(
-    `Running source sequence day ${sequenceDayIndex + 1}/${sequenceDays}: ${sources.length} of ${matchingSources.length} matching sources.`
+    `Running source sequence day ${effectiveSequenceDayIndex + 1}/${effectiveSequenceDays}: ${sources.length} of ${matchingSources.length} matching sources.`
   );
 
   if (!sources.length) {

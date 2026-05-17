@@ -57,6 +57,7 @@ const PesapalCallback = lazy(() => import("./pages/PesapalCallback"));
 const About = lazy(() => import("./pages/About"));
 const Pillars = lazy(() => import("./pages/Pillars"));
 const Careers = lazy(() => import("./pages/Careers"));
+const JobDetail = lazy(() => import("./pages/JobDetail"));
 const Leadership = lazy(() => import("./pages/Leadership"));
 const Register = lazy(() => import("./pages/Register"));
 const AuthFlow = lazy(() => import("./components/auth/AuthFlow"));
@@ -99,6 +100,7 @@ const ApprovalsPage = lazy(() => import("./pages/dashboard/ApprovalsPage"));
 const JobsModerationPage = lazy(() => import("./pages/dashboard/JobsModerationPage"));
 const AllContributionsPage = lazy(() => import("./pages/dashboard/AllContributionsPage"));
 const ReportsPage = lazy(() => import("./pages/dashboard/ReportsPage"));
+const AccountingSuitePage = lazy(() => import("./pages/dashboard/AccountingSuitePage"));
 const TreasurerDashboard = lazy(() => import("./pages/dashboard/TreasurerDashboard"));
 const SecretaryDashboard = lazy(() => import("./pages/dashboard/SecretaryDashboard"));
 const PaymentsManagement = lazy(() => import("./pages/dashboard/PaymentsManagement"));
@@ -160,7 +162,13 @@ const App = () => {
                 {/* Information Pages */}
                 <Route path="/about" element={<About />} />
                 <Route path="/pillars" element={<Pillars />} />
-                <Route path="/careers" element={<Careers />} />
+                <Route path="/jobs" element={<Careers variant="all" />} />
+                <Route path="/jobs/:jobId" element={<JobDetail />} />
+                <Route path="/job-search" element={<Navigate to="/jobs" replace />} />
+                <Route path="/careers" element={<Navigate to="/jobs" replace />} />
+                <Route path="/government-jobs" element={<Careers variant="government" />} />
+                <Route path="/public-jobs" element={<Careers variant="public" />} />
+                <Route path="/muranga-jobs" element={<Careers variant="muranga" />} />
                 <Route path="/leadership" element={<Leadership />} />
                 <Route path="/benefits" element={<Benefits />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
@@ -307,6 +315,14 @@ const App = () => {
                         </ProtectedRoute>
                       }
                     />
+                    <Route
+                      path="accounting"
+                      element={
+                        <ProtectedRoute requiredRoles={['admin', 'treasurer']} stealth>
+                          <AccountingSuitePage />
+                        </ProtectedRoute>
+                      }
+                    />
                     <Route path="reports" element={<ReportsPage />} />
                   </Route>
 
@@ -405,6 +421,7 @@ const App = () => {
                   <Route path="contributions" element={<Navigate to="/dashboard/finance/contributions" replace />} />
                   <Route path="all-contributions" element={<Navigate to="/dashboard/finance/all-contributions" replace />} />
                   <Route path="treasurer-dashboard" element={<Navigate to="/dashboard/finance/treasurer-dashboard" replace />} />
+                  <Route path="accounting" element={<Navigate to="/dashboard/finance/accounting" replace />} />
                   <Route path="mpesa-management" element={<Navigate to="/dashboard/finance/mpesa" replace />} />
                   <Route path="reports" element={<Navigate to="/dashboard/finance/reports" replace />} />
                   <Route path="welfare" element={<Navigate to="/dashboard/members/welfare" replace />} />

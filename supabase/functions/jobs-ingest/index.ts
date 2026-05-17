@@ -61,10 +61,20 @@ const normalizeJobType = (value?: string): JobType => {
   return allowed.includes(normalized as JobType) ? (normalized as JobType) : "other";
 };
 
+const decodeEntities = (value: string) =>
+  value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+const stripTags = (value: string) => value.replace(/<[^>]+>/g, "");
+
 const normalizeText = (value?: string | null, fallback = "") => {
   const candidate = value ?? fallback;
   if (candidate === null || candidate === undefined) return "";
-  return String(candidate).trim();
+  return stripTags(decodeEntities(String(candidate))).replace(/\s+/g, " ").trim();
 };
 
 const normalizeOptionalText = (value?: string | null) => {

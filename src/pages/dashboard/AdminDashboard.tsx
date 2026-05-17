@@ -8,6 +8,7 @@ import {
 import { formatKES, useOfficialDashboardStats } from '@/hooks/useOfficialDashboardStats';
 import {
   Bell,
+  Calculator,
   CalendarDays,
   CheckCircle2,
   DollarSign,
@@ -169,11 +170,11 @@ const AdminDashboard = () => {
             onClick={() => navigate('/dashboard/members/welfare-management')}
           />
           <OfficialQuickActionCard
-            title="Reports"
-            description="Review finance, operations, and member insights."
-            icon={FileStack}
+            title="Accounting Suite"
+            description="Record expenditure and review balance sheet, income, and analytics."
+            icon={Calculator}
             tone="rose"
-            onClick={() => navigate('/dashboard/finance/reports')}
+            onClick={() => navigate('/dashboard/finance/accounting')}
           />
           <OfficialQuickActionCard
             title="System Operations"

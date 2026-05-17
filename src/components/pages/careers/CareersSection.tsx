@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Briefcase,
   Clock,
@@ -13,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { useScrollAnimation } from '@/hooks/useScrollAnimation';
 import { supabase } from '@/integrations/supabase/client';
 import { StructuredData } from '@/components/StructuredData';
+import { getJobsPageSeo, JOBS_BASE_URL, JOB_SEARCH_LINKS, type JobsPageVariant } from '@/config/jobsSeo';
 
 type JobType =
   | 'casual'
@@ -66,17 +68,48 @@ const jobTypeOrder: Record<JobType, number> = {
   other: 8,
 };
 
-const CareersSection = () => {
+const employmentTypeSchema: Record<JobType, string> = {
+  casual: 'TEMPORARY',
+  contract: 'CONTRACTOR',
+  part_time: 'PART_TIME',
+  full_time: 'FULL_TIME',
+  permanent: 'FULL_TIME',
+  temporary: 'TEMPORARY',
+  internship: 'INTERN',
+  volunteer: 'VOLUNTEER',
+  other: 'OTHER',
+};
+
+type CareersSectionProps = {
+  variant?: JobsPageVariant;
+  headingLevel?: 'h1' | 'h2';
+};
+
+const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSectionProps) => {
+  const seo = getJobsPageSeo(variant);
+  const [searchParams] = useSearchParams();
   const { ref: headerRef, isVisible: headerVisible } = useScrollAnimation(),
     { ref: jobsRef, isVisible: jobsVisible } = useScrollAnimation();
+  const initialSearch = searchParams.get('search') || '';
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [typeFilter, setTypeFilter] = useState<JobType | 'all'>('all');
-  const [onlyMuranga, setOnlyMuranga] = useState(false);
-  const [onlyCasual, setOnlyCasual] = useState(false);
-  const [onlyGovernment, setOnlyGovernment] = useState(false);
+  const [onlyMuranga, setOnlyMuranga] = useState(Boolean(seo.defaultFilters?.onlyMuranga));
+  const [onlyCasual, setOnlyCasual] = useState(Boolean(seo.defaultFilters?.onlyCasual));
+  const [onlyGovernment, setOnlyGovernment] = useState(Boolean(seo.defaultFilters?.onlyGovernment));
+  const HeadingTag = headingLevel;
+
+  useEffect(() => {
+    setOnlyMuranga(Boolean(seo.defaultFilters?.onlyMuranga));
+    setOnlyCasual(Boolean(seo.defaultFilters?.onlyCasual));
+    setOnlyGovernment(Boolean(seo.defaultFilters?.onlyGovernment));
+  }, [seo.defaultFilters?.onlyCasual, seo.defaultFilters?.onlyGovernment, seo.defaultFilters?.onlyMuranga, variant]);
+
+  useEffect(() => {
+    setSearch(searchParams.get('search') || '');
+  }, [searchParams]);
 
   useEffect(() => {
     const loadJobs = async () => {
@@ -181,9 +214,31 @@ const CareersSection = () => {
       itemListElement: topJobs.map((job, index) => ({
         '@type': 'ListItem',
         position: index + 1,
-        url: job.apply_url || job.source_url,
+        url: `${JOBS_BASE_URL}/jobs/${job.id}`,
         name: `${job.title} at ${job.organization}`,
         description: job.excerpt || `${job.title} in ${job.location}`,
+        item: {
+          '@type': 'JobPosting',
+          title: job.title,
+          description: job.excerpt || `${job.title} opportunity at ${job.organization} in ${job.location}.`,
+          datePosted: job.posted_at,
+          validThrough: `${job.deadline}T23:59:59+03:00`,
+          employmentType: employmentTypeSchema[job.job_type],
+          url: `${JOBS_BASE_URL}/jobs/${job.id}`,
+          hiringOrganization: {
+            '@type': 'Organization',
+            name: job.organization,
+          },
+          jobLocation: {
+            '@type': 'Place',
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: job.location,
+              addressRegion: job.county,
+              addressCountry: 'KE',
+            },
+          },
+        },
       })),
     };
   }, [sortedJobs]);
@@ -205,26 +260,25 @@ const CareersSection = () => {
               headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
             }`}
           >
-            Community Jobs Board
+            {seo.eyebrow}
           </span>
-          <h2
+          <HeadingTag
             className={`heading-display text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-primary mb-6 transition-all duration-700 animation-delay-100 ${
               headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
             }`}
           >
-            Latest Jobs From Trusted Sources
-          </h2>
+            {seo.heading}
+          </HeadingTag>
           <p
             className={`text-lg text-muted-foreground max-w-2xl mx-auto transition-all duration-700 animation-delay-200 ${
               headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
             }`}
           >
-            We do not hire directly. We collect verified opportunities from government and trusted job sites so our
-            community can access real jobs quickly.
+            {seo.intro} We do not hire directly; each listing points to the original trusted source.
           </p>
         </div>
 
-        <div className="mb-12 grid gap-4 md:grid-cols-3">
+        <div className="mb-10 grid gap-4 md:grid-cols-3">
           <div className="p-5 rounded-2xl bg-card border border-border/50 flex items-start gap-3">
             <Landmark className="w-6 h-6 text-primary mt-1" />
             <div>
@@ -253,6 +307,24 @@ const CareersSection = () => {
             </div>
           </div>
         </div>
+
+        <nav aria-label="Job search categories" className="mb-12 grid gap-3 md:grid-cols-4">
+          {JOB_SEARCH_LINKS.map((link) => {
+            const isActive = link.href === seo.canonicalPath;
+            return (
+              <Link
+                key={link.href}
+                to={link.href}
+                className={`rounded-xl border p-4 transition hover:border-primary/60 hover:bg-primary/5 ${
+                  isActive ? 'border-primary bg-primary/10' : 'border-border/60 bg-card/60'
+                }`}
+              >
+                <span className="block text-sm font-semibold text-foreground">{link.label}</span>
+                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{link.description}</span>
+              </Link>
+            );
+          })}
+        </nav>
 
         <div ref={jobsRef} className="mb-16">
           <div
@@ -295,7 +367,7 @@ const CareersSection = () => {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search by title, organization, location, or source"
+                placeholder={seo.searchPlaceholder}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
@@ -379,7 +451,11 @@ const CareersSection = () => {
                         </span>
                       </div>
 
-                      <h4 className="text-lg font-semibold text-foreground">{job.title}</h4>
+                      <h4 className="text-lg font-semibold text-foreground">
+                        <Link to={`/jobs/${job.id}`} className="hover:text-primary hover:underline">
+                          {job.title}
+                        </Link>
+                      </h4>
                       <p className="text-sm text-muted-foreground">{job.organization}</p>
 
                       <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
@@ -404,6 +480,9 @@ const CareersSection = () => {
                           Apply Now
                         </a>
                       </Button>
+                      <Button asChild variant="secondary">
+                        <Link to={`/jobs/${job.id}`}>Job Details</Link>
+                      </Button>
                       <Button asChild variant="outline">
                         <a href={job.source_url} target="_blank" rel="noreferrer" className="flex items-center gap-2">
                           View Source
@@ -427,14 +506,16 @@ const CareersSection = () => {
             <div className="p-6 rounded-2xl bg-card border border-border/50">
               <h4 className="text-lg font-semibold text-foreground mb-2">How listings work</h4>
               <p className="text-sm text-muted-foreground">
-                Listings are pulled from official sources and trusted job boards. Expired jobs are removed automatically
-                to keep the page light and accurate.
+                Listings are pulled from official sources and trusted job boards, including Government of Kenya,
+                county government, public service, and reputable employment sources. Expired jobs are removed
+                automatically to keep the page light and accurate.
               </p>
             </div>
             <div className="p-6 rounded-2xl bg-card border border-border/50">
-              <h4 className="text-lg font-semibold text-foreground mb-2">Need a job posted?</h4>
+              <h4 className="text-lg font-semibold text-foreground mb-2">Looking for Murang'a jobs?</h4>
               <p className="text-sm text-muted-foreground">
-                If you have a verified listing to add, contact the committee and we will include it for the community.
+                Use the Murang'a jobs filter for casual work, county opportunities, internships, and public jobs near
+                Turuturu, Kigumo, Githima, and nearby areas.
               </p>
             </div>
           </div>

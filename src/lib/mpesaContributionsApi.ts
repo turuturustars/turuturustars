@@ -4,6 +4,7 @@ export type CboPaymentStatus = 'pending' | 'completed' | 'failed' | 'awaiting_ap
 export type CboPaymentMethod = 'stk' | 'till';
 export type FinanceEntityType = 'payment' | 'refund' | 'expenditure';
 export type FinanceApprovalRole = 'chairperson' | 'admin' | 'secretary' | 'patron';
+export type ExpenditurePaymentMethod = 'manual' | 'automatic' | 'cash' | 'bank' | 'mpesa' | 'wallet';
 
 export const REQUIRED_APPROVAL_ROLES: FinanceApprovalRole[] = ['chairperson', 'admin', 'secretary', 'patron'];
 
@@ -41,7 +42,14 @@ export interface CboExpenditure {
   amount: number;
   category: string;
   description: string;
-  payment_method: 'manual' | 'automatic';
+  payment_method: ExpenditurePaymentMethod;
+  expense_date: string | null;
+  payee: string | null;
+  reference_number: string | null;
+  receipt_url: string | null;
+  fund: string | null;
+  account_code: string | null;
+  notes: string | null;
   initiated_by: string;
   status: 'pending_approval' | 'approved' | 'rejected';
   approved_at: string | null;
@@ -123,7 +131,14 @@ export interface RecordExpenditureInput {
   amount: number;
   category: string;
   description: string;
-  paymentMethod?: 'manual' | 'automatic';
+  paymentMethod?: ExpenditurePaymentMethod;
+  expenseDate?: string;
+  payee?: string;
+  referenceNumber?: string;
+  receiptUrl?: string;
+  fund?: string;
+  accountCode?: string;
+  notes?: string;
 }
 
 export interface RefundableContribution {
@@ -134,6 +149,24 @@ export interface RefundableContribution {
   created_at: string | null;
   reference_number: string | null;
 }
+
+type SupabaseErrorLike = { message?: string } | null;
+type SupabaseListResponse<T> = { data: T[] | null; error: SupabaseErrorLike };
+type SupabaseSingleResponse<T> = { data: T | null; error: SupabaseErrorLike };
+type UntypedQueryBuilder<T> = PromiseLike<SupabaseListResponse<T>> & {
+  select: (columns: string) => UntypedQueryBuilder<T>;
+  eq: (column: string, value: unknown) => UntypedQueryBuilder<T>;
+  in: (column: string, values: unknown[]) => UntypedQueryBuilder<T>;
+  not: (column: string, operator: string, value: unknown) => UntypedQueryBuilder<T>;
+  order: (column: string, options?: { ascending?: boolean }) => UntypedQueryBuilder<T>;
+  limit: (count: number) => UntypedQueryBuilder<T>;
+  maybeSingle: () => PromiseLike<SupabaseSingleResponse<T>>;
+};
+type UntypedSupabase = {
+  from: <T>(table: string) => UntypedQueryBuilder<T>;
+};
+
+const db = supabase as unknown as UntypedSupabase;
 
 function parseFunctionError(error: unknown, fallbackMessage: string): Error {
   if (!error) return new Error(fallbackMessage);
@@ -249,6 +282,13 @@ export async function recordExpenditure(input: RecordExpenditureInput) {
       category: input.category,
       description: input.description,
       payment_method: input.paymentMethod ?? 'manual',
+      expense_date: input.expenseDate,
+      payee: input.payee,
+      reference_number: input.referenceNumber,
+      receipt_url: input.receiptUrl,
+      fund: input.fund,
+      account_code: input.accountCode,
+      notes: input.notes,
     },
   });
 
@@ -260,20 +300,20 @@ export async function recordExpenditure(input: RecordExpenditureInput) {
 }
 
 export async function fetchPaymentsForMember(memberId: string, limit = 25): Promise<CboPayment[]> {
-  const { data, error } = await (supabase as any)
-    .from('payments')
+  const { data, error } = await db
+    .from<CboPayment>('payments')
     .select('id, member_id, phone, amount, method, checkout_request_id, merchant_request_id, mpesa_receipt, status, verified_at, created_at')
     .eq('member_id', memberId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch payments');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchPaymentByCheckoutId(checkoutRequestId: string): Promise<CboPayment | null> {
-  const { data, error } = await (supabase as any)
-    .from('payments')
+  const { data, error } = await db
+    .from<CboPayment>('payments')
     .select('id, member_id, phone, amount, method, checkout_request_id, merchant_request_id, mpesa_receipt, status, verified_at, created_at')
     .eq('checkout_request_id', checkoutRequestId)
     .maybeSingle();
@@ -285,31 +325,31 @@ export async function fetchPaymentByCheckoutId(checkoutRequestId: string): Promi
 }
 
 export async function fetchAwaitingApprovalPayments(limit = 100): Promise<CboPayment[]> {
-  const { data, error } = await (supabase as any)
-    .from('payments')
+  const { data, error } = await db
+    .from<CboPayment>('payments')
     .select('id, member_id, phone, amount, method, checkout_request_id, merchant_request_id, mpesa_receipt, status, verified_at, created_at')
     .eq('status', 'awaiting_approval')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch awaiting approvals');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchFinancePayments(limit = 200): Promise<CboPayment[]> {
-  const { data, error } = await (supabase as any)
-    .from('payments')
+  const { data, error } = await db
+    .from<CboPayment>('payments')
     .select('id, member_id, phone, amount, method, checkout_request_id, merchant_request_id, mpesa_receipt, status, verified_at, created_at')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch payment records');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchRefundableContributionsForMember(memberId: string, limit = 100): Promise<RefundableContribution[]> {
-  const { data, error } = await (supabase as any)
-    .from('contributions')
+  const { data, error } = await db
+    .from<RefundableContribution>('contributions')
     .select('id, amount, contribution_type, status, created_at, reference_number')
     .eq('member_id', memberId)
     .eq('status', 'paid')
@@ -318,19 +358,19 @@ export async function fetchRefundableContributionsForMember(memberId: string, li
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch refundable contributions');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchRefundRequestsForMember(memberId: string, limit = 50): Promise<CboRefundRequest[]> {
-  const { data, error } = await (supabase as any)
-    .from('refund_requests')
+  const { data, error } = await db
+    .from<CboRefundRequest>('refund_requests')
     .select('id, member_id, contribution_id, contribution_type, original_amount, requested_amount, payout_amount, reason, status, rejection_reason, created_at, resolved_at')
     .eq('member_id', memberId)
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch refund requests');
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row) => ({
     ...row,
     original_amount: toNumber(row.original_amount),
     requested_amount: toNumber(row.requested_amount),
@@ -339,15 +379,15 @@ export async function fetchRefundRequestsForMember(memberId: string, limit = 50)
 }
 
 export async function fetchPendingRefundRequests(limit = 100): Promise<CboRefundRequest[]> {
-  const { data, error } = await (supabase as any)
-    .from('refund_requests')
+  const { data, error } = await db
+    .from<CboRefundRequest>('refund_requests')
     .select('id, member_id, contribution_id, contribution_type, original_amount, requested_amount, payout_amount, reason, status, rejection_reason, created_at, resolved_at')
     .eq('status', 'pending_approval')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch pending refund requests');
-  return (data ?? []).map((row: any) => ({
+  return (data ?? []).map((row) => ({
     ...row,
     original_amount: toNumber(row.original_amount),
     requested_amount: toNumber(row.requested_amount),
@@ -356,26 +396,26 @@ export async function fetchPendingRefundRequests(limit = 100): Promise<CboRefund
 }
 
 export async function fetchExpenditures(limit = 200): Promise<CboExpenditure[]> {
-  const { data, error } = await (supabase as any)
-    .from('expenditures')
-    .select('id, amount, category, description, payment_method, initiated_by, status, approved_at, rejection_reason, created_at')
+  const { data, error } = await db
+    .from<CboExpenditure>('expenditures')
+    .select('id, amount, category, description, payment_method, expense_date, payee, reference_number, receipt_url, fund, account_code, notes, initiated_by, status, approved_at, rejection_reason, created_at')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch expenditures');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchPendingExpenditures(limit = 100): Promise<CboExpenditure[]> {
-  const { data, error } = await (supabase as any)
-    .from('expenditures')
-    .select('id, amount, category, description, payment_method, initiated_by, status, approved_at, rejection_reason, created_at')
+  const { data, error } = await db
+    .from<CboExpenditure>('expenditures')
+    .select('id, amount, category, description, payment_method, expense_date, payee, reference_number, receipt_url, fund, account_code, notes, initiated_by, status, approved_at, rejection_reason, created_at')
     .eq('status', 'pending_approval')
     .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw new Error(error.message || 'Failed to fetch pending expenditures');
-  return (data ?? []).map((row: any) => ({ ...row, amount: toNumber(row.amount) }));
+  return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
 export async function fetchFinanceApprovalsForEntities(
@@ -384,8 +424,8 @@ export async function fetchFinanceApprovalsForEntities(
 ): Promise<Record<string, FinanceApproval[]>> {
   if (entityIds.length === 0) return {};
 
-  const { data, error } = await (supabase as any)
-    .from('finance_approvals')
+  const { data, error } = await db
+    .from<FinanceApproval>('finance_approvals')
     .select('id, entity_type, entity_id, required_role, decision, approver_id, approver_role, notes, decided_at, created_at')
     .eq('entity_type', entityType)
     .in('entity_id', entityIds);

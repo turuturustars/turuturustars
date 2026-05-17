@@ -45,6 +45,7 @@ interface Member {
   full_name: string;
   email: string | null;
   phone: string;
+  id_number: string | null;
   membership_number: string | null;
   status: 'active' | 'dormant' | 'pending' | 'suspended';
   is_student: boolean;
@@ -77,6 +78,7 @@ const MembersPage = () => {
     fullName: string;
     email: string;
     phone: string;
+    idNumber: string;
     isStudent: string;
     feePaid: string;
     status: 'active' | 'pending';
@@ -86,6 +88,7 @@ const MembersPage = () => {
     fullName: '',
     email: '',
     phone: '',
+    idNumber: '',
     isStudent: 'no',
     feePaid: 'no',
     status: 'active',
@@ -116,6 +119,7 @@ const MembersPage = () => {
           m.full_name.toLowerCase().includes(term) ||
           m.email?.toLowerCase().includes(term) ||
           m.phone.includes(term) ||
+          m.id_number?.includes(term) ||
           m.membership_number?.includes(term)
       );
     }
@@ -147,7 +151,7 @@ const MembersPage = () => {
         async () => {
           const { data, error: fetchError } = await supabase
             .from('profiles')
-            .select('id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at')
+            .select('id, full_name, email, phone, id_number, membership_number, status, is_student, registration_fee_paid, joined_at')
             .order('joined_at', { ascending: false });
 
           if (fetchError) throw fetchError;
@@ -331,8 +335,8 @@ const MembersPage = () => {
 
   const handleAddMember = async () => {
     if (!canManageMembers) return;
-    if (!addDialog.fullName || !addDialog.phone) {
-      toast({ title: 'Missing details', description: 'Name and phone are required', variant: 'destructive' });
+    if (!addDialog.fullName || !addDialog.phone || !addDialog.idNumber) {
+      toast({ title: 'Missing details', description: 'Name, phone, and National ID are required', variant: 'destructive' });
       return;
     }
 
@@ -344,6 +348,7 @@ const MembersPage = () => {
           full_name: addDialog.fullName,
           email: addDialog.email || null,
           phone: addDialog.phone,
+          id_number: addDialog.idNumber,
           status: addDialog.status,
           is_student: addDialog.isStudent === 'yes',
           registration_fee_paid: addDialog.feePaid === 'yes',
@@ -374,6 +379,7 @@ const MembersPage = () => {
         fullName: '',
         email: '',
         phone: '',
+        idNumber: '',
         isStudent: 'no',
         feePaid: 'no',
         status: 'active',
@@ -864,7 +870,9 @@ const MembersPage = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Member</DialogTitle>
-            <DialogDescription>Admins and officials can register members who need assistance.</DialogDescription>
+            <DialogDescription>
+              Admins and officials can register members who need assistance. The National ID becomes the first password.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -891,6 +899,14 @@ const MembersPage = () => {
                 value={addDialog.phone}
                 onChange={(e) => setAddDialog((prev) => ({ ...prev, phone: e.target.value }))}
                 placeholder="+2547..."
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">National ID</label>
+              <Input
+                value={addDialog.idNumber}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, idNumber: e.target.value }))}
+                placeholder="12345678"
               />
             </div>
             <div className="grid gap-2">

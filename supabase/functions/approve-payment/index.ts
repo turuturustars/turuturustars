@@ -45,7 +45,8 @@ const ENTITY_CONFIG: Record<
     pendingStatus: "pending_approval",
     approvedStatus: "approved",
     rejectedStatus: "rejected",
-    selectColumns: "id, amount, category, description, payment_method, initiated_by, status, created_at, approved_at, rejection_reason",
+    selectColumns:
+      "id, amount, category, description, payment_method, expense_date, payee, reference_number, receipt_url, fund, account_code, notes, initiated_by, status, created_at, approved_at, rejection_reason",
   },
 };
 

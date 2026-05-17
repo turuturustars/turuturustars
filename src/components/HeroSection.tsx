@@ -1,105 +1,46 @@
-import { ArrowRight, HeartHandshake } from 'lucide-react';
+import { ArrowRight, CalendarDays, HeartHandshake, MapPin, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './HeroSection.css';
 
-import galleryMembers from '@/assets/gallery-members.png';
-import veronikaEvent from '@/assets/turuturu_stars_community_togther_with_senator_veronica_maina.jpg';
-import prizeGivingDay from '@/assets/turuturustars_community_during_prize_giving_day.jpg';
 import bestStudents from '@/assets/best_students_with_student_motivation_team.jpg';
 
-const HERO_SEQUENCE = [
-  { image: galleryMembers, word: 'KARIBU' },
-  { image: veronikaEvent, word: 'TUJENGE' },
-  { image: prizeGivingDay, word: 'TUKUZE' },
-  { image: bestStudents, word: 'TURUTURU NI' },
+const proofPoints = [
+  { value: '2019', label: 'Vision began', icon: CalendarDays },
+  { value: '2023', label: 'Registered CBO', icon: ShieldCheck },
+  { value: '200+', label: 'Members and friends', icon: Users },
 ];
 
-const WORD_COLORS = ['#8ed4ff', '#ffd66e', '#ff8a8a', '#8dffcf', '#d5b4ff', '#ffba6c'];
-
-const pickRandomColor = (currentColor: string) => {
-  if (WORD_COLORS.length < 2) {
-    return WORD_COLORS[0] ?? '#8ed4ff';
-  }
-
-  const filteredColors = WORD_COLORS.filter((color) => color !== currentColor);
-  const randomIndex = Math.floor(Math.random() * filteredColors.length);
-  return filteredColors[randomIndex];
-};
-
 const HeroSection = () => {
-  const [isReducedMotion, setIsReducedMotion] = useState(false);
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [activeWordColor, setActiveWordColor] = useState(WORD_COLORS[0]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setIsReducedMotion(mediaQuery.matches);
-
-    const handleChange = (event: MediaQueryListEvent) => {
-      setIsReducedMotion(event.matches);
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  useEffect(() => {
-    HERO_SEQUENCE.forEach((step) => {
-      const preloadImage = new Image();
-      preloadImage.src = step.image;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (isReducedMotion) {
-      return undefined;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setActiveStepIndex((currentIndex) => (currentIndex + 1) % HERO_SEQUENCE.length);
-      setActiveWordColor((currentColor) => pickRandomColor(currentColor));
-    }, 4200);
-
-    return () => window.clearInterval(intervalId);
-  }, [isReducedMotion]);
-
-  const activeStep = HERO_SEQUENCE[activeStepIndex];
-
   return (
-    <section id="home" className="hero-shell">
-      <div className="hero-image-stage" aria-hidden="true">
+    <section id="home" className="home-hero" aria-labelledby="home-hero-title">
+      <div className="home-hero-media" aria-hidden="true">
         <img
-          key={activeStepIndex}
-          src={activeStep.image}
-          alt="Turuturu Stars community activities"
-          className={`hero-image-main ${isReducedMotion ? '' : 'hero-image-main-enter'}`}
+          src={bestStudents}
+          alt=""
+          className="home-hero-image"
           loading="eager"
+          fetchPriority="high"
+          decoding="async"
         />
       </div>
-      <div className="hero-image-overlay" aria-hidden="true" />
+      <div className="home-hero-overlay" aria-hidden="true" />
 
-      <div className="hero-content">
-        <div className="hero-copy">
-          <h1 className="hero-rotating-title">
-            <span className="hero-word-window">
-              <span
-                key={activeStepIndex}
-                className={`hero-changing-word ${isReducedMotion ? '' : 'hero-changing-word-drop'}`}
-                style={{ color: activeWordColor }}
-              >
-                {activeStep.word}
-              </span>
-            </span>
-            <span className="hero-fixed-word"> NYUMBANI.</span>
-          </h1>
-
-          <p className="hero-lead">
-            TUJENGE NA TUINUANE.
+      <div className="home-hero-inner">
+        <div className="home-hero-copy">
+          <p className="home-hero-kicker">
+            <MapPin className="h-4 w-4" />
+            Turuturu, Murang'a County
           </p>
 
-          <div className="hero-actions">
+          <h1 id="home-hero-title">Turuturu Stars CBO</h1>
+
+          <p className="home-hero-lead">
+            Karibu nyumbani. We bring Turuturu families, friends, and well-wishers together
+            to support education, welfare, and community development with dignity.
+          </p>
+
+          <div className="home-hero-actions" aria-label="Primary actions">
             <Button asChild size="lg" className="hero-primary-button">
               <Link to="/auth">
                 Member login
@@ -109,12 +50,36 @@ const HeroSection = () => {
 
             <Button asChild variant="outline" size="lg" className="hero-secondary-button">
               <Link to="/donate">
-                Donate
+                Support our work
                 <HeartHandshake className="ml-2 h-5 w-5" />
               </Link>
             </Button>
           </div>
+
+          <p className="home-hero-note">
+            Tujenge na tuinane, one contribution, one pupil, one neighbour at a time.
+          </p>
         </div>
+
+        <div className="home-hero-caption" aria-label="Current focus">
+          <span>Current focus</span>
+          <strong>School mentorship, member welfare, and verified local opportunities.</strong>
+        </div>
+      </div>
+
+      <div className="home-hero-proof" aria-label="Turuturu Stars highlights">
+        {proofPoints.map((point) => {
+          const Icon = point.icon;
+          return (
+            <div className="home-hero-proof-item" key={point.label}>
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <div>
+                <strong>{point.value}</strong>
+                <span>{point.label}</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

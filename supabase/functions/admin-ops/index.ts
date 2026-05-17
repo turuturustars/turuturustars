@@ -524,13 +524,25 @@ serve(async (req) => {
       const fullName = (body.full_name as string | undefined)?.trim();
       const phone = (body.phone as string | undefined)?.trim();
       const email = (body.email as string | undefined)?.trim() || null;
-      const password = (body.password as string | undefined) || crypto.randomUUID().slice(0, 12) + "Aa1!";
+      const rawIdNumber =
+        typeof body.id_number === "string"
+          ? body.id_number
+          : typeof body.idNumber === "string"
+            ? body.idNumber
+            : "";
+      const idNumber = rawIdNumber.replace(/\s+/g, "").trim();
+      const requestedPassword = (body.password as string | undefined)?.trim();
+      const password = requestedPassword || idNumber;
       const status = (body.status as string | undefined) || "active";
       const isStudent = Boolean(body.is_student);
       const feePaid = Boolean(body.registration_fee_paid);
 
-      if (!fullName || !phone) {
-        throw new HttpError(400, "Full name and phone are required");
+      if (!fullName || !phone || !idNumber) {
+        throw new HttpError(400, "Full name, phone, and National ID are required");
+      }
+
+      if (password.length < 6) {
+        throw new HttpError(400, "National ID must be at least 6 characters to be used as the default password");
       }
 
       // Synthesize an email if none provided so auth.admin.createUser works
@@ -541,7 +553,7 @@ serve(async (req) => {
         password,
         email_confirm: true,
         phone: phone.replace(/[^0-9+]/g, "") || undefined,
-        user_metadata: { full_name: fullName, phone, created_by_admin: true },
+        user_metadata: { full_name: fullName, phone, id_number: idNumber, created_by_admin: true },
       });
 
       if (createErr || !created?.user?.id) {
@@ -558,6 +570,7 @@ serve(async (req) => {
           full_name: fullName,
           phone,
           email,
+          id_number: idNumber,
           status,
           is_student: isStudent,
           registration_fee_paid: feePaid,
@@ -573,7 +586,7 @@ serve(async (req) => {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("id, full_name, email, phone, membership_number, status, is_student, registration_fee_paid, joined_at")
+        .select("id, full_name, email, phone, id_number, membership_number, status, is_student, registration_fee_paid, joined_at")
         .eq("id", newUserId)
         .maybeSingle();
 

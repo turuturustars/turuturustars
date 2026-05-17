@@ -55,6 +55,7 @@ export const usePageMeta = (metadata: PageMetaData) => {
     setMetaTag('og:title', metadata.title, true);
     setMetaTag('og:description', metadata.description, true);
     setMetaTag('og:type', metadata.ogType || 'website', true);
+    setMetaTag('og:site_name', 'Turuturu Stars CBO', true);
     if (metadata.ogImage) {
       setMetaTag('og:image', metadata.ogImage, true);
     }
@@ -69,6 +70,7 @@ export const usePageMeta = (metadata: PageMetaData) => {
 
     // Set canonical URL if provided
     if (metadata.canonicalUrl) {
+      setMetaTag('og:url', metadata.canonicalUrl, true);
       let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
       if (!canonical) {
         canonical = document.createElement('link');

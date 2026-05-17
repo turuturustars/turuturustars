@@ -37,7 +37,7 @@ const esc = (s: string) =>
 const renderSitemap = (jobs: Job[]) => {
   const items = jobs
     .map((job) => {
-      const loc = job.apply_url || job.source_url;
+      const loc = `${SITE_URL.replace(/\/$/, "")}/jobs/${job.id}`;
       return `<url><loc>${esc(loc)}</loc><lastmod>${esc(job.posted_at)}</lastmod><changefreq>daily</changefreq><priority>0.5</priority></url>`;
     })
     .join("");
@@ -48,7 +48,7 @@ const renderAtom = (jobs: Job[]) => {
   const updated = jobs[0]?.posted_at || new Date().toISOString();
   const entries = jobs
     .map((job) => {
-      const link = job.apply_url || job.source_url;
+      const link = `${SITE_URL.replace(/\/$/, "")}/jobs/${job.id}`;
       const summary = esc(job.excerpt || `${job.title} at ${job.organization} in ${job.location}`);
       return `
       <entry>
@@ -56,7 +56,7 @@ const renderAtom = (jobs: Job[]) => {
         <title>${esc(job.title)} - ${esc(job.organization)}</title>
         <link href="${esc(link)}" />
         <updated>${esc(job.posted_at)}</updated>
-        <summary>${summary}</summary>
+        <summary>${summary} Source: ${esc(job.source_name)}.</summary>
       </entry>`;
     })
     .join("");
@@ -64,7 +64,7 @@ const renderAtom = (jobs: Job[]) => {
   return `<?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Turuturu Stars Jobs</title>
-  <link href="${esc(SITE_URL)}/careers" />
+  <link href="${esc(SITE_URL.replace(/\/$/, ""))}/jobs" />
   <updated>${esc(updated)}</updated>
   <id>tag:turuturustars.co.ke,jobs</id>
   ${entries}
