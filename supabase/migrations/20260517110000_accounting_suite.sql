@@ -138,6 +138,68 @@ begin
 end;
 $$;
 
+create or replace function public.accounting_account_id_by_key(_system_key text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  account_id uuid;
+begin
+  select id
+  into account_id
+  from public.accounting_accounts
+  where system_key = _system_key
+    and is_active = true
+  limit 1;
+
+  if account_id is null then
+    raise exception 'Accounting account with system key % was not found', _system_key;
+  end if;
+
+  return account_id;
+end;
+$$;
+
+create or replace function public.accounting_expense_account_for(_account_code text, _category text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  account_id uuid;
+  category_label text := lower(coalesce(_category, ''));
+  system_key text;
+begin
+  if nullif(trim(coalesce(_account_code, '')), '') is not null then
+    select id
+    into account_id
+    from public.accounting_accounts
+    where code = trim(_account_code)
+      and account_type = 'expense'
+      and is_active = true
+    limit 1;
+
+    if account_id is not null then
+      return account_id;
+    end if;
+  end if;
+
+  system_key := case
+    when category_label like '%welfare%' then 'welfare_disbursements'
+    when category_label like '%refund%' then 'refunds_paid'
+    when category_label like '%bank%' or category_label like '%mpesa%' or category_label like '%m-pesa%' or category_label like '%finance%' then 'finance_charges'
+    when category_label like '%admin%' or category_label like '%office%' or category_label like '%communication%' then 'administration_expenses'
+    when category_label like '%other%' then 'uncategorized_expense'
+    else 'program_expenses'
+  end;
+
+  return public.accounting_account_id_by_key(system_key);
+end;
+$$;
+
 insert into public.accounting_accounts (code, name, account_type, system_key, description)
 values
   ('1000', 'Cash and Bank', 'asset', 'cash_bank', 'Cash, bank, and verified liquid balances'),
@@ -165,6 +227,98 @@ set
   system_key = excluded.system_key,
   description = excluded.description,
   updated_at = now();
+
+create or replace function public.sync_expenditure_accounting_entry()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  entry_id uuid;
+  expense_account_id uuid;
+  credit_account_id uuid;
+  rounded_amount numeric(14, 2);
+  entry_description text;
+  line_memo text;
+begin
+  if new.status = 'approved' then
+    rounded_amount := round(new.amount, 2);
+    expense_account_id := public.accounting_expense_account_for(new.account_code, new.category);
+    credit_account_id := public.accounting_account_id_by_key('cash_bank');
+    entry_description := 'Approved expenditure: ' || coalesce(nullif(trim(new.description), ''), new.category);
+    line_memo := concat_ws(' | ', nullif(trim(new.payee), ''), nullif(trim(new.reference_number), ''), nullif(trim(new.fund), ''));
+
+    insert into public.accounting_journal_entries (
+      entry_date,
+      description,
+      source_type,
+      source_id,
+      status,
+      created_by,
+      posted_at
+    )
+    values (
+      new.expense_date,
+      entry_description,
+      'expenditure',
+      new.id,
+      'posted',
+      new.initiated_by,
+      now()
+    )
+    on conflict (source_type, source_id)
+      where source_type is not null and source_id is not null
+    do update
+    set
+      entry_date = excluded.entry_date,
+      description = excluded.description,
+      status = 'posted',
+      created_by = coalesce(public.accounting_journal_entries.created_by, excluded.created_by),
+      posted_at = coalesce(public.accounting_journal_entries.posted_at, excluded.posted_at),
+      updated_at = now()
+    returning id into entry_id;
+
+    delete from public.accounting_journal_lines
+    where journal_entry_id = entry_id;
+
+    insert into public.accounting_journal_lines (journal_entry_id, account_id, debit, credit, memo)
+    values
+      (entry_id, expense_account_id, rounded_amount, 0, line_memo),
+      (entry_id, credit_account_id, 0, rounded_amount, line_memo);
+
+    perform public.assert_accounting_entry_balanced(entry_id);
+  elsif tg_op = 'UPDATE' and old.status = 'approved' and new.status is distinct from 'approved' then
+    update public.accounting_journal_entries
+    set
+      status = 'void',
+      updated_at = now()
+    where source_type = 'expenditure'
+      and source_id = new.id;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_expenditure_accounting_entry on public.expenditures;
+create trigger trg_sync_expenditure_accounting_entry
+  after insert or update of amount, category, description, payment_method, expense_date, payee, reference_number, fund, account_code, status
+  on public.expenditures
+  for each row
+  execute function public.sync_expenditure_accounting_entry();
+
+drop trigger if exists set_updated_at_accounting_accounts on public.accounting_accounts;
+create trigger set_updated_at_accounting_accounts
+  before update on public.accounting_accounts
+  for each row
+  execute function public.set_updated_at_timestamp();
+
+drop trigger if exists set_updated_at_accounting_journal_entries on public.accounting_journal_entries;
+create trigger set_updated_at_accounting_journal_entries
+  before update on public.accounting_journal_entries
+  for each row
+  execute function public.set_updated_at_timestamp();
 
 alter table public.accounting_accounts enable row level security;
 alter table public.accounting_periods enable row level security;

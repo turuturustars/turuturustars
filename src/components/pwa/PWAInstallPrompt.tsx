@@ -127,9 +127,9 @@ export const PWAInstallPrompt = () => {
       )}
 
       {showInstallPrompt && (
-        <div className="fixed inset-x-4 bottom-4 z-[110] mx-auto max-w-md rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur">
+        <div className="fixed inset-x-3 bottom-3 z-[110] mx-auto max-w-md rounded-lg border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:inset-x-4 sm:bottom-4 sm:p-4">
           <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
+            <div className="rounded-md bg-blue-50 p-2 text-blue-700">
               <MonitorSmartphone className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
@@ -143,13 +143,13 @@ export const PWAInstallPrompt = () => {
             </Button>
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <Button size="sm" className="h-9" onClick={handleInstall}>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button size="sm" className="h-9 w-full rounded-md sm:w-auto" onClick={handleInstall}>
               <Download className="h-4 w-4" />
               Show install steps
             </Button>
             {deviceFlags.isWindows && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-700">
+              <span className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-700 sm:w-auto">
                 <Pin className="h-3.5 w-3.5" />
                 Pin to taskbar supported
               </span>

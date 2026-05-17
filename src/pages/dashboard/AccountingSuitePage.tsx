@@ -44,6 +44,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -455,16 +456,30 @@ const AccountingSuitePage = () => {
     paidRefunds.forEach((row) => addToMonth(getRowDate(row), 'expenses', row.payout_amount));
     periodKittyDisbursements.forEach((row) => addToMonth(row.created_at, 'expenses', row.amount));
 
-    const trialBalanceRows = [
+    const baseTrialBalanceRows = [
       { code: '1000', account: 'Cash and Bank', debit: Math.max(cashAndBank, 0), credit: Math.max(-cashAndBank, 0) },
       { code: '1100', account: 'Contribution Receivables', debit: receivables, credit: 0 },
       { code: '1010', account: 'M-Pesa Clearing', debit: mpesaClearing, credit: 0 },
       { code: '2100', account: 'Member Wallet Liability', debit: 0, credit: memberWalletLiability },
       { code: '2000', account: 'Accounts Payable', debit: 0, credit: payables + refundPayables },
-      { code: '3000', account: 'Accumulated Fund Balance', debit: Math.max(-fundBalance, 0), credit: Math.max(fundBalance, 0) },
       { code: '4000', account: 'Income Control', debit: 0, credit: income },
       { code: '5000', account: 'Expense Control', debit: totalExpenses, credit: 0 },
     ];
+    const baseTrialDebit = baseTrialBalanceRows.reduce((sum, row) => sum + row.debit, 0);
+    const baseTrialCredit = baseTrialBalanceRows.reduce((sum, row) => sum + row.credit, 0);
+    const fundBalanceControl = {
+      code: '3000',
+      account: 'Accumulated Fund Balance',
+      debit: Math.max(baseTrialCredit - baseTrialDebit, 0),
+      credit: Math.max(baseTrialDebit - baseTrialCredit, 0),
+    };
+    const trialBalanceRows = [
+      ...baseTrialBalanceRows.slice(0, 5),
+      fundBalanceControl,
+      ...baseTrialBalanceRows.slice(5),
+    ];
+    const trialBalanceDebitTotal = trialBalanceRows.reduce((sum, row) => sum + row.debit, 0);
+    const trialBalanceCreditTotal = trialBalanceRows.reduce((sum, row) => sum + row.credit, 0);
 
     return {
       paidContributions,
@@ -500,6 +515,9 @@ const AccountingSuitePage = () => {
       expensesByCategory,
       monthlyTrend: lastSixMonths,
       trialBalanceRows,
+      trialBalanceDebitTotal,
+      trialBalanceCreditTotal,
+      trialBalanceDifference: trialBalanceDebitTotal - trialBalanceCreditTotal,
       balanceDifference: totalAssets - (totalLiabilities + fundBalance),
     };
   }, [contributions, expenditures, kittyDisbursements, kitties, payments, period, refunds, wallets]);
@@ -1070,6 +1088,19 @@ const AccountingSuitePage = () => {
                     </TableRow>
                   ))}
                 </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={2}>Totals</TableCell>
+                    <TableCell className="text-right">{formatKES(analytics.trialBalanceDebitTotal)}</TableCell>
+                    <TableCell className="text-right">{formatKES(analytics.trialBalanceCreditTotal)}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={2}>Difference</TableCell>
+                    <TableCell colSpan={2} className="text-right">
+                      {formatKES(Math.abs(analytics.trialBalanceDifference))}
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
               </Table>
             </CardContent>
           </Card>

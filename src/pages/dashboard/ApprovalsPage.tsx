@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { logAuditAction } from '@/lib/auditLogger';
+import CboTreasurerApprovalPanel from '@/components/payment/CboTreasurerApprovalPanel';
 import {
   UserCheck,
   UserX,
@@ -32,6 +33,7 @@ import {
   XCircle,
   Loader2,
   Users,
+  ReceiptText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -54,14 +56,11 @@ const ApprovalsPage = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const { toast } = useToast();
-  const { user, roles } = useAuth();
+  const { user, roles, hasRole } = useAuth();
   const actorRole = roles?.[0] || 'member';
+  const canApproveFinance = hasRole('chairperson') || hasRole('admin') || hasRole('secretary') || hasRole('patron');
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -82,7 +81,11 @@ const ApprovalsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const approveMember = async (memberId: string) => {
     try {
@@ -221,6 +224,12 @@ const ApprovalsPage = () => {
           <TabsTrigger value="pending">
             Pending Members ({pendingMembers.length})
           </TabsTrigger>
+          {canApproveFinance && (
+            <TabsTrigger value="finance">
+              <ReceiptText className="w-4 h-4 mr-2" />
+              Finance Approvals
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="pending">
@@ -402,6 +411,12 @@ const ApprovalsPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canApproveFinance && (
+          <TabsContent value="finance">
+            <CboTreasurerApprovalPanel />
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Reject Dialog */}

@@ -103,7 +103,7 @@ const Header = () => {
                   "relative px-0.5 py-2 text-sm font-bold tracking-normal transition-colors after:absolute after:bottom-1 after:left-0 after:h-[2px] after:w-full after:origin-left after:rounded-full after:bg-[#f1c762] after:transition-transform after:content-['']",
                   isActive(item.href)
                     ? cn('after:scale-x-100', isScrolled ? 'text-[#0a263b]' : 'text-white')
-                    : cn('after:scale-x-0', isScrolled ? 'text-[#556b7f] hover:text-[#0a263b]' : 'text-white/76 hover:text-white')
+                    : cn('after:scale-x-0', isScrolled ? 'text-[#556b7f] hover:text-[#0a263b]' : 'text-white/75 hover:text-white')
                 )}
               >
                 {item.label}

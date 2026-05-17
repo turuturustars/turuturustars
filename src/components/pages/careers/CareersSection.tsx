@@ -246,81 +246,96 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
   return (
     <section
       id="careers"
-      className="py-24 bg-gradient-to-br from-background via-section-accent to-background relative overflow-hidden"
+      className="relative overflow-hidden bg-[#eef6f2] py-20 sm:py-24"
     >
       <StructuredData data={jobSchema} type="ItemList" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-pulse animation-delay-300 -z-10"></div>
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-gold/5 rounded-full blur-3xl animate-pulse animation-delay-500 -z-10"></div>
-      <div className="absolute top-1/2 right-1/4 w-72 h-72 bg-secondary/5 rounded-full blur-3xl animate-float -z-10"></div>
 
       <div className="section-container relative z-10">
-        <div ref={headerRef} className="text-center mb-16">
-          <span
-            className={`inline-block text-sm font-semibold text-primary uppercase tracking-wider mb-4 transition-all duration-700 ${
+        <div
+          ref={headerRef}
+          className="mb-12 grid gap-8 border-b border-[#b9d3d5] pb-10 lg:grid-cols-[minmax(0,0.72fr)_minmax(280px,0.28fr)] lg:items-end"
+        >
+          <div>
+            <span
+              className={`mb-4 inline-block text-sm font-black uppercase text-[#0b6f95] transition-all duration-700 ${
+                headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {seo.eyebrow}
+            </span>
+            <HeadingTag
+              className={`heading-display mb-5 max-w-4xl text-4xl font-bold text-[#09253a] transition-all duration-700 md:text-5xl ${
+                headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {seo.heading}
+            </HeadingTag>
+            <p
+              className={`max-w-3xl text-base leading-8 text-[#415b6a] transition-all duration-700 md:text-lg ${
+                headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+              }`}
+            >
+              {seo.intro} We do not hire directly; every listing keeps a link back to the original source.
+            </p>
+          </div>
+
+          <div
+            className={`border-l-4 border-[#f1c762] bg-white/70 p-5 transition-all duration-700 ${
               headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
             }`}
           >
-            {seo.eyebrow}
-          </span>
-          <HeadingTag
-            className={`heading-display text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-primary mb-6 transition-all duration-700 animation-delay-100 ${
-              headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
-            }`}
-          >
-            {seo.heading}
-          </HeadingTag>
-          <p
-            className={`text-lg text-muted-foreground max-w-2xl mx-auto transition-all duration-700 animation-delay-200 ${
-              headerVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
-            }`}
-          >
-            {seo.intro} We do not hire directly; each listing points to the original trusted source.
-          </p>
+            <p className="text-sm font-black uppercase text-[#09253a]">For the community</p>
+            <p className="mt-2 text-sm leading-7 text-[#526274]">
+              Government, public, casual, and Murang'a opportunities are grouped so people can scan quickly and apply from the official source.
+            </p>
+          </div>
         </div>
 
-        <div className="mb-10 grid gap-4 md:grid-cols-3">
-          <div className="p-5 rounded-2xl bg-card border border-border/50 flex items-start gap-3">
-            <Landmark className="w-6 h-6 text-primary mt-1" />
+        <div className="mb-8 grid gap-3 md:grid-cols-3">
+          <div className="flex items-start gap-3 border border-[#c8dcdd] bg-white/80 p-4">
+            <Landmark className="mt-1 h-5 w-5 text-[#0b6f95]" />
             <div>
-              <p className="text-sm font-semibold text-foreground">Government and County Jobs</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm font-black text-[#09253a]">Government and County Jobs</p>
+              <p className="text-sm leading-6 text-[#526274]">
                 We prioritize official county and national government listings.
               </p>
             </div>
           </div>
-          <div className="p-5 rounded-2xl bg-card border border-border/50 flex items-start gap-3">
-            <ShieldCheck className="w-6 h-6 text-primary mt-1" />
+          <div className="flex items-start gap-3 border border-[#c8dcdd] bg-white/80 p-4">
+            <ShieldCheck className="mt-1 h-5 w-5 text-[#0b6f95]" />
             <div>
-              <p className="text-sm font-semibold text-foreground">Murang'a First</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm font-black text-[#09253a]">Murang'a First</p>
+              <p className="text-sm leading-6 text-[#526274]">
                 Jobs in Murang'a stay at the top so locals see them first.
               </p>
             </div>
           </div>
-          <div className="p-5 rounded-2xl bg-card border border-border/50 flex items-start gap-3">
-            <Briefcase className="w-6 h-6 text-primary mt-1" />
+          <div className="flex items-start gap-3 border border-[#c8dcdd] bg-white/80 p-4">
+            <Briefcase className="mt-1 h-5 w-5 text-[#0b6f95]" />
             <div>
-              <p className="text-sm font-semibold text-foreground">Casual Jobs Prioritized</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm font-black text-[#09253a]">Casual Jobs Prioritized</p>
+              <p className="text-sm leading-6 text-[#526274]">
                 Casual work appears before other listings to help people start quickly.
               </p>
             </div>
           </div>
         </div>
 
-        <nav aria-label="Job search categories" className="mb-12 grid gap-3 md:grid-cols-4">
+        <nav aria-label="Job search categories" className="mb-12 grid overflow-hidden border border-[#c8dcdd] bg-white md:grid-cols-4">
           {JOB_SEARCH_LINKS.map((link) => {
             const isActive = link.href === seo.canonicalPath;
             return (
               <Link
                 key={link.href}
                 to={link.href}
-                className={`rounded-xl border p-4 transition hover:border-primary/60 hover:bg-primary/5 ${
-                  isActive ? 'border-primary bg-primary/10' : 'border-border/60 bg-card/60'
+                className={`border-b border-[#d6e4e5] p-4 transition hover:bg-[#f7fbfb] md:border-b-0 md:border-r md:last:border-r-0 ${
+                  isActive ? 'bg-[#09253a] text-white' : 'text-[#09253a]'
                 }`}
               >
-                <span className="block text-sm font-semibold text-foreground">{link.label}</span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{link.description}</span>
+                <span className="block text-sm font-black">{link.label}</span>
+                <span className={`mt-1 block text-xs leading-relaxed ${isActive ? 'text-white/72' : 'text-[#526274]'}`}>
+                  {link.description}
+                </span>
               </Link>
             );
           })}
@@ -332,28 +347,28 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
               jobsVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-3xl font-bold text-foreground">Available Opportunities</h3>
+            <h3 className="text-3xl font-bold text-[#09253a]">Available Opportunities</h3>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setOnlyMuranga((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                  onlyMuranga ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground'
+                className={`rounded-md border px-3 py-1.5 text-xs font-black transition ${
+                  onlyMuranga ? 'border-[#09253a] bg-[#09253a] text-white' : 'border-[#b9d3d5] bg-white text-[#526274]'
                 }`}
               >
                 Murang'a first
               </button>
               <button
                 onClick={() => setOnlyCasual((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                  onlyCasual ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground'
+                className={`rounded-md border px-3 py-1.5 text-xs font-black transition ${
+                  onlyCasual ? 'border-[#09253a] bg-[#09253a] text-white' : 'border-[#b9d3d5] bg-white text-[#526274]'
                 }`}
               >
                 Casual only
               </button>
               <button
                 onClick={() => setOnlyGovernment((prev) => !prev)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                  onlyGovernment ? 'bg-primary/10 border-primary text-primary' : 'border-border text-muted-foreground'
+                className={`rounded-md border px-3 py-1.5 text-xs font-black transition ${
+                  onlyGovernment ? 'border-[#09253a] bg-[#09253a] text-white' : 'border-[#b9d3d5] bg-white text-[#526274]'
                 }`}
               >
                 Government only
@@ -363,20 +378,20 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
 
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-8">
             <div className="relative flex-1 max-w-xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#526274]" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={seo.searchPlaceholder}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="w-full rounded-md border border-[#b9d3d5] bg-white py-2.5 pl-10 pr-4 text-sm text-[#09253a] focus:outline-none focus:ring-2 focus:ring-[#0b6f95]/30"
               />
             </div>
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Filter className="h-4 w-4 text-[#526274]" />
               <select
                 value={typeFilter}
                 onChange={(event) => setTypeFilter(event.target.value as JobType | 'all')}
-                className="px-3 py-2 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="rounded-md border border-[#b9d3d5] bg-white px-3 py-2 text-sm text-[#09253a] focus:outline-none focus:ring-2 focus:ring-[#0b6f95]/30"
               >
                 <option value="all">All job types</option>
                 {Object.entries(jobTypeLabels).map(([value, label]) => (
@@ -394,26 +409,26 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
                 {[0, 1, 2].map((index) => (
                   <div
                     key={`job-skeleton-${index}`}
-                    className="border border-border/50 rounded-xl p-6 bg-card/60 animate-pulse"
+                    className="animate-pulse border border-[#c8dcdd] bg-white/70 p-6"
                   >
-                    <div className="h-4 w-1/3 bg-muted rounded mb-3"></div>
-                    <div className="h-3 w-1/2 bg-muted rounded mb-4"></div>
-                    <div className="h-3 w-full bg-muted rounded"></div>
+                    <div className="mb-3 h-4 w-1/3 rounded bg-[#dbe8e8]"></div>
+                    <div className="mb-4 h-3 w-1/2 rounded bg-[#dbe8e8]"></div>
+                    <div className="h-3 w-full rounded bg-[#dbe8e8]"></div>
                   </div>
                 ))}
               </div>
             )}
 
             {!loading && errorMessage && (
-              <div className="border border-border/50 rounded-xl p-6 bg-card text-sm text-muted-foreground">
+              <div className="border border-[#c8dcdd] bg-white p-6 text-sm text-[#526274]">
                 {errorMessage}
               </div>
             )}
 
             {!loading && !errorMessage && sortedJobs.length === 0 && (
-              <div className="border border-dashed border-border/70 rounded-2xl p-10 text-center bg-card/50">
-                <p className="text-lg font-semibold text-foreground mb-2">No jobs found right now</p>
-                <p className="text-sm text-muted-foreground">
+              <div className="border border-dashed border-[#b9d3d5] bg-white/60 p-10 text-center">
+                <p className="mb-2 text-lg font-black text-[#09253a]">No jobs found right now</p>
+                <p className="text-sm text-[#526274]">
                   Try adjusting filters or check back soon. We refresh listings regularly.
                 </p>
               </div>
@@ -424,41 +439,42 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
               sortedJobs.map((job, index) => (
                 <div
                   key={job.id}
-                  className={`border border-border/50 rounded-xl p-6 bg-card/70 hover:border-primary/40 transition-all duration-300 animation-delay-${
-                    (index + 1) * 75
-                  } ${jobsVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'}`}
+                  className={`border-l-4 border-[#0b6f95] bg-white p-5 shadow-sm transition-all duration-300 hover:border-l-[#f1c762] hover:shadow-md ${
+                    jobsVisible ? 'animate-fade-up' : 'opacity-0 translate-y-10'
+                  }`}
+                  style={{ transitionDelay: `${Math.min(index, 6) * 70}ms` }}
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-2">
                         {job.is_priority_location && (
-                          <span className="inline-flex px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                          <span className="inline-flex rounded bg-[#e4f0f1] px-2 py-1 text-xs font-black text-[#0b6f95]">
                             Murang'a Priority
                           </span>
                         )}
                         {job.job_type === 'casual' && (
-                          <span className="inline-flex px-2 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                          <span className="inline-flex rounded bg-[#fff4cc] px-2 py-1 text-xs font-black text-[#775b00]">
                             Casual
                           </span>
                         )}
                         {job.is_government && (
-                          <span className="inline-flex px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                          <span className="inline-flex rounded bg-[#def4e7] px-2 py-1 text-xs font-black text-[#146239]">
                             Government
                           </span>
                         )}
-                        <span className="inline-flex px-2 py-1 rounded-full bg-muted text-muted-foreground text-xs font-semibold">
+                        <span className="inline-flex rounded bg-[#eef2f2] px-2 py-1 text-xs font-black text-[#526274]">
                           {jobTypeLabels[job.job_type]}
                         </span>
                       </div>
 
-                      <h4 className="text-lg font-semibold text-foreground">
-                        <Link to={`/jobs/${job.id}`} className="hover:text-primary hover:underline">
+                      <h4 className="text-lg font-black leading-snug text-[#09253a]">
+                        <Link to={`/jobs/${job.id}`} className="hover:text-[#0b6f95] hover:underline">
                           {job.title}
                         </Link>
                       </h4>
-                      <p className="text-sm text-muted-foreground">{job.organization}</p>
+                      <p className="text-sm text-[#526274]">{job.organization}</p>
 
-                      <div className="flex flex-wrap gap-4 mt-3 text-sm text-muted-foreground">
+                      <div className="mt-3 flex flex-wrap gap-4 text-sm text-[#526274]">
                         <span className="flex items-center gap-1">
                           <MapPin className="w-4 h-4" />
                           {job.location} - {job.county}
@@ -470,26 +486,26 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
                       </div>
 
                       {job.excerpt && (
-                        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{job.excerpt}</p>
+                        <p className="mt-3 text-sm leading-relaxed text-[#526274]">{job.excerpt}</p>
                       )}
                     </div>
 
                     <div className="flex flex-col gap-2 lg:min-w-[180px]">
-                      <Button asChild className="btn-primary">
+                      <Button asChild className="rounded-md bg-[#0b6f95] text-white hover:bg-[#09253a]">
                         <a href={job.apply_url || job.source_url} target="_blank" rel="noreferrer">
                           Apply Now
                         </a>
                       </Button>
-                      <Button asChild variant="secondary">
+                      <Button asChild variant="secondary" className="rounded-md">
                         <Link to={`/jobs/${job.id}`}>Job Details</Link>
                       </Button>
-                      <Button asChild variant="outline">
+                      <Button asChild variant="outline" className="rounded-md">
                         <a href={job.source_url} target="_blank" rel="noreferrer" className="flex items-center gap-2">
                           View Source
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       </Button>
-                      <p className="text-xs text-muted-foreground text-center">Source: {job.source_name}</p>
+                      <p className="text-center text-xs text-[#526274]">Source: {job.source_name}</p>
                     </div>
                   </div>
                 </div>
@@ -498,22 +514,22 @@ const CareersSection = ({ variant = 'all', headingLevel = 'h2' }: CareersSection
         </div>
 
         <div
-          className={`mt-16 pt-10 border-t border-border/60 transition-all duration-700 ${
+          className={`mt-16 border-t border-[#b9d3d5] pt-10 transition-all duration-700 ${
             jobsVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
           }`}
         >
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="p-6 rounded-2xl bg-card border border-border/50">
-              <h4 className="text-lg font-semibold text-foreground mb-2">How listings work</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="border border-[#c8dcdd] bg-white/80 p-6">
+              <h4 className="mb-2 text-lg font-black text-[#09253a]">How listings work</h4>
+              <p className="text-sm leading-7 text-[#526274]">
                 Listings are pulled from official sources and trusted job boards, including Government of Kenya,
                 county government, public service, and reputable employment sources. Expired jobs are removed
                 automatically to keep the page light and accurate.
               </p>
             </div>
-            <div className="p-6 rounded-2xl bg-card border border-border/50">
-              <h4 className="text-lg font-semibold text-foreground mb-2">Looking for Murang'a jobs?</h4>
-              <p className="text-sm text-muted-foreground">
+            <div className="border border-[#c8dcdd] bg-white/80 p-6">
+              <h4 className="mb-2 text-lg font-black text-[#09253a]">Looking for Murang'a jobs?</h4>
+              <p className="text-sm leading-7 text-[#526274]">
                 Use the Murang'a jobs filter for casual work, county opportunities, internships, and public jobs near
                 Turuturu, Kigumo, Githima, and nearby areas.
               </p>
