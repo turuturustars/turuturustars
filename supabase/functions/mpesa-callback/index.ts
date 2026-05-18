@@ -5,6 +5,9 @@ import { verifyCallbackSignature } from "../_shared/mpesa.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SIGNATURE_SECRET = Deno.env.get("MPESA_CALLBACK_SIGNATURE_SECRET");
+const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
+const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
+const WHATSAPP_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v21.0";
 
 interface MpesaTransaction {
   id: string;
@@ -33,6 +36,87 @@ interface StkCallbackPayload {
       };
     };
   };
+}
+
+interface WhatsappPaymentIntent {
+  id: string;
+  contact_id: string | null;
+  member_id: string;
+  phone_number: string;
+  amount: number;
+  payment_purpose: "contribution" | "wallet_topup";
+  contribution_ids: string[];
+  wallet_transaction_id: string | null;
+}
+
+type SupabaseClient = ReturnType<typeof createClient>;
+
+async function sendWhatsAppPaymentUpdate(
+  supabase: SupabaseClient,
+  intent: WhatsappPaymentIntent,
+  success: boolean,
+  amount: number,
+  receiptNumber: string,
+  resultDescription: string,
+) {
+  if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
+    console.log("WhatsApp credentials not configured; skipping WhatsApp payment confirmation");
+    return null;
+  }
+
+  const successfulServiceLine = intent.payment_purpose === "wallet_topup"
+    ? "Your wallet has been updated."
+    : "Your contribution record has been updated.";
+
+  const body = success
+    ? [
+      `Payment received: KES ${amount}`,
+      receiptNumber ? `Receipt: ${receiptNumber}` : null,
+      successfulServiceLine,
+    ].filter(Boolean).join("\n")
+    : [
+      "M-Pesa payment was not completed.",
+      resultDescription || "Please try again or contact the treasurer.",
+    ].join("\n");
+
+  const response = await fetch(
+    `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${WHATSAPP_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: intent.phone_number,
+        type: "text",
+        text: {
+          preview_url: false,
+          body,
+        },
+      }),
+    },
+  );
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result?.error?.message || "WhatsApp payment confirmation failed");
+  }
+
+  await supabase.from("whatsapp_messages").insert({
+    contact_id: intent.contact_id,
+    member_id: intent.member_id,
+    wa_message_id: result?.messages?.[0]?.id ?? null,
+    direction: "outbound",
+    message_type: "text",
+    text_body: body,
+    payload: result ?? {},
+    status: result?.messages?.[0]?.id ? "sent" : "failed",
+  });
+
+  return result?.messages?.[0]?.id ?? null;
 }
 
 serve(async (req) => {
@@ -266,6 +350,120 @@ serve(async (req) => {
       }
     }
 
+    // If this STK push was started from WhatsApp, reconcile all linked contributions
+    // and send a payment confirmation back in the same WhatsApp thread.
+    try {
+      const { data: whatsappIntent, error: intentError } = await supabase
+        .from("whatsapp_payment_intents")
+        .select("id, contact_id, member_id, phone_number, amount, payment_purpose, contribution_ids, wallet_transaction_id")
+        .eq("checkout_request_id", CheckoutRequestID)
+        .maybeSingle();
+
+      if (intentError) {
+        console.error("Error checking WhatsApp payment intent:", intentError);
+      }
+
+      if (whatsappIntent) {
+        const intent = whatsappIntent as WhatsappPaymentIntent;
+        const intentStatus = ResultCode === 0 ? "completed" : "failed";
+
+        await supabase
+          .from("whatsapp_payment_intents")
+          .update({
+            status: intentStatus,
+            failure_reason: ResultCode === 0 ? null : ResultDesc,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", intent.id);
+
+        const contributionIds = Array.isArray(intent.contribution_ids) ? intent.contribution_ids : [];
+        if (ResultCode === 0 && intent.payment_purpose === "contribution" && contributionIds.length > 0) {
+          const { error: contributionUpdateError } = await supabase
+            .from("contributions")
+            .update({
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              reference_number: mpesaReceiptNumber,
+              updated_at: new Date().toISOString(),
+            })
+            .in("id", contributionIds);
+
+          if (contributionUpdateError) {
+            console.error("Error updating WhatsApp-linked contributions:", contributionUpdateError);
+          }
+        }
+
+        if (ResultCode === 0 && intent.payment_purpose === "wallet_topup" && intent.wallet_transaction_id) {
+          const { error: walletCreditError } = await supabase.rpc("credit_member_wallet", {
+            p_wallet_transaction_id: intent.wallet_transaction_id,
+            p_amount: amount || intent.amount,
+            p_reference_number: mpesaReceiptNumber || null,
+          });
+
+          if (walletCreditError) {
+            console.error("Error crediting WhatsApp wallet top-up:", walletCreditError);
+          }
+        }
+
+        if (ResultCode !== 0 && intent.payment_purpose === "wallet_topup" && intent.wallet_transaction_id) {
+          const { error: walletFailureError } = await supabase
+            .from("member_wallet_transactions")
+            .update({
+              status: "failed",
+              description: ResultDesc || "M-Pesa wallet top-up failed",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", intent.wallet_transaction_id)
+            .eq("status", "pending");
+
+          if (walletFailureError) {
+            console.error("Error marking wallet top-up failed:", walletFailureError);
+          }
+        }
+
+        let whatsappMessageId: string | null = null;
+        let whatsappSendError: string | null = null;
+        try {
+          whatsappMessageId = await sendWhatsAppPaymentUpdate(
+            supabase,
+            intent,
+            ResultCode === 0,
+            amount || intent.amount,
+            mpesaReceiptNumber,
+            ResultDesc,
+          );
+        } catch (sendError) {
+          whatsappSendError = sendError instanceof Error ? sendError.message : "WhatsApp confirmation failed";
+          console.error("Error sending WhatsApp payment confirmation:", sendError);
+        }
+
+        const whatsappStatus = whatsappSendError
+          ? "failed"
+          : whatsappMessageId
+            ? "sent"
+            : "skipped";
+
+        await supabase.from("notifications").insert({
+          user_id: intent.member_id,
+          title: ResultCode === 0 ? "Payment received" : "Payment failed",
+          message: ResultCode === 0
+            ? `M-Pesa payment of KES ${amount || intent.amount} has been received. Receipt: ${mpesaReceiptNumber || "pending"}`
+            : `M-Pesa payment was not completed: ${ResultDesc}`,
+          type: intent.payment_purpose === "wallet_topup" ? "wallet" : "contribution",
+          sent_via: ["whatsapp"],
+          whatsapp_status: whatsappStatus,
+          whatsapp_message_id: whatsappMessageId,
+          whatsapp_sent_at: whatsappMessageId ? new Date().toISOString() : null,
+          whatsapp_error: whatsappSendError,
+          read: false,
+        });
+      }
+    } catch (whatsappError) {
+      console.error("Error processing WhatsApp payment reconciliation:", whatsappError);
+      // Do not fail the M-Pesa callback response if WhatsApp follow-up fails.
+    }
+    
+    // Log audit action
     try {
       await supabase.rpc("log_audit_action", {
         p_action_type: "MPESA_CALLBACK_PROCESSED",

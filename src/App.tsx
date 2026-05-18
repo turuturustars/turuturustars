@@ -116,6 +116,7 @@ const WalletPage = lazy(() => import("./pages/dashboard/WalletPage"));
 const KittiesPage = lazy(() => import("./pages/dashboard/KittiesPage"));
 const KittyDetailPage = lazy(() => import("./pages/dashboard/KittyDetailPage"));
 const InsuranceBenefitsPage = lazy(() => import("./pages/dashboard/InsuranceBenefitsPage"));
+const WhatsAppAutomationPage = lazy(() => import("./pages/dashboard/WhatsAppAutomationPage"));
 
 // QueryClient configuration with better defaults
 const queryClient = new QueryClient({
@@ -347,6 +348,7 @@ const App = () => {
                     <Route path="announcements" element={<AnnouncementsPage />} />
                     <Route path="messages" element={<PrivateMessagesPage />} />
                     <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="whatsapp" element={<WhatsAppAutomationPage />} />
                   </Route>
 
                   {/* Admin functions */}
@@ -435,6 +437,7 @@ const App = () => {
                   <Route path="notifications" element={<Navigate to="/dashboard/communication/notifications" replace />} />
                   <Route path="community" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="chat" element={<Navigate to="/dashboard/communication/messages" replace />} />
+                  <Route path="whatsapp" element={<Navigate to="/dashboard/communication/whatsapp" replace />} />
                   <Route path="approvals" element={<Navigate to="/dashboard/admin-panel/approvals" replace />} />
                   <Route path="jobs" element={<Navigate to="/dashboard/admin-panel/jobs" replace />} />
                 </Route>

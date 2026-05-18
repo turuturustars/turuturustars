@@ -24,6 +24,7 @@ import {
   Vote,
   ShieldCheck,
   Calculator,
+  Bot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -118,6 +119,10 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     { label: 'Private Messages', href: '/dashboard/communication/messages', icon: MessageCircle, badge: null },
     { label: 'Profile', href: '/dashboard/profile', icon: Settings, badge: null },
   ];
+
+  const officialCommunicationLinks = isUserOfficial
+    ? [{ label: 'WhatsApp AI', href: '/dashboard/communication/whatsapp', icon: Bot, badge: null }]
+    : [];
 
   const roleSpecificLinks = () => {
     const links: Array<{ label: string; href: string; icon: LucideIcon }> = [];
@@ -277,7 +282,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
           </div>
           
           <div className="space-y-0.5">
-            {memberLinks.map((link) => {
+            {[...memberLinks, ...officialCommunicationLinks].map((link) => {
               const Icon = link.icon;
               const isActive = location.pathname === link.href;
               return (
