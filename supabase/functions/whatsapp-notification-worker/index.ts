@@ -47,7 +47,11 @@ function createServiceClient() {
 }
 
 function ensureAuthorized(req: Request): void {
-  const expectedSecret = Deno.env.get("WHATSAPP_NOTIFICATIONS_JOB_SECRET")?.trim();
+  const expectedSecret = (
+    Deno.env.get("WHATSAPP_NOTIFICATIONS_JOB_SECRET") ||
+    Deno.env.get("WHATSAPP_NOTIFICATION_SECRET") ||
+    ""
+  ).trim();
   if (!expectedSecret) {
     return;
   }

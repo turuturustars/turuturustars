@@ -17,7 +17,7 @@ jobs:
       - name: Trigger whatsapp-notifications edge function
         env:
           WHATSAPP_NOTIFICATIONS_URL: https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/whatsapp-notification-worker
-          WHATSAPP_NOTIFICATIONS_JOB_SECRET: ${{ secrets.WHATSAPP_NOTIFICATIONS_JOB_SECRET }}
+          WHATSAPP_NOTIFICATIONS_JOB_SECRET: ${{ secrets.WHATSAPP_NOTIFICATIONS_JOB_SECRET || secrets.WHATSAPP_NOTIFICATION_SECRET }}
         run: |
           set -euo pipefail
 

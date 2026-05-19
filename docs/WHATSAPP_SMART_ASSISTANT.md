@@ -99,6 +99,6 @@ When the member replies with one of those emojis, the rating is saved and the bo
 
 When the assistant is waiting for a reply, such as registration OTP, missing transaction amount, or welfare case title, it marks the session as awaiting response. The `whatsapp-notification-worker` job also checks those sessions. If the user has not replied after `WHATSAPP_ABANDONMENT_MINUTES` minutes, default `3`, it sends one warm pause message with a day/evening/night wish and stops nudging.
 
-Run the `whatsapp-notification-worker` job frequently with `WHATSAPP_NOTIFICATIONS_JOB_SECRET`. The same worker still processes queued WhatsApp notifications. The included GitHub workflow runs it every 5 minutes; use Supabase Scheduled Functions or another scheduler at about 1-minute frequency when you need the pause message to land as close as possible to the 3-minute mark.
+Run the `whatsapp-notification-worker` job frequently with `WHATSAPP_NOTIFICATIONS_JOB_SECRET`. It also accepts the older `WHATSAPP_NOTIFICATION_SECRET` secret name for compatibility. The same worker still processes queued WhatsApp notifications. The included GitHub workflow runs it every 5 minutes; use Supabase Scheduled Functions or another scheduler at about 1-minute frequency when you need the pause message to land as close as possible to the 3-minute mark.
 
 When the user comes back, the bot recognizes the paused session and sends a varied welcome-back message that mentions where the conversation stopped before continuing with the new message.
