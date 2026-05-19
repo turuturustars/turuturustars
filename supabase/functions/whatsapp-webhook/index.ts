@@ -12,7 +12,17 @@ const WHATSAPP_VERIFY_TOKEN = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "";
 const WHATSAPP_APP_SECRET = Deno.env.get("WHATSAPP_APP_SECRET") ?? "";
 const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
-const WHATSAPP_GRAPH_VERSION = Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v21.0";
+const WHATSAPP_GRAPH_VERSION =
+  Deno.env.get("WHATSAPP_GRAPH_API_VERSION") ?? Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v21.0";
+const AI_PROVIDER = (Deno.env.get("WHATSAPP_AI_PROVIDER") ?? Deno.env.get("AI_PROVIDER") ?? "auto").toLowerCase();
+const AI_TIMEOUT_MS = getNumberEnv("AI_TIMEOUT_MS", 10000);
+const AI_MAX_OUTPUT_TOKENS = getNumberEnv("AI_MAX_OUTPUT_TOKENS", 320);
+const AI_KNOWLEDGE_FETCH_LIMIT = getNumberEnv("AI_KNOWLEDGE_FETCH_LIMIT", 80);
+const AI_KNOWLEDGE_CONTEXT_LIMIT = getNumberEnv("AI_KNOWLEDGE_CONTEXT_LIMIT", 12);
+const AI_DIRECT_KNOWLEDGE_SCORE = getNumberEnv("AI_DIRECT_KNOWLEDGE_SCORE", 6);
+const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
+const GROQ_MODEL = Deno.env.get("GROQ_KNOWLEDGE_MODEL") ?? Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-120b";
+const GROQ_BASE_URL = (Deno.env.get("GROQ_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/+$/, "");
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.4-mini";
 const MPESA_CONSUMER_KEY = Deno.env.get("MPESA_CONSUMER_KEY") ?? "";
@@ -21,6 +31,31 @@ const MPESA_PASSKEY = Deno.env.get("MPESA_PASSKEY") ?? "";
 const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE") ?? "";
 const MPESA_BASE_URL = Deno.env.get("MPESA_BASE_URL") ?? "https://sandbox.safaricom.co.ke";
 const MPESA_CALLBACK_URL = Deno.env.get("MPESA_CALLBACK_URL") ?? `${SUPABASE_URL}/functions/v1/mpesa-callback`;
+
+const SEARCH_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "you",
+  "your",
+  "with",
+  "from",
+  "what",
+  "when",
+  "where",
+  "how",
+  "can",
+  "kwa",
+  "na",
+  "ya",
+  "za",
+  "wa",
+  "ni",
+  "nini",
+  "gani",
+  "tafadhali",
+  "please",
+]);
 
 type SupabaseClient = ReturnType<typeof createClient>;
 type BotMode = "public" | "member";
@@ -101,6 +136,7 @@ interface KnowledgeEntry {
   content: string;
   category: string;
   bot_scope: "public" | "member" | "both";
+  metadata?: Record<string, unknown> | null;
 }
 
 interface OpenAIResponsePayload {
@@ -111,6 +147,17 @@ interface OpenAIResponsePayload {
       type?: string;
       text?: string;
     }>;
+  }>;
+  error?: {
+    message?: string;
+  };
+}
+
+interface ChatCompletionResponsePayload {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
   }>;
   error?: {
     message?: string;
@@ -170,6 +217,11 @@ serve(async (req) => {
   }
 
   if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("health") === "1") {
+      return webhookHealthResponse();
+    }
+
     return handleWebhookVerification(req);
   }
 
@@ -221,12 +273,20 @@ async function processWebhookPayload(supabase: SupabaseClient, payload: WebhookP
       const value = change.value ?? {};
 
       for (const status of value.statuses ?? []) {
-        await updateMessageStatus(supabase, status);
+        try {
+          await updateMessageStatus(supabase, status);
+        } catch (error) {
+          console.error("Failed to process WhatsApp status update:", status?.id, error);
+        }
       }
 
       for (const message of value.messages ?? []) {
         const contactInfo = (value.contacts ?? []).find((contact: WhatsAppContactInfo) => contact.wa_id === message.from);
-        await handleIncomingMessage(supabase, message, contactInfo);
+        try {
+          await handleIncomingMessage(supabase, message, contactInfo);
+        } catch (error) {
+          console.error("Failed to process WhatsApp inbound message:", message?.id, error);
+        }
       }
     }
   }
@@ -260,6 +320,10 @@ async function handleIncomingMessage(
     .eq("wa_message_id", message.id)
     .maybeSingle();
 
+  if (existing.error && existing.error.code !== "PGRST116") {
+    console.error("Failed to check WhatsApp message idempotency:", existing.error);
+  }
+
   if (existing.data?.id) {
     return;
   }
@@ -268,7 +332,7 @@ async function handleIncomingMessage(
   const contact = await upsertContact(supabase, message.from, contactInfo, member);
   const text = extractMessageText(message);
 
-  await supabase.from("whatsapp_messages").insert({
+  const { error: inboundLogError } = await supabase.from("whatsapp_messages").insert({
     contact_id: contact.id,
     member_id: member?.id ?? null,
     wa_message_id: message.id,
@@ -279,7 +343,21 @@ async function handleIncomingMessage(
     status: "received",
   });
 
-  const reply = await routeIncomingText(supabase, contact, member, text);
+  if (inboundLogError) {
+    console.error("Failed to log inbound WhatsApp message:", inboundLogError);
+  }
+
+  let reply: string | null = null;
+  try {
+    reply = await routeIncomingText(supabase, contact, member, text);
+  } catch (error) {
+    console.error("Failed to route WhatsApp inbound text:", error);
+    reply = [
+      "Sorry, I could not process that message right now.",
+      "Reply MENU to continue, or try again shortly.",
+    ].join("\n");
+  }
+
   if (reply) {
     await sendAndLogText(supabase, contact, member?.id ?? null, reply);
   }
@@ -333,15 +411,15 @@ async function routePublicText(supabase: SupabaseClient, text: string, command: 
     ].join("\n");
   }
 
-  if (command.includes("announcement") || command.includes("news") || command.includes("notice")) {
+  if (isAnnouncementCommand(command)) {
     return latestAnnouncementsReply(supabase);
   }
 
-  if (command.includes("join") || command.includes("register") || command.includes("membership")) {
+  if (isJoinCommand(command)) {
     return publicMembershipReply();
   }
 
-  if (command.includes("contact") || command.includes("support") || command.includes("help")) {
+  if (isSupportCommand(command)) {
     return publicSupportReply();
   }
 
@@ -363,6 +441,10 @@ async function routeMemberText(
     return walletSummaryReply(supabase, member);
   }
 
+  if (isReceiptCommand(command)) {
+    return recentPaymentsReply(supabase, member);
+  }
+
   if (command.includes("contribute")) {
     return handlePaymentRequest(supabase, contact, member, text);
   }
@@ -371,31 +453,27 @@ async function routeMemberText(
     return handlePaymentRequest(supabase, contact, member, text);
   }
 
-  if (command.includes("balance") || command.includes("due") || command.includes("arrears") || command.includes("contribution")) {
+  if (isBalanceCommand(command)) {
     return contributionSummaryReply(supabase, member);
   }
 
-  if (command.includes("meeting")) {
+  if (isMeetingCommand(command)) {
     return nextMeetingReply(supabase);
   }
 
-  if (command.includes("announcement") || command.includes("news") || command.includes("notice")) {
+  if (isAnnouncementCommand(command)) {
     return latestAnnouncementsReply(supabase);
   }
 
-  if (command.includes("welfare") || command.includes("kitty") || command.includes("kity") || command.includes("case")) {
+  if (isWelfareCommand(command)) {
     return activeWelfareCasesReply(supabase);
   }
 
-  if (command.includes("profile") || command.includes("status") || command.includes("account")) {
+  if (isProfileCommand(command)) {
     return profileStatusReply(member);
   }
 
-  if (command.includes("receipt") || command.includes("history") || command.includes("paid")) {
-    return recentPaymentsReply(supabase, member);
-  }
-
-  if (command.includes("notification") || command.includes("alert")) {
+  if (isNotificationCommand(command)) {
     return unreadNotificationsReply(supabase, member);
   }
 
@@ -403,12 +481,29 @@ async function routeMemberText(
 }
 
 function isMenuCommand(command: string) {
-  return ["hi", "hello", "hey", "menu", "help", "start"].includes(command);
+  return [
+    "hi",
+    "hello",
+    "helo",
+    "helloo",
+    "hey",
+    "menu",
+    "help",
+    "start",
+    "mambo",
+    "niaje",
+    "habari",
+  ].includes(command) ||
+    command.startsWith("hello ") ||
+    command.startsWith("helo ") ||
+    command.startsWith("hey ");
 }
 
 function isPaymentCommand(command: string) {
   return command === "pay" ||
     command.startsWith("pay ") ||
+    command === "lipa" ||
+    command.startsWith("lipa ") ||
     command.includes("contribute") ||
     command.includes("mpesa") ||
     command.includes("m-pesa") ||
@@ -435,18 +530,123 @@ function isWalletInfoCommand(command: string) {
 }
 
 function isMemberOnlyCommand(command: string) {
-  return command.includes("balance") ||
-    command.includes("arrears") ||
-    command.includes("contribution") ||
+  return isBalanceCommand(command) ||
     command.includes("contribute") ||
     command.includes("wallet") ||
     command.includes("fund") ||
-    command.includes("profile") ||
-    command.includes("receipt") ||
-    command.includes("notification") ||
-    command.includes("welfare") ||
-    command.includes("kitty") ||
-    command.includes("kity");
+    isProfileCommand(command) ||
+    isReceiptCommand(command) ||
+    isNotificationCommand(command) ||
+    isWelfareCommand(command);
+}
+
+function isAnnouncementCommand(command: string) {
+  return hasAnyTerm(command, [
+    "announc",
+    "annouc",
+    "anounc",
+    "anouc",
+    "news",
+    "notice",
+    "matangazo",
+    "tangazo",
+  ]);
+}
+
+function isJoinCommand(command: string) {
+  return hasAnyTerm(command, [
+    "join",
+    "register",
+    "registration",
+    "membership",
+    "member",
+    "jiunga",
+    "sajili",
+    "usajili",
+    "mwanachama",
+  ]);
+}
+
+function isSupportCommand(command: string) {
+  return hasAnyTerm(command, [
+    "contact",
+    "support",
+    "help",
+    "msaada",
+    "mawasiliano",
+  ]);
+}
+
+function isBalanceCommand(command: string) {
+  return hasAnyTerm(command, [
+    "balance",
+    "due",
+    "arrears",
+    "contribution",
+    "salio",
+    "deni",
+    "madeni",
+    "michango",
+  ]);
+}
+
+function isMeetingCommand(command: string) {
+  return hasAnyTerm(command, [
+    "meeting",
+    "mkutano",
+    "mikutano",
+  ]);
+}
+
+function isWelfareCommand(command: string) {
+  return hasAnyTerm(command, [
+    "welfare",
+    "kitty",
+    "kity",
+    "case",
+    "dhiki",
+    "msiba",
+    "ustawi",
+  ]);
+}
+
+function isProfileCommand(command: string) {
+  return hasAnyTerm(command, [
+    "profile",
+    "status",
+    "account",
+    "wasifu",
+    "akaunti",
+    "taarifa zangu",
+  ]);
+}
+
+function isReceiptCommand(command: string) {
+  return hasAnyTerm(command, [
+    "receipt",
+    "history",
+    "paid",
+    "risiti",
+    "stakabadhi",
+    "malipo",
+    "nimelipa",
+    "nimelipia",
+  ]);
+}
+
+function isNotificationCommand(command: string) {
+  return hasAnyTerm(command, [
+    "notification",
+    "notifications",
+    "alert",
+    "alerts",
+    "taarifa",
+    "notisi",
+  ]);
+}
+
+function hasAnyTerm(command: string, terms: string[]) {
+  return terms.some((term) => command.includes(term));
 }
 
 function menuReply(member: MemberProfile | null, botMode: BotMode) {
@@ -800,30 +1000,33 @@ async function smartKnowledgeReply(
 ) {
   const { data, error } = await supabase
     .from("ai_knowledge_base")
-    .select("title, content, category, bot_scope")
+    .select("title, content, category, bot_scope, metadata")
     .eq("is_active", true)
     .in("bot_scope", [botMode, "both"])
-    .limit(50);
+    .limit(AI_KNOWLEDGE_FETCH_LIMIT);
 
   if (error) {
     console.error("Failed to fetch AI knowledge base:", error);
   }
 
   const entries = (data ?? []) as KnowledgeEntry[];
-  const best = entries
-    .map((entry) => ({
-      entry,
-      score: keywordScore(text, `${entry.title} ${entry.category} ${entry.content}`),
-    }))
-    .sort((a, b) => b.score - a.score)[0];
+  const ranked = rankKnowledgeEntries(text, entries);
+  const relevantEntries = ranked
+    .filter((item) => item.score > 0)
+    .slice(0, AI_KNOWLEDGE_CONTEXT_LIMIT)
+    .map((item) => item.entry);
+  const contextEntries = relevantEntries.length
+    ? relevantEntries
+    : entries.slice(0, AI_KNOWLEDGE_CONTEXT_LIMIT);
 
-  if (best && best.score > 0) {
-    return `${best.entry.content}\n\nReply MENU for more options.`;
-  }
-
-  const aiReply = await generateAiReply(text, member, botMode, entries);
+  const aiReply = await generateAiReply(text, member, botMode, contextEntries);
   if (aiReply) {
     return aiReply;
+  }
+
+  const best = ranked[0];
+  if (best && best.score >= AI_DIRECT_KNOWLEDGE_SCORE) {
+    return `${best.entry.content}\n\nReply MENU for more options.`;
   }
 
   return [
@@ -841,12 +1044,65 @@ async function generateAiReply(
   botMode: BotMode,
   entries: KnowledgeEntry[],
 ) {
-  if (!OPENAI_API_KEY) {
-    return null;
+  if ((AI_PROVIDER === "auto" || AI_PROVIDER === "groq") && GROQ_API_KEY) {
+    const groqReply = await generateGroqReply(text, member, botMode, entries);
+    if (groqReply) {
+      return groqReply;
+    }
   }
 
+  if ((AI_PROVIDER === "auto" || AI_PROVIDER === "openai") && OPENAI_API_KEY) {
+    return generateOpenAIReply(text, member, botMode, entries);
+  }
+
+  return null;
+}
+
+async function generateGroqReply(
+  text: string,
+  member: MemberProfile | null,
+  botMode: BotMode,
+  entries: KnowledgeEntry[],
+) {
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetchWithTimeout(`${GROQ_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: GROQ_MODEL,
+        messages: buildChatMessages(text, member, botMode, entries),
+        temperature: 0.2,
+        top_p: 0.9,
+        max_completion_tokens: AI_MAX_OUTPUT_TOKENS,
+        stream: false,
+      }),
+    });
+
+    const payload = await readJsonResponse<ChatCompletionResponsePayload>(response);
+    if (!response.ok) {
+      console.error("Groq fallback failed:", payload.error?.message ?? response.statusText);
+      return null;
+    }
+
+    const reply = extractChatCompletionText(payload);
+    return reply ? clampWhatsAppReply(reply) : null;
+  } catch (error) {
+    console.error("Groq fallback threw:", error);
+    return null;
+  }
+}
+
+async function generateOpenAIReply(
+  text: string,
+  member: MemberProfile | null,
+  botMode: BotMode,
+  entries: KnowledgeEntry[],
+) {
+  try {
+    const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
@@ -856,11 +1112,11 @@ async function generateAiReply(
         model: OPENAI_MODEL,
         instructions: buildAiInstructions(botMode),
         input: buildAiInput(text, member, botMode, entries),
-        max_output_tokens: 320,
+        max_output_tokens: AI_MAX_OUTPUT_TOKENS,
       }),
     });
 
-    const payload = await response.json() as OpenAIResponsePayload;
+    const payload = await readJsonResponse<OpenAIResponsePayload>(response);
     if (!response.ok) {
       console.error("OpenAI fallback failed:", payload.error?.message ?? response.statusText);
       return null;
@@ -882,11 +1138,17 @@ function buildAiInstructions(botMode: BotMode) {
   return [
     "You are the Turuturu Stars WhatsApp assistant.",
     audienceRule,
-    "Answer using only the supplied knowledge base and the command list.",
+    "Understand English, Swahili, Sheng, abbreviations, and common typing mistakes.",
+    "First decide whether a live command should handle the request. If yes, give the exact command and a short explanation.",
+    "Answer using only the supplied knowledge base, live command guide, and authenticated context.",
     "Do not invent balances, receipt numbers, meeting dates, payment status, member status, welfare targets, or announcements.",
+    "Never claim you have updated a profile, cast a vote, created a payment, changed membership status, or registered a member unless the deterministic system already did it.",
+    "Never ask for an M-Pesa PIN, password, OTP, full ID number, or card details in WhatsApp.",
+    "If the user asks for confidential, official-only, or member-only information they are not allowed to see, politely refuse and suggest the correct official channel.",
     "For live member actions, direct users to commands: PAY, CONTRIBUTE 500, WALLET, FUND 500, BALANCE, WELFARE, MEETING, ANNOUNCEMENTS, PROFILE, RECEIPTS, NOTIFICATIONS.",
     "For public users asking to join, direct them to JOIN or official support.",
-    "Keep replies concise, friendly, and suitable for WhatsApp. End with a helpful command when useful.",
+    "If the user asks in Swahili, reply in natural Swahili unless English is clearer for a command.",
+    "Keep replies concise, friendly, and suitable for WhatsApp. Avoid tables. Ask at most one follow-up question. End with a helpful command when useful.",
   ].join("\n");
 }
 
@@ -897,13 +1159,17 @@ function buildAiInput(
   entries: KnowledgeEntry[],
 ) {
   const knowledge = entries.length
-    ? entries.map((entry, index) => `${index + 1}. ${entry.title} [${entry.category}/${entry.bot_scope}]\n${entry.content}`).join("\n\n")
+    ? entries.map(formatKnowledgeEntry).join("\n\n")
     : "No active knowledge base entries were found.";
 
   const memberContext = botMode === "member" && member
     ? [
       "Authenticated member context:",
       "yes",
+      `Name: ${member.full_name}`,
+      `Membership number: ${member.membership_number ?? "not set"}`,
+      `Profile status: ${member.status ?? "not set"}`,
+      `Registration fee paid: ${member.registration_fee_paid ? "yes" : "no or unknown"}`,
       "Do not answer live profile, payment, balance, receipt, or status facts from this AI prompt.",
     ].join("\n")
     : "Authenticated member context: no";
@@ -911,11 +1177,48 @@ function buildAiInput(
   return [
     `Bot mode: ${botMode}`,
     memberContext,
+    "Live command guide:",
+    liveCommandGuide(botMode),
     "Knowledge base:",
     knowledge,
     "User message:",
     text,
   ].join("\n\n");
+}
+
+function liveCommandGuide(botMode: BotMode) {
+  if (botMode === "public") {
+    return [
+      "MENU or HELP: show public options.",
+      "JOIN: explain how to become a member.",
+      "ANNOUNCEMENTS: show public notices.",
+      "CONTACT or SUPPORT: explain how to reach officials.",
+      "START and STOP: opt in or out of WhatsApp updates.",
+      "If a public user asks for balances, receipts, payments, voting, welfare private details, or profile changes, tell them to use their registered member WhatsApp number or contact an official.",
+    ].join("\n");
+  }
+
+  return [
+    "MENU or HELP: show member options.",
+    "PAY: start M-Pesa STK for pending contributions.",
+    "CONTRIBUTE 500: start M-Pesa STK for a specific contribution amount.",
+    "BALANCE: show pending contributions and arrears.",
+    "WALLET: show wallet balance and recent wallet top-ups.",
+    "FUND 500: start M-Pesa STK to top up wallet.",
+    "WELFARE or KITTY: show active welfare cases.",
+    "MEETING: show the next scheduled meeting.",
+    "ANNOUNCEMENTS: show latest notices.",
+    "PROFILE: show member status.",
+    "RECEIPTS: show recent confirmed payments.",
+    "NOTIFICATIONS: show unread alerts.",
+    "START and STOP: opt in or out of WhatsApp updates.",
+  ].join("\n");
+}
+
+function formatKnowledgeEntry(entry: KnowledgeEntry, index: number) {
+  const terms = metadataTerms(entry.metadata);
+  const termLine = terms.length ? `\nSearch terms: ${terms.join(", ")}` : "";
+  return `${index + 1}. ${entry.title} [${entry.category}/${entry.bot_scope}]${termLine}\n${entry.content}`;
 }
 
 function extractOpenAIText(payload: OpenAIResponsePayload) {
@@ -931,9 +1234,49 @@ function extractOpenAIText(payload: OpenAIResponsePayload) {
   return parts.join("\n").trim();
 }
 
+function extractChatCompletionText(payload: ChatCompletionResponsePayload) {
+  return payload.choices?.[0]?.message?.content?.trim() ?? "";
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const raw = await response.text();
+  if (!raw) {
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch (_error) {
+    return {
+      error: {
+        message: raw.slice(0, 500),
+      },
+    } as T;
+  }
+}
+
 function clampWhatsAppReply(text: string) {
   const trimmed = text.replace(/\n{3,}/g, "\n\n").trim();
   return trimmed.length > 1200 ? `${trimmed.slice(0, 1190)}...` : trimmed;
+}
+
+function getNumberEnv(name: string, fallback: number) {
+  const value = Number.parseInt(Deno.env.get(name) ?? "", 10);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
 async function getPendingContributions(supabase: SupabaseClient, memberId: string): Promise<Contribution[]> {
@@ -1105,10 +1448,24 @@ async function sendAndLogText(
   memberId: string | null,
   text: string,
 ) {
-  const result = await sendWhatsAppText(contact.wa_id, text);
-  const waMessageId = result?.messages?.[0]?.id ?? null;
+  let result: Record<string, unknown> = {};
+  let waMessageId: string | null = null;
+  let status = "sent";
 
-  await supabase.from("whatsapp_messages").insert({
+  try {
+    result = await sendWhatsAppText(contact.wa_id, text);
+    const messages = result?.messages as Array<{ id?: string }> | undefined;
+    waMessageId = messages?.[0]?.id ?? null;
+    status = waMessageId ? "sent" : "failed";
+  } catch (error) {
+    status = "failed";
+    result = {
+      error: error instanceof Error ? error.message : String(error),
+    };
+    console.error("Failed to send WhatsApp reply:", result);
+  }
+
+  const { error: outboundLogError } = await supabase.from("whatsapp_messages").insert({
     contact_id: contact.id,
     member_id: memberId,
     wa_message_id: waMessageId,
@@ -1116,13 +1473,39 @@ async function sendAndLogText(
     message_type: "text",
     text_body: text,
     payload: result ?? {},
-    status: waMessageId ? "sent" : "failed",
+    status,
   });
 
-  await supabase
+  if (outboundLogError) {
+    console.error("Failed to log outbound WhatsApp message:", outboundLogError);
+  }
+
+  const { error: contactUpdateError } = await supabase
     .from("whatsapp_contacts")
     .update({ last_outbound_at: new Date().toISOString() })
     .eq("id", contact.id);
+
+  if (contactUpdateError) {
+    console.error("Failed to update WhatsApp contact outbound timestamp:", contactUpdateError);
+  }
+}
+
+function buildChatMessages(
+  text: string,
+  member: MemberProfile | null,
+  botMode: BotMode,
+  entries: KnowledgeEntry[],
+) {
+  return [
+    {
+      role: "system",
+      content: buildAiInstructions(botMode),
+    },
+    {
+      role: "user",
+      content: buildAiInput(text, member, botMode, entries),
+    },
+  ];
 }
 
 async function sendWhatsAppText(to: string, text: string) {
@@ -1212,6 +1595,48 @@ function extractMessageText(message: WhatsAppMessage) {
   return "";
 }
 
+function rankKnowledgeEntries(query: string, entries: KnowledgeEntry[]) {
+  return entries
+    .map((entry) => ({
+      entry,
+      score: knowledgeScore(query, entry),
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+function knowledgeScore(query: string, entry: KnowledgeEntry) {
+  const queryTokens = tokenizeForSearch(query);
+  if (!queryTokens.length) {
+    return 0;
+  }
+
+  const titleTokens = new Set(tokenizeForSearch(`${entry.title} ${entry.category}`));
+  const contentTokens = new Set(tokenizeForSearch(`${entry.content} ${metadataSearchText(entry.metadata)}`));
+  const haystack = normalizeForSearch(`${entry.title} ${entry.category} ${entry.content} ${metadataSearchText(entry.metadata)}`);
+  let score = 0;
+
+  for (const token of queryTokens) {
+    if (titleTokens.has(token)) {
+      score += 5;
+    }
+
+    if (contentTokens.has(token)) {
+      score += 2;
+    }
+
+    if (token.length >= 4 && Array.from(contentTokens).some((word) => word.startsWith(token) || token.startsWith(word))) {
+      score += 1;
+    }
+  }
+
+  const normalizedQuery = normalizeForSearch(query);
+  if (normalizedQuery.length >= 5 && haystack.includes(normalizedQuery)) {
+    score += 6;
+  }
+
+  return score;
+}
+
 function extractAmount(text: string) {
   const match = text.replace(/,/g, "").match(/\b(?:kes|ksh|k)?\s*(\d+(?:\.\d{1,2})?)\b/i);
   if (!match) return null;
@@ -1220,8 +1645,43 @@ function extractAmount(text: string) {
 }
 
 function keywordScore(query: string, content: string) {
-  const words = new Set(query.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length > 2));
-  return content.toLowerCase().split(/[^a-z0-9]+/).reduce((score, word) => score + (words.has(word) ? 1 : 0), 0);
+  const words = new Set(tokenizeForSearch(query));
+  return tokenizeForSearch(content).reduce((score, word) => score + (words.has(word) ? 1 : 0), 0);
+}
+
+function tokenizeForSearch(value: string) {
+  return normalizeForSearch(value)
+    .split(" ")
+    .filter((word) => word.length > 2 && !SEARCH_STOP_WORDS.has(word));
+}
+
+function normalizeForSearch(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function metadataSearchText(metadata: KnowledgeEntry["metadata"]) {
+  return metadata ? JSON.stringify(metadata) ?? "" : "";
+}
+
+function metadataTerms(metadata: KnowledgeEntry["metadata"]) {
+  if (!metadata) {
+    return [];
+  }
+
+  const value = metadata.search_terms;
+  if (Array.isArray(value)) {
+    return value.map((term) => String(term)).filter(Boolean).slice(0, 18);
+  }
+
+  if (typeof value === "string") {
+    return value.split(",").map((term) => term.trim()).filter(Boolean).slice(0, 18);
+  }
+
+  return [];
 }
 
 function phoneCandidates(phone: string) {
@@ -1313,6 +1773,38 @@ function assertWhatsAppConfigured() {
   if (!WHATSAPP_ACCESS_TOKEN || !WHATSAPP_PHONE_NUMBER_ID) {
     throw new Error("WhatsApp credentials are not configured");
   }
+}
+
+function webhookHealthResponse() {
+  return jsonResponse({
+    ok: true,
+    function: "whatsapp-webhook",
+    checked_at: new Date().toISOString(),
+    configured: {
+      supabase_url: Boolean(SUPABASE_URL),
+      service_role: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      verify_token: Boolean(WHATSAPP_VERIFY_TOKEN),
+      app_secret: Boolean(WHATSAPP_APP_SECRET),
+      access_token: Boolean(WHATSAPP_ACCESS_TOKEN),
+      phone_number_id: Boolean(WHATSAPP_PHONE_NUMBER_ID),
+      ai_provider: selectedAiProvider(),
+      groq: Boolean(GROQ_API_KEY),
+      openai: Boolean(OPENAI_API_KEY),
+      mpesa: Boolean(MPESA_CONSUMER_KEY && MPESA_CONSUMER_SECRET && MPESA_PASSKEY && MPESA_SHORTCODE),
+    },
+  }, 200);
+}
+
+function selectedAiProvider() {
+  if ((AI_PROVIDER === "auto" || AI_PROVIDER === "groq") && GROQ_API_KEY) {
+    return "groq";
+  }
+
+  if ((AI_PROVIDER === "auto" || AI_PROVIDER === "openai") && OPENAI_API_KEY) {
+    return "openai";
+  }
+
+  return "none";
 }
 
 function assertMpesaConfigured() {

@@ -34,6 +34,24 @@ type Actor = {
   email?: string;
 };
 
+type AuthAdminError = { message: string };
+
+type AuthAdminApi = {
+  createUser: (attributes: {
+    email: string;
+    password: string;
+    email_confirm?: boolean;
+    phone?: string;
+    user_metadata?: Record<string, unknown>;
+  }) => Promise<{
+    data: { user?: { id?: string } | null } | null;
+    error: AuthAdminError | null;
+  }>;
+  deleteUser: (userId: string, shouldSoftDelete?: boolean) => Promise<{
+    error: AuthAdminError | null;
+  }>;
+};
+
 class HttpError extends Error {
   status: number;
   details?: Record<string, unknown>;
@@ -51,9 +69,6 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const ELEVATED_ROLES = [
   "admin",
@@ -93,9 +108,103 @@ const ASSIGNABLE_OFFICIAL_ROLES = new Set([
   "committee_member",
   "patron",
 ]);
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function createAdminClient() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRole) {
+    throw new HttpError(500, "Member registration service is missing Supabase credentials");
+  }
+
+  return createClient(supabaseUrl, serviceRole, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function getAuthAdmin(supabase: ReturnType<typeof createClient>): AuthAdminApi {
+  return supabase.auth.admin as unknown as AuthAdminApi;
+}
 
 function hasAnyRole(userRoles: string[], requiredRoles: readonly string[]): boolean {
   return userRoles.some((role) => requiredRoles.includes(role));
+}
+
+function normalizeKenyanPhone(rawPhone: string): string | null {
+  const digits = rawPhone.trim().replace(/\D/g, "");
+  if (/^0[17][0-9]{8}$/.test(digits)) {
+    return `+254${digits.slice(1)}`;
+  }
+  if (/^254[17][0-9]{8}$/.test(digits)) {
+    return `+${digits}`;
+  }
+  return null;
+}
+
+function isDuplicateAuthError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("already") || lower.includes("registered") || lower.includes("duplicate");
+}
+
+function mapCreateUserError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("email") && isDuplicateAuthError(message)) {
+    return "A member already uses this email address. Search for the existing member or use a different email.";
+  }
+  if (lower.includes("phone") && isDuplicateAuthError(message)) {
+    return "A member already uses this phone number. Search for the existing member or use a different phone.";
+  }
+  if (lower.includes("password")) {
+    return "National ID must be at least 6 characters because it becomes the first password.";
+  }
+  if (isDuplicateAuthError(message)) {
+    return "This member already has a login account. Check the email, phone, or National ID.";
+  }
+  return "Unable to create the member login account. Please check the details and try again.";
+}
+
+async function ensureNoExistingProfile(
+  supabase: ReturnType<typeof createClient>,
+  field: "email" | "phone" | "id_number",
+  value: string | null,
+  label: string,
+): Promise<void> {
+  if (!value) return;
+
+  const query = supabase
+    .from("profiles")
+    .select("id, full_name, membership_number")
+    .limit(1);
+  const { data, error } = field === "email"
+    ? await query.ilike(field, value)
+    : await query.eq(field, value);
+
+  if (error) {
+    throw new HttpError(500, `Failed to check existing ${label}`, { detail: error.message });
+  }
+
+  const existing = Array.isArray(data) ? data[0] : null;
+  if (existing) {
+    const name = existing.full_name ? ` (${existing.full_name})` : "";
+    const memberNumber = existing.membership_number ? `, ${existing.membership_number}` : "";
+    throw new HttpError(409, `A member with this ${label} already exists${name}${memberNumber}.`);
+  }
+}
+
+async function generateMembershipNumber(supabase: ReturnType<typeof createClient>): Promise<string | null> {
+  const { data, error } = await supabase.rpc("generate_membership_number");
+  if (error) {
+    console.warn("Failed to generate membership number", error.message);
+    return null;
+  }
+  return typeof data === "string" && data.trim() ? data.trim() : null;
+}
+
+async function cleanupCreatedUser(supabase: ReturnType<typeof createClient>, userId: string): Promise<void> {
+  const { error } = await getAuthAdmin(supabase).deleteUser(userId, false);
+  if (error) {
+    console.warn("Failed to cleanup partially created member", { userId, error: error.message });
+  }
 }
 
 function ensureElevated(roles: string[]): void {
@@ -405,7 +514,7 @@ async function permanentlyDeleteMember(
 
   await cleanupMemberReferences(supabase, memberId);
 
-  const { error: deleteError } = await (supabase.auth.admin as any).deleteUser(memberId, false);
+  const { error: deleteError } = await getAuthAdmin(supabase).deleteUser(memberId, false);
   if (deleteError) {
     throw new HttpError(500, "Failed to permanently delete member", {
       detail: deleteError.message,
@@ -510,7 +619,7 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createAdminClient();
     const actor = await getActor(supabase, token);
 
     const body = await req.json();
@@ -522,8 +631,9 @@ serve(async (req) => {
 
     if (action === "create_member") {
       const fullName = (body.full_name as string | undefined)?.trim();
-      const phone = (body.phone as string | undefined)?.trim();
-      const email = (body.email as string | undefined)?.trim() || null;
+      const rawPhone = (body.phone as string | undefined)?.trim() || "";
+      const phone = normalizeKenyanPhone(rawPhone);
+      const email = (body.email as string | undefined)?.trim().toLowerCase() || null;
       const rawIdNumber =
         typeof body.id_number === "string"
           ? body.id_number
@@ -537,58 +647,140 @@ serve(async (req) => {
       const isStudent = Boolean(body.is_student);
       const feePaid = Boolean(body.registration_fee_paid);
 
-      if (!fullName || !phone || !idNumber) {
+      if (!fullName || !rawPhone || !idNumber) {
         throw new HttpError(400, "Full name, phone, and National ID are required");
+      }
+
+      if (!phone) {
+        throw new HttpError(400, "Enter a valid Kenyan mobile number, for example 07XXXXXXXX or +2547XXXXXXXX.");
+      }
+
+      if (email && !EMAIL_REGEX.test(email)) {
+        throw new HttpError(400, "Enter a valid email address, or leave email blank.");
       }
 
       if (password.length < 6) {
         throw new HttpError(400, "National ID must be at least 6 characters to be used as the default password");
       }
 
+      if (status !== "active" && status !== "pending") {
+        throw new HttpError(400, "Member status must be Active or Pending.");
+      }
+
+      await ensureNoExistingProfile(supabase, "phone", phone, "phone number");
+      await ensureNoExistingProfile(supabase, "id_number", idNumber, "National ID");
+      await ensureNoExistingProfile(supabase, "email", email, "email address");
+
       // Synthesize an email if none provided so auth.admin.createUser works
       const effectiveEmail = email || `member-${Date.now()}-${Math.floor(Math.random() * 1000)}@turuturustars.local`;
 
-      const { data: created, error: createErr } = await (supabase.auth.admin as any).createUser({
+      const { data: created, error: createErr } = await getAuthAdmin(supabase).createUser({
         email: effectiveEmail,
         password,
         email_confirm: true,
-        phone: phone.replace(/[^0-9+]/g, "") || undefined,
+        phone,
         user_metadata: { full_name: fullName, phone, id_number: idNumber, created_by_admin: true },
       });
 
       if (createErr || !created?.user?.id) {
-        throw new HttpError(500, "Failed to create user", { detail: createErr?.message ?? "no user returned" });
+        const detail = createErr?.message ?? "no user returned";
+        throw new HttpError(isDuplicateAuthError(detail) ? 409 : 500, mapCreateUserError(detail), { detail });
       }
 
       const newUserId = created.user.id as string;
+      const now = new Date().toISOString();
 
-      // The handle_new_user trigger creates a profile + member role.
-      // Patch profile with admin-supplied fields.
-      const { error: profErr } = await supabase
+      const { data: existingProfile, error: existingProfileErr } = await supabase
         .from("profiles")
-        .update({
-          full_name: fullName,
-          phone,
-          email,
-          id_number: idNumber,
-          status,
-          is_student: isStudent,
-          registration_fee_paid: feePaid,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", newUserId);
+        .select("membership_number, joined_at")
+        .eq("id", newUserId)
+        .maybeSingle();
 
-      if (profErr) {
-        // best-effort cleanup
-        await (supabase.auth.admin as any).deleteUser(newUserId, false);
-        throw new HttpError(500, "Failed to finalize profile", { detail: profErr.message });
+      if (existingProfileErr) {
+        await cleanupCreatedUser(supabase, newUserId);
+        throw new HttpError(500, "Failed to prepare member profile", { detail: existingProfileErr.message });
       }
 
-      const { data: profile } = await supabase
+      const generatedMembershipNumber = existingProfile?.membership_number
+        ? null
+        : await generateMembershipNumber(supabase);
+      const membershipNumber =
+        (existingProfile?.membership_number as string | null | undefined) ??
+        generatedMembershipNumber ??
+        `TS-${Date.now()}`;
+
+      const profilePayload: Record<string, unknown> = {
+        id: newUserId,
+        full_name: fullName,
+        phone,
+        email,
+        id_number: idNumber,
+        status,
+        is_student: isStudent,
+        registration_fee_paid: feePaid,
+        updated_at: now,
+        joined_at: (existingProfile?.joined_at as string | null | undefined) ?? now,
+      };
+      if (membershipNumber) {
+        profilePayload.membership_number = membershipNumber;
+      }
+
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .upsert(profilePayload, { onConflict: "id" });
+
+      if (profErr) {
+        await cleanupCreatedUser(supabase, newUserId);
+        throw new HttpError(500, "Failed to save member profile", { detail: profErr.message });
+      }
+
+      const { error: roleErr } = await supabase
+        .from("user_roles")
+        .upsert(
+          {
+            user_id: newUserId,
+            role: "member",
+            assigned_by: actor.id,
+          },
+          { onConflict: "user_id,role" },
+        );
+
+      if (roleErr) {
+        await cleanupCreatedUser(supabase, newUserId);
+        throw new HttpError(500, "Failed to assign member role", { detail: roleErr.message });
+      }
+
+      const { error: trackingErr } = await supabase
+        .from("contribution_tracking")
+        .upsert({ member_id: newUserId }, { onConflict: "member_id" });
+
+      if (trackingErr) {
+        console.warn("Failed to initialize contribution tracking", { userId: newUserId, error: trackingErr.message });
+      }
+
+      const { error: notificationPrefsErr } = await supabase
+        .from("notification_preferences")
+        .upsert({ user_id: newUserId }, { onConflict: "user_id" });
+
+      if (notificationPrefsErr) {
+        console.warn("Failed to initialize notification preferences", {
+          userId: newUserId,
+          error: notificationPrefsErr.message,
+        });
+      }
+
+      const { data: profile, error: readProfileErr } = await supabase
         .from("profiles")
         .select("id, full_name, email, phone, id_number, membership_number, status, is_student, registration_fee_paid, joined_at")
         .eq("id", newUserId)
         .maybeSingle();
+
+      if (readProfileErr || !profile) {
+        await cleanupCreatedUser(supabase, newUserId);
+        throw new HttpError(500, "Member account was created but profile could not be loaded", {
+          detail: readProfileErr?.message ?? "no profile returned",
+        });
+      }
 
       await logAdminAction(supabase, actor.id, actor.primaryRole, "member_created", "member", newUserId, {
         full_name: fullName,
@@ -685,14 +877,17 @@ serve(async (req) => {
         "membership_rejected",
       );
 
-      if (Boolean(body.delete_account)) {
-        await permanentlyDeleteMember(supabase, actor, memberId, body.confirmation, Boolean(body.force));
+      const deleteAccount = body.delete_account === true;
+      const forceDelete = body.force === true;
+
+      if (deleteAccount) {
+        await permanentlyDeleteMember(supabase, actor, memberId, body.confirmation, forceDelete);
       }
 
       await logAdminAction(supabase, actor.id, actor.primaryRole, "member_rejected", "member", memberId, {
         reason,
-        delete_account: Boolean(body.delete_account),
-        force: Boolean(body.force),
+        delete_account: deleteAccount,
+        force: forceDelete,
       });
 
       return new Response(JSON.stringify({ ok: true, member_id: memberId, rejected: true }), {

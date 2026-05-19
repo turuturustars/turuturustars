@@ -12,10 +12,14 @@ It can:
 - Guide unknown numbers through a registration-interest flow:
   confirm the WhatsApp number, collect email, send an email OTP, and store the verified request.
 - Understand natural English, Kiswahili, and mixed Kenyan phrasing.
-- Answer member queries about profile status, contributions, wallet balance, announcements, meetings, and welfare cases.
+- Offer an M-Pesa-style numbered menu while still accepting normal conversation.
+- Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
+- Start wallet top-ups by M-Pesa STK push using the main `wallets` and `wallet_transactions` ledger.
+- Let members list active kitties and contribute to a kitty by M-Pesa or from their wallet.
 - Record member transaction/contribution notices as `contributions.status = pending`.
 - Let treasurers/admins record expenditures as `expenditures.status = pending_approval`.
 - Unlock official/admin actions by the registered sender number and roles, including creating welfare cases.
+- Answer trainable support questions from `ai_knowledge_base`, with optional Groq/OpenAI wording when configured.
 - Keep an audit trail in `whatsapp_sessions`, `whatsapp_messages`, and `whatsapp_actions`.
 - Keep service feedback in `whatsapp_conversation_ratings`.
 - Keep registration leads in `whatsapp_registration_requests` for admin review or conversion.
@@ -38,18 +42,34 @@ Recommended:
 ```bash
 supabase secrets set WHATSAPP_APP_SECRET="meta-app-secret"
 supabase secrets set WHATSAPP_ABANDONMENT_MINUTES="3"
+supabase secrets set MPESA_CONSUMER_KEY="..." MPESA_CONSUMER_SECRET="..." MPESA_SHORTCODE="..." MPESA_PASSKEY="..." MPESA_BASE_URL="https://api.safaricom.co.ke"
+supabase secrets set MPESA_CALLBACK_URL="https://<project-ref>.functions.supabase.co/functions/v1/mpesa-callback"
 ```
 
-Optional AI intent extraction. Groq is preferred when both providers are configured; OpenAI remains a fallback:
+Optional AI intent extraction and knowledge replies:
 
 ```bash
-supabase secrets set GROQ_API_KEY="groq-api-key"
-supabase secrets set GROQ_MODEL="llama-3.3-70b-versatile"
+supabase secrets set WHATSAPP_AI_PROVIDER="groq"
+supabase secrets set GROQ_API_KEY="your-rotated-groq-api-key"
+supabase secrets set WHATSAPP_AI_TIMEOUT_MS="8000"
+supabase secrets set GROQ_REGISTRATION_MODEL="openai/gpt-oss-20b"
+supabase secrets set GROQ_INTENT_MODEL="openai/gpt-oss-20b"
+supabase secrets set GROQ_KNOWLEDGE_MODEL="openai/gpt-oss-120b"
+```
+
+The bot uses Groq automatically when `GROQ_API_KEY` is present. `GROQ_REGISTRATION_MODEL` and `GROQ_INTENT_MODEL` default to `openai/gpt-oss-20b` so classification can use structured JSON schema output; `GROQ_KNOWLEDGE_MODEL` defaults to `openai/gpt-oss-120b` for stronger member-facing wording. `WHATSAPP_AI_MODEL` or `GROQ_MODEL` can set one model for all AI tasks, but that disables the purpose-specific defaults.
+
+You can still use OpenAI instead:
+
+```bash
+supabase secrets set WHATSAPP_AI_PROVIDER="openai"
 supabase secrets set OPENAI_API_KEY="openai-api-key"
 supabase secrets set OPENAI_MODEL="gpt-4o-mini"
 ```
 
-Without `GROQ_API_KEY` or `OPENAI_API_KEY`, the function still works using the local English/Kiswahili parser.
+Set `WHATSAPP_AI_PROVIDER="off"` to force the local English/Kiswahili parser only. Without `GROQ_API_KEY` or `OPENAI_API_KEY`, the function still works using the local parser and direct database lookups.
+
+Do not commit AI keys or paste production keys into docs or code. Store them only as Supabase Edge Function secrets, and rotate any key that has been shared in chat or logs.
 
 ## Meta Webhook
 
@@ -72,8 +92,12 @@ Niko na deni gani?
 Nimelipa 500 welfare ref QJD123ABC
 Record transaction 1000 membership fee ref QJD123ABC
 Wallet balance?
+Top up wallet 500
+Contribute 300 to school kitty by M-Pesa
+Contribute 200 to kitty from wallet
 Matangazo mapya?
 Mkutano ujao ni lini?
+MENU
 ```
 
 Officials/admins get role-aware actions from the registered phone number:

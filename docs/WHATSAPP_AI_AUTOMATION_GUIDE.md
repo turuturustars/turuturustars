@@ -17,26 +17,26 @@ The chatbot runs in two modes:
 
 ## Current Implementation
 
-This repo now includes the backend foundation:
+This repo now includes the backend foundation. The newer canonical assistant should be `supabase/functions/whatsapp-bot`; keep `whatsapp-webhook` only as legacy reference until its remaining payment flows are fully retired or ported.
 
-- `supabase/functions/whatsapp-webhook` receives official WhatsApp webhooks.
+- `supabase/functions/whatsapp-bot` receives official WhatsApp webhooks and runs the smart member assistant.
 - `supabase/functions/whatsapp-send` lets authorized officials send WhatsApp messages or templates.
 - `whatsapp_contacts` links WhatsApp phone numbers to member profiles.
 - `whatsapp_messages` stores inbound/outbound messages and delivery statuses.
-- `whatsapp_payment_intents` tracks WhatsApp-started M-Pesa payments.
-- `member_wallets` and `member_wallet_transactions` record wallet balances and WhatsApp-funded top-ups.
+- `whatsapp_sessions`, `whatsapp_actions`, `whatsapp_conversation_ratings`, and `whatsapp_registration_requests` store smart-assistant state, audit trails, ratings, and registration leads.
+- `wallets` and `wallet_transactions` record wallet balances and WhatsApp-funded top-ups.
 - `whatsapp-notifications` sends queued app notifications through the official WhatsApp number.
 - `ai_knowledge_base` stores trainable support answers with `bot_scope` set to `public`, `member`, or `both`.
-- `mpesa-callback` reconciles WhatsApp payment intents and sends WhatsApp confirmations.
+- `mpesa-callback` reconciles M-Pesa payments and sends WhatsApp confirmations where configured.
 - `/dashboard/communication/whatsapp` lets officials manage bot answers, inspect recent WhatsApp messages, review payment intents, dispatch queued notifications, and send a test WhatsApp message.
-- Optional OpenAI fallback improves answers when no exact knowledge-base keyword match is found.
+- Optional Groq or OpenAI fallback improves intent extraction and knowledge-base wording when configured.
 
 ## Production Flow
 
 ### 1. Customer/member asks a question
 
 1. Member sends WhatsApp message to the official WhatsApp Business number.
-2. Meta sends the message to `whatsapp-webhook`.
+2. Meta sends the message to `whatsapp-bot`.
 3. The webhook links the phone number to `profiles.phone` when possible.
 4. The webhook chooses public or member chatbot mode.
 5. The bot answers using command routing and scoped `ai_knowledge_base`.
@@ -45,7 +45,7 @@ This repo now includes the backend foundation:
 ### 2. Member pays from WhatsApp
 
 1. Member replies `PAY`.
-2. The webhook checks pending or missed contributions.
+2. The bot checks pending or missed contributions.
 3. The system starts an M-Pesa STK push using Safaricom Daraja.
 4. A `whatsapp_payment_intents` row is created.
 5. Safaricom calls `mpesa-callback`.
@@ -55,7 +55,7 @@ This repo now includes the backend foundation:
 ### 3. Member funds wallet from WhatsApp
 
 1. Member replies `FUND 500`, `TOPUP 500`, `DEPOSIT 500`, or `WALLET 500`.
-2. The webhook creates a pending `member_wallet_transactions` credit.
+2. The bot creates a pending `wallet_transactions` credit.
 3. The system starts an M-Pesa STK push.
 4. Safaricom calls `mpesa-callback`.
 5. The callback atomically credits the member wallet only after a successful M-Pesa result.
@@ -89,7 +89,7 @@ Create or connect:
 - WhatsApp business phone number.
 - Permanent or long-lived system user access token.
 - Webhook callback URL:
-  `https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook`
+  `https://<project-ref>.supabase.co/functions/v1/whatsapp-bot`
 - Webhook verify token matching `WHATSAPP_VERIFY_TOKEN`.
 - Webhook subscription for WhatsApp messages.
 
@@ -107,8 +107,8 @@ WHATSAPP_VERIFY_TOKEN=choose-a-long-random-token
 WHATSAPP_APP_SECRET=meta-app-secret
 WHATSAPP_ACCESS_TOKEN=meta-system-user-token
 WHATSAPP_PHONE_NUMBER_ID=meta-phone-number-id
-WHATSAPP_GRAPH_VERSION=v21.0
-WHATSAPP_NOTIFICATION_SECRET=choose-a-long-random-dispatch-secret
+WHATSAPP_GRAPH_API_VERSION=v20.0
+WHATSAPP_NOTIFICATIONS_JOB_SECRET=choose-a-long-random-dispatch-secret
 
 MPESA_CONSUMER_KEY=...
 MPESA_CONSUMER_SECRET=...
@@ -117,9 +117,18 @@ MPESA_SHORTCODE=...
 MPESA_BASE_URL=https://sandbox.safaricom.co.ke
 MPESA_CALLBACK_URL=https://<project-ref>.supabase.co/functions/v1/mpesa-callback
 
-# Optional smart-answer fallback
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.4-mini
+# Optional smart intent and knowledge fallback. Groq is preferred for low-latency WhatsApp replies.
+WHATSAPP_AI_PROVIDER=groq
+WHATSAPP_AI_TIMEOUT_MS=8000
+GROQ_API_KEY=...
+GROQ_REGISTRATION_MODEL=openai/gpt-oss-20b
+GROQ_INTENT_MODEL=openai/gpt-oss-20b
+GROQ_KNOWLEDGE_MODEL=openai/gpt-oss-120b
+
+# Optional OpenAI fallback instead of Groq.
+# WHATSAPP_AI_PROVIDER=openai
+# OPENAI_API_KEY=...
+# OPENAI_MODEL=gpt-4o-mini
 ```
 
 Use Safaricom production URLs and production credentials when going live.
@@ -175,7 +184,9 @@ Start with retrieval from `ai_knowledge_base`, not fine-tuning. Officials can ma
 - Wallet funding and wallet use.
 - Contacts for officials.
 
-The webhook can also call OpenAI's Responses API when `OPENAI_API_KEY` is configured. Exact member operations still stay deterministic: payments, balances, receipts, profile status, meetings, announcements, notifications, and welfare cases are read from Supabase commands instead of invented by the model.
+The smart assistant can call Groq or OpenAI through an OpenAI-compatible chat-completions interface. Registration and intent extraction use structured JSON when the chosen model supports it, then fall back to normal JSON mode and finally to the local English/Kiswahili parser. Exact member operations still stay deterministic: payments, balances, receipts, profile status, meetings, announcements, notifications, welfare cases, wallet top-ups, and kitty contributions are read from Supabase commands instead of invented by the model.
+
+Never commit AI keys. Store them as Supabase Edge Function secrets only, and rotate any key that has been shared in chat or logs before production.
 
 ## Local Webhook Testing With ngrok
 
@@ -191,13 +202,13 @@ ngrok http 54321
 Then set the Meta webhook callback URL to the HTTPS forwarding URL plus the local function path, for example:
 
 ```text
-https://<ngrok-domain>/functions/v1/whatsapp-webhook
+https://<ngrok-domain>/functions/v1/whatsapp-bot
 ```
 
 For deployed Supabase testing, use:
 
 ```text
-https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook
+https://<project-ref>.supabase.co/functions/v1/whatsapp-bot
 ```
 
 ## Important Notes

@@ -39,6 +39,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { logAuditAction } from '@/lib/auditLogger';
 import { useAuth } from '@/hooks/useAuth';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 interface Member {
   id: string;
@@ -47,10 +48,86 @@ interface Member {
   phone: string;
   id_number: string | null;
   membership_number: string | null;
-  status: 'active' | 'dormant' | 'pending' | 'suspended';
+  status: MemberStatus;
   is_student: boolean;
   registration_fee_paid: boolean;
   joined_at: string;
+}
+
+type MemberStatus = 'active' | 'dormant' | 'pending' | 'suspended';
+
+type FunctionErrorPayload = {
+  error?: string;
+  details?: {
+    detail?: string;
+    error?: string;
+    message?: string;
+    response?: { message?: string };
+  } | string | null;
+};
+
+async function getFunctionErrorMessage(error: unknown): Promise<string> {
+  let status: number | undefined;
+  let serverMessage = '';
+  let serverDetail = '';
+
+  if (error && typeof error === 'object') {
+    const context = (error as { context?: unknown }).context;
+    if (context instanceof Response) {
+      status = context.status;
+      try {
+        const payload = (await context.clone().json()) as FunctionErrorPayload;
+        serverMessage = payload.error?.trim() || '';
+        if (typeof payload.details === 'string') {
+          serverDetail = payload.details.trim();
+        } else if (payload.details) {
+          serverDetail =
+            payload.details.detail?.trim() ||
+            payload.details.error?.trim() ||
+            payload.details.message?.trim() ||
+            payload.details.response?.message?.trim() ||
+            '';
+        }
+      } catch {
+        // The response was not JSON. Fall through to status-based messages.
+      }
+    }
+
+    const rawMessage =
+      'message' in error && typeof (error as { message?: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : '';
+
+    const lowerRaw = rawMessage.toLowerCase();
+    if (status === 404 || lowerRaw.includes('failed to send a request to the edge function')) {
+      return 'The member registration service is not available right now. Please contact the system administrator, then try again.';
+    }
+    if (status === 401) {
+      return 'Your session has expired. Sign out, sign in again, and retry.';
+    }
+    if (status === 403) {
+      return 'Your account does not have permission to add members.';
+    }
+    if (status === 409) {
+      return serverMessage || serverDetail || 'This member already exists. Check the email, phone, or National ID.';
+    }
+
+    const combined = `${serverMessage} ${serverDetail} ${rawMessage}`.toLowerCase();
+    if (combined.includes('already') || combined.includes('registered') || combined.includes('duplicate')) {
+      return serverMessage || serverDetail || 'This member already exists. Check the email, phone, or National ID.';
+    }
+    if (serverMessage) {
+      return serverMessage;
+    }
+    if (serverDetail) {
+      return serverDetail;
+    }
+    if (rawMessage) {
+      return rawMessage;
+    }
+  }
+
+  return 'The member could not be saved. Please check the details and try again.';
 }
 
 const MembersPage = () => {
@@ -64,7 +141,7 @@ const MembersPage = () => {
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     memberId?: string;
-    newStatus?: string;
+    newStatus?: MemberStatus;
   }>({ open: false });
   const [deleteDialog, setDeleteDialog] = useState<{
     step: 'idle' | 'prompt' | 'confirm';
@@ -83,6 +160,7 @@ const MembersPage = () => {
     feePaid: string;
     status: 'active' | 'pending';
     isSubmitting: boolean;
+    submitError: string | null;
   }>({
     open: false,
     fullName: '',
@@ -93,6 +171,7 @@ const MembersPage = () => {
     feePaid: 'no',
     status: 'active',
     isSubmitting: false,
+    submitError: null,
   });
   const { toast } = useToast();
   const { status, showSuccess } = useStatus();
@@ -181,7 +260,7 @@ const MembersPage = () => {
     }
   };
 
-  const handleStatusChange = (memberId: string, newStatus: string) => {
+  const handleStatusChange = (memberId: string, newStatus: MemberStatus) => {
     setConfirmDialog({
       open: true,
       memberId,
@@ -286,7 +365,7 @@ const MembersPage = () => {
         async () => {
           const { error: updateError } = await supabase
             .from('profiles')
-            .update({ status: newStatus as any })
+            .update({ status: newStatus })
             .eq('id', memberId);
 
           if (updateError) throw updateError;
@@ -300,7 +379,7 @@ const MembersPage = () => {
 
       setMembers((prev) =>
         prev.map((m) =>
-          m.id === memberId ? { ...m, status: newStatus as any } : m
+          m.id === memberId ? { ...m, status: newStatus } : m
         )
       );
 
@@ -335,27 +414,48 @@ const MembersPage = () => {
 
   const handleAddMember = async () => {
     if (!canManageMembers) return;
-    if (!addDialog.fullName || !addDialog.phone || !addDialog.idNumber) {
-      toast({ title: 'Missing details', description: 'Name, phone, and National ID are required', variant: 'destructive' });
+    const fullName = addDialog.fullName.trim();
+    const email = addDialog.email.trim().toLowerCase();
+    const idNumber = addDialog.idNumber.replace(/\s+/g, '').trim();
+    const normalizedPhone = normalizeKenyanPhone(addDialog.phone);
+    const failValidation = (description: string) => {
+      setAddDialog((prev) => ({ ...prev, submitError: description }));
+      toast({ title: 'Check member details', description, variant: 'destructive' });
+    };
+
+    if (!fullName || !addDialog.phone.trim() || !idNumber) {
+      failValidation('Name, phone, and National ID are required.');
+      return;
+    }
+    if (!normalizedPhone) {
+      failValidation(formatKenyanPhoneError());
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      failValidation('Enter a valid email address, or leave email blank.');
+      return;
+    }
+    if (idNumber.length < 6) {
+      failValidation('National ID must be at least 6 characters because it becomes the first password.');
       return;
     }
 
-    setAddDialog((prev) => ({ ...prev, isSubmitting: true }));
+    setAddDialog((prev) => ({ ...prev, isSubmitting: true, submitError: null }));
     try {
       const { data, error } = await supabase.functions.invoke('admin-ops', {
         body: {
           action: 'create_member',
-          full_name: addDialog.fullName,
-          email: addDialog.email || null,
-          phone: addDialog.phone,
-          id_number: addDialog.idNumber,
+          full_name: fullName,
+          email: email || null,
+          phone: normalizedPhone,
+          id_number: idNumber,
           status: addDialog.status,
           is_student: addDialog.isStudent === 'yes',
           registration_fee_paid: addDialog.feePaid === 'yes',
         },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(await getFunctionErrorMessage(error));
       if (data?.error) throw new Error(data.error);
 
       const member = data?.member as Member | undefined;
@@ -384,12 +484,13 @@ const MembersPage = () => {
         feePaid: 'no',
         status: 'active',
         isSubmitting: false,
+        submitError: null,
       });
     } catch (err) {
       const msg = getErrorMessage(err);
       logError(err, 'MembersPage.handleAddMember');
-      toast({ title: 'Create failed', description: msg, variant: 'destructive' });
-      setAddDialog((prev) => ({ ...prev, isSubmitting: false }));
+      toast({ title: 'Member not saved', description: msg, variant: 'destructive' });
+      setAddDialog((prev) => ({ ...prev, isSubmitting: false, submitError: msg }));
     }
   };
 
@@ -595,7 +696,7 @@ const MembersPage = () => {
                       <div className="pt-2 border-t">
                         <Select
                           value={member.status}
-                          onValueChange={(value) => handleStatusChange(member.id, value)}
+                          onValueChange={(value) => handleStatusChange(member.id, value as MemberStatus)}
                           disabled={updatingId === member.id}
                         >
                           <SelectTrigger className="w-full">
@@ -691,7 +792,7 @@ const MembersPage = () => {
                           <div className="flex flex-wrap items-center gap-2">
                             <Select
                               value={member.status}
-                              onValueChange={(value) => handleStatusChange(member.id, value)}
+                              onValueChange={(value) => handleStatusChange(member.id, value as MemberStatus)}
                               disabled={updatingId === member.id}
                             >
                               <SelectTrigger className="w-[140px]">
@@ -866,7 +967,7 @@ const MembersPage = () => {
       </Dialog>
 
       {/* Add Member */}
-      <Dialog open={addDialog.open} onOpenChange={(open) => setAddDialog((prev) => ({ ...prev, open }))}>
+      <Dialog open={addDialog.open} onOpenChange={(open) => setAddDialog((prev) => ({ ...prev, open, submitError: open ? prev.submitError : null }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Member</DialogTitle>
@@ -880,7 +981,7 @@ const MembersPage = () => {
               <label className="text-sm font-medium">Full name</label>
               <Input
                 value={addDialog.fullName}
-                onChange={(e) => setAddDialog((prev) => ({ ...prev, fullName: e.target.value }))}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, fullName: e.target.value, submitError: null }))}
                 placeholder="Jane Doe"
               />
             </div>
@@ -889,7 +990,7 @@ const MembersPage = () => {
               <Input
                 type="email"
                 value={addDialog.email}
-                onChange={(e) => setAddDialog((prev) => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, email: e.target.value, submitError: null }))}
                 placeholder="jane@example.com"
               />
             </div>
@@ -897,7 +998,7 @@ const MembersPage = () => {
               <label className="text-sm font-medium">Phone</label>
               <Input
                 value={addDialog.phone}
-                onChange={(e) => setAddDialog((prev) => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, phone: e.target.value, submitError: null }))}
                 placeholder="+2547..."
               />
             </div>
@@ -905,7 +1006,7 @@ const MembersPage = () => {
               <label className="text-sm font-medium">National ID</label>
               <Input
                 value={addDialog.idNumber}
-                onChange={(e) => setAddDialog((prev) => ({ ...prev, idNumber: e.target.value }))}
+                onChange={(e) => setAddDialog((prev) => ({ ...prev, idNumber: e.target.value, submitError: null }))}
                 placeholder="12345678"
               />
             </div>
@@ -955,6 +1056,13 @@ const MembersPage = () => {
               </Select>
             </div>
           </div>
+
+          {addDialog.submitError && (
+            <div className="mt-4 flex gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-950">
+              <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-700" />
+              <p>{addDialog.submitError}</p>
+            </div>
+          )}
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setAddDialog((prev) => ({ ...prev, open: false }))}>
