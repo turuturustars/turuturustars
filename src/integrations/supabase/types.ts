@@ -1059,6 +1059,7 @@ export type Database = {
           created_by: string
           id: string
           meeting_type: string
+          recipient_scope: string
           scheduled_date: string
           status: string | null
           title: string
@@ -1071,6 +1072,7 @@ export type Database = {
           created_by: string
           id?: string
           meeting_type: string
+          recipient_scope?: string
           scheduled_date: string
           status?: string | null
           title: string
@@ -1083,6 +1085,7 @@ export type Database = {
           created_by?: string
           id?: string
           meeting_type?: string
+          recipient_scope?: string
           scheduled_date?: string
           status?: string | null
           title?: string
@@ -1548,6 +1551,7 @@ export type Database = {
           sound: boolean
           updated_at: string
           user_id: string
+          whatsapp: boolean
         }
         Insert: {
           created_at?: string
@@ -1571,6 +1575,7 @@ export type Database = {
           sound?: boolean
           updated_at?: string
           user_id: string
+          whatsapp?: boolean
         }
         Update: {
           created_at?: string
@@ -1594,6 +1599,7 @@ export type Database = {
           sound?: boolean
           updated_at?: string
           user_id?: string
+          whatsapp?: boolean
         }
         Relationships: [
           {

@@ -17,6 +17,7 @@ export interface NotificationPreferencesRecord {
   user_id: string;
   in_app: boolean;
   email: boolean;
+  whatsapp: boolean;
   push: boolean;
   sound: boolean;
   enable_announcements: boolean;
@@ -33,6 +34,7 @@ export interface NotificationPreferencesRecord {
 const DEFAULT_PREFERENCES: Omit<NotificationPreferencesRecord, 'user_id' | 'created_at' | 'updated_at'> = {
   in_app: true,
   email: true,
+  whatsapp: true,
   push: true,
   sound: true,
   enable_announcements: true,
@@ -201,6 +203,7 @@ export function useNotificationPreferences(userId?: string) {
   const delivery = useMemo(() => ({
     inApp: preferences?.in_app ?? true,
     email: preferences?.email ?? true,
+    whatsapp: preferences?.whatsapp ?? true,
     push: preferences?.push ?? true,
     sound: preferences?.sound ?? true,
   }), [preferences]);

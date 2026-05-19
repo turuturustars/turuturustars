@@ -19,13 +19,15 @@ import {
   sendMeetingNotifications, 
   playNotificationSound,
   getNotificationRecipients,
-  type MeetingNotificationType 
+  type MeetingNotificationType,
+  type MeetingRecipientScope,
 } from '@/lib/meetingNotificationService';
 
 interface Meeting {
   id: string;
   title: string;
   meeting_type: string;
+  recipient_scope: MeetingRecipientScope;
   scheduled_date: string;
   venue: string | null;
   agenda: string | null;
@@ -56,7 +58,7 @@ interface Profile {
 }
 
 export default function MeetingsPage() {
-  const { user, hasRole, isOfficial } = useAuth();
+  const { user, hasRole } = useAuth();
   const { status, showSuccess } = useStatus();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [members, setMembers] = useState<Profile[]>([]);
@@ -69,6 +71,7 @@ export default function MeetingsPage() {
   const [newMeeting, setNewMeeting] = useState({
     title: '',
     meeting_type: 'member',
+    recipient_scope: 'all_members' as MeetingRecipientScope,
     scheduled_date: '',
     venue: '',
     agenda: ''
@@ -89,7 +92,7 @@ export default function MeetingsPage() {
     // Use correct column names from database schema
     const { data, error } = await supabase
       .from('meetings')
-      .select('id, title, meeting_type, scheduled_date, venue, agenda, status, created_by, created_at')
+      .select('id, title, meeting_type, recipient_scope, scheduled_date, venue, agenda, status, created_by, created_at')
       .order('scheduled_date', { ascending: false });
 
     if (error) {
@@ -142,6 +145,7 @@ export default function MeetingsPage() {
     const { data, error } = await supabase.from('meetings').insert({
       title: newMeeting.title,
       meeting_type: newMeeting.meeting_type,
+      recipient_scope: newMeeting.recipient_scope,
       scheduled_date: newMeeting.scheduled_date,
       venue: newMeeting.venue || null,
       agenda: newMeeting.agenda || null,
@@ -154,8 +158,7 @@ export default function MeetingsPage() {
       return;
     }
 
-    // Get notification recipients based on meeting type
-    const recipients = await getNotificationRecipients(newMeeting.meeting_type);
+    const recipients = await getNotificationRecipients(newMeeting.meeting_type, newMeeting.recipient_scope);
     
     // Send notifications
     await sendMeetingNotifications(
@@ -167,6 +170,7 @@ export default function MeetingsPage() {
         venue: newMeeting.venue,
         agenda: newMeeting.agenda,
         createdBy: user?.id,
+        recipientScope: newMeeting.recipient_scope,
       },
       recipients
     );
@@ -176,7 +180,7 @@ export default function MeetingsPage() {
 
     toast.success('Meeting scheduled successfully and notifications sent');
     setShowCreateDialog(false);
-    setNewMeeting({ title: '', meeting_type: 'member', scheduled_date: '', venue: '', agenda: '' });
+    setNewMeeting({ title: '', meeting_type: 'member', recipient_scope: 'all_members', scheduled_date: '', venue: '', agenda: '' });
     fetchMeetings();
   };
 
@@ -234,7 +238,7 @@ export default function MeetingsPage() {
 
     // Send cancellation notifications if status is changed to cancelled
     if (newStatus === 'cancelled') {
-      const recipients = await getNotificationRecipients(meeting.meeting_type);
+      const recipients = await getNotificationRecipients(meeting.meeting_type, meeting.recipient_scope);
       await sendMeetingNotifications(
         {
           meetingId: meeting.id,
@@ -244,6 +248,7 @@ export default function MeetingsPage() {
           venue: meeting.venue,
           agenda: meeting.agenda,
           createdBy: meeting.created_by,
+          recipientScope: meeting.recipient_scope,
         },
         recipients
       );
@@ -268,6 +273,12 @@ export default function MeetingsPage() {
       special: 'bg-orange-100 text-orange-800'
     };
     return <Badge className={variants[type] || 'bg-gray-100'}>{type.replace('_', ' ').toUpperCase()}</Badge>;
+  };
+
+  const getRecipientScopeBadge = (scope: MeetingRecipientScope) => {
+    const label = scope === 'officials' ? 'OFFICIALS ONLY' : 'ALL MEMBERS';
+    const className = scope === 'officials' ? 'bg-slate-100 text-slate-800' : 'bg-cyan-100 text-cyan-800';
+    return <Badge className={className}>{label}</Badge>;
   };
 
   const getStatusBadge = (meetingStatus: string) => {
@@ -328,6 +339,18 @@ export default function MeetingsPage() {
                     <SelectItem value="management_committee">Management Committee</SelectItem>
                     <SelectItem value="agm">AGM</SelectItem>
                     <SelectItem value="special">Special Meeting</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={newMeeting.recipient_scope}
+                  onValueChange={(v) => setNewMeeting({ ...newMeeting, recipient_scope: v as MeetingRecipientScope })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Audience" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all_members">All Active Members</SelectItem>
+                    <SelectItem value="officials">Officials Only</SelectItem>
                   </SelectContent>
                 </Select>
                 <Input
@@ -420,6 +443,7 @@ export default function MeetingsPage() {
                       <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-lg">{meeting.title}</h3>
                         {getMeetingTypeBadge(meeting.meeting_type)}
+                        {getRecipientScopeBadge(meeting.recipient_scope)}
                         {getStatusBadge(meeting.status)}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -485,6 +509,7 @@ export default function MeetingsPage() {
                       </div>
                       <div className="text-right">
                         {getMeetingTypeBadge(meeting.meeting_type)}
+                        <div className="mt-1">{getRecipientScopeBadge(meeting.recipient_scope)}</div>
                       </div>
                     </div>
 
@@ -524,6 +549,7 @@ export default function MeetingsPage() {
                 <TableRow>
                   <TableHead>Meeting</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Audience</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Venue</TableHead>
                   <TableHead>Status</TableHead>
@@ -533,7 +559,7 @@ export default function MeetingsPage() {
               <TableBody>
                 {pastMeetings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground">
                       No past meetings
                     </TableCell>
                   </TableRow>
@@ -542,6 +568,7 @@ export default function MeetingsPage() {
                     <TableRow key={meeting.id}>
                       <TableCell className="font-medium">{meeting.title}</TableCell>
                       <TableCell>{getMeetingTypeBadge(meeting.meeting_type)}</TableCell>
+                      <TableCell>{getRecipientScopeBadge(meeting.recipient_scope)}</TableCell>
                       <TableCell>{format(new Date(meeting.scheduled_date), 'PP')}</TableCell>
                       <TableCell>{meeting.venue || '-'}</TableCell>
                       <TableCell>{getStatusBadge(meeting.status)}</TableCell>

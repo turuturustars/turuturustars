@@ -3,6 +3,7 @@ import { sendNotification } from './notificationService';
 import { BrowserNotificationService } from './notificationService';
 
 export type MeetingNotificationType = 'created' | 'scheduled' | 'cancelled' | 'reminder';
+export type MeetingRecipientScope = 'all_members' | 'officials';
 
 export interface MeetingNotificationPayload {
   meetingId: string;
@@ -12,6 +13,7 @@ export interface MeetingNotificationPayload {
   venue?: string | null;
   agenda?: string | null;
   createdBy?: string;
+  recipientScope?: MeetingRecipientScope;
 }
 
 /**
@@ -135,7 +137,16 @@ export const getMeetingOfficials = async (): Promise<string[]> => {
         'organizing_secretary',
       ]);
 
-    return [...new Set(officials?.map(r => r.user_id) || [])];
+    const officialIds = [...new Set(officials?.map(r => r.user_id) || [])];
+    if (officialIds.length === 0) return [];
+
+    const { data: activeOfficials } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('id', officialIds)
+      .eq('status', 'active');
+
+    return activeOfficials?.map(p => p.id) || [];
   } catch (error) {
     console.error('Error fetching meeting officials:', error);
     return [];
@@ -143,14 +154,17 @@ export const getMeetingOfficials = async (): Promise<string[]> => {
 };
 
 /**
- * Determine notification recipients based on meeting type
+ * Determine notification recipients based on the selected meeting audience.
  */
-export const getNotificationRecipients = async (meetingType: string): Promise<string[]> => {
-  if (meetingType === 'management_committee' || meetingType === 'agm') {
-    // Management committee and AGM notifications go to officials
+export const getNotificationRecipients = async (
+  meetingType: string,
+  recipientScope?: MeetingRecipientScope
+): Promise<string[]> => {
+  const resolvedScope = recipientScope ?? (meetingType === 'management_committee' ? 'officials' : 'all_members');
+
+  if (resolvedScope === 'officials') {
     return getMeetingOfficials();
-  } else {
-    // General member meetings go to all active members
-    return getMeetingStakeholders();
   }
+
+  return getMeetingStakeholders();
 };

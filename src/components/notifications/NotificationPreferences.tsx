@@ -19,6 +19,7 @@ import {
   FileCheck,
   Megaphone,
   Info,
+  MessageCircle,
   MessageSquare,
   CreditCard,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ interface NotificationPreferencesState {
   enableMessages: boolean;
   enableTransactions: boolean;
   emailNotifications: boolean;
+  whatsappNotifications: boolean;
   soundNotifications: boolean;
   pushNotifications: boolean;
 }
@@ -58,7 +60,7 @@ interface NotificationType {
 }
 
 interface DeliveryMethod {
-  key: keyof Pick<NotificationPreferencesState, 'emailNotifications' | 'soundNotifications' | 'pushNotifications'>;
+  key: keyof Pick<NotificationPreferencesState, 'emailNotifications' | 'whatsappNotifications' | 'soundNotifications' | 'pushNotifications'>;
   title: string;
   description: string;
   icon: any;
@@ -79,6 +81,7 @@ const NotificationPreferences = () => {
     enableMessages: true,
     enableTransactions: true,
     emailNotifications: true,
+    whatsappNotifications: true,
     soundNotifications: true,
     pushNotifications: true,
   });
@@ -92,6 +95,7 @@ const NotificationPreferences = () => {
     enableMessages: true,
     enableTransactions: true,
     emailNotifications: true,
+    whatsappNotifications: true,
     soundNotifications: true,
     pushNotifications: true,
   });
@@ -108,6 +112,7 @@ const NotificationPreferences = () => {
       enableMessages: storedPreferences.enable_messages,
       enableTransactions: storedPreferences.enable_transactions,
       emailNotifications: storedPreferences.email,
+      whatsappNotifications: storedPreferences.whatsapp ?? true,
       soundNotifications: storedPreferences.sound,
       pushNotifications: storedPreferences.push,
     };
@@ -133,6 +138,7 @@ const NotificationPreferences = () => {
       await savePreferences({
         in_app: true,
         email: preferences.emailNotifications,
+        whatsapp: preferences.whatsappNotifications,
         sound: preferences.soundNotifications,
         push: preferences.pushNotifications,
         enable_announcements: preferences.enableAnnouncements,
@@ -227,6 +233,13 @@ const NotificationPreferences = () => {
       title: 'Email Notifications',
       description: 'Receive email summaries of your notifications',
       icon: Mail,
+      canToggle: true,
+    },
+    {
+      key: 'whatsappNotifications',
+      title: 'WhatsApp Notifications',
+      description: 'Receive important alerts on your registered WhatsApp number',
+      icon: MessageCircle,
       canToggle: true,
     },
     {
