@@ -642,7 +642,7 @@ const DashboardHome = () => {
                     </div>
                     <div className="text-left flex-1">
                       <div className="font-semibold text-sm">Pay with M-Pesa</div>
-                      <div className="text-xs opacity-90">Phone + amount, instant STK prompt</div>
+                      <div className="text-xs opacity-90">Phone + amount, quick M-Pesa request</div>
                     </div>
                     <ArrowRight className="w-4 h-4" />
                   </AccessibleButton>

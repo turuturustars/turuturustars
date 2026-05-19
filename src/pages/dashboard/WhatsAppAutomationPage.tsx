@@ -52,6 +52,12 @@ type WhatsAppNotification = Pick<
   Tables<'notifications'>,
   'id' | 'title' | 'message' | 'type' | 'created_at' | 'whatsapp_status' | 'whatsapp_error' | 'whatsapp_sent_at'
 >;
+type CommunitySubmission = Tables<'community_knowledge_submissions'> & {
+  profiles?: {
+    full_name: string | null;
+    membership_number: string | null;
+  } | null;
+};
 
 interface KnowledgeForm {
   id: string | null;
@@ -85,34 +91,42 @@ const WhatsAppAutomationPage = () => {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [payments, setPayments] = useState<PaymentIntent[]>([]);
   const [notifications, setNotifications] = useState<WhatsAppNotification[]>([]);
+  const [submissions, setSubmissions] = useState<CommunitySubmission[]>([]);
   const [form, setForm] = useState<KnowledgeForm>(emptyForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [processingSubmissionId, setProcessingSubmissionId] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('Hello from Turuturu Stars WhatsApp assistant.');
 
   const stats = useMemo(() => {
     const activeKnowledge = knowledge.filter((entry) => entry.is_active).length;
+    const pendingSubmissions = submissions.filter((submission) => submission.status === 'pending').length;
     const inboundMessages = messages.filter((message) => message.direction === 'inbound').length;
     const pendingPayments = payments.filter((payment) => ['pending', 'stk_requested'].includes(payment.status)).length;
     const failedPayments = payments.filter((payment) => payment.status === 'failed').length;
     const queuedNotifications = notifications.filter((notification) => notification.whatsapp_status === 'queued').length;
 
-    return { activeKnowledge, inboundMessages, pendingPayments, failedPayments, queuedNotifications };
-  }, [knowledge, messages, payments, notifications]);
+    return { activeKnowledge, pendingSubmissions, inboundMessages, pendingPayments, failedPayments, queuedNotifications };
+  }, [knowledge, messages, payments, notifications, submissions]);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
-    const [knowledgeResult, messageResult, paymentResult, notificationResult] = await Promise.all([
+    const [knowledgeResult, submissionResult, messageResult, paymentResult, notificationResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
         .select('*')
         .order('updated_at', { ascending: false }),
       supabase
+        .from('community_knowledge_submissions')
+        .select('*, profiles(full_name, membership_number)')
+        .order('created_at', { ascending: false })
+        .limit(60),
+      supabase
         .from('whatsapp_messages')
-        .select('id, contact_id, member_id, wa_message_id, direction, message_type, text_body, status, status_updated_at, created_at, payload, whatsapp_contacts(profile_name, phone_number, wa_id)')
+        .select('id, contact_id, member_id, profile_id, phone, wa_message_id, provider_message_id, direction, message_type, text_body, body, status, status_updated_at, created_at, payload, raw_payload, whatsapp_contacts(profile_name, phone_number, wa_id)')
         .order('created_at', { ascending: false })
         .limit(60),
       supabase
@@ -128,15 +142,16 @@ const WhatsAppAutomationPage = () => {
         .limit(40),
     ]);
 
-    if (knowledgeResult.error || messageResult.error || paymentResult.error || notificationResult.error) {
+    if (knowledgeResult.error || submissionResult.error || messageResult.error || paymentResult.error || notificationResult.error) {
       toast({
         title: 'WhatsApp data not loaded',
-        description: knowledgeResult.error?.message || messageResult.error?.message || paymentResult.error?.message || notificationResult.error?.message,
+        description: knowledgeResult.error?.message || submissionResult.error?.message || messageResult.error?.message || paymentResult.error?.message || notificationResult.error?.message,
         variant: 'destructive',
       });
     }
 
     setKnowledge((knowledgeResult.data ?? []) as KnowledgeEntry[]);
+    setSubmissions((submissionResult.data ?? []) as CommunitySubmission[]);
     setMessages((messageResult.data ?? []) as WhatsAppMessage[]);
     setPayments((paymentResult.data ?? []) as PaymentIntent[]);
     setNotifications((notificationResult.data ?? []) as WhatsAppNotification[]);
@@ -266,6 +281,95 @@ const WhatsAppAutomationPage = () => {
     fetchDashboardData();
   };
 
+  const handleApproveSubmission = async (submission: CommunitySubmission) => {
+    setProcessingSubmissionId(submission.id);
+    const { data: knowledgeEntry, error: insertError } = await supabase
+      .from('ai_knowledge_base')
+      .insert({
+        category: submission.topic || 'community',
+        bot_scope: 'both',
+        title: communitySubmissionTitle(submission),
+        content: buildCommunityKnowledgeContent(submission),
+        is_active: true,
+        created_by: user?.id ?? null,
+        metadata: {
+          source: 'community_knowledge_submission',
+          submission_id: submission.id,
+          area: submission.area,
+          attribution_name: submission.attribution_name,
+          phone: submission.phone,
+          reviewed_by: user?.id ?? null,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (insertError || !knowledgeEntry) {
+      setProcessingSubmissionId(null);
+      toast({
+        title: 'Submission not approved',
+        description: insertError?.message || 'The bot answer could not be created.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('community_knowledge_submissions')
+      .update({
+        status: 'approved',
+        reviewed_by: user?.id ?? null,
+        reviewed_at: new Date().toISOString(),
+        ai_knowledge_base_id: knowledgeEntry.id,
+      })
+      .eq('id', submission.id);
+
+    setProcessingSubmissionId(null);
+
+    if (updateError) {
+      toast({
+        title: 'Review status not updated',
+        description: updateError.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Community memory approved',
+      description: 'The reviewed submission is now active bot knowledge.',
+    });
+    fetchDashboardData();
+  };
+
+  const handleRejectSubmission = async (submission: CommunitySubmission) => {
+    setProcessingSubmissionId(submission.id);
+    const { error } = await supabase
+      .from('community_knowledge_submissions')
+      .update({
+        status: 'rejected',
+        reviewed_by: user?.id ?? null,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', submission.id);
+    setProcessingSubmissionId(null);
+
+    if (error) {
+      toast({
+        title: 'Submission not rejected',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Community memory rejected',
+      description: 'The submission will stay out of active bot knowledge.',
+    });
+    fetchDashboardData();
+  };
+
   if (authLoading || isLoading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center">
@@ -302,17 +406,19 @@ const WhatsAppAutomationPage = () => {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <StatCard icon={Bot} label="Active answers" value={stats.activeKnowledge} />
+        <StatCard icon={MessageCircle} label="Pending memories" value={stats.pendingSubmissions} tone={stats.pendingSubmissions > 0 ? 'attention' : 'normal'} />
         <StatCard icon={MessageCircle} label="Recent inbound" value={stats.inboundMessages} />
-        <StatCard icon={Smartphone} label="Payment prompts" value={stats.pendingPayments} />
+        <StatCard icon={Smartphone} label="Payment requests" value={stats.pendingPayments} />
         <StatCard icon={Send} label="Queued notices" value={stats.queuedNotifications} />
         <StatCard icon={XCircle} label="Failed payments" value={stats.failedPayments} tone={stats.failedPayments > 0 ? 'danger' : 'normal'} />
       </div>
 
       <Tabs defaultValue="knowledge" className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-grid sm:w-auto sm:grid-cols-5">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-grid sm:w-auto sm:grid-cols-6">
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
+          <TabsTrigger value="submissions">Submissions</TabsTrigger>
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="notifications">Notices</TabsTrigger>
@@ -414,6 +520,79 @@ const WhatsAppAutomationPage = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="submissions">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Community Knowledge Submissions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Topic</TableHead>
+                    <TableHead>Submission</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {submissions.map((submission) => (
+                    <TableRow key={submission.id}>
+                      <TableCell className="min-w-36">
+                        <div className="font-medium">{titleCase(submission.topic || 'community')}</div>
+                        <div className="text-xs text-muted-foreground">{submission.area || 'General'}</div>
+                      </TableCell>
+                      <TableCell className="max-w-lg">
+                        <p className="line-clamp-3 text-sm">{submission.answer}</p>
+                        {submission.question && (
+                          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{submission.question}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="min-w-40">
+                        <div className="text-sm">{submission.attribution_name || submission.profiles?.full_name || 'WhatsApp'}</div>
+                        <div className="text-xs text-muted-foreground">{submission.profiles?.membership_number || submission.phone || '-'}</div>
+                      </TableCell>
+                      <TableCell>
+                        <ReviewStatusBadge status={submission.status} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{formatDate(submission.created_at)}</TableCell>
+                      <TableCell>
+                        {submission.status === 'pending' ? (
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button
+                              size="sm"
+                              className="gap-2"
+                              disabled={processingSubmissionId === submission.id}
+                              onClick={() => handleApproveSubmission(submission)}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Approve
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2"
+                              disabled={processingSubmissionId === submission.id}
+                              onClick={() => handleRejectSubmission(submission)}
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Reject
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Reviewed</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="messages">
           <Card>
             <CardHeader>
@@ -434,14 +613,14 @@ const WhatsAppAutomationPage = () => {
                   {messages.map((message) => (
                     <TableRow key={message.id}>
                       <TableCell className="min-w-40">
-                        <div className="font-medium">{message.whatsapp_contacts?.profile_name || message.whatsapp_contacts?.phone_number || 'Unknown'}</div>
-                        <div className="text-xs text-muted-foreground">{message.whatsapp_contacts?.wa_id}</div>
+                        <div className="font-medium">{message.whatsapp_contacts?.profile_name || message.whatsapp_contacts?.phone_number || message.phone || 'Unknown'}</div>
+                        <div className="text-xs text-muted-foreground">{message.whatsapp_contacts?.wa_id || message.member_id || message.profile_id || '-'}</div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={message.direction === 'inbound' ? 'secondary' : 'outline'}>{message.direction}</Badge>
                       </TableCell>
                       <TableCell className="max-w-md">
-                        <p className="line-clamp-2 text-sm">{message.text_body || message.message_type}</p>
+                        <p className="line-clamp-2 text-sm">{message.text_body || message.body || message.message_type}</p>
                       </TableCell>
                       <TableCell>{message.status}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{formatDate(message.created_at)}</TableCell>
@@ -467,7 +646,7 @@ const WhatsAppAutomationPage = () => {
                     <TableHead>Purpose</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Checkout</TableHead>
+                    <TableHead>Payment reference</TableHead>
                     <TableHead>Created</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -580,15 +759,19 @@ const StatCard = ({
   icon: typeof Bot;
   label: string;
   value: number;
-  tone?: 'normal' | 'danger';
+  tone?: 'normal' | 'danger' | 'attention';
 }) => (
   <Card>
     <CardContent className="flex items-center justify-between gap-3 p-4">
       <div>
         <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={cn('mt-1 text-2xl font-semibold', tone === 'danger' && 'text-destructive')}>{value}</p>
+        <p className={cn('mt-1 text-2xl font-semibold', tone === 'danger' && 'text-destructive', tone === 'attention' && 'text-amber-600')}>{value}</p>
       </div>
-      <div className={cn('rounded-md bg-primary/10 p-2 text-primary', tone === 'danger' && 'bg-destructive/10 text-destructive')}>
+      <div className={cn(
+        'rounded-md bg-primary/10 p-2 text-primary',
+        tone === 'danger' && 'bg-destructive/10 text-destructive',
+        tone === 'attention' && 'bg-amber-100 text-amber-700',
+      )}>
         <Icon className="h-5 w-5" />
       </div>
     </CardContent>
@@ -613,6 +796,11 @@ const PaymentStatusBadge = ({ status }: { status: string }) => {
   return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>;
 };
 
+const ReviewStatusBadge = ({ status }: { status: string }) => {
+  const variant = status === 'approved' ? 'secondary' : status === 'rejected' ? 'destructive' : 'outline';
+  return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>;
+};
+
 function normalizeScope(value: string): BotScope {
   return value === 'public' || value === 'member' || value === 'both' ? value : 'both';
 }
@@ -620,6 +808,31 @@ function normalizeScope(value: string): BotScope {
 function formatDate(value: string | null) {
   if (!value) return '-';
   return format(new Date(value), 'dd MMM yyyy HH:mm');
+}
+
+function titleCase(value: string) {
+  return value
+    .replace(/[_-]/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`)
+    .join(' ');
+}
+
+function communitySubmissionTitle(submission: CommunitySubmission) {
+  const topic = titleCase(submission.topic || 'community');
+  return submission.area ? `${topic}: ${submission.area}` : `Community Memory: ${topic}`;
+}
+
+function buildCommunityKnowledgeContent(submission: CommunitySubmission) {
+  const parts = [
+    submission.area ? `Area: ${submission.area}.` : null,
+    submission.answer.trim(),
+    submission.attribution_name ? `Community source: ${submission.attribution_name}.` : null,
+    'This is community-submitted knowledge reviewed by Turuturu Stars officials.',
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(' ');
 }
 
 export default WhatsAppAutomationPage;

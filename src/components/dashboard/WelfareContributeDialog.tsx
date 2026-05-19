@@ -125,7 +125,7 @@ const WelfareContributeDialog = ({
 
       createdContributionId = contribution.id;
       setPaymentStep('processing');
-      setStatusMessage('Sending M-Pesa STK prompt...');
+      setStatusMessage('Sending an M-Pesa request to your phone...');
 
       const formattedPhone = formatPhoneNumber(phone);
       const result = await initiateSTKPush({
@@ -145,7 +145,7 @@ const WelfareContributeDialog = ({
       setCheckoutRequestId(result.CheckoutRequestID);
       setStatusMessage('Check your phone and enter your M-Pesa PIN.');
 
-      toast.success('M-Pesa prompt sent to your phone');
+      toast.success('M-Pesa request sent to your phone');
 
       const transaction = await MpesaTransactionService.pollTransactionStatus(result.CheckoutRequestID, {
         onStatusChange: (status) => setStatusMessage(status),
@@ -200,7 +200,7 @@ const WelfareContributeDialog = ({
             Welfare Contribution
           </DialogTitle>
           <DialogDescription>
-            Pay directly with M-Pesa STK push using your phone number.
+            Pay with M-Pesa using your phone number.
           </DialogDescription>
         </DialogHeader>
 
@@ -218,7 +218,7 @@ const WelfareContributeDialog = ({
             </div>
             <p className="text-sm text-blue-800">{statusMessage}</p>
             {checkoutRequestId && (
-              <p className="text-xs font-mono text-blue-700 break-all">Checkout ID: {checkoutRequestId}</p>
+              <p className="text-xs text-blue-700 break-all">Payment reference: {checkoutRequestId}</p>
             )}
           </div>
         ) : (

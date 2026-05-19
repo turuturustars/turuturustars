@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { notifyTreasurersOfMoneyEvent } from "../_shared/treasurer-whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,7 +31,9 @@ const MPESA_CONSUMER_SECRET = Deno.env.get("MPESA_CONSUMER_SECRET") ?? "";
 const MPESA_PASSKEY = Deno.env.get("MPESA_PASSKEY") ?? "";
 const MPESA_SHORTCODE = Deno.env.get("MPESA_SHORTCODE") ?? "";
 const MPESA_BASE_URL = Deno.env.get("MPESA_BASE_URL") ?? "https://sandbox.safaricom.co.ke";
-const MPESA_CALLBACK_URL = Deno.env.get("MPESA_CALLBACK_URL") ?? `${SUPABASE_URL}/functions/v1/mpesa-callback`;
+const MPESA_CALLBACK_URL = callbackUrlWithSecret(
+  getEnv(["WHATSAPP_MPESA_CALLBACK_URL", "MPESA_WHATSAPP_CALLBACK_URL"], `${SUPABASE_URL}/functions/v1/mpesa-callback`),
+);
 
 const SEARCH_STOP_WORDS = new Set([
   "the",
@@ -137,6 +140,12 @@ interface KnowledgeEntry {
   category: string;
   bot_scope: "public" | "member" | "both";
   metadata?: Record<string, unknown> | null;
+}
+
+interface ConversationTurn {
+  direction: "inbound" | "outbound";
+  text_body: string | null;
+  created_at: string | null;
 }
 
 interface OpenAIResponsePayload {
@@ -391,18 +400,37 @@ async function routeIncomingText(
     return null;
   }
 
+  if (isGoodbyeCommand(command)) {
+    return goodbyeReply(member);
+  }
+
   if (isMenuCommand(command)) {
     return menuReply(member, botMode);
   }
 
+  if (isIdentityStatement(command)) {
+    return identityReply(member);
+  }
+
   if (botMode === "public") {
-    return routePublicText(supabase, text, command);
+    return routePublicText(supabase, contact, text, command);
   }
 
   return routeMemberText(supabase, contact, member, text, command);
 }
 
-async function routePublicText(supabase: SupabaseClient, text: string, command: string) {
+async function routePublicText(supabase: SupabaseClient, contact: ContactRecord, text: string, command: string) {
+  const menuSelection = publicMenuSelection(command);
+  if (menuSelection) {
+    command = menuSelection;
+    text = menuSelection;
+  }
+
+  if (command === "start") {
+    await supabase.from("whatsapp_contacts").update({ opted_in: true }).eq("id", contact.id);
+    return "You are opted in to WhatsApp updates. Reply MENU for options.";
+  }
+
   if (isPaymentCommand(command) || isMemberOnlyCommand(command)) {
     return [
       "That is a member service.",
@@ -419,11 +447,15 @@ async function routePublicText(supabase: SupabaseClient, text: string, command: 
     return publicMembershipReply();
   }
 
+  if (isAboutCommand(command)) {
+    return publicAboutReply();
+  }
+
   if (isSupportCommand(command)) {
     return publicSupportReply();
   }
 
-  return smartKnowledgeReply(supabase, text, null, "public");
+  return smartKnowledgeReply(supabase, contact, text, null, "public");
 }
 
 async function routeMemberText(
@@ -433,6 +465,19 @@ async function routeMemberText(
   text: string,
   command: string,
 ) {
+  const menuSelection = memberMenuSelection(command);
+  if (menuSelection === "contribute_prompt") {
+    return [
+      "Step 2: How much do you want to contribute?",
+      "Reply with the amount, for example: CONTRIBUTE 500",
+      "To clear all pending contributions instead, reply PAY.",
+    ].join("\n");
+  }
+  if (menuSelection) {
+    command = menuSelection;
+    text = menuSelection;
+  }
+
   if (isWalletFundingCommand(command)) {
     return handleWalletFundingRequest(supabase, contact, member, text);
   }
@@ -477,7 +522,11 @@ async function routeMemberText(
     return unreadNotificationsReply(supabase, member);
   }
 
-  return smartKnowledgeReply(supabase, text, member, "member");
+  if (isSupportCommand(command)) {
+    return memberSupportReply(member);
+  }
+
+  return smartKnowledgeReply(supabase, contact, text, member, "member");
 }
 
 function isMenuCommand(command: string) {
@@ -499,6 +548,21 @@ function isMenuCommand(command: string) {
     command.startsWith("hey ");
 }
 
+function isGoodbyeCommand(command: string) {
+  const normalized = command
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "")
+    .replace(/\s+/g, " ");
+
+  return /^(?:bye|goodbye|good bye|thanks|thank you|thx|asante|sawa basi|baadaye|tutaonana|done|finished|no more|nothing else)$/i.test(normalized) ||
+    /^(?:i\s+want\s+to\s+)?(?:leave it at that|that'?s all|that is all)(?:\s+(?:thanks|thank you|bye|goodbye|good bye))?$/i.test(normalized);
+}
+
+function isIdentityStatement(command: string) {
+  return /^(i am|i'm|im|my name is|this is|ni mimi|mimi ni)\s+[\p{L}\s.'-]{2,}$/iu.test(command);
+}
+
 function isPaymentCommand(command: string) {
   return command === "pay" ||
     command.startsWith("pay ") ||
@@ -511,7 +575,11 @@ function isPaymentCommand(command: string) {
 }
 
 function isWalletFundingCommand(command: string) {
-  return command.startsWith("fund ") ||
+  return command === "fund" ||
+    command === "topup" ||
+    command === "top up" ||
+    command === "deposit" ||
+    command.startsWith("fund ") ||
     command.startsWith("topup ") ||
     command.startsWith("top up ") ||
     command.startsWith("deposit ") ||
@@ -526,6 +594,9 @@ function isWalletInfoCommand(command: string) {
     command === "wallet balance" ||
     command === "my wallet" ||
     command === "funds" ||
+    command.includes("wallet") ||
+    command.includes("akiba") ||
+    command.includes("mfuko") ||
     command.includes("wallet history");
 }
 
@@ -575,6 +646,67 @@ function isSupportCommand(command: string) {
     "msaada",
     "mawasiliano",
   ]);
+}
+
+function isAboutCommand(command: string) {
+  return hasAnyTerm(command, [
+    "about",
+    "who are you",
+    "turuturu stars",
+    "what is turuturu",
+    "cbo",
+    "community",
+  ]);
+}
+
+function publicMenuSelection(command: string): string | null {
+  const number = command.match(/^(\d{1,2})(?:[.)\s-].*)?$/)?.[1];
+  switch (number) {
+    case "1":
+      return "join";
+    case "2":
+      return "about";
+    case "3":
+      return "announcements";
+    case "4":
+      return "contact";
+    case "5":
+      return "start";
+    default:
+      return null;
+  }
+}
+
+function memberMenuSelection(command: string): string | null {
+  const number = command.match(/^(\d{1,2})(?:[.)\s-].*)?$/)?.[1];
+  switch (number) {
+    case "1":
+      return "balance";
+    case "2":
+      return "pay";
+    case "3":
+      return "contribute_prompt";
+    case "4":
+      return "wallet";
+    case "5":
+      return "fund";
+    case "6":
+      return "receipts";
+    case "7":
+      return "welfare";
+    case "8":
+      return "meeting";
+    case "9":
+      return "announcements";
+    case "10":
+      return "profile";
+    case "11":
+      return "notifications";
+    case "12":
+      return "support";
+    default:
+      return null;
+  }
 }
 
 function isBalanceCommand(command: string) {
@@ -649,34 +781,76 @@ function hasAnyTerm(command: string, terms: string[]) {
   return terms.some((term) => command.includes(term));
 }
 
+function goodbyeReply(member: MemberProfile | null) {
+  const name = member ? `, ${firstName(member.full_name)}` : "";
+  return [
+    `You're welcome${name}. I will be here whenever you need me.`,
+    "Reply MENU any time to continue.",
+  ].join("\n");
+}
+
+function identityReply(member: MemberProfile | null) {
+  if (member) {
+    return [
+      `Hi ${firstName(member.full_name)}. I have this WhatsApp number matched to ${member.full_name}.`,
+      "You can ask naturally, like \"check my contributions\" or \"how about my wallet\", and I will handle it.",
+      "Reply PROFILE to see your member status or MENU for all options.",
+    ].join("\n");
+  }
+
+  return [
+    "Thanks. I can help with public Turuturu Stars questions here.",
+    "To unlock member services, use the WhatsApp number saved on your member profile.",
+    "Reply JOIN for membership information or CONTACT for support.",
+  ].join("\n");
+}
+
 function menuReply(member: MemberProfile | null, botMode: BotMode) {
   if (botMode === "public") {
     return [
-      "Hello, this is Turuturu Stars public assistant.",
-      "Reply with:",
-      "JOIN - how to become a member",
-      "ABOUT - learn about Turuturu Stars",
-      "ANNOUNCEMENTS - latest public notices",
-      "CONTACT - support information",
+      "Hello, this is the Turuturu Stars public assistant.",
+      "Step 1: Reply with a number or keyword.",
+      "Step 2: I will guide the next action.",
+      "",
+      "1. JOIN - how to become a member",
+      "2. ABOUT - learn about Turuturu Stars",
+      "3. ANNOUNCEMENTS - latest public notices",
+      "4. CONTACT - support information",
+      "5. START - opt in to WhatsApp updates",
+      "",
+      "Use START to opt in or STOP to opt out of WhatsApp updates.",
       "Members should use their registered WhatsApp number for payments and account services.",
     ].join("\n");
   }
 
   return [
-    `Hello ${firstName(member?.full_name ?? "member")}. This is your member assistant.`,
-    "Reply with:",
-    "PAY - pay pending contributions by M-Pesa STK push",
-    "CONTRIBUTE 500 - pay a specific contribution amount",
-    "WALLET - see wallet balance and recent top-ups",
-    "FUND 500 - top up wallet by M-Pesa STK push",
-    "BALANCE - see pending contributions",
-    "WELFARE - see active welfare/kitty cases",
-    "MEETING - see the next scheduled meeting",
-    "ANNOUNCEMENTS - see latest notices",
-    "PROFILE - see member status",
-    "RECEIPTS - see recent payments",
-    "NOTIFICATIONS - see unread alerts",
-    "STOP - opt out of WhatsApp updates",
+    `Hello ${firstName(member?.full_name ?? "member")}. This is your Turuturu Stars member assistant.`,
+    "Step 1: Reply with a number or keyword.",
+    "Step 2: If payment/details are needed, I will ask for them.",
+    "Step 3: For M-Pesa, approve the request when it appears on your phone.",
+    "",
+    "1. BALANCE - check pending contributions",
+    "2. PAY - clear pending contributions with M-Pesa",
+    "3. CONTRIBUTE 500 - pay a specific contribution amount",
+    "4. WALLET - wallet balance and recent top-ups",
+    "5. FUND 500 - top up wallet with M-Pesa",
+    "6. RECEIPTS - recent confirmed payments",
+    "7. WELFARE - active welfare/kitty cases",
+    "8. MEETING - next scheduled meeting",
+    "9. ANNOUNCEMENTS - latest notices",
+    "10. PROFILE - member status",
+    "11. NOTIFICATIONS - unread alerts",
+    "12. SUPPORT - ask for help",
+    "",
+    "You can also type naturally, for example: check my contributions, how about my wallet, or paid 500 welfare ref QJD123.",
+    "Reply STOP to opt out of WhatsApp updates.",
+  ].join("\n");
+}
+
+function publicAboutReply() {
+  return [
+    "Turuturu Stars is a community organization focused on member welfare, contributions, meetings, announcements, and local opportunities.",
+    "Reply JOIN to learn registration steps, or CONTACT if you need help from an official.",
   ].join("\n");
 }
 
@@ -698,6 +872,14 @@ function publicSupportReply() {
   ].join("\n");
 }
 
+function memberSupportReply(member: MemberProfile) {
+  return [
+    `I can help, ${firstName(member.full_name)}.`,
+    "You can ask about payments, wallet, receipts, welfare, meetings, announcements, profile, and notifications.",
+    "For something that needs an official, send a short description here and an official can follow up.",
+  ].join("\n");
+}
+
 async function handlePaymentRequest(
   supabase: SupabaseClient,
   contact: ContactRecord,
@@ -716,7 +898,7 @@ async function handlePaymentRequest(
   const amount = requestedAmount ?? pending.reduce((sum, contribution) => sum + Number(contribution.amount), 0);
 
   if (!amount || amount <= 0) {
-    return "You do not have pending contributions right now. Reply BALANCE any time to check again.";
+    return "You do not have pending contributions right now. Reply MENU to choose another service, or BALANCE to check again.";
   }
 
   try {
@@ -732,8 +914,8 @@ async function handlePaymentRequest(
       accountPrefix: "TS",
     });
     return [
-      `M-Pesa STK push sent to ${formatPhoneForDisplay(stk.phoneNumber)} for KES ${formatMoney(amount)}.`,
-      "Enter your M-Pesa PIN to complete payment.",
+      `I sent an M-Pesa request to ${formatPhoneForDisplay(stk.phoneNumber)} for KES ${formatMoney(amount)}.`,
+      "Check your phone and enter your M-Pesa PIN to complete payment.",
       "I will confirm here when the payment is received.",
     ].join("\n");
   } catch (error) {
@@ -752,8 +934,8 @@ async function handleWalletFundingRequest(
 
   if (!amount || amount <= 0) {
     return [
-      "How much do you want to add to your wallet?",
-      "Example: FUND 500",
+      "Step 2: How much do you want to add to your wallet?",
+      "Reply with the amount, for example: FUND 500",
     ].join("\n");
   }
 
@@ -787,8 +969,8 @@ async function handleWalletFundingRequest(
     });
 
     return [
-      `M-Pesa STK push sent to ${formatPhoneForDisplay(stk.phoneNumber)} for KES ${formatMoney(amount)}.`,
-      "Enter your M-Pesa PIN to fund your wallet.",
+      `I sent an M-Pesa request to ${formatPhoneForDisplay(stk.phoneNumber)} for KES ${formatMoney(amount)}.`,
+      "Check your phone and enter your M-Pesa PIN to top up your wallet.",
       "I will confirm here when your wallet is updated.",
     ].join("\n");
   } catch (error) {
@@ -821,9 +1003,9 @@ async function walletSummaryReply(supabase: SupabaseClient, member: MemberProfil
     : ["No wallet transactions yet."];
 
   return [
-    `Wallet balance: ${wallet.currency} ${formatMoney(wallet.balance)}`,
+    `I checked your wallet. Current balance: ${wallet.currency} ${formatMoney(wallet.balance)}`,
     ...lines,
-    "Reply FUND 500 to top up by M-Pesa.",
+    "To top up, reply FUND 500 and approve the M-Pesa request on your phone.",
   ].join("\n");
 }
 
@@ -834,7 +1016,7 @@ async function contributionSummaryReply(supabase: SupabaseClient, member: Member
 
   const pending = await getPendingContributions(supabase, member.id);
   if (pending.length === 0) {
-    return "You do not have pending contributions right now.";
+    return "I checked your contributions. You do not have pending contributions right now. Reply MENU to choose another service.";
   }
 
   const total = pending.reduce((sum, contribution) => sum + Number(contribution.amount), 0);
@@ -846,7 +1028,7 @@ async function contributionSummaryReply(supabase: SupabaseClient, member: Member
   return [
     `Pending total: KES ${formatMoney(total)}`,
     ...lines,
-    "Reply PAY to receive an M-Pesa STK push.",
+    "Reply PAY to pay with M-Pesa.",
   ].join("\n");
 }
 
@@ -992,8 +1174,26 @@ async function unreadNotificationsReply(supabase: SupabaseClient, member: Member
   return ["Unread notifications:", ...lines].join("\n\n");
 }
 
+async function recentConversationTurns(supabase: SupabaseClient, contactId: string): Promise<ConversationTurn[]> {
+  const { data, error } = await supabase
+    .from("whatsapp_messages")
+    .select("direction, text_body, created_at")
+    .eq("contact_id", contactId)
+    .not("text_body", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  if (error) {
+    console.error("Failed to fetch recent WhatsApp conversation:", error);
+    return [];
+  }
+
+  return ((data ?? []) as ConversationTurn[]).reverse();
+}
+
 async function smartKnowledgeReply(
   supabase: SupabaseClient,
+  contact: ContactRecord,
   text: string,
   member: MemberProfile | null,
   botMode: BotMode,
@@ -1019,7 +1219,8 @@ async function smartKnowledgeReply(
     ? relevantEntries
     : entries.slice(0, AI_KNOWLEDGE_CONTEXT_LIMIT);
 
-  const aiReply = await generateAiReply(text, member, botMode, contextEntries);
+  const recentTurns = await recentConversationTurns(supabase, contact.id);
+  const aiReply = await generateAiReply(text, member, botMode, contextEntries, recentTurns);
   if (aiReply) {
     return aiReply;
   }
@@ -1043,16 +1244,17 @@ async function generateAiReply(
   member: MemberProfile | null,
   botMode: BotMode,
   entries: KnowledgeEntry[],
+  recentTurns: ConversationTurn[],
 ) {
   if ((AI_PROVIDER === "auto" || AI_PROVIDER === "groq") && GROQ_API_KEY) {
-    const groqReply = await generateGroqReply(text, member, botMode, entries);
+    const groqReply = await generateGroqReply(text, member, botMode, entries, recentTurns);
     if (groqReply) {
       return groqReply;
     }
   }
 
   if ((AI_PROVIDER === "auto" || AI_PROVIDER === "openai") && OPENAI_API_KEY) {
-    return generateOpenAIReply(text, member, botMode, entries);
+    return generateOpenAIReply(text, member, botMode, entries, recentTurns);
   }
 
   return null;
@@ -1063,6 +1265,7 @@ async function generateGroqReply(
   member: MemberProfile | null,
   botMode: BotMode,
   entries: KnowledgeEntry[],
+  recentTurns: ConversationTurn[],
 ) {
   try {
     const response = await fetchWithTimeout(`${GROQ_BASE_URL}/chat/completions`, {
@@ -1073,7 +1276,7 @@ async function generateGroqReply(
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: buildChatMessages(text, member, botMode, entries),
+        messages: buildChatMessages(text, member, botMode, entries, recentTurns),
         temperature: 0.2,
         top_p: 0.9,
         max_completion_tokens: AI_MAX_OUTPUT_TOKENS,
@@ -1100,6 +1303,7 @@ async function generateOpenAIReply(
   member: MemberProfile | null,
   botMode: BotMode,
   entries: KnowledgeEntry[],
+  recentTurns: ConversationTurn[],
 ) {
   try {
     const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
@@ -1111,7 +1315,7 @@ async function generateOpenAIReply(
       body: JSON.stringify({
         model: OPENAI_MODEL,
         instructions: buildAiInstructions(botMode),
-        input: buildAiInput(text, member, botMode, entries),
+        input: buildAiInput(text, member, botMode, entries, recentTurns),
         max_output_tokens: AI_MAX_OUTPUT_TOKENS,
       }),
     });
@@ -1148,6 +1352,7 @@ function buildAiInstructions(botMode: BotMode) {
     "For live member actions, direct users to commands: PAY, CONTRIBUTE 500, WALLET, FUND 500, BALANCE, WELFARE, MEETING, ANNOUNCEMENTS, PROFILE, RECEIPTS, NOTIFICATIONS.",
     "For public users asking to join, direct them to JOIN or official support.",
     "If the user asks in Swahili, reply in natural Swahili unless English is clearer for a command.",
+    "Use plain text only. Do not use Markdown, bold markers, or asterisks around commands.",
     "Keep replies concise, friendly, and suitable for WhatsApp. Avoid tables. Ask at most one follow-up question. End with a helpful command when useful.",
   ].join("\n");
 }
@@ -1157,6 +1362,7 @@ function buildAiInput(
   member: MemberProfile | null,
   botMode: BotMode,
   entries: KnowledgeEntry[],
+  recentTurns: ConversationTurn[],
 ) {
   const knowledge = entries.length
     ? entries.map(formatKnowledgeEntry).join("\n\n")
@@ -1179,6 +1385,8 @@ function buildAiInput(
     memberContext,
     "Live command guide:",
     liveCommandGuide(botMode),
+    "Recent conversation:",
+    formatConversationTurns(recentTurns),
     "Knowledge base:",
     knowledge,
     "User message:",
@@ -1200,11 +1408,11 @@ function liveCommandGuide(botMode: BotMode) {
 
   return [
     "MENU or HELP: show member options.",
-    "PAY: start M-Pesa STK for pending contributions.",
-    "CONTRIBUTE 500: start M-Pesa STK for a specific contribution amount.",
+    "PAY: pay pending contributions with M-Pesa.",
+    "CONTRIBUTE 500: pay a specific contribution amount with M-Pesa.",
     "BALANCE: show pending contributions and arrears.",
     "WALLET: show wallet balance and recent wallet top-ups.",
-    "FUND 500: start M-Pesa STK to top up wallet.",
+    "FUND 500: top up wallet with M-Pesa.",
     "WELFARE or KITTY: show active welfare cases.",
     "MEETING: show the next scheduled meeting.",
     "ANNOUNCEMENTS: show latest notices.",
@@ -1219,6 +1427,24 @@ function formatKnowledgeEntry(entry: KnowledgeEntry, index: number) {
   const terms = metadataTerms(entry.metadata);
   const termLine = terms.length ? `\nSearch terms: ${terms.join(", ")}` : "";
   return `${index + 1}. ${entry.title} [${entry.category}/${entry.bot_scope}]${termLine}\n${entry.content}`;
+}
+
+function formatConversationTurns(turns: ConversationTurn[]) {
+  if (!turns.length) {
+    return "No recent messages found.";
+  }
+
+  return turns
+    .map((turn) => {
+      const speaker = turn.direction === "inbound" ? "Member" : "Assistant";
+      return `${speaker}: ${clampConversationLine(turn.text_body ?? "")}`;
+    })
+    .join("\n");
+}
+
+function clampConversationLine(text: string) {
+  const singleLine = text.replace(/\s+/g, " ").trim();
+  return singleLine.length > 260 ? `${singleLine.slice(0, 257)}...` : singleLine;
 }
 
 function extractOpenAIText(payload: OpenAIResponsePayload) {
@@ -1270,8 +1496,15 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
 }
 
 function clampWhatsAppReply(text: string) {
-  const trimmed = text.replace(/\n{3,}/g, "\n\n").trim();
+  const trimmed = plainWhatsAppText(text);
   return trimmed.length > 1200 ? `${trimmed.slice(0, 1190)}...` : trimmed;
+}
+
+function plainWhatsAppText(text: string) {
+  return text
+    .replace(/\*/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 function getEnv(names: string | string[], fallback = "") {
@@ -1289,6 +1522,15 @@ function getEnv(names: string | string[], fallback = "") {
 function getNumberEnv(names: string | string[], fallback: number) {
   const value = Number.parseInt(getEnv(names), 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function callbackUrlWithSecret(callbackUrl: string) {
+  const secret = Deno.env.get("MPESA_CALLBACK_SIGNATURE_SECRET")?.trim();
+  const trimmedUrl = callbackUrl.trim();
+  if (!trimmedUrl || !secret || /(?:\?|&)token=/.test(trimmedUrl)) {
+    return trimmedUrl;
+  }
+  return `${trimmedUrl}${trimmedUrl.includes("?") ? "&" : "?"}token=${encodeURIComponent(secret)}`;
 }
 
 async function getPendingContributions(supabase: SupabaseClient, memberId: string): Promise<Contribution[]> {
@@ -1394,7 +1636,7 @@ async function initiateMpesaPayment(
 
   const result = await response.json();
   if (!response.ok || result.errorCode || result.ResponseCode !== "0") {
-    throw new Error(result.errorMessage || result.ResponseDescription || "M-Pesa STK push failed");
+    throw new Error(result.errorMessage || result.ResponseDescription || "M-Pesa payment request failed");
   }
 
   const { data: transaction, error: transactionError } = await supabase
@@ -1435,6 +1677,27 @@ async function initiateMpesaPayment(
     throw intentError;
   }
 
+  try {
+    await notifyTreasurersOfMoneyEvent(supabase, {
+      title: options.purpose === "wallet_topup"
+        ? "WhatsApp wallet top-up initiated"
+        : "WhatsApp contribution payment initiated",
+      amount,
+      status: "pending",
+      source: "whatsapp-webhook",
+      memberId: member.id,
+      memberName: member.full_name,
+      memberPhone: phoneNumber,
+      membershipNumber: member.membership_number,
+      reference: result.CheckoutRequestID,
+      checkoutRequestId: result.CheckoutRequestID,
+      transactionId: transaction.id,
+      details: options.transactionDesc,
+    });
+  } catch (treasurerAlertError) {
+    console.error("Failed to send treasurer WhatsApp alert for WhatsApp payment:", treasurerAlertError);
+  }
+
   return { phoneNumber, checkoutRequestId: result.CheckoutRequestID };
 }
 
@@ -1460,12 +1723,13 @@ async function sendAndLogText(
   memberId: string | null,
   text: string,
 ) {
+  const body = plainWhatsAppText(text);
   let result: Record<string, unknown> = {};
   let waMessageId: string | null = null;
   let status = "sent";
 
   try {
-    result = await sendWhatsAppText(contact.wa_id, text);
+    result = await sendWhatsAppText(contact.wa_id, body);
     const messages = result?.messages as Array<{ id?: string }> | undefined;
     waMessageId = messages?.[0]?.id ?? null;
     status = waMessageId ? "sent" : "failed";
@@ -1483,7 +1747,7 @@ async function sendAndLogText(
     wa_message_id: waMessageId,
     direction: "outbound",
     message_type: "text",
-    text_body: text,
+    text_body: body,
     payload: result ?? {},
     status,
   });
@@ -1507,6 +1771,7 @@ function buildChatMessages(
   member: MemberProfile | null,
   botMode: BotMode,
   entries: KnowledgeEntry[],
+  recentTurns: ConversationTurn[],
 ) {
   return [
     {
@@ -1515,7 +1780,7 @@ function buildChatMessages(
     },
     {
       role: "user",
-      content: buildAiInput(text, member, botMode, entries),
+      content: buildAiInput(text, member, botMode, entries, recentTurns),
     },
   ];
 }
@@ -1523,7 +1788,8 @@ function buildChatMessages(
 async function sendWhatsAppText(to: string, text: string) {
   assertWhatsAppConfigured();
 
-  const body = text.length > 3900 ? `${text.slice(0, 3890)}...` : text;
+  const plain = plainWhatsAppText(text);
+  const body = plain.length > 3900 ? `${plain.slice(0, 3890)}...` : plain;
   const response = await fetch(
     `https://graph.facebook.com/${WHATSAPP_GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {

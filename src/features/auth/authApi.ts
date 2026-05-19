@@ -166,6 +166,25 @@ export async function signInWithEmail(payload: SignInPayload) {
   };
 }
 
+export async function signInWithOAuth(provider: 'google') {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: buildSiteUrl('/auth/callback'),
+    },
+  });
+
+  if (error) {
+    throw toAuthRequestError({
+      message: error.message || 'Unable to continue with Google.',
+      status: error.status,
+      code: error.code,
+    });
+  }
+
+  return { success: true, data };
+}
+
 type SmsVerificationSendResponse = {
   success: true;
   message: string;
@@ -350,7 +369,7 @@ export async function fetchProfile(userId: string) {
 
 export async function generateMembershipNumber() {
   try {
-    const { data, error } = await (supabase as any).rpc('generate_membership_number');
+    const { data, error } = await supabase.rpc('generate_membership_number');
     if (error) return null;
     if (typeof data === 'string' && data.trim()) return data;
     return null;

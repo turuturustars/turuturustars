@@ -10,7 +10,7 @@ It can:
 - Greet registered members by name when the number is recognized.
 - Ask registered members to rate the chat with emoji choices `😍 😊 😐 🙁 😡` and store those ratings.
 - Guide unknown numbers through a registration-interest flow:
-  confirm the WhatsApp number, collect email, send an email OTP, and store the verified request.
+  confirm the WhatsApp number, collect email, send an email OTP, collect required profile details, and create the member account.
 - Understand natural English, Kiswahili, and mixed Kenyan phrasing.
 - Offer an M-Pesa-style numbered menu while still accepting normal conversation.
 - Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
@@ -22,7 +22,7 @@ It can:
 - Answer trainable support questions from `ai_knowledge_base`, with optional Groq/OpenAI wording when configured.
 - Keep an audit trail in `whatsapp_sessions`, `whatsapp_messages`, and `whatsapp_actions`.
 - Keep service feedback in `whatsapp_conversation_ratings`.
-- Keep registration leads in `whatsapp_registration_requests` for admin review or conversion.
+- Keep registration history in `whatsapp_registration_requests` for audit, retry, and admin review when automatic conversion fails.
 
 ## Required Secrets
 
@@ -32,10 +32,14 @@ Set these Supabase Edge Function secrets:
 supabase secrets set WHATSAPP_VERIFY_TOKEN="long-random-token"
 supabase secrets set WHATSAPP_ACCESS_TOKEN="meta-cloud-api-token"
 supabase secrets set WHATSAPP_PHONE_NUMBER_ID="meta-phone-number-id"
+supabase secrets set WHATSAPP_SITE_URL="https://turuturustars.co.ke"
 supabase secrets set WHATSAPP_REGISTRATION_OTP_PEPPER="long-random-otp-pepper"
+supabase secrets set WHATSAPP_REGISTRATION_DEFAULT_STATUS="pending"
 supabase secrets set WHATSAPP_NOTIFICATIONS_JOB_SECRET="long-random-job-secret"
 supabase secrets set BREVO_API_KEY="brevo-api-key" BREVO_SENDER_EMAIL="support@turuturustars.co.ke"
 ```
+
+Keep `WHATSAPP_REGISTRATION_DEFAULT_STATUS` as `pending` for production. Setting it to `active` makes WhatsApp-created accounts usable immediately after registration.
 
 Recommended:
 
@@ -55,6 +59,7 @@ supabase secrets set WHATSAPP_AI_TIMEOUT_MS="8000"
 supabase secrets set GROQ_REGISTRATION_MODEL="openai/gpt-oss-20b"
 supabase secrets set GROQ_INTENT_MODEL="openai/gpt-oss-20b"
 supabase secrets set GROQ_KNOWLEDGE_MODEL="openai/gpt-oss-120b"
+supabase secrets set WHATSAPP_AI_CONVERSATION_TURNS="8"
 ```
 
 The bot uses Groq automatically when `GROQ_API_KEY` is present. `GROQ_REGISTRATION_MODEL` and `GROQ_INTENT_MODEL` default to `openai/gpt-oss-20b` so classification can use structured JSON schema output; `GROQ_KNOWLEDGE_MODEL` defaults to `openai/gpt-oss-120b` for stronger member-facing wording. `WHATSAPP_AI_MODEL` or `GROQ_MODEL` can set one model for all AI tasks, but that disables the purpose-specific defaults.
@@ -67,9 +72,13 @@ supabase secrets set OPENAI_API_KEY="openai-api-key"
 supabase secrets set OPENAI_MODEL="gpt-4o-mini"
 ```
 
-Set `WHATSAPP_AI_PROVIDER="off"` to force the local English/Kiswahili parser only. Without `GROQ_API_KEY` or `OPENAI_API_KEY`, the function still works using the local parser and direct database lookups.
+Set `WHATSAPP_AI_PROVIDER="off"` to force the local English/Kiswahili parser only. Without `GROQ_API_KEY` or `OPENAI_API_KEY`, the function still works using the local parser, direct database lookups, Swahili search terms, and a clarification reply that asks one follow-up question instead of dumping a full menu.
+
+Knowledge answers can use the last few logged WhatsApp turns for continuity. Tune that with `WHATSAPP_AI_CONVERSATION_TURNS`, default `8`; the AI still may not perform payments, updates, approvals, voting, or registration unless the deterministic command flow has already done it.
 
 Do not commit AI keys or paste production keys into docs or code. Store them only as Supabase Edge Function secrets, and rotate any key that has been shared in chat or logs.
+
+Member and official replies also append a clickable access link when the answer has a matching dashboard or public page. For example, a wallet reply ends with `Press here to access your wallet: https://turuturustars.co.ke/dashboard/finance/wallet`. Set `WHATSAPP_SITE_URL` if the production domain changes.
 
 ## Meta Webhook
 
@@ -111,7 +120,7 @@ Tumetumia 3500 kununua stationery kwa office
 
 Contribution records created from WhatsApp are pending until finance verifies them. Expenditures created from WhatsApp remain pending approval through the normal governance workflow. Welfare cases created from WhatsApp are opened as active cases and linked to the official who created them.
 
-Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, provide an email, then reply with the OTP sent to that email. Verified requests stay locked out of member features until an admin approves or converts the registration.
+Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, provide an email or reply `NO EMAIL`, verify email by OTP when available, then provide full name, National ID, and location. Once required details are complete, the bot creates an auth/profile member account with the National ID as the first password. By default the new member is `pending`, so member-priority services stay locked until an admin approves the account.
 
 After registered-member replies, the assistant appends:
 

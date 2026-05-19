@@ -66,7 +66,7 @@ const MpesaManagement = () => {
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   
-  // STK Push form
+  // M-Pesa request form
   const [stkPhone, setStkPhone] = useState('');
   const [stkAmount, setStkAmount] = useState('');
   const [stkReference, setStkReference] = useState('');
@@ -127,14 +127,14 @@ const MpesaManagement = () => {
       
       if (result.ResponseCode === '0') {
         toast({
-          title: 'STK Push Sent',
-          description: 'Check the phone for M-Pesa prompt',
+          title: 'M-Pesa request sent',
+          description: 'Check the phone and approve the M-Pesa request',
         });
         setStkDialogOpen(false);
         resetStkForm();
         fetchTransactions();
       } else {
-        throw new Error(result.ResponseDescription || 'STK Push failed');
+        throw new Error(result.ResponseDescription || 'M-Pesa payment failed');
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -210,7 +210,7 @@ const MpesaManagement = () => {
       await registerUrls();
       toast({
         title: 'URLs Registered',
-        description: 'M-Pesa callback URLs have been registered',
+        description: 'M-Pesa confirmation URLs have been registered',
       });
       fetchAuditLogs();
     } catch (error: unknown) {
@@ -344,12 +344,12 @@ const MpesaManagement = () => {
           <DialogTrigger asChild>
             <Button>
               <Send className="w-4 h-4 mr-2" />
-              Send STK Push
+              Send M-Pesa Request
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Send M-Pesa STK Push</DialogTitle>
+              <DialogTitle>Send M-Pesa Request</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -464,7 +464,7 @@ const MpesaManagement = () => {
 
         <Button variant="outline" onClick={handleRegisterUrls} disabled={isProcessing}>
           <Settings className="w-4 h-4 mr-2" />
-          Register Callback URLs
+          Register Confirmation URLs
         </Button>
       </div>
 

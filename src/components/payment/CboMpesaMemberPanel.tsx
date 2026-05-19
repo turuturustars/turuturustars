@@ -110,7 +110,7 @@ const CboMpesaMemberPanel = () => {
           });
         }
       } catch (error) {
-        console.error('STK polling error', error);
+        console.error('M-Pesa payment status polling error', error);
       }
     }, 5000);
 
@@ -127,12 +127,12 @@ const CboMpesaMemberPanel = () => {
   }, [payments]);
 
   const handleStkPush = async () => {
-    if (!assertCanInteract('initiate STK push')) return;
+    if (!assertCanInteract('pay with M-Pesa')) return;
 
     const amount = Number(stkAmount);
     if (!stkPhone.trim() || !Number.isFinite(amount) || amount <= 0) {
       toast({
-        title: 'Invalid STK input',
+        title: 'Check payment details',
         description: 'Enter a valid phone and amount.',
         variant: 'destructive',
       });
@@ -153,15 +153,15 @@ const CboMpesaMemberPanel = () => {
       setStkAmount('');
 
       toast({
-        title: 'STK push sent',
-        description: result.customer_message || 'Approve the payment prompt on your phone.',
+        title: 'M-Pesa request sent',
+        description: result.customer_message || 'Approve the M-Pesa request on your phone.',
       });
 
       await loadPayments();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to initiate STK push';
+      const message = error instanceof Error ? error.message : 'Failed to start M-Pesa payment';
       toast({
-        title: 'STK push failed',
+        title: 'M-Pesa payment failed',
         description: message,
         variant: 'destructive',
       });
@@ -226,9 +226,9 @@ const CboMpesaMemberPanel = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Smartphone className="w-5 h-5" />
-              STK Push
+              Pay with M-Pesa
             </CardTitle>
-            <CardDescription>Send a payment prompt to your phone and complete with M-Pesa PIN.</CardDescription>
+            <CardDescription>Send a payment request to your phone and complete with your M-Pesa PIN.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
@@ -241,11 +241,11 @@ const CboMpesaMemberPanel = () => {
             </div>
             <Button onClick={handleStkPush} disabled={stkLoading || !canInteract} className="w-full">
               {stkLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}
-              Initiate STK Push
+              Pay with M-Pesa
             </Button>
             {activeCheckoutId && (
               <div className="rounded-md border p-3 text-sm bg-muted/40">
-                <p className="font-medium">Checkout: {activeCheckoutId}</p>
+                <p className="font-medium">Payment reference: {activeCheckoutId}</p>
                 <p className="text-muted-foreground mt-1">Status: {activeStatus || 'pending'}</p>
               </div>
             )}

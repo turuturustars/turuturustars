@@ -108,6 +108,7 @@ WHATSAPP_APP_SECRET=meta-app-secret
 WHATSAPP_ACCESS_TOKEN=meta-system-user-token
 WHATSAPP_PHONE_NUMBER_ID=meta-phone-number-id
 WHATSAPP_GRAPH_API_VERSION=v20.0
+WHATSAPP_SITE_URL=https://turuturustars.co.ke
 WHATSAPP_NOTIFICATIONS_JOB_SECRET=choose-a-long-random-dispatch-secret
 
 MPESA_CONSUMER_KEY=...
@@ -120,6 +121,7 @@ MPESA_CALLBACK_URL=https://<project-ref>.supabase.co/functions/v1/mpesa-callback
 # Optional smart intent and knowledge fallback. Groq is preferred for low-latency WhatsApp replies.
 WHATSAPP_AI_PROVIDER=groq
 WHATSAPP_AI_TIMEOUT_MS=8000
+WHATSAPP_AI_CONVERSATION_TURNS=8
 GROQ_API_KEY=...
 GROQ_REGISTRATION_MODEL=openai/gpt-oss-20b
 GROQ_INTENT_MODEL=openai/gpt-oss-20b
@@ -184,7 +186,7 @@ Start with retrieval from `ai_knowledge_base`, not fine-tuning. Officials can ma
 - Wallet funding and wallet use.
 - Contacts for officials.
 
-The smart assistant can call Groq or OpenAI through an OpenAI-compatible chat-completions interface. Registration and intent extraction use structured JSON when the chosen model supports it, then fall back to normal JSON mode and finally to the local English/Kiswahili parser. Exact member operations still stay deterministic: payments, balances, receipts, profile status, meetings, announcements, notifications, welfare cases, wallet top-ups, and kitty contributions are read from Supabase commands instead of invented by the model.
+The smart assistant can call Groq or OpenAI through an OpenAI-compatible chat-completions interface. Registration and intent extraction use structured JSON when the chosen model supports it, then fall back to normal JSON mode and finally to the local English/Kiswahili parser. Knowledge answers use active `ai_knowledge_base` entries, Swahili/Sheng search terms, and a small recent-conversation window controlled by `WHATSAPP_AI_CONVERSATION_TURNS` so follow-up questions feel continuous. Exact member operations still stay deterministic: payments, balances, receipts, profile status, meetings, announcements, notifications, welfare cases, wallet top-ups, and kitty contributions are read from Supabase commands instead of invented by the model.
 
 Never commit AI keys. Store them as Supabase Edge Function secrets only, and rotate any key that has been shared in chat or logs before production.
 

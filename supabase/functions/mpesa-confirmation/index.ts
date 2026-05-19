@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createServiceClient, logCallbackAudit, normalizeKenyanPhone, normalizeReceipt } from "../_shared/mpesa.ts";
+import { notifyTreasurersOfMoneyEvent } from "../_shared/treasurer-whatsapp.ts";
 
 serve(async (req) => {
   const supabase = createServiceClient();
@@ -31,7 +32,7 @@ serve(async (req) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, full_name, phone, membership_number")
       .eq("phone", phone)
       .maybeSingle();
 
@@ -42,7 +43,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (!existingPayment?.id) {
-      await supabase.from("payments").insert({
+      const { data: insertedPayment, error: insertError } = await supabase.from("payments").insert({
         member_id: profile?.id ?? null,
         phone,
         amount,
@@ -52,7 +53,29 @@ serve(async (req) => {
         mpesa_receipt: receipt,
         status: "awaiting_approval",
         verified_at: null,
-      });
+      }).select("id").maybeSingle();
+
+      if (insertError) {
+        console.error("mpesa-confirmation insert failed", insertError);
+      } else {
+        try {
+          await notifyTreasurersOfMoneyEvent(supabase, {
+            title: "C2B M-Pesa payment received",
+            amount,
+            status: "awaiting_approval",
+            source: "mpesa-confirmation",
+            memberId: profile?.id ?? null,
+            memberName: profile?.full_name ?? null,
+            memberPhone: phone,
+            membershipNumber: profile?.membership_number ?? null,
+            reference: receipt,
+            transactionId: insertedPayment?.id ?? null,
+            details: "Direct till/paybill confirmation",
+          });
+        } catch (treasurerAlertError) {
+          console.error("mpesa-confirmation treasurer WhatsApp alert failed", treasurerAlertError);
+        }
+      }
     }
 
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: "Accepted" }), {

@@ -35,7 +35,7 @@ const PaymentsManagement = () => {
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-2xl font-serif font-bold text-foreground">M-Pesa Management</h1>
-        <p className="text-muted-foreground">Receive and reconcile CBO payments using M-Pesa STK and till verification.</p>
+        <p className="text-muted-foreground">Receive and reconcile CBO payments through M-Pesa and till verification.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -43,22 +43,22 @@ const PaymentsManagement = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-green-600" />
-              STK Payments
+              M-Pesa Payments
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Member enters phone + amount and receives instant M-Pesa prompt.</p>
+            <p className="text-sm text-muted-foreground">Member enters phone and amount, then receives an M-Pesa request.</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-blue-600" />
-              Callback Verified
+              M-Pesa Confirmed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Payments are confirmed from callback data before final completion.</p>
+            <p className="text-sm text-muted-foreground">Payments are checked against M-Pesa confirmation before final completion.</p>
           </CardContent>
         </Card>
         <Card>

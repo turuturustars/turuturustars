@@ -31,6 +31,41 @@ export function optionalEnv(name: string): string | null {
   return Deno.env.get(name) ?? null;
 }
 
+export function functionsBaseUrl(): string {
+  const explicit = optionalEnv("SUPABASE_FUNCTIONS_URL")?.trim();
+  if (explicit) return explicit.replace(/\/+$/, "");
+
+  const supabaseUrl = requireEnv("SUPABASE_URL");
+  const host = new URL(supabaseUrl).hostname;
+  const ref = host.split(".")[0];
+  return `https://${ref}.functions.supabase.co`;
+}
+
+export function edgeFunctionUrl(functionName: string): string {
+  return `${functionsBaseUrl()}/functions/v1/${functionName.replace(/^\/+/, "")}`;
+}
+
+export function appendCallbackToken(callbackUrl: string, secret = optionalEnv("MPESA_CALLBACK_SIGNATURE_SECRET")): string {
+  const trimmedUrl = callbackUrl.trim();
+  const trimmedSecret = secret?.trim();
+  if (!trimmedUrl || !trimmedSecret || /(?:\?|&)token=/.test(trimmedUrl)) {
+    return trimmedUrl;
+  }
+
+  return `${trimmedUrl}${trimmedUrl.includes("?") ? "&" : "?"}token=${encodeURIComponent(trimmedSecret)}`;
+}
+
+export function isCallbackTokenValid(requestUrl: string, secret = optionalEnv("MPESA_CALLBACK_SIGNATURE_SECRET")): boolean {
+  const trimmedSecret = secret?.trim();
+  if (!trimmedSecret) return true;
+
+  try {
+    return new URL(requestUrl).searchParams.get("token") === trimmedSecret;
+  } catch {
+    return false;
+  }
+}
+
 export function createServiceClient() {
   const supabaseUrl = requireEnv("SUPABASE_URL");
   const serviceRole = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -145,18 +180,19 @@ export async function getMpesaAccessToken(): Promise<string> {
   });
 
   const payload = await safeJson(response);
+  const accessToken = typeof payload.access_token === "string" ? payload.access_token : "";
 
-  if (!response.ok || !payload.access_token) {
+  if (!response.ok || !accessToken) {
     throw new HttpError(502, "Failed to get M-Pesa OAuth token", payload);
   }
 
   const expiresIn = Number(payload.expires_in ?? 3599);
   mpesaTokenCache = {
-    token: payload.access_token,
+    token: accessToken,
     expiresAt: Date.now() + expiresIn * 1000,
   };
 
-  return payload.access_token;
+  return accessToken;
 }
 
 export async function fetchWithRetry(url: string, init: RequestInit, attempts = 3, baseDelayMs = 400): Promise<Response> {
@@ -183,10 +219,10 @@ export async function fetchWithRetry(url: string, init: RequestInit, attempts = 
   throw new HttpError(502, "Failed to reach M-Pesa API after retries", lastError ?? undefined);
 }
 
-export async function safeJson(response: Response): Promise<Record<string, any>> {
+export async function safeJson(response: Response): Promise<Record<string, unknown>> {
   const raw = await response.text();
   try {
-    return JSON.parse(raw || "{}");
+    return JSON.parse(raw || "{}") as Record<string, unknown>;
   } catch {
     return { raw };
   }

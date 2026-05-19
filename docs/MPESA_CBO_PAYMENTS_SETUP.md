@@ -13,13 +13,14 @@ Set these in Supabase Edge Function secrets (and local `.env` for local testing)
 - `MPESA_CONSUMER_SECRET`
 - `MPESA_SHORTCODE`
 - `MPESA_PASSKEY`
-- `MPESA_CALLBACK_URL`
+- `MPESA_CALLBACK_URL` or `MPESA_STK_CALLBACK_URL` for dashboard STK payments
 - `MPESA_BASE_URL` (set `https://sandbox.safaricom.co.ke` for sandbox)
 
 Optional hardening / extensions:
 
 - `MPESA_CALLBACK_SIGNATURE_SECRET` (enables callback signature verification)
 - `MPESA_PULL_VERIFICATION_URL` (optional external pull verification endpoint for till receipts)
+- `WHATSAPP_MPESA_CALLBACK_URL` for WhatsApp assistant wallet/kitty STK payments
 
 ## 2) Apply DB Migration
 
@@ -56,7 +57,10 @@ supabase functions deploy mpesa-validation
 
 For STK Push callbacks, Daraja should call:
 
-- `MPESA_CALLBACK_URL` -> `/functions/v1/stk-callback`
+- Dashboard/CBO payment STK: `MPESA_STK_CALLBACK_URL` or `MPESA_CALLBACK_URL` -> `/functions/v1/stk-callback`
+- WhatsApp assistant STK: `WHATSAPP_MPESA_CALLBACK_URL` -> `/functions/v1/mpesa-callback`
+
+If `MPESA_CALLBACK_SIGNATURE_SECRET` is set, the Edge Functions append the required `token` query parameter to STK callback URLs automatically. This matters because Daraja will call the exact `CallBackURL` sent in the STK request.
 
 For C2B flow (Till confirmations):
 

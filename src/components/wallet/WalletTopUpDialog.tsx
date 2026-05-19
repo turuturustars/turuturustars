@@ -24,12 +24,12 @@ const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
 const statusCopy: Record<TopUpStatus, { title: string; detail: string; progress: number }> = {
   idle: {
     title: 'Ready',
-    detail: 'Enter an amount and send the M-Pesa prompt.',
+    detail: 'Enter an amount and send the M-Pesa request.',
     progress: 0,
   },
   pending: {
     title: 'Waiting for M-Pesa confirmation',
-    detail: 'Approve the STK prompt on your phone. This window will keep checking.',
+    detail: 'Approve the M-Pesa request on your phone. This window will keep checking.',
     progress: 55,
   },
   checking: {
@@ -49,7 +49,7 @@ const statusCopy: Record<TopUpStatus, { title: string; detail: string; progress:
   },
   timeout: {
     title: 'Still waiting for confirmation',
-    detail: 'The prompt may have expired or M-Pesa is delayed. You can check again manually.',
+    detail: 'The M-Pesa request may have expired or M-Pesa is delayed. You can check again manually.',
     progress: 100,
   },
 };
@@ -120,7 +120,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
           }
           return 'completed';
         });
-        setStatusDetail(transaction?.mpesa_receipt_number ? `Receipt ${transaction.mpesa_receipt_number}` : null);
+      setStatusDetail(transaction?.mpesa_receipt_number ? `Receipt ${transaction.mpesa_receipt_number}` : null);
         return;
       }
 
@@ -184,7 +184,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
       return;
     }
     if (!phone) {
-      toast({ title: 'Phone required', description: 'Enter the M-Pesa number to receive the prompt.', variant: 'destructive' });
+      toast({ title: 'Phone required', description: 'Enter the M-Pesa number to receive the payment request.', variant: 'destructive' });
       return;
     }
     if (!user?.id) return;
@@ -206,7 +206,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
       setStatus('pending');
       setStatusDetail(null);
       toast({
-        title: 'STK Push sent',
+        title: 'M-Pesa request sent',
         description: 'Check your phone and enter your M-Pesa PIN to complete the top-up.',
       });
       onSuccess?.();
@@ -286,7 +286,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
 
             <Button onClick={handleSubmit} disabled={loading} className="w-full gap-2">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
-              {loading ? 'Sending prompt...' : `Send STK Push${numericAmount ? ` for ${formatKES(numericAmount)}` : ''}`}
+              {loading ? 'Sending M-Pesa request...' : `Pay with M-Pesa${numericAmount ? ` (${formatKES(numericAmount)})` : ''}`}
             </Button>
           </div>
         )}

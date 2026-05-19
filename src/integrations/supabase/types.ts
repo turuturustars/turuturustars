@@ -321,6 +321,88 @@ export type Database = {
           },
         ]
       }
+      community_knowledge_submissions: {
+        Row: {
+          ai_knowledge_base_id: string | null
+          answer: string
+          area: string | null
+          attribution_name: string | null
+          consent_to_use: boolean
+          created_at: string
+          id: string
+          metadata: Json
+          phone: string | null
+          profile_id: string | null
+          question: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          status: string
+          topic: string
+          updated_at: string
+        }
+        Insert: {
+          ai_knowledge_base_id?: string | null
+          answer: string
+          area?: string | null
+          attribution_name?: string | null
+          consent_to_use?: boolean
+          created_at?: string
+          id?: string
+          metadata?: Json
+          phone?: string | null
+          profile_id?: string | null
+          question?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+        }
+        Update: {
+          ai_knowledge_base_id?: string | null
+          answer?: string
+          area?: string | null
+          attribution_name?: string | null
+          consent_to_use?: boolean
+          created_at?: string
+          id?: string
+          metadata?: Json
+          phone?: string | null
+          profile_id?: string | null
+          question?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          status?: string
+          topic?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_knowledge_submissions_ai_knowledge_base_id_fkey"
+            columns: ["ai_knowledge_base_id"]
+            isOneToOne: false
+            referencedRelation: "ai_knowledge_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_knowledge_submissions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_knowledge_submissions_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discipline_records: {
         Row: {
           created_at: string | null
@@ -2762,6 +2844,7 @@ export type Database = {
       }
       whatsapp_messages: {
         Row: {
+          body: string | null
           contact_id: string | null
           created_at: string
           direction: string
@@ -2769,12 +2852,18 @@ export type Database = {
           member_id: string | null
           message_type: string
           payload: Json
+          phone: string | null
+          profile_id: string | null
+          provider_message_id: string | null
+          provider_response: Json | null
+          raw_payload: Json
           status: string
           status_updated_at: string | null
           text_body: string | null
           wa_message_id: string | null
         }
         Insert: {
+          body?: string | null
           contact_id?: string | null
           created_at?: string
           direction: string
@@ -2782,12 +2871,18 @@ export type Database = {
           member_id?: string | null
           message_type?: string
           payload?: Json
+          phone?: string | null
+          profile_id?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          raw_payload?: Json
           status?: string
           status_updated_at?: string | null
           text_body?: string | null
           wa_message_id?: string | null
         }
         Update: {
+          body?: string | null
           contact_id?: string | null
           created_at?: string
           direction?: string
@@ -2795,6 +2890,11 @@ export type Database = {
           member_id?: string | null
           message_type?: string
           payload?: Json
+          phone?: string | null
+          profile_id?: string | null
+          provider_message_id?: string | null
+          provider_response?: Json | null
+          raw_payload?: Json
           status?: string
           status_updated_at?: string | null
           text_body?: string | null
@@ -2811,6 +2911,13 @@ export type Database = {
           {
             foreignKeyName: "whatsapp_messages_member_id_fkey"
             columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_messages_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

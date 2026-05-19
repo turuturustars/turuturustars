@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { HttpError, corsHeaders, errorResponse, isOptionsRequest, jsonResponse, readJsonBody } from "../_shared/http.ts";
 import {
+  appendCallbackToken,
   createServiceClient,
   createStkPassword,
   createTimestamp,
+  edgeFunctionUrl,
   ensureMemberCanInteract,
   extractClientIp,
   fetchWithRetry,
@@ -16,6 +18,7 @@ import {
   requireAuthenticatedUser,
   requireEnv,
 } from "../_shared/mpesa.ts";
+import { notifyTreasurersOfMoneyEvent } from "../_shared/treasurer-whatsapp.ts";
 
 type StkPushRequest = {
   phone: string;
@@ -59,7 +62,11 @@ serve(async (req) => {
     }
 
     const baseUrl = requireEnv("MPESA_BASE_URL");
-    const callbackUrl = requireEnv("MPESA_CALLBACK_URL");
+    const callbackBase =
+      Deno.env.get("MPESA_STK_CALLBACK_URL")?.trim() ||
+      Deno.env.get("MPESA_CALLBACK_URL")?.trim() ||
+      edgeFunctionUrl("stk-callback");
+    const callbackUrl = appendCallbackToken(callbackBase);
     const shortCode = requireEnv("MPESA_SHORTCODE");
     const passkey = requireEnv("MPESA_PASSKEY");
 
@@ -155,6 +162,23 @@ serve(async (req) => {
       }
     } else {
       paymentId = insertedPayment?.id ?? null;
+    }
+
+    try {
+      await notifyTreasurersOfMoneyEvent(serviceSupabase, {
+        title: "STK payment initiated",
+        amount,
+        status: "pending",
+        source: "stk-push",
+        memberId,
+        memberPhone: phone,
+        reference: mpesaResponse.CheckoutRequestID ?? null,
+        checkoutRequestId: mpesaResponse.CheckoutRequestID ?? null,
+        transactionId: paymentId,
+        details: transactionDesc,
+      });
+    } catch (treasurerAlertError) {
+      console.error("stk-push treasurer WhatsApp alert failed", treasurerAlertError);
     }
 
     return jsonResponse({

@@ -149,8 +149,8 @@ const WalletTransactionList = ({ transactions, topUps = [] }: Props) => {
                       {topUp.result_desc || `Sent to ${topUp.phone_number} on ${formatDate(topUp.created_at)}`}
                     </p>
                     {topUp.checkout_request_id && (
-                      <p className="truncate text-[10px] font-mono text-muted-foreground/80">
-                        Checkout: {topUp.checkout_request_id}
+                      <p className="truncate text-[10px] text-muted-foreground/80">
+                        Payment reference: {topUp.checkout_request_id}
                       </p>
                     )}
                   </div>

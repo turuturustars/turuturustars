@@ -84,9 +84,9 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
 
       setCheckoutRequestId(response.CheckoutRequestID);
       setStkSent(true);
-      toast.success('STK Push sent. Check your phone.');
+      toast.success('M-Pesa request sent. Check your phone.');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'STK push failed'));
+      toast.error(getErrorMessage(error, 'M-Pesa payment failed'));
     } finally {
       setBusy(false);
     }
@@ -165,8 +165,8 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
               </div>
               {checkoutRequestId && (
                 <div className="mt-2 flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Checkout ID</span>
-                  <span className="truncate font-mono text-xs">{checkoutRequestId}</span>
+                  <span className="text-muted-foreground">Payment reference</span>
+                  <span className="truncate text-xs">{checkoutRequestId}</span>
                 </div>
               )}
             </div>
@@ -230,7 +230,7 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
               </div>
               <Button onClick={payWithMpesa} disabled={busy || !amountIsValid} className="w-full gap-2">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
-                Send STK Push
+                Pay with M-Pesa
               </Button>
             </TabsContent>
 

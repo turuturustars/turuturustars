@@ -194,7 +194,7 @@ export async function initiateStkPushPayment(input: InitiateStkPushInput): Promi
   });
 
   if (error || !data?.ok) {
-    throw parseFunctionError(error ?? data, data?.error || 'Failed to initiate STK push');
+    throw parseFunctionError(error ?? data, data?.error || 'Failed to start M-Pesa payment');
   }
 
   return {

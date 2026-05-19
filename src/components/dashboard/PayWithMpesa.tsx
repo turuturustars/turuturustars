@@ -173,13 +173,13 @@ const PayWithMpesa = ({
       setReferenceId(checkoutRequestId);
 
       toast({
-        title: '✓ Payment Initiated',
-        description: `Check your phone (${formatted}) for the M-Pesa prompt within 30 seconds`,
+        title: 'M-Pesa request sent',
+        description: `Check your phone (${formatted}) and enter your M-Pesa PIN within 30 seconds`,
       });
 
       // Poll for transaction status with improved handling
       setStatusMessage('Waiting for payment confirmation...');
-      
+
       const completedTransaction = await MpesaTransactionService.pollTransactionStatus(
         checkoutRequestId,
         {
@@ -320,7 +320,7 @@ const PayWithMpesa = ({
           <div className="space-y-1">
             <p className="text-sm font-medium text-sky-950">Approve on your phone</p>
             <p className="text-xs leading-relaxed text-sky-800">
-              We'll send an M-Pesa prompt to this number. Enter your PIN on your phone to complete the payment.
+              We'll send an M-Pesa request to this number. Enter your PIN on your phone to complete the payment.
             </p>
           </div>
         </div>
@@ -450,7 +450,7 @@ const PayWithMpesa = ({
             disabled={!isValid || isProcessing}
             isLoading={isProcessing}
             loadingText="Processing"
-            ariaLabel="Send M-Pesa prompt"
+            ariaLabel="Pay with M-Pesa"
             className={cn(
               'flex-1 gap-2 font-semibold transition-all',
               isProcessing && 'opacity-90'
@@ -459,7 +459,7 @@ const PayWithMpesa = ({
             {!isProcessing && (
               <>
                 {submitError ? <RefreshCw className="w-4 h-4" /> : <Smartphone className="w-4 h-4" />}
-                {submitError ? 'Try Again' : 'Send M-Pesa Prompt'}
+                {submitError ? 'Try Again' : 'Pay with M-Pesa'}
               </>
             )}
           </AccessibleButton>

@@ -5,9 +5,9 @@ export interface UserFriendlyPaymentError {
 }
 
 const DEFAULT_PAYMENT_ERROR: UserFriendlyPaymentError = {
-  title: "We couldn't send the M-Pesa prompt",
+  title: "We couldn't send the M-Pesa request",
   message: "Please confirm the phone number and amount, then try again.",
-  reassurance: "You have not been charged unless you approved an M-Pesa prompt on your phone.",
+  reassurance: "You have not been charged unless you approved an M-Pesa request on your phone.",
 };
 
 function getErrorMessage(error: unknown): string {
@@ -48,7 +48,7 @@ export function getFriendlyMpesaError(error: unknown): UserFriendlyPaymentError 
     return {
       title: "M-Pesa service is not reachable",
       message: "We couldn't connect to the payment service right now. Please check your connection and try again in a minute.",
-      reassurance: "No M-Pesa prompt was sent, so no money has been deducted.",
+      reassurance: "No M-Pesa request was sent, so no money has been deducted.",
     };
   }
 
@@ -61,7 +61,7 @@ export function getFriendlyMpesaError(error: unknown): UserFriendlyPaymentError 
     return {
       title: "M-Pesa payments need attention",
       message: "The payment service is temporarily unavailable. Please contact support so we can fix it.",
-      reassurance: "No M-Pesa prompt was sent, so no money has been deducted.",
+      reassurance: "No M-Pesa request was sent, so no money has been deducted.",
     };
   }
 
@@ -76,7 +76,7 @@ export function getFriendlyMpesaError(error: unknown): UserFriendlyPaymentError 
     return {
       title: "M-Pesa is temporarily unavailable",
       message: "The payment provider did not accept the request. Please try again shortly.",
-      reassurance: "You have not been charged unless you approved an M-Pesa prompt on your phone.",
+      reassurance: "You have not been charged unless you approved an M-Pesa request on your phone.",
     };
   }
 
@@ -90,7 +90,7 @@ export function getFriendlyMpesaError(error: unknown): UserFriendlyPaymentError 
   if (message.includes("cancel") || message.includes("declin") || message.includes("timeout") || message.includes("timed out")) {
     return {
       title: "Payment was not completed",
-      message: "The M-Pesa prompt was cancelled or expired. Send a new prompt when you are ready.",
+      message: "The M-Pesa request was cancelled or expired. Try again when you are ready.",
     };
   }
 

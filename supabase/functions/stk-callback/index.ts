@@ -3,10 +3,12 @@ import { HttpError, corsHeaders, errorResponse, isOptionsRequest, jsonResponse }
 import {
   createServiceClient,
   extractStkCallbackMetadata,
+  isCallbackTokenValid,
   logCallbackAudit,
   normalizeReceipt,
   verifyCallbackSignature,
 } from "../_shared/mpesa.ts";
+import { notifyTreasurersOfMoneyEvent } from "../_shared/treasurer-whatsapp.ts";
 
 type StkCallbackPayload = {
   Body?: {
@@ -40,7 +42,7 @@ serve(async (req) => {
 
     const rawBody = await req.text();
     const signatureHeader = req.headers.get("x-mpesa-signature") ?? req.headers.get("x-signature");
-    const signatureValid = await verifyCallbackSignature(rawBody, signatureHeader);
+    const signatureValid = isCallbackTokenValid(req.url) || await verifyCallbackSignature(rawBody, signatureHeader);
 
     let body: StkCallbackPayload;
     try {
@@ -90,7 +92,7 @@ serve(async (req) => {
 
     const { data: payment, error: paymentError } = await supabase
       .from("payments")
-      .select("id, status, mpesa_receipt")
+      .select("id, status, mpesa_receipt, member_id, phone, amount, checkout_request_id")
       .eq("checkout_request_id", checkoutRequestId)
       .maybeSingle();
 
@@ -115,6 +117,21 @@ serve(async (req) => {
         const { error: orphanInsertError } = await supabase.from("payments").insert(insertPayload);
         if (orphanInsertError && orphanInsertError.code !== "23505") {
           throw new HttpError(500, "Failed to write orphan callback payment", orphanInsertError);
+        }
+
+        try {
+          await notifyTreasurersOfMoneyEvent(supabase, {
+            title: resultCode === 0 ? "Unmatched STK payment received" : "Unmatched STK payment failed",
+            amount: Number(metadata.amount ?? 0),
+            status: resultCode === 0 ? "awaiting_approval" : "failed",
+            source: "stk-callback",
+            memberPhone: metadata.phone,
+            reference: receipt || checkoutRequestId,
+            checkoutRequestId,
+            details: resultDesc,
+          });
+        } catch (treasurerAlertError) {
+          console.error("Error sending treasurer WhatsApp alert for unmatched STK callback:", treasurerAlertError);
         }
       }
 
@@ -190,6 +207,24 @@ serve(async (req) => {
           resultDesc,
         });
       }
+    }
+
+    try {
+      const nextStatus = resultCode === 0 ? "awaiting_approval" : "failed";
+      await notifyTreasurersOfMoneyEvent(supabase, {
+        title: resultCode === 0 ? "STK payment awaiting approval" : "STK payment failed",
+        amount: Number(metadata.amount || payment.amount || 0),
+        status: nextStatus,
+        source: "stk-callback",
+        memberId: payment.member_id,
+        memberPhone: metadata.phone || payment.phone || null,
+        reference: receipt || payment.mpesa_receipt || checkoutRequestId,
+        checkoutRequestId,
+        transactionId: payment.id,
+        details: resultDesc,
+      });
+    } catch (treasurerAlertError) {
+      console.error("Error sending treasurer WhatsApp alert for STK callback:", treasurerAlertError);
     }
 
     return acceptedResponse();

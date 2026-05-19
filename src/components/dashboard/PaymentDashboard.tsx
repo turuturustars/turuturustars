@@ -650,8 +650,8 @@ For inquiries, contact the treasurer.
                   <div className="bg-white p-3 rounded border border-blue-100 text-sm">
                     <p className="font-medium mb-1">How it works:</p>
                     <ol className="text-xs space-y-1 list-decimal list-inside">
-                      <li>We'll send an STK push to your M-Pesa</li>
-                      <li>Enter your M-Pesa PIN when prompted</li>
+                      <li>We'll send an M-Pesa request to your phone</li>
+                      <li>Enter your M-Pesa PIN on your phone</li>
                       <li>Payment will be confirmed automatically</li>
                       <li>You'll receive a digital receipt</li>
                     </ol>

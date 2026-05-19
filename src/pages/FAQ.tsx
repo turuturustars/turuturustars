@@ -48,7 +48,7 @@ const FAQ = () => {
       category: 'Contributions',
       question: 'How do I set up my contribution?',
       answer:
-        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. Payments are processed via M-Pesa STK push.',
+        'Log into your dashboard, go to Contributions, and set up your preferred contribution amount and frequency. You can pay with M-Pesa from your phone.',
     },
     {
       category: 'Contributions',

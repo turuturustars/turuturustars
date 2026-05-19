@@ -125,7 +125,7 @@ const WalletPage = () => {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <p className="font-medium">Some top-ups need attention</p>
-                  <p className="text-xs opacity-80">Check the activity list for failed or timed-out M-Pesa prompts.</p>
+                  <p className="text-xs opacity-80">Check the activity list for failed or timed-out M-Pesa requests.</p>
                 </div>
               </div>
             )}
@@ -139,7 +139,7 @@ const WalletPage = () => {
             <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-medium">Waiting for M-Pesa confirmation</p>
-              <p className="text-xs opacity-80">Your wallet will update automatically after Safaricom confirms the prompt.</p>
+              <p className="text-xs opacity-80">Your wallet will update automatically after M-Pesa confirms the payment.</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 bg-background/70">

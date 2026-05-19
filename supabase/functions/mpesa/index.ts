@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { notifyTreasurersOfMoneyEvent } from "../_shared/treasurer-whatsapp.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -63,6 +64,12 @@ function parseAmount(rawValue: unknown): number {
     });
   }
   return Math.round(amount);
+}
+
+function moneyAlertTitle(transactionType: string, statusLabel: string): string {
+  if (transactionType === "wallet_topup") return `Wallet top-up ${statusLabel}`;
+  if (transactionType === "kitty_contribution") return `Kitty contribution ${statusLabel}`;
+  return `M-Pesa payment ${statusLabel}`;
 }
 
 async function ensureMemberCanTransact(
@@ -395,7 +402,7 @@ serve(async (req) => {
         
         // Log the transaction
 
-        await supabase.from("mpesa_transactions").insert({
+        const { data: insertedTransaction, error: transactionInsertError } = await supabase.from("mpesa_transactions").insert({
           transaction_type: transactionType,
           merchant_request_id: result.MerchantRequestID,
           checkout_request_id: result.CheckoutRequestID,
@@ -406,8 +413,13 @@ serve(async (req) => {
           kitty_id: transactionType === "kitty_contribution" ? kittyId : null,
           status: result.ResponseCode === "0" ? "pending" : "failed",
           initiated_by: user.id,
-        });
+        }).select("id").maybeSingle();
 
+        if (transactionInsertError) {
+          throw new HttpError(500, "Failed to store M-Pesa transaction", {
+            detail: transactionInsertError.message,
+          });
+        }
 
         // Create audit log
 
@@ -417,6 +429,23 @@ serve(async (req) => {
           p_entity_type: "mpesa_transaction",
           p_metadata: { amount, phoneNumber, checkoutRequestId: result.CheckoutRequestID },
         });
+
+        try {
+          await notifyTreasurersOfMoneyEvent(supabase, {
+            title: moneyAlertTitle(transactionType, "initiated"),
+            amount,
+            status: "pending",
+            source: "mpesa",
+            memberId,
+            memberPhone: phoneNumber,
+            reference: result.CheckoutRequestID,
+            checkoutRequestId: result.CheckoutRequestID,
+            transactionId: insertedTransaction?.id ?? null,
+            details: transactionDesc || accountReference || null,
+          });
+        } catch (treasurerAlertError) {
+          console.error(`[${new Date().toISOString()}] mpesa: treasurer alert failed`, treasurerAlertError);
+        }
 
         
         break;
@@ -476,6 +505,11 @@ serve(async (req) => {
         
         // Update transaction status
         if (result.ResultCode !== undefined) {
+          const { data: previousTransaction } = await supabase
+            .from("mpesa_transactions")
+            .select("status")
+            .eq("checkout_request_id", checkoutRequestId)
+            .maybeSingle();
 
           const updateTime = new Date().toISOString();
           const statusMap: Record<number | string, string> = {
@@ -495,7 +529,7 @@ serve(async (req) => {
               status: newStatus,
             })
             .eq("checkout_request_id", checkoutRequestId)
-            .select("id, member_id, transaction_type, amount, kitty_id, checkout_request_id")
+            .select("id, member_id, transaction_type, amount, kitty_id, phone_number, checkout_request_id")
             .maybeSingle();
 
           if (reconcileUpdateError) {
@@ -503,6 +537,25 @@ serve(async (req) => {
           }
           
           console.log(`[${updateTime}] mpesa: transaction status=${newStatus}`);
+
+          if (reconciledTransaction && previousTransaction?.status !== newStatus) {
+            try {
+              await notifyTreasurersOfMoneyEvent(supabase, {
+                title: moneyAlertTitle(String(reconciledTransaction.transaction_type || "stk_push"), newStatus),
+                amount: Number(reconciledTransaction.amount || 0),
+                status: newStatus,
+                source: "mpesa-query-status",
+                memberId: reconciledTransaction.member_id,
+                memberPhone: reconciledTransaction.phone_number,
+                reference: String(reconciledTransaction.checkout_request_id || checkoutRequestId),
+                checkoutRequestId,
+                transactionId: reconciledTransaction.id,
+                details: typeof result.ResultDesc === "string" ? result.ResultDesc : null,
+              });
+            } catch (treasurerAlertError) {
+              console.error(`[${new Date().toISOString()}] mpesa: treasurer status alert failed`, treasurerAlertError);
+            }
+          }
 
           if (Number(result.ResultCode) === 0 && reconciledTransaction) {
             const expectedAmount = Number(reconciledTransaction.amount ?? 0);

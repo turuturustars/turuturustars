@@ -152,7 +152,7 @@ const PayWithMpesa = ({
         contributionId,
       });
 
-      console.log("STK Push result:", result);
+      console.log("M-Pesa payment request result:", result);
 
       if (result.ResponseCode === '0') {
         // Record transaction
@@ -175,8 +175,8 @@ const PayWithMpesa = ({
             onPaymentSuccess(refId);
           }
           toast({
-            title: '✓ Payment Initiated',
-            description: `Check your phone (${formatted}) for the M-Pesa prompt`,
+            title: 'M-Pesa request sent',
+            description: `Check your phone (${formatted}) and enter your M-Pesa PIN`,
           });
         }, 1500);
 
@@ -242,7 +242,7 @@ const PayWithMpesa = ({
               Payment of <span className="font-bold text-lg">KES {parseInt(amount).toLocaleString()}</span> initiated
             </p>
             <p className="text-xs text-gray-600 text-center mb-6">
-              Check your phone ({phone.replace(/(.{3})(?=.{4})/g, '$1***')}) for the M-Pesa prompt
+              Check your phone ({phone.replace(/(.{3})(?=.{4})/g, '$1***')}) for the M-Pesa request
             </p>
             <Card className="w-full bg-white/80 border-green-200 mb-6">
               <CardContent className="pt-4 text-center">
@@ -275,7 +275,7 @@ const PayWithMpesa = ({
             </div>
             <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Payment</h3>
             <p className="text-sm text-gray-700 text-center mb-6">
-              Sending M-Pesa prompt to<br />
+              Sending an M-Pesa request to<br />
               <span className="font-semibold">{phone.replace(/(.{3})(?=.{4})/g, '$1***')}</span>
             </p>
 
@@ -290,7 +290,7 @@ const PayWithMpesa = ({
                 </div>
                 <p className="text-4xl font-bold text-blue-600">{estimatedTime}s</p>
                 <p className="text-xs text-gray-500 mt-3">
-                  STK prompt will appear automatically
+                  A M-Pesa request will appear on your phone
                 </p>
               </CardContent>
             </Card>
@@ -302,7 +302,7 @@ const PayWithMpesa = ({
                   1
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">M-Pesa prompt arrives</p>
+                  <p className="text-sm font-medium text-gray-900">M-Pesa request arrives</p>
                   <p className="text-xs text-gray-600">You'll see it on your phone</p>
                 </div>
               </div>
@@ -443,7 +443,7 @@ const PayWithMpesa = ({
                       <p className="font-medium mb-1">How it works:</p>
                       <ol className="text-xs space-y-1 list-decimal list-inside">
                         <li>Enter your M-Pesa number</li>
-                        <li>We'll send an STK prompt immediately</li>
+                        <li>We'll send an M-Pesa request to your phone</li>
                         <li>Enter your M-Pesa PIN to complete</li>
                         <li>Get instant confirmation</li>
                       </ol>
