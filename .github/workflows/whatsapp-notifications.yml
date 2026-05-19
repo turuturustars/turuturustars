@@ -1,0 +1,33 @@
+name: WhatsApp Notifications
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+concurrency:
+  group: whatsapp-notifications
+  cancel-in-progress: false
+
+jobs:
+  send-whatsapp-notifications:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger whatsapp-notifications edge function
+        env:
+          WHATSAPP_NOTIFICATIONS_URL: https://mkcgkfzltohxagqvsbqk.supabase.co/functions/v1/whatsapp-notification-worker
+          WHATSAPP_NOTIFICATIONS_JOB_SECRET: ${{ secrets.WHATSAPP_NOTIFICATIONS_JOB_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${WHATSAPP_NOTIFICATIONS_JOB_SECRET}" ]; then
+            echo "WHATSAPP_NOTIFICATIONS_JOB_SECRET is not configured; skipping run to avoid failure spam."
+            exit 0
+          fi
+
+          curl -sS --fail-with-body \
+            -X POST "${WHATSAPP_NOTIFICATIONS_URL}" \
+            -H "Content-Type: application/json" \
+            -H "x-whatsapp-job-secret: ${WHATSAPP_NOTIFICATIONS_JOB_SECRET}" \
+            -d '{"limit": 100}'

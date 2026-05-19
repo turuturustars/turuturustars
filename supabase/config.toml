@@ -78,3 +78,9 @@ verify_jwt = false
 
 [functions.whatsapp-notifications]
 verify_jwt = false
+
+[functions.whatsapp-bot]
+verify_jwt = false
+
+[functions.whatsapp-notification-worker]
+verify_jwt = false
