@@ -203,6 +203,18 @@ const REGISTRATION_REQUEST_SELECT =
 const REGISTRATION_INTENT_PATTERN =
   /\b(register|registration|join|joining|member|membership|interested|interest|intrest|sign\s*up|sign\s*me\s*up|apply|application|enroll|enrol|become\s+(a\s+)?member|be\s+part|part\s+of\s+(the\s+)?(community|group|cbo)|community|cbo|group|turuturu\s+stars|sajili|usajili|jiunge|kujiunga|nataka\s+kuingia|kuwa\s+mwanachama|mwanachama)\b/i;
 
+type AiProvider = {
+  name: "groq" | "openai";
+  endpoint: string;
+  apiKey: string;
+  model: string;
+};
+
+type AiMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
 function clampConfidence(value: unknown): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0.4;
@@ -213,6 +225,111 @@ function cleanString(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
+}
+
+function configuredAiProvider(): AiProvider | null {
+  const groqApiKey = Deno.env.get("GROQ_API_KEY")?.trim();
+  if (groqApiKey) {
+    return {
+      name: "groq",
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      apiKey: groqApiKey,
+      model: Deno.env.get("GROQ_MODEL")?.trim() || "llama-3.3-70b-versatile",
+    };
+  }
+
+  const openaiApiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
+  if (openaiApiKey) {
+    return {
+      name: "openai",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      apiKey: openaiApiKey,
+      model: Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini",
+    };
+  }
+
+  return null;
+}
+
+function parseAiJson(content: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Some providers can still wrap JSON when under pressure. Try the object body below.
+  }
+
+  const firstBrace = content.indexOf("{");
+  const lastBrace = content.lastIndexOf("}");
+  if (firstBrace < 0 || lastBrace <= firstBrace) return null;
+
+  try {
+    const parsed = JSON.parse(content.slice(firstBrace, lastBrace + 1)) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+async function requestAiJson(
+  messages: AiMessage[],
+  options: { task: string; temperature: number; timeoutMs: number },
+): Promise<Record<string, unknown> | null> {
+  const provider = configuredAiProvider();
+  if (!provider) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs);
+
+  try {
+    const response = await fetch(provider.endpoint, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${provider.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: provider.model,
+        temperature: options.temperature,
+        response_format: { type: "json_object" },
+        messages,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
+    if (!response.ok) {
+      console.error(`${provider.name} ${options.task} failed`, response.status, payload);
+      return null;
+    }
+
+    const choices = payload?.choices as Array<Record<string, unknown>> | undefined;
+    const message = choices?.[0]?.message as Record<string, unknown> | undefined;
+    const content = cleanString(message?.content);
+    if (!content) {
+      console.error(`${provider.name} ${options.task} returned empty content`);
+      return null;
+    }
+
+    const parsed = parseAiJson(content);
+    if (!parsed) {
+      console.error(`${provider.name} ${options.task} returned non-JSON content`);
+      return null;
+    }
+
+    return parsed;
+  } catch (error) {
+    console.error(`AI ${options.task} unavailable via ${provider.name}, using local parser`, error);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function normalizePhoneForStorage(phone: string): string {
@@ -451,62 +568,29 @@ function isRegistrationInterest(text: string): boolean {
 }
 
 async function aiDetectRegistrationInterest(text: string): Promise<boolean | null> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
-  if (!apiKey || !text.trim()) return null;
+  if (!text.trim()) return null;
 
-  const model = Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini";
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+  const parsed = await requestAiJson(
+    [
+      {
+        role: "system",
+        content: [
+          "Classify whether a WhatsApp message means the sender wants to register, join, apply for, or become part of Turuturu Stars community membership.",
+          "Understand English, Kiswahili, Sheng, typos, and indirect phrasing like 'how do I become a member' or 'I want to be part of the group'.",
+          "Return JSON only with keys: wants_registration boolean, confidence number from 0 to 1.",
+        ].join(" "),
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: [
-              "Classify whether a WhatsApp message means the sender wants to register, join, apply for, or become part of Turuturu Stars community membership.",
-              "Understand English, Kiswahili, Sheng, typos, and indirect phrasing like 'how do I become a member' or 'I want to be part of the group'.",
-              "Return JSON only with keys: wants_registration boolean, confidence number from 0 to 1.",
-            ].join(" "),
-          },
-          {
-            role: "user",
-            content: text,
-          },
-        ],
-      }),
-    });
+      {
+        role: "user",
+        content: text,
+      },
+    ],
+    { task: "registration classifier", temperature: 0, timeoutMs: 5000 },
+  );
+  if (!parsed) return null;
 
-    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
-    if (!response.ok) {
-      console.error("OpenAI registration classifier failed", response.status, payload);
-      return null;
-    }
-
-    const choices = payload?.choices as Array<Record<string, unknown>> | undefined;
-    const message = choices?.[0]?.message as Record<string, unknown> | undefined;
-    const content = cleanString(message?.content);
-    if (!content) return null;
-
-    const parsed = JSON.parse(content) as Record<string, unknown>;
-    const confidence = clampConfidence(parsed.confidence);
-    return parsed.wants_registration === true && confidence >= 0.55;
-  } catch (error) {
-    console.error("AI registration classifier unavailable, using local parser", error);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  const confidence = clampConfidence(parsed.confidence);
+  return parsed.wants_registration === true && confidence >= 0.55;
 }
 
 async function detectRegistrationInterest(text: string): Promise<boolean> {
@@ -1263,75 +1347,39 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
 }
 
 async function aiInterpretMessage(text: string, profile: Profile, roles: string[]): Promise<ParsedIntent | null> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
-  if (!apiKey) return null;
-
-  const model = Deno.env.get("OPENAI_MODEL")?.trim() || "gpt-4o-mini";
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+  const parsed = await requestAiJson(
+    [
+      {
+        role: "system",
+        content: [
+          "You extract one actionable intent from a WhatsApp message for Turuturu Stars, a Kenyan community organization.",
+          "Understand natural English, Kiswahili, Sheng, typos, and common Kenyan mixed language.",
+          "Return JSON only with keys: intent, confidence, language, amount, contribution_type, payment_method, transaction_date, title, description, category, case_type, payee, reference_number, target_member, profile_updates.",
+          "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, record_contribution, record_expenditure, create_welfare_case, unknown.",
+          "Use record_contribution when a member says they paid, sent money, made a transaction, contributed, donated, or wants to record a member payment.",
+          "Use record_expenditure when an official says money was spent, something was bought, or an expense should be recorded.",
+          "Use create_welfare_case when an official/admin asks to add, open, or create a welfare case. Put the case title in title, case type in case_type, target amount in amount, and beneficiary/member name or phone in target_member when available.",
+          "Use update_profile when a member wants to add, correct, or complete profile details. Put only safe editable fields inside profile_updates: full_name, id_number, email, location, occupation, employment_status, education_level, interests, additional_notes.",
+          "Use ISO YYYY-MM-DD for transaction_date when a date is clear. Use null when unknown.",
+        ].join(" "),
       },
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: [
-              "You extract one actionable intent from a WhatsApp message for Turuturu Stars, a Kenyan community organization.",
-              "Understand natural English, Kiswahili, and common Kenyan mixed language.",
-              "Return JSON only with keys: intent, confidence, language, amount, contribution_type, payment_method, transaction_date, title, description, category, case_type, payee, reference_number, target_member, profile_updates.",
-              "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, record_contribution, record_expenditure, create_welfare_case, unknown.",
-              "Use record_contribution when a member says they paid, sent money, made a transaction, contributed, donated, or wants to record a member payment.",
-              "Use record_expenditure when an official says money was spent, something was bought, or an expense should be recorded.",
-              "Use create_welfare_case when an official/admin asks to add, open, or create a welfare case. Put the case title in title, case type in case_type, target amount in amount, and beneficiary/member name or phone in target_member when available.",
-              "Use update_profile when a member wants to add, correct, or complete profile details. Put only safe editable fields inside profile_updates: full_name, id_number, email, location, occupation, employment_status, education_level, interests, additional_notes.",
-              "Use ISO YYYY-MM-DD for transaction_date when a date is clear. Use null when unknown.",
-            ].join(" "),
+      {
+        role: "user",
+        content: JSON.stringify({
+          message: text,
+          member: {
+            name: profile.full_name,
+            membership_number: profile.membership_number,
+            status: profile.status,
           },
-          {
-            role: "user",
-            content: JSON.stringify({
-              message: text,
-              member: {
-                name: profile.full_name,
-                membership_number: profile.membership_number,
-                status: profile.status,
-              },
-              roles,
-            }),
-          },
-        ],
-      }),
-    });
+          roles,
+        }),
+      },
+    ],
+    { task: "intent extraction", temperature: 0.1, timeoutMs: 8000 },
+  );
 
-    const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
-    if (!response.ok) {
-      console.error("OpenAI intent extraction failed", response.status, payload);
-      return null;
-    }
-
-    const choices = payload?.choices as Array<Record<string, unknown>> | undefined;
-    const message = choices?.[0]?.message as Record<string, unknown> | undefined;
-    const content = cleanString(message?.content);
-    if (!content) return null;
-
-    const parsed = JSON.parse(content) as Record<string, unknown>;
-    return normalizeParsedIntent(parsed, text);
-  } catch (error) {
-    console.error("AI intent extraction unavailable, using local parser", error);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return parsed ? normalizeParsedIntent(parsed, text) : null;
 }
 
 async function interpretMessage(text: string, profile: Profile, roles: string[]): Promise<ParsedIntent> {

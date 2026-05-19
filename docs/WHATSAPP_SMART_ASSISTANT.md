@@ -40,14 +40,16 @@ supabase secrets set WHATSAPP_APP_SECRET="meta-app-secret"
 supabase secrets set WHATSAPP_ABANDONMENT_MINUTES="3"
 ```
 
-Optional AI intent extraction:
+Optional AI intent extraction. Groq is preferred when both providers are configured; OpenAI remains a fallback:
 
 ```bash
+supabase secrets set GROQ_API_KEY="groq-api-key"
+supabase secrets set GROQ_MODEL="llama-3.3-70b-versatile"
 supabase secrets set OPENAI_API_KEY="openai-api-key"
 supabase secrets set OPENAI_MODEL="gpt-4o-mini"
 ```
 
-Without `OPENAI_API_KEY`, the function still works using the local English/Kiswahili parser.
+Without `GROQ_API_KEY` or `OPENAI_API_KEY`, the function still works using the local English/Kiswahili parser.
 
 ## Meta Webhook
 
