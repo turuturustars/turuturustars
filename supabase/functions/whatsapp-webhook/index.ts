@@ -14,17 +14,17 @@ const WHATSAPP_ACCESS_TOKEN = Deno.env.get("WHATSAPP_ACCESS_TOKEN") ?? "";
 const WHATSAPP_PHONE_NUMBER_ID = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID") ?? "";
 const WHATSAPP_GRAPH_VERSION =
   Deno.env.get("WHATSAPP_GRAPH_API_VERSION") ?? Deno.env.get("WHATSAPP_GRAPH_VERSION") ?? "v21.0";
-const AI_PROVIDER = (Deno.env.get("WHATSAPP_AI_PROVIDER") ?? Deno.env.get("AI_PROVIDER") ?? "auto").toLowerCase();
-const AI_TIMEOUT_MS = getNumberEnv("AI_TIMEOUT_MS", 10000);
-const AI_MAX_OUTPUT_TOKENS = getNumberEnv("AI_MAX_OUTPUT_TOKENS", 320);
-const AI_KNOWLEDGE_FETCH_LIMIT = getNumberEnv("AI_KNOWLEDGE_FETCH_LIMIT", 80);
-const AI_KNOWLEDGE_CONTEXT_LIMIT = getNumberEnv("AI_KNOWLEDGE_CONTEXT_LIMIT", 12);
-const AI_DIRECT_KNOWLEDGE_SCORE = getNumberEnv("AI_DIRECT_KNOWLEDGE_SCORE", 6);
-const GROQ_API_KEY = Deno.env.get("GROQ_API_KEY") ?? "";
-const GROQ_MODEL = Deno.env.get("GROQ_KNOWLEDGE_MODEL") ?? Deno.env.get("GROQ_MODEL") ?? "openai/gpt-oss-120b";
-const GROQ_BASE_URL = (Deno.env.get("GROQ_BASE_URL") ?? "https://api.groq.com/openai/v1").replace(/\/+$/, "");
-const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
-const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-5.4-mini";
+const AI_PROVIDER = getEnv(["WHATSAPP_AI_PROVIDER", "AI_PROVIDER"], "auto").toLowerCase();
+const AI_TIMEOUT_MS = getNumberEnv(["WHATSAPP_AI_TIMEOUT_MS", "AI_TIMEOUT_MS"], 10000);
+const AI_MAX_OUTPUT_TOKENS = getNumberEnv(["WHATSAPP_AI_MAX_OUTPUT_TOKENS", "AI_MAX_OUTPUT_TOKENS"], 320);
+const AI_KNOWLEDGE_FETCH_LIMIT = getNumberEnv(["WHATSAPP_AI_KNOWLEDGE_FETCH_LIMIT", "AI_KNOWLEDGE_FETCH_LIMIT"], 80);
+const AI_KNOWLEDGE_CONTEXT_LIMIT = getNumberEnv(["WHATSAPP_AI_KNOWLEDGE_CONTEXT_LIMIT", "AI_KNOWLEDGE_CONTEXT_LIMIT"], 12);
+const AI_DIRECT_KNOWLEDGE_SCORE = getNumberEnv(["WHATSAPP_AI_DIRECT_KNOWLEDGE_SCORE", "AI_DIRECT_KNOWLEDGE_SCORE"], 6);
+const GROQ_API_KEY = getEnv("GROQ_API_KEY");
+const GROQ_MODEL = getEnv(["GROQ_KNOWLEDGE_MODEL", "GROQ_MODEL", "WHATSAPP_AI_MODEL"], "openai/gpt-oss-120b");
+const GROQ_BASE_URL = getEnv("GROQ_BASE_URL", "https://api.groq.com/openai/v1").replace(/\/+$/, "");
+const OPENAI_API_KEY = getEnv("OPENAI_API_KEY");
+const OPENAI_MODEL = getEnv(["OPENAI_MODEL", "WHATSAPP_AI_MODEL"], "gpt-5.4-mini");
 const MPESA_CONSUMER_KEY = Deno.env.get("MPESA_CONSUMER_KEY") ?? "";
 const MPESA_CONSUMER_SECRET = Deno.env.get("MPESA_CONSUMER_SECRET") ?? "";
 const MPESA_PASSKEY = Deno.env.get("MPESA_PASSKEY") ?? "";
@@ -1274,8 +1274,20 @@ function clampWhatsAppReply(text: string) {
   return trimmed.length > 1200 ? `${trimmed.slice(0, 1190)}...` : trimmed;
 }
 
-function getNumberEnv(name: string, fallback: number) {
-  const value = Number.parseInt(Deno.env.get(name) ?? "", 10);
+function getEnv(names: string | string[], fallback = "") {
+  const keys = Array.isArray(names) ? names : [names];
+  for (const key of keys) {
+    const value = Deno.env.get(key)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return fallback;
+}
+
+function getNumberEnv(names: string | string[], fallback: number) {
+  const value = Number.parseInt(getEnv(names), 10);
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
