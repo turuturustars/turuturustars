@@ -1,6 +1,6 @@
 # WhatsApp Smart Assistant
 
-The `whatsapp-bot` Supabase Edge Function turns the Turuturu Stars WhatsApp number into a registered-member assistant.
+The `whatsapp-webhook` Supabase Edge Function turns the Turuturu Stars WhatsApp number into a registered-member assistant. The older `whatsapp-bot` entrypoint imports this same implementation for compatibility.
 
 It can:
 
@@ -85,7 +85,7 @@ Member and official replies also append a clickable access link when the answer 
 Deploy the function, then set this callback URL in the Meta WhatsApp app:
 
 ```text
-https://<project-ref>.functions.supabase.co/whatsapp-bot
+https://<project-ref>.functions.supabase.co/whatsapp-webhook
 ```
 
 Use the same `WHATSAPP_VERIFY_TOKEN` as the Meta verify token.

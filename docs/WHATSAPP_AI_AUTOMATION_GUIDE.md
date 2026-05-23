@@ -17,9 +17,9 @@ The chatbot runs in two modes:
 
 ## Current Implementation
 
-This repo now includes the backend foundation. The newer canonical assistant should be `supabase/functions/whatsapp-bot`; keep `whatsapp-webhook` only as legacy reference until its remaining payment flows are fully retired or ported.
+This repo now keeps the smart assistant behind the existing `supabase/functions/whatsapp-webhook` endpoint so current Meta and app integrations do not need to change. `supabase/functions/whatsapp-bot` is only a compatibility entrypoint that imports the same implementation.
 
-- `supabase/functions/whatsapp-bot` receives official WhatsApp webhooks and runs the smart member assistant.
+- `supabase/functions/whatsapp-webhook` receives official WhatsApp webhooks and runs the smart member assistant.
 - `supabase/functions/whatsapp-send` lets authorized officials send WhatsApp messages or templates.
 - `whatsapp_contacts` links WhatsApp phone numbers to member profiles.
 - `whatsapp_messages` stores inbound/outbound messages and delivery statuses.
@@ -36,7 +36,7 @@ This repo now includes the backend foundation. The newer canonical assistant sho
 ### 1. Customer/member asks a question
 
 1. Member sends WhatsApp message to the official WhatsApp Business number.
-2. Meta sends the message to `whatsapp-bot`.
+2. Meta sends the message to `whatsapp-webhook`.
 3. The webhook links the phone number to `profiles.phone` when possible.
 4. The webhook chooses public or member chatbot mode.
 5. The bot answers using command routing and scoped `ai_knowledge_base`.
@@ -89,7 +89,7 @@ Create or connect:
 - WhatsApp business phone number.
 - Permanent or long-lived system user access token.
 - Webhook callback URL:
-  `https://<project-ref>.supabase.co/functions/v1/whatsapp-bot`
+  `https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook`
 - Webhook verify token matching `WHATSAPP_VERIFY_TOKEN`.
 - Webhook subscription for WhatsApp messages.
 
@@ -204,13 +204,13 @@ ngrok http 54321
 Then set the Meta webhook callback URL to the HTTPS forwarding URL plus the local function path, for example:
 
 ```text
-https://<ngrok-domain>/functions/v1/whatsapp-bot
+https://<ngrok-domain>/functions/v1/whatsapp-webhook
 ```
 
 For deployed Supabase testing, use:
 
 ```text
-https://<project-ref>.supabase.co/functions/v1/whatsapp-bot
+https://<project-ref>.supabase.co/functions/v1/whatsapp-webhook
 ```
 
 ## Important Notes

@@ -17,6 +17,8 @@ type SignupRequest = {
 
 const DEFAULT_SITE_URL = "https://turuturustars.co.ke";
 const SUPPORT_EMAIL = "support@turuturustars.co.ke";
+const PHONE_ALREADY_REGISTERED_MESSAGE =
+  "This phone number is already registered. Sign in with that number or use another phone number.";
 
 function createAdminClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -39,6 +41,35 @@ function normalizeKenyanPhone(rawPhone: string): string | null {
     return `+${digits}`;
   }
   return null;
+}
+
+async function findRegisteredProfileByPhone(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  phone: string,
+): Promise<{ id: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("id")
+    .eq("phone", phone)
+    .or("soft_deleted.is.null,soft_deleted.eq.false")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new HttpError(500, "Unable to verify whether this phone number is already registered.", error);
+  }
+
+  return data?.id ? { id: data.id as string } : null;
+}
+
+async function ensurePhoneNotRegistered(
+  supabaseAdmin: ReturnType<typeof createAdminClient>,
+  phone: string,
+): Promise<void> {
+  const existingProfile = await findRegisteredProfileByPhone(supabaseAdmin, phone);
+  if (existingProfile) {
+    throw new HttpError(409, PHONE_ALREADY_REGISTERED_MESSAGE);
+  }
 }
 
 async function verifyTurnstileToken(token: string, req: Request): Promise<boolean> {
@@ -174,6 +205,8 @@ serve(async (req) => {
         : `${DEFAULT_SITE_URL}/auth/callback`;
 
     const supabaseAdmin = createAdminClient();
+    await ensurePhoneNotRegistered(supabaseAdmin, normalizedPhone);
+
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: "signup",
       email,
@@ -191,6 +224,11 @@ serve(async (req) => {
     });
 
     if (error) {
+      const existingProfile = await findRegisteredProfileByPhone(supabaseAdmin, normalizedPhone);
+      if (existingProfile) {
+        throw new HttpError(409, PHONE_ALREADY_REGISTERED_MESSAGE);
+      }
+
       const message = error.message || "Unable to create account.";
       const status =
         message.toLowerCase().includes("already") || message.toLowerCase().includes("registered")

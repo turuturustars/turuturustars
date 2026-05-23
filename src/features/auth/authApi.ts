@@ -60,6 +60,21 @@ const toAuthRequestError = (error: { message: string; status?: number; code?: st
   return authError;
 };
 
+const isPhoneAlreadyRegisteredError = (
+  error: ({ code?: string; message?: string } & Record<string, unknown>) | null
+) => {
+  const message = `${error?.message || ''} ${typeof error?.details === 'string' ? error.details : ''}`.toLowerCase();
+  return (
+    message.includes('phone') &&
+    (
+      error?.code === '23505' ||
+      message.includes('already registered') ||
+      message.includes('already linked') ||
+      message.includes('already exists')
+    )
+  );
+};
+
 export const isProfileComplete = (profile?: Partial<ProfileRow> | null) => {
   if (!profile) return false;
   return Boolean(profile.full_name && profile.phone && profile.id_number);
@@ -420,7 +435,16 @@ export async function updateProfile(userId: string, updates: Partial<ProfileRow>
     .select()
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    if (isPhoneAlreadyRegisteredError(error)) {
+      throw toAuthRequestError({
+        message: 'This phone number is already registered. Sign in with that number or use another phone number.',
+        status: 409,
+        code: 'phone_already_registered',
+      });
+    }
+    throw error;
+  }
   return data as ProfileRow;
 }
 

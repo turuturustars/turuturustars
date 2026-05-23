@@ -190,6 +190,19 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     );
   };
 
+  const looksLikeRegisteredPhoneError = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('phone') &&
+      (
+        normalized.includes('already registered') ||
+        normalized.includes('already linked') ||
+        normalized.includes('already exists') ||
+        normalized.includes('existing account')
+      )
+    );
+  };
+
   const handleManualLoginCheck = async () => {
     if (!loginCaptchaToken) return;
     const verified = await verifyTurnstileToken(loginCaptchaToken);
@@ -506,6 +519,15 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign up failed';
+      if (looksLikeRegisteredPhoneError(message)) {
+        toast({
+          title: 'Phone already registered',
+          description: 'This phone number is already registered. Sign in with that number or use another phone number.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       if (looksLikeExistingAccountError(message)) {
         setMode('signin');
         setLoginForm((prev) => ({ ...prev, identifier: signupForm.email }));
