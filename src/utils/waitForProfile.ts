@@ -22,7 +22,7 @@ export async function waitForProfile(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (options?.signal?.aborted) {
-      // eslint-disable-next-line no-console
+
       console.debug('waitForProfile aborted');
       return null;
     }
@@ -35,17 +35,17 @@ export async function waitForProfile(
         .maybeSingle();
 
       if (!error && data) {
-        // eslint-disable-next-line no-console
+
         console.debug(`waitForProfile: found profile for ${userId} on attempt ${attempt + 1}`);
         return data as Record<string, unknown>;
       }
 
       if (error) {
-        // eslint-disable-next-line no-console
+
         console.warn('waitForProfile supabase error', error);
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
+
       console.warn('waitForProfile attempt error', e);
     }
 
@@ -60,11 +60,11 @@ export async function waitForProfile(
       // swallow observer errors
     }
 
-    // eslint-disable-next-line no-await-in-loop
+
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-  // eslint-disable-next-line no-console
+
   console.warn(`waitForProfile: profile for ${userId} not found after ${attempts} attempts`);
   return null;
 }

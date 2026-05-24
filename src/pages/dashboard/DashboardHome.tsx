@@ -7,7 +7,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { getPrimaryRole, normalizeRoles } from '@/lib/rolePermissions';
 import { supabase } from '@/integrations/supabase/client';
-import { useRealtimeAnnouncements } from '@/hooks/useRealtimeAnnouncements';
 import ContributionChart from '@/components/dashboard/ContributionChart';
 import WelfareParticipationChart from '@/components/dashboard/WelfareParticipationChart';
 import PayWithMpesa from '@/components/dashboard/PayWithMpesa';
@@ -79,7 +78,6 @@ const DashboardHome = () => {
   const { profile, isOfficial, roles } = useAuth();
   const { status, showSuccess } = useStatus();
   const { toast } = useToast();
-  const { announcements } = useRealtimeAnnouncements();
   const [stats, setStats] = useState<DashboardStats>({
     totalContributions: 0,
     pendingContributions: 0,
@@ -289,7 +287,7 @@ const DashboardHome = () => {
       color: 'text-purple-600 dark:text-purple-400',
       bgColor: 'bg-purple-50 dark:bg-purple-950/50',
       gradient: 'from-purple-500 to-pink-500',
-      action: { label: 'View All', path: '/dashboard/communication/notifications' }
+      action: { label: 'View All', path: '/dashboard/communication' }
     },
   ];
 
@@ -299,7 +297,7 @@ const DashboardHome = () => {
       path: '/dashboard/finance/contributions', 
       icon: DollarSign,
       color: 'from-green-500 to-emerald-500',
-      description: 'Add to your savings'
+      description: 'Support community goals'
     },
     { 
       label: 'Membership Fees', 
@@ -672,74 +670,45 @@ const DashboardHome = () => {
           </CardContent>
         </Card>
 
-        {/* Announcements */}
+        {/* Communications */}
         <Card className="lg:col-span-2 border-2 shadow-lg">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-primary" />
-                <CardTitle className="text-lg">Latest Announcements</CardTitle>
+                <CardTitle className="text-lg">Communications</CardTitle>
               </div>
-              <AccessibleButton variant="ghost" size="sm" asChild ariaLabel="View all announcements">
-                <Link to="/dashboard/communication/announcements">
-                  View All
+              <AccessibleButton variant="ghost" size="sm" asChild ariaLabel="Open communications">
+                <Link to="/dashboard/communication">
+                  Open
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Link>
               </AccessibleButton>
             </div>
-            <CardDescription className="text-xs">Stay updated with organization news</CardDescription>
+            <CardDescription className="text-xs">Member updates</CardDescription>
           </CardHeader>
           <CardContent>
-            {announcements.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-3">
-                  <Bell className="w-8 h-8 text-muted-foreground/50" />
+            <Link
+              to="/dashboard/communication"
+              className="group flex items-center justify-between rounded-xl border-2 border-border bg-gradient-to-br from-accent/50 to-accent/30 p-5 transition-all duration-300 hover:border-primary hover:shadow-lg"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Bell className="h-6 w-6" />
                 </div>
-                <h4 className="font-semibold text-foreground mb-1">No Announcements</h4>
-                <p className="text-sm text-muted-foreground">
-                  Check back later for updates
-                </p>
+                <div>
+                  <h4 className="font-semibold text-foreground">
+                    {stats.unreadNotifications > 0
+                      ? `${stats.unreadNotifications} unread communication${stats.unreadNotifications === 1 ? '' : 's'}`
+                      : 'All caught up'}
+                  </h4>
+                  <p className="text-sm text-muted-foreground">
+                    Announcements, reminders, and account alerts
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {announcements.slice(0, 3).map((announcement) => (
-                  <Link
-                    key={announcement.id}
-                    to={`/dashboard/communication/announcements#${announcement.id}`}
-                    className="group p-4 rounded-xl bg-gradient-to-br from-accent/50 to-accent/30 border-2 border-border hover:border-primary transition-all duration-300 cursor-pointer hover:shadow-lg"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-foreground text-sm sm:text-base group-hover:text-primary transition-colors line-clamp-2">
-                        {announcement.title}
-                      </h4>
-                      {announcement.priority === 'urgent' && (
-                        <Badge variant="destructive" className="ml-2 flex-shrink-0 animate-pulse">
-                          Urgent
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
-                      {announcement.content}
-                    </p>
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        <span>
-                          {announcement.published_at 
-                            ? new Date(announcement.published_at).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })
-                            : 'Recently'}
-                        </span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
+              <ChevronRight className="h-5 w-5 text-muted-foreground transition-all group-hover:translate-x-1 group-hover:text-primary" />
+            </Link>
           </CardContent>
         </Card>
       </div>

@@ -108,6 +108,28 @@ type CommunityKnowledgeDraft = {
   consent_to_use: boolean;
 };
 
+type PaymentRetryKind =
+  | "wallet_topup"
+  | "contribution"
+  | "kitty_contribution"
+  | "welfare_contribution";
+
+type PaymentRetryState = {
+  kind: PaymentRetryKind;
+  amount: number;
+  phone?: string;
+  checkout_request_id?: string | null;
+  mpesa_transaction_id?: string | null;
+  contribution_id?: string | null;
+  contribution_type?: string | null;
+  kitty_id?: string;
+  kitty_title?: string;
+  welfare_case_id?: string;
+  welfare_case_title?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
 type RegistrationRequest = {
   id: string;
   whatsapp_phone: string;
@@ -143,6 +165,7 @@ type WhatsappRegisteredMember = {
 type SessionState = {
   pending_intent?: Partial<ParsedIntent>;
   menu?: MenuState;
+  payment_retry?: PaymentRetryState;
   registration?: RegistrationState;
   community_knowledge?: CommunityKnowledgeState;
   asked_for?: string[];
@@ -153,6 +176,8 @@ type MenuSection =
   | "main"
   | "wallet"
   | "wallet_topup_amount"
+  | "contribution"
+  | "contribution_now_amount"
   | "welfare"
   | "welfare_select"
   | "welfare_amount"
@@ -242,6 +267,7 @@ type IntentName =
   | "approve_member"
   | "record_contribution"
   | "record_expenditure"
+  | "record_discipline"
   | "create_welfare_case"
   | "update_profile"
   | "unknown";
@@ -391,6 +417,7 @@ const INTENTS = new Set<IntentName>([
   "approve_member",
   "record_contribution",
   "record_expenditure",
+  "record_discipline",
   "create_welfare_case",
   "update_profile",
   "unknown",
@@ -398,6 +425,7 @@ const INTENTS = new Set<IntentName>([
 
 const PAYMENT_METHODS = new Set(["manual", "automatic", "cash", "bank", "mpesa", "wallet"]);
 const FINANCE_ROLES = new Set(["admin", "treasurer"]);
+const DISCIPLINE_ROLES = new Set(["admin", "organizing_secretary"]);
 const ANNOUNCEMENT_ROLES = new Set(["admin", "chairperson", "vice_chairman", "secretary", "vice_secretary", "treasurer", "organizing_secretary"]);
 const MEMBER_APPROVAL_ROLES = new Set(["admin"]);
 const OFFICIAL_ROLES = new Set([
@@ -441,6 +469,7 @@ const REGISTRATION_OTP_TTL_SECONDS = 10 * 60;
 const REGISTRATION_OTP_RESEND_SECONDS = 60;
 const REGISTRATION_OTP_MAX_ATTEMPTS = 5;
 const DEFAULT_ABANDONMENT_MINUTES = 3;
+const PAYMENT_RETRY_TTL_MINUTES = 24 * 60;
 const DEFAULT_AI_KNOWLEDGE_FETCH_LIMIT = 80;
 const DEFAULT_AI_KNOWLEDGE_CONTEXT_LIMIT = 12;
 const DEFAULT_AI_DIRECT_KNOWLEDGE_SCORE = 6;
@@ -1046,6 +1075,14 @@ function accessLinkForIntent(intent: IntentName, roles: string[]): AccessLinkCon
     };
   }
 
+  if (intent === "record_discipline" && isOfficialMember) {
+    return {
+      label: "discipline records",
+      swLabel: "rekodi za discipline",
+      path: "/dashboard/members/discipline",
+    };
+  }
+
   const links: Partial<Record<IntentName, AccessLinkConfig>> = {
     help: {
       label: "your dashboard",
@@ -1307,6 +1344,10 @@ function canApproveMember(roles: string[]): boolean {
   return hasAnyBotRole(roles, MEMBER_APPROVAL_ROLES);
 }
 
+function canRecordDiscipline(roles: string[]): boolean {
+  return hasAnyBotRole(roles, DISCIPLINE_ROLES);
+}
+
 function canRecordFinance(profile: Profile, roles: string[]): boolean {
   if (hasAnyBotRole(roles, FINANCE_ROLES)) return true;
   return profile.status === "active";
@@ -1560,6 +1601,34 @@ function inferExpenseCategory(text: string, value?: unknown): string {
   return cleanString(value) || "other";
 }
 
+function inferDisciplineIncidentType(text: string, value?: unknown): string {
+  const raw = `${cleanString(value) || ""} ${text}`.toLowerCase();
+  if (/\b(?:meeting|mkutano|late|lateness|absent|absence|missed|kuchelewa|kutohudhuria)\b/i.test(raw)) return "meeting_attendance";
+  if (/\b(?:payment|contribution|mchango|arrears|deni|default)\b/i.test(raw)) return "contribution_default";
+  if (/\b(?:conduct|behavior|behaviour|misconduct|nidhamu|respect|abuse|insult)\b/i.test(raw)) return "conduct";
+  if (/\b(?:fine|faini|penalty|adhabu)\b/i.test(raw)) return "fine";
+  return cleanString(value) || "discipline";
+}
+
+function extractDisciplineReason(text: string): string | null {
+  const explicit = text.match(/\b(?:because|reason|for|kwa|ya)\s+([^,;\n]{4,180})/i);
+  if (explicit) {
+    const candidate = explicit[1]
+      .replace(/\b(?:member|mwanachama|fine|faini|penalty|amount|ksh|kes|shs?)\b.*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (candidate.length >= 4) return shorten(candidate, 180);
+  }
+
+  const cleaned = text
+    .replace(/\b(?:add|record|create|charge|issue|weka|ongeza|fine|fines|faini|penalty|discipline|disciplinary|adhabu|nidhamu|member|mwanachama)\b/gi, " ")
+    .replace(/\b(?:ksh|kes|shs?|amount)\s*\d+(?:\.\d{1,2})?\b/gi, " ")
+    .replace(/\b\d+(?:\.\d{1,2})?\s*(?:ksh|kes|shs?)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length >= 8 ? shorten(cleaned, 180) : null;
+}
+
 function detectLanguage(text: string): "en" | "sw" {
   const normalized = text.toLowerCase().replace(/[^\p{L}\p{N}\s']/gu, " ");
   const tokens = normalized.split(/\s+/).filter(Boolean);
@@ -1726,8 +1795,8 @@ function isSmartReceiptIssueText(text: string): boolean {
 function isSmartPaymentFollowUpText(text: string): boolean {
   return isSmartPaymentDoneText(text) ||
     isSmartReceiptIssueText(text) ||
-    /\b(?:payment|mpesa|m-pesa|stk|transaction|wallet top|top\s*up|fund|kitty)\b[\s\S]{0,80}\b(?:status|confirm|confirmed|received|complete|completed|went through|imeingia|imefika|imekubali)\b/i.test(text) ||
-    /\b(?:status|confirm|confirmed|received|complete|completed|went through|imeingia|imefika|imekubali)\b[\s\S]{0,80}\b(?:payment|mpesa|m-pesa|stk|transaction|wallet top|top\s*up|fund|kitty)\b/i.test(text);
+    /\b(?:payment|mpesa|m-pesa|stk|transaction|wallet top|top\s*up|fund|kitty|welfare|contribution|mchango)\b[\s\S]{0,80}\b(?:status|confirm|confirmed|received|complete|completed|went through|imeingia|imefika|imekubali)\b/i.test(text) ||
+    /\b(?:status|confirm|confirmed|received|complete|completed|went through|imeingia|imefika|imekubali)\b[\s\S]{0,80}\b(?:payment|mpesa|m-pesa|stk|transaction|wallet top|top\s*up|fund|kitty|welfare|contribution|mchango)\b/i.test(text);
 }
 
 function isRegisteredMemberJoinText(text: string): boolean {
@@ -1735,9 +1804,29 @@ function isRegisteredMemberJoinText(text: string): boolean {
 }
 
 function isRegisterOtherMemberRequestText(text: string): boolean {
-  return /\b(?:register|registration|add|create|enroll|enrol|onboard|sign\s*up|sajili)\b[\s\S]{0,80}\b(?:member|members|meber|mebers|person|people|account|user|users|mwanachama|wanachama)\b/i.test(text) ||
+  const normalized = text.trim();
+  if (/\b(?:announcement|announcements|announce|notice|tangazo|matangazo|fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure)\b/i.test(normalized)) {
+    return false;
+  }
+
+  return /\b(?:register|registration|add|create|enroll|enrol|onboard|sign\s*up|sajili)\b[\s\S]{0,80}\b(?:member|members|meber|mebers|person|people|account|user|users|mwanachama|wanachama)\b/i.test(normalized) ||
     /\b(?:member|members|meber|mebers|mwanachama|wanachama)\b[\s\S]{0,80}\b(?:register|registration|adding|add|create|onboard|sajili)\b/i.test(text) ||
-    /\bneed\s+to\s+be\s+able\s+to\s+register\b/i.test(text);
+    /\bneed\s+to\s+be\s+able\s+to\s+register\b/i.test(normalized);
+}
+
+function isMemberBenefitsQuestion(text: string): boolean {
+  return /\b(?:member|members|membership|wanachama|mwanachama)\b[\s\S]{0,60}\b(?:benefit|benefits|faida|advantages?|privileges?)\b/i.test(text) ||
+    /\b(?:benefit|benefits|faida|advantages?|privileges?)\b[\s\S]{0,60}\b(?:member|members|membership|wanachama|mwanachama)\b/i.test(text);
+}
+
+function isAdminCapabilityQuestion(text: string): boolean {
+  return /\b(?:why|mbona|kwa nini|how come)\b[\s\S]{0,80}\b(?:admin|official|role|roles)\b[\s\S]{0,80}\b(?:cannot|can't|not able|unable|perform|activity|activities|tools?)\b/i.test(text) ||
+    /\b(?:admin|official)\b[\s\S]{0,80}\b(?:tools?|activities|commands|roles?)\b/i.test(text);
+}
+
+function isRecordDisciplineRequest(text: string): boolean {
+  return /\b(?:add|record|create|charge|issue|weka|ongeza)\b[\s\S]{0,80}\b(?:fine|fines|faini|penalty|discipline|disciplinary|adhabu|nidhamu)\b/i.test(text) ||
+    /\b(?:fine|fines|faini|penalty|discipline|disciplinary|adhabu|nidhamu)\b[\s\S]{0,80}\b(?:member|mwanachama|for|to|kwa|ya)\b/i.test(text);
 }
 
 function isCasualGreetingText(text: string): boolean {
@@ -2116,6 +2205,14 @@ function extractAnnouncementDraft(
   };
 }
 
+function isVagueAnnouncementRequest(text: string): boolean {
+  const normalized = text.trim();
+  if (/\btitle\s*[:=-].+\b(?:content|message|body)\s*[:=-]/i.test(normalized)) return false;
+  if (/^(?:announce|announcement|notice|tangazo|matangazo)\s*[:;-]\s*.{8,}/i.test(normalized)) return false;
+  return /\b(?:help|assist|guide|how|let us|can we|nataka|naomba)\b[\s\S]{0,120}\b(?:announcement|announcements|notice|tangazo|matangazo)\b/i.test(normalized) ||
+    /\b(?:announcement|announcements|notice|tangazo|matangazo)\b[\s\S]{0,120}\b(?:help|assist|guide|how|kindly)\b/i.test(normalized);
+}
+
 function isContributionVerificationRequest(text: string): boolean {
   const normalized = text.trim();
   if (!normalized) return false;
@@ -2160,17 +2257,18 @@ function extractTargetMemberForAdminCommand(text: string): string | null {
     .replace(/\b(?:ksh|kes|shs?|amount|kiasi)\s*\d+(?:\.\d{1,2})?\b/gi, " ")
     .replace(/\b\d+(?:\.\d{1,2})?\s*(?:ksh|kes|shs?)\b/gi, " ");
 
-  const explicit = withoutReference.match(/\b(?:for|member|mwanachama|user|account|registration|profile|ya|kwa)\s+([^,.;\n]{3,100})/i);
+  const explicit = withoutReference.match(/\b(?:for|to|member|mwanachama|user|account|registration|profile|ya|kwa)\s+([^,.;\n]{3,100})/i);
   if (explicit) {
     const candidate = explicit[1]
-      .replace(/\b(?:payment|contribution|member|registration|account|paid|verify|confirm|approve|activate|kubali|idhinisha)\b/gi, " ")
+      .replace(/\b(?:because|reason|for)\b.*$/i, " ")
+      .replace(/\b(?:payment|contribution|member|registration|account|paid|verify|confirm|approve|activate|fine|fines|faini|penalty|discipline|adhabu|nidhamu|kubali|idhinisha)\b/gi, " ")
       .replace(/\s+/g, " ")
       .trim();
     if (candidate.length >= 3) return shorten(candidate, 100);
   }
 
   const cleaned = withoutReference
-    .replace(/\b(?:verify|confirm|approve|activate|accept|mark|paid|payment|contribution|manual|member|registration|account|mpesa|m-pesa|thibitisha|hakiki|kubali|idhinisha|malipo|mchango|mwanachama|usajili)\b/gi, " ")
+    .replace(/\b(?:add|record|create|charge|issue|to|for|a|the|verify|confirm|approve|activate|accept|mark|paid|payment|contribution|manual|member|registration|account|mpesa|m-pesa|fine|fines|faini|penalty|discipline|adhabu|nidhamu|thibitisha|hakiki|kubali|idhinisha|malipo|mchango|mwanachama|usajili)\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -2772,6 +2870,16 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
     return { ...base, intent: "query_receipts", confidence: 0.83 };
   }
 
+  if (isMemberBenefitsQuestion(text)) {
+    return {
+      ...base,
+      intent: "query_membership",
+      confidence: 0.86,
+      description: text,
+      category: "benefits",
+    };
+  }
+
   if (/(notification|notifications|alerts?|unread|ujumbe mpya|taarifa mpya|notisi)/i.test(lower)) {
     return { ...base, intent: "query_notifications", confidence: 0.78 };
   }
@@ -2808,6 +2916,17 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
 
   if (/(vote|voting|motion|motions|ballot|poll|kura|kupiga kura|maamuzi|azimio)/i.test(lower)) {
     return { ...base, intent: "query_voting", confidence: 0.78 };
+  }
+
+  if (isRecordDisciplineRequest(text)) {
+    return {
+      ...base,
+      intent: "record_discipline",
+      confidence: amount ? 0.82 : 0.7,
+      target_member: extractTargetMemberForAdminCommand(text),
+      description: text,
+      category: inferDisciplineIncidentType(text),
+    };
   }
 
   if (/(discipline|disciplinary|fine|fines|penalt|case against me|nidhamu|adhabu|faini)/i.test(lower)) {
@@ -2934,13 +3053,14 @@ async function aiInterpretMessage(
             "Use the supplied member roles as authoritative context. Chairman means chairperson. Treasurer and admin can handle finance verification. Chairperson, secretary, treasurer, organizing secretary, and admin can publish announcements when their stored roles allow it.",
             "Use conversation_summary and recent_conversation only for continuity and pronoun/context resolution. The latest message must still clearly ask for the action.",
             "Return JSON only with keys: intent, confidence, language, amount, contribution_type, payment_method, transaction_date, title, description, category, case_type, payee, reference_number, target_member, profile_updates.",
-            "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, query_kitties, query_receipts, query_notifications, query_jobs, query_voting, query_discipline, query_refunds, query_approvals, query_membership, query_support, query_community, top_up_wallet, contribute_welfare, contribute_kitty, contribute_community_knowledge, create_announcement, verify_contribution, approve_member, record_contribution, record_expenditure, create_welfare_case, unknown.",
+            "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, query_kitties, query_receipts, query_notifications, query_jobs, query_voting, query_discipline, query_refunds, query_approvals, query_membership, query_support, query_community, top_up_wallet, contribute_welfare, contribute_kitty, contribute_community_knowledge, create_announcement, verify_contribution, approve_member, record_contribution, record_expenditure, record_discipline, create_welfare_case, unknown.",
             "Use query_contributions when the member asks to check, view, see, list, or ask about contribution balance, pending contributions, arrears, or contribution status.",
-            "Use record_contribution when a member says they paid, sent money, made a transaction, contributed, donated, or wants to record a member payment.",
+            "Use record_contribution when a member says they paid, sent money, made a transaction, contributed, donated, wants to record a member payment, or asks to start a general contribution payment such as CONTRIBUTE 500.",
             "Use top_up_wallet when the member wants to add money to their wallet by M-Pesa.",
             "Use contribute_welfare when the member wants to contribute, pay, send, changia, or support an active welfare case/kesi/medical/bereavement case. Set payment_method to wallet if they explicitly say wallet, otherwise use mpesa.",
             "Use contribute_kitty when the member wants to contribute to a community kitty/fundraiser. Set payment_method to wallet if they explicitly say wallet, otherwise use mpesa.",
             "Use record_expenditure when an official says money was spent, something was bought, or an expense should be recorded.",
+            "Use record_discipline when an admin/organizing secretary asks to add or record a fine, penalty, discipline case, faini, adhabu, or nidhamu for a member. Put the member name/phone/membership number in target_member, fine amount in amount, and reason in description.",
             "Use create_welfare_case when an official/admin asks to add, open, or create a welfare case. Put the case title in title, case type in case_type, target amount in amount, and beneficiary/member name or phone in target_member when available.",
             "Use create_announcement when an official/admin asks to publish, post, send, alert members, notify watu, send notice, weka announcement, tuma tangazo, or add an announcement/notice. Put the announcement title in title, body in description, and priority in category when available.",
             "Use verify_contribution when a treasurer/admin asks to verify, approve, confirm, or mark a manual contribution/payment as paid. Put the M-Pesa receipt/reference in reference_number and member name/phone/membership number in target_member when available.",
@@ -2948,7 +3068,7 @@ async function aiInterpretMessage(
             "Use update_profile when a member wants to add, correct, or complete profile details. Put only safe editable fields inside profile_updates: full_name, id_number, email, location, occupation, employment_status, education_level, interests, additional_notes.",
             "Use query_community when a user asks about Turuturu Stars history, villages, schools, areas, cohorts, local landmarks, or community people.",
             "Use contribute_community_knowledge when a user wants to teach, train, add, submit, or preserve community knowledge, history, village details, local stories, landmarks, cohorts, or names for review.",
-            "Use query_kitties for community kitty/fundraiser questions, query_receipts for receipts/payment history, query_notifications for unread alerts, query_jobs for job opportunities, query_voting for motions/kura, query_discipline for fines or discipline records, query_refunds for refund status or rules, query_approvals for official approval queues, query_membership for membership fee/registration status, and query_support for contacts or helpdesk questions.",
+            "Use query_kitties for community kitty/fundraiser questions, query_receipts for receipts/payment history, query_notifications for unread alerts, query_jobs for job opportunities, query_voting for motions/kura, query_discipline for viewing fines or discipline records, query_refunds for refund status or rules, query_approvals for official approval queues, query_membership for membership fee/registration status or member benefits/faida, and query_support for contacts or helpdesk questions.",
             "Use ISO YYYY-MM-DD for transaction_date when a date is clear. Use null when unknown.",
           ].join(" "),
         },
@@ -2993,9 +3113,21 @@ async function interpretMessage(
   recentTurns: ConversationTurn[] = [],
   conversationSummary: Record<string, unknown> = {},
 ): Promise<ParsedIntent> {
+  const deterministic = fallbackInterpretMessage(text);
+  if (
+    deterministic.confidence >= 0.7 &&
+    (
+      deterministic.intent === "create_announcement" ||
+      deterministic.intent === "record_discipline" ||
+      (deterministic.intent === "query_membership" && isMemberBenefitsQuestion(text))
+    )
+  ) {
+    return deterministic;
+  }
+
   const aiIntent = await aiInterpretMessage(text, profile, roles, recentTurns, conversationSummary);
   if (aiIntent && aiIntent.confidence >= 0.45) return aiIntent;
-  return fallbackInterpretMessage(text);
+  return deterministic;
 }
 
 function mergeWithPendingIntent(intent: ParsedIntent, session: WhatsappSession | null): ParsedIntent {
@@ -3004,6 +3136,7 @@ function mergeWithPendingIntent(intent: ParsedIntent, session: WhatsappSession |
   if (
     pending.intent !== "record_contribution" &&
     pending.intent !== "record_expenditure" &&
+    pending.intent !== "record_discipline" &&
     pending.intent !== "create_welfare_case" &&
     pending.intent !== "update_profile" &&
     pending.intent !== "top_up_wallet" &&
@@ -3511,6 +3644,7 @@ async function maybeSendWelcomeBack(
   if (!shouldSendWelcomeBack(session)) return;
   if (session.state?.registration?.step && message.text.trim()) return;
   if (session.state?.menu?.section && session.state.menu.section !== "main" && message.text.trim()) return;
+  if (session.state?.payment_retry && message.text.trim()) return;
   await sendAndLogReply(supabase, message, profile, welcomeBackReply(profile, session, language), false);
   await markWelcomeBackSent(supabase, message.phone);
 }
@@ -4819,6 +4953,7 @@ function isConversationAwaitingResponse(state: SessionState | null | undefined):
   if (registrationStep && registrationStep !== "completed") return true;
   if (state.community_knowledge?.step) return true;
   if (state.pending_intent?.intent) return true;
+  if (state.payment_retry && isFreshPaymentRetry(state.payment_retry)) return true;
   if (state.menu && state.menu.section !== "main") return true;
   return false;
 }
@@ -4869,12 +5004,24 @@ function conversationContextLabel(state: SessionState | null | undefined, langua
     return sw ? "tulikuwa tunasubiri ruhusa ya kuhifadhi memory hiyo" : "we were waiting for permission to save that memory";
   }
 
+  const retry = state?.payment_retry;
+  if (retry && isFreshPaymentRetry(retry)) {
+    const label = paymentRetryLabel(retry.kind, language);
+    const amount = formatMoney(Number(retry.amount || 0));
+    return sw
+      ? `tulikuwa tunasubiri confirmation ya ${label} ya ${amount}`
+      : `we were waiting for confirmation of your ${label} of ${amount}`;
+  }
+
   const pendingIntent = state?.pending_intent?.intent;
   if (pendingIntent === "record_contribution") {
     return sw ? "tulikuwa tunamalizia kurekodi transaction yako" : "we were finishing that transaction record";
   }
   if (pendingIntent === "record_expenditure") {
     return sw ? "tulikuwa tunamalizia kurekodi expenditure" : "we were finishing that expenditure record";
+  }
+  if (pendingIntent === "record_discipline") {
+    return sw ? "tulikuwa tunamalizia discipline/fine record" : "we were finishing that discipline/fine record";
   }
   if (pendingIntent === "create_welfare_case") {
     return sw ? "tulikuwa tunafungua welfare case" : "we were opening that welfare case";
@@ -4895,6 +5042,12 @@ function conversationContextLabel(state: SessionState | null | undefined, langua
   const menuSection = state?.menu?.section;
   if (menuSection === "wallet_topup_amount") {
     return sw ? "tulikuwa tunaweka amount ya wallet top-up" : "we were entering the wallet top-up amount";
+  }
+  if (menuSection === "contribution") {
+    return sw ? "tulikuwa kwenye contribution menu" : "we were in the contribution menu";
+  }
+  if (menuSection === "contribution_now_amount") {
+    return sw ? "tulikuwa tunaweka amount ya contribution" : "we were entering the contribution amount";
   }
   if (menuSection === "kitty_select") {
     return sw ? "tulikuwa tunachagua kitty" : "we were choosing a kitty";
@@ -5122,6 +5275,16 @@ function contributionSummaryReply(profile: Profile, context: FinanceContext, lan
     lines.push(language === "sw" ? "Hakuna rekodi ya mchango bado." : "No contribution records yet.");
   }
 
+  if (totalPending > 0) {
+    lines.push(language === "sw"
+      ? `Kulipa pending contributions: reply PAY, au reply CONTRIBUTION ${totalPending}.`
+      : `To pay pending contributions: reply PAY, or reply CONTRIBUTION ${totalPending}.`);
+  } else {
+    lines.push(language === "sw"
+      ? "Huna pending contributions. Kuchangia kiasi kingine kwa M-Pesa: reply CONTRIBUTION 500."
+      : "You have no pending contributions. To make another contribution by M-Pesa: reply CONTRIBUTION 500.");
+  }
+
   return lines.join("\n");
 }
 
@@ -5258,12 +5421,50 @@ function sessionWithMenu(menu: MenuState): SessionState {
   };
 }
 
+function paymentRetryState(retry: Omit<PaymentRetryState, "created_at" | "updated_at"> & Partial<Pick<PaymentRetryState, "created_at">>): PaymentRetryState {
+  const now = new Date().toISOString();
+  return {
+    ...retry,
+    created_at: retry.created_at || now,
+    updated_at: now,
+  };
+}
+
+function sessionWithPaymentRetry(retry: PaymentRetryState): SessionState {
+  return {
+    payment_retry: retry,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function isFreshPaymentRetry(retry: PaymentRetryState | null | undefined): boolean {
+  if (!retry?.amount || retry.amount <= 0) return false;
+  const timestamp = new Date(retry.updated_at || retry.created_at || "").getTime();
+  if (!Number.isFinite(timestamp)) return true;
+  return Date.now() - timestamp <= PAYMENT_RETRY_TTL_MINUTES * 60 * 1000;
+}
+
+function isPaymentRetryText(text: string): boolean {
+  return /^(?:retry|try\s*again|again|repeat|resend|send\s*again|tuma\s*tena|jaribu\s*tena|rudia)$/i.test(text.trim());
+}
+
+function isPaymentRetryCancelText(text: string): boolean {
+  return /^(?:cancel|stop|acha|sitaki|forget|ignore|clear)$/i.test(text.trim());
+}
+
+function paymentRetryLabel(kind: PaymentRetryKind, language: "auto" | "en" | "sw"): string {
+  if (kind === "wallet_topup") return language === "sw" ? "wallet top-up" : "wallet top-up";
+  if (kind === "welfare_contribution") return language === "sw" ? "welfare contribution" : "welfare contribution";
+  if (kind === "kitty_contribution") return language === "sw" ? "kitty contribution" : "kitty contribution";
+  return language === "sw" ? "contribution" : "contribution";
+}
+
 function menuIntent(intent: IntentName, language: "auto" | "en" | "sw", confidence = 0.95): ParsedIntent {
   return { intent, confidence, language };
 }
 
 function exactMenuRequest(text: string): boolean {
-  return /^(menu|main menu|home|help|start|msaada)$/i.test(text.trim());
+  return /^(menu|munu|menyu|main menu|home|help|start|msaada)$/i.test(text.trim());
 }
 
 function isBackCommand(text: string): boolean {
@@ -5406,6 +5607,31 @@ function walletMenuReply(context: FinanceContext, language: "auto" | "en" | "sw"
   return lines.join("\n");
 }
 
+function contributionOptionsReply(language: "auto" | "en" | "sw"): string {
+  const lines = language === "sw"
+    ? [
+      "Contribution menu",
+      "Choose the next step:",
+      "1. Contribute now with M-Pesa",
+      "2. Contribute later",
+      "3. Record a contribution already made",
+      "",
+      "Uki-record payment tayari imelipwa, tuma amount, purpose, na M-Pesa/bank reference au paste message kamili.",
+      "0. Back to main menu",
+    ]
+    : [
+      "Contribution menu",
+      "Choose the next step:",
+      "1. Contribute now with M-Pesa",
+      "2. Contribute later",
+      "3. Record a contribution already made",
+      "",
+      "When recording a payment already made, send the amount, purpose, and M-Pesa/bank reference or paste the full payment message.",
+      "0. Back to main menu",
+    ];
+  return lines.join("\n");
+}
+
 function kittyMenuReply(language: "auto" | "en" | "sw"): string {
   const lines = language === "sw"
     ? [
@@ -5469,6 +5695,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "4. Today's money alerts",
       "5. Publish announcement",
       "6. My role",
+      "7. Add fine/discipline record",
       "",
       "0. Back to main menu",
     ]
@@ -5482,6 +5709,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "4. Today's money alerts",
       "5. Publish announcement",
       "6. My role",
+      "7. Add fine/discipline record",
       "",
       "0. Back to main menu",
     ];
@@ -5676,7 +5904,7 @@ async function initiateWhatsAppStkPush(
   rawPhone: string,
   amount: number,
   options: {
-    transactionType: "wallet_topup" | "kitty_contribution" | "welfare_contribution";
+    transactionType: "wallet_topup" | "contribution" | "kitty_contribution" | "welfare_contribution";
     accountReference: string;
     transactionDesc: string;
     kittyId?: string | null;
@@ -5758,6 +5986,8 @@ async function initiateWhatsAppStkPush(
     await notifyTreasurersOfMoneyEvent(supabase, {
       title: options.transactionType === "wallet_topup"
         ? "WhatsApp wallet top-up initiated"
+        : options.transactionType === "contribution"
+          ? "WhatsApp contribution payment initiated"
         : options.transactionType === "kitty_contribution"
           ? "WhatsApp kitty contribution initiated"
           : "WhatsApp welfare contribution initiated",
@@ -5840,8 +6070,105 @@ async function startWalletTopUp(
       checkout_request_id: stk.checkoutRequestId,
       mpesa_transaction_id: stk.mpesaTransactionId,
     },
-    nextState: {},
+    nextState: sessionWithPaymentRetry(paymentRetryState({
+      kind: "wallet_topup",
+      amount: parsedAmount,
+      phone: stk.phoneNumber,
+      checkout_request_id: stk.checkoutRequestId,
+      mpesa_transaction_id: stk.mpesaTransactionId,
+    })),
   };
+}
+
+async function startContributionMpesaPayment(
+  supabase: SupabaseClient,
+  profile: Profile,
+  roles: string[],
+  rawPhone: string,
+  amount: number,
+  contributionType: string,
+  language: "auto" | "en" | "sw",
+): Promise<ExecutionResult> {
+  if (!canRecordFinance(profile, roles)) {
+    return {
+      actionStatus: "blocked",
+      reply: language === "sw"
+        ? `Account yako iko ${profile.status || "unknown"}, kwa hivyo contribution payment imefungwa hadi admin aidhinishe account.`
+        : `Your account is ${profile.status || "unknown"}, so contribution payment is locked until admin approval.`,
+      result: { blocked_status: profile.status },
+      nextState: {},
+    };
+  }
+
+  const parsedAmount = parsePositiveAmount(amount);
+  const normalizedType = normalizeContributionType(contributionType, contributionType);
+  const { data: contribution, error: contributionError } = await supabase
+    .from("contributions")
+    .insert({
+      member_id: profile.id,
+      amount: parsedAmount,
+      contribution_type: normalizedType,
+      status: "pending",
+      notes: "WhatsApp M-Pesa contribution payment awaiting callback.",
+    })
+    .select("id")
+    .single();
+
+  if (contributionError || !contribution) {
+    throw new HttpError(500, "Failed to prepare WhatsApp contribution payment", contributionError);
+  }
+
+  const contributionId = String((contribution as Record<string, unknown>).id);
+  const reference = `CONTRIB-${(profile.membership_number || profile.id).replace(/[^a-z0-9]/gi, "").slice(0, 10)}`;
+
+  try {
+    const stk = await initiateWhatsAppStkPush(supabase, profile, rawPhone, parsedAmount, {
+      transactionType: "contribution",
+      accountReference: reference,
+      transactionDesc: `Contribution payment: ${shorten(normalizedType, 40)}`,
+      contributionId,
+    });
+
+    return {
+      actionStatus: "completed",
+      reply: language === "sw"
+        ? [
+          `Nimetuma ombi la M-Pesa kwa ${displayPhone(stk.phoneNumber)} la ${formatMoney(parsedAmount)} kwa contribution (${normalizedType}).`,
+          "Fungua ujumbe wa M-Pesa kwa simu yako na uweke PIN kukamilisha payment.",
+          "Nitakutumia confirmation ikipokelewa.",
+        ].join("\n")
+        : [
+          `I sent a Pay with M-Pesa prompt to ${displayPhone(stk.phoneNumber)} for ${formatMoney(parsedAmount)} for your ${normalizedType} contribution.`,
+          "Check your phone and enter your M-Pesa PIN to complete the payment.",
+          "I will confirm when it is received.",
+        ].join("\n"),
+      result: {
+        transaction_type: "contribution",
+        amount: parsedAmount,
+        contribution_type: normalizedType,
+        contribution_id: contributionId,
+        checkout_request_id: stk.checkoutRequestId,
+        mpesa_transaction_id: stk.mpesaTransactionId,
+      },
+      contributionId,
+      nextState: sessionWithPaymentRetry(paymentRetryState({
+        kind: "contribution",
+        amount: parsedAmount,
+        phone: stk.phoneNumber,
+        checkout_request_id: stk.checkoutRequestId,
+        mpesa_transaction_id: stk.mpesaTransactionId,
+        contribution_id: contributionId,
+        contribution_type: normalizedType,
+      })),
+    };
+  } catch (error) {
+    await supabase
+      .from("contributions")
+      .delete()
+      .eq("id", contributionId)
+      .eq("status", "pending");
+    throw error;
+  }
 }
 
 async function startWelfareMpesaContribution(
@@ -5916,7 +6243,16 @@ async function startWelfareMpesaContribution(
       },
       contributionId,
       welfareCaseId: welfareCase.id,
-      nextState: {},
+      nextState: sessionWithPaymentRetry(paymentRetryState({
+        kind: "welfare_contribution",
+        amount: parsedAmount,
+        phone: stk.phoneNumber,
+        checkout_request_id: stk.checkoutRequestId,
+        mpesa_transaction_id: stk.mpesaTransactionId,
+        contribution_id: contributionId,
+        welfare_case_id: welfareCase.id,
+        welfare_case_title: welfareCase.title,
+      })),
     };
   } catch (error) {
     await supabase
@@ -6034,7 +6370,15 @@ async function startKittyMpesaContribution(
       checkout_request_id: stk.checkoutRequestId,
       mpesa_transaction_id: stk.mpesaTransactionId,
     },
-    nextState: {},
+    nextState: sessionWithPaymentRetry(paymentRetryState({
+      kind: "kitty_contribution",
+      amount: parsedAmount,
+      phone: stk.phoneNumber,
+      checkout_request_id: stk.checkoutRequestId,
+      mpesa_transaction_id: stk.mpesaTransactionId,
+      kitty_id: kitty.id,
+      kitty_title: kitty.title,
+    })),
   };
 }
 
@@ -6093,6 +6437,264 @@ async function contributeKittyFromWallet(
   };
 }
 
+function paymentRetryIntent(kind: PaymentRetryKind, language: "auto" | "en" | "sw"): ParsedIntent {
+  if (kind === "wallet_topup") return menuIntent("top_up_wallet", language, 0.9);
+  if (kind === "welfare_contribution") return menuIntent("contribute_welfare", language, 0.9);
+  if (kind === "kitty_contribution") return menuIntent("contribute_kitty", language, 0.9);
+  return menuIntent("record_contribution", language, 0.9);
+}
+
+function isAmountOnlyText(text: string): boolean {
+  return Boolean(extractAmount(text)) && /^[\s\d.,/=]*(?:ksh|kes|shs?|bob|k)?[\s\d.,/=]*(?:ksh|kes|shs?|bob|k)?$/i.test(text.trim());
+}
+
+function mentionsPaymentRetryTarget(text: string): boolean {
+  return /\b(?:retry|again|repeat|resend|contribute|contiribute|contribution|pay|fund|top\s*up|send|changia|lipa|lipia|weka|jaribu|rudia|tuma)\b/i.test(text);
+}
+
+async function retryTransactionFromState(
+  supabase: SupabaseClient,
+  profile: Profile,
+  retry: PaymentRetryState,
+): Promise<RecentSmartMpesaTransaction | null> {
+  let query = supabase
+    .from("mpesa_transactions")
+    .select("id, transaction_type, amount, status, result_desc, mpesa_receipt_number, checkout_request_id, phone_number, created_at, updated_at")
+    .eq("member_id", profile.id)
+    .limit(1);
+
+  if (retry.checkout_request_id) {
+    query = query.eq("checkout_request_id", retry.checkout_request_id);
+  } else if (retry.mpesa_transaction_id) {
+    query = query.eq("id", retry.mpesa_transaction_id);
+  } else {
+    return null;
+  }
+
+  const { data, error } = await query.maybeSingle();
+  if (error && error.code !== "PGRST116") {
+    console.error("Failed to load WhatsApp retry transaction", error);
+    return null;
+  }
+  return (data as RecentSmartMpesaTransaction | null) ?? null;
+}
+
+function paymentStatusIsWaiting(status: string): boolean {
+  return ["pending", "incomplete", "unknown", ""].includes(status);
+}
+
+function paymentStatusIsRetryable(status: string): boolean {
+  return ["failed", "request_timeout", "user_cancelled", "cancelled", "timeout"].includes(status);
+}
+
+function paymentStillWaitingReply(retry: PaymentRetryState, transaction: RecentSmartMpesaTransaction | null, language: "auto" | "en" | "sw"): string {
+  const label = paymentRetryLabel(retry.kind, language);
+  const amount = formatMoney(Number(transaction?.amount || retry.amount || 0));
+  const phone = transaction?.phone_number || retry.phone;
+  return language === "sw"
+    ? [
+      `Bado nasubiri confirmation ya ${label} ya ${amount}${phone ? ` iliyotumwa kwa ${displayPhone(phone)}` : ""}.`,
+      "Kama tayari umeweka PIN, subiri kidogo. Ukipata SMS ya M-Pesa lakini hapa haijasasisha, tuma receipt/ref hapa.",
+      "Reply CANCEL kufuta hatua hii au MENU kuona huduma nyingine.",
+    ].join("\n")
+    : [
+      `I am still waiting for M-Pesa confirmation for the ${label} of ${amount}${phone ? ` sent to ${displayPhone(phone)}` : ""}.`,
+      "If you already entered your PIN, give it a minute. If M-Pesa sent an SMS but this chat does not update, send the receipt/ref here.",
+      "Reply CANCEL to clear this step or MENU for other services.",
+    ].join("\n");
+}
+
+function paymentRetryExpiredReply(retry: PaymentRetryState, language: "auto" | "en" | "sw"): string {
+  const label = paymentRetryLabel(retry.kind, language);
+  return language === "sw"
+    ? `Hiyo ${label} ya awali imepitwa na muda. Reply MENU uchague service tena, au andika request mpya kama "contribute 500 for welfare".`
+    : `That earlier ${label} step has expired. Reply MENU to choose the service again, or send a fresh request like "contribute 500 for welfare".`;
+}
+
+async function activeWelfareCaseById(supabase: SupabaseClient, id?: string): Promise<WelfareSummary | null> {
+  if (!id) return null;
+  const cases = await listActiveWelfareCases(supabase, 50);
+  return cases.find((item) => item.id === id) || null;
+}
+
+async function activeKittyById(supabase: SupabaseClient, id?: string): Promise<KittySummary | null> {
+  if (!id) return null;
+  const kitties = await listActiveKitties(supabase);
+  return kitties.find((item) => item.id === id) || null;
+}
+
+async function handlePaymentRetrySession(
+  supabase: SupabaseClient,
+  message: InboundMessage,
+  profile: Profile,
+  roles: string[],
+  session: WhatsappSession,
+): Promise<{ parsed: ParsedIntent; execution: ExecutionResult; lastIntent: string } | null> {
+  const retry = session.state?.payment_retry;
+  if (!retry) return null;
+
+  const text = message.text.trim();
+  const language = detectLanguage(text);
+  const amountOverride = extractAmount(text);
+  const shouldHandle = isPaymentRetryText(text) || isAmountOnlyText(text) || mentionsPaymentRetryTarget(text) || isPaymentRetryCancelText(text);
+  if (!shouldHandle) return null;
+
+  const parsed = paymentRetryIntent(retry.kind, language);
+  if (isPaymentRetryCancelText(text)) {
+    return {
+      parsed,
+      execution: {
+        actionStatus: "completed",
+        reply: language === "sw"
+          ? "Sawa, nimefuta hatua ya payment iliyokuwa inasubiri. Reply MENU kuchagua huduma nyingine."
+          : "Done, I cleared the pending payment step. Reply MENU to choose another service.",
+        result: { payment_retry_cleared: true, previous_retry: retry },
+        nextState: {},
+      },
+      lastIntent: "payment_retry_cancelled",
+    };
+  }
+
+  if (!isFreshPaymentRetry(retry)) {
+    return {
+      parsed,
+      execution: {
+        actionStatus: "needs_clarification",
+        reply: paymentRetryExpiredReply(retry, language),
+        result: { payment_retry_expired: true, previous_retry: retry },
+        nextState: {},
+      },
+      lastIntent: "payment_retry_expired",
+    };
+  }
+
+  let transaction = await retryTransactionFromState(supabase, profile, retry);
+  if (transaction) {
+    transaction = await syncSmartMpesaTransactionStatus(supabase, transaction);
+    const status = String(transaction.status || "").toLowerCase();
+    if (status === "completed") {
+      return {
+        parsed,
+        execution: {
+          actionStatus: "completed",
+          reply: formatSmartPaymentFollowUpReply(transaction, language),
+          result: { payment_retry_completed: true, transaction_id: transaction.id, status },
+          nextState: {},
+        },
+        lastIntent: "payment_retry_completed",
+      };
+    }
+
+    if (paymentStatusIsWaiting(status)) {
+      return {
+        parsed,
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: paymentStillWaitingReply(retry, transaction, language),
+          result: { payment_retry_waiting: true, transaction_id: transaction.id, status },
+          nextState: session.state ?? sessionWithPaymentRetry(retry),
+        },
+        lastIntent: "payment_retry_waiting",
+      };
+    }
+
+    if (isMpesaConfigurationFailure(transaction.result_desc)) {
+      return {
+        parsed,
+        execution: {
+          actionStatus: "blocked",
+          reply: [
+            friendlyMpesaFailureReason(transaction.result_desc, language),
+            language === "sw"
+              ? "Situme retry nyingine hadi setup iangaliwe, ili tusisumbue simu yako na prompts zitakazofail."
+              : "I will not send another retry until the setup is checked, so your phone is not spammed with prompts that will fail.",
+          ].join("\n"),
+          result: { payment_retry_blocked: true, transaction_id: transaction.id, status, reason: transaction.result_desc },
+          nextState: {},
+        },
+        lastIntent: "payment_retry_blocked",
+      };
+    }
+
+    if (!paymentStatusIsRetryable(status) && !isPaymentRetryText(text) && !amountOverride) {
+      return null;
+    }
+  }
+
+  const amount = amountOverride || retry.amount;
+  if (retry.kind === "wallet_topup") {
+    const execution = await startWalletTopUp(supabase, profile, roles, message.phone, amount, language);
+    return {
+      parsed: { ...parsed, amount },
+      execution,
+      lastIntent: "top_up_wallet",
+    };
+  }
+
+  if (retry.kind === "welfare_contribution") {
+    const welfareCase = await activeWelfareCaseById(supabase, retry.welfare_case_id);
+    if (!welfareCase) {
+      const chooser = await welfareSelectionReply(supabase, "welfare_mpesa", language);
+      return {
+        parsed,
+        execution: {
+          actionStatus: chooser.count > 0 ? "needs_clarification" : "completed",
+          reply: `${language === "sw" ? "Sijapata welfare case ya payment ya awali." : "I could not find the welfare case from the earlier payment."}\n${chooser.reply}`,
+          result: { missing: chooser.count > 0 ? ["welfare_case"] : [], payment_retry_target_missing: true, retry },
+          nextState: chooser.state,
+        },
+        lastIntent: "contribute_welfare",
+      };
+    }
+
+    const execution = await startWelfareMpesaContribution(supabase, profile, roles, message.phone, welfareCase, amount, language);
+    return {
+      parsed: { ...parsed, amount, title: welfareCase.title, payment_method: "mpesa" },
+      execution,
+      lastIntent: "contribute_welfare",
+    };
+  }
+
+  if (retry.kind === "kitty_contribution") {
+    const kitty = await activeKittyById(supabase, retry.kitty_id);
+    if (!kitty) {
+      const chooser = await kittySelectionReply(supabase, "kitty_mpesa", language);
+      return {
+        parsed,
+        execution: {
+          actionStatus: chooser.count > 0 ? "needs_clarification" : "completed",
+          reply: `${language === "sw" ? "Sijapata kitty ya payment ya awali." : "I could not find the kitty from the earlier payment."}\n${chooser.reply}`,
+          result: { missing: chooser.count > 0 ? ["kitty"] : [], payment_retry_target_missing: true, retry },
+          nextState: chooser.state,
+        },
+        lastIntent: "contribute_kitty",
+      };
+    }
+
+    const execution = await startKittyMpesaContribution(supabase, profile, roles, message.phone, kitty, amount, language);
+    return {
+      parsed: { ...parsed, amount, title: kitty.title, payment_method: "mpesa" },
+      execution,
+      lastIntent: "contribute_kitty",
+    };
+  }
+
+  const execution = await startContributionMpesaPayment(
+    supabase,
+    profile,
+    roles,
+    message.phone,
+    amount,
+    retry.contribution_type || "general",
+    language,
+  );
+  return {
+    parsed: { ...parsed, amount, contribution_type: retry.contribution_type || "general", payment_method: "mpesa" },
+    execution,
+    lastIntent: "record_contribution",
+  };
+}
+
 async function handleNumberedMenu(
   supabase: SupabaseClient,
   message: InboundMessage,
@@ -6146,6 +6748,9 @@ async function handleNumberedMenu(
     };
   }
 
+  const retryHandled = await handlePaymentRetrySession(supabase, message, profile, roles, session);
+  if (retryHandled) return retryHandled;
+
   if (current?.section === "wallet_topup_amount") {
     const amount = extractAmount(text);
     if (!amount) {
@@ -6166,6 +6771,29 @@ async function handleNumberedMenu(
       parsed: { ...menuIntent("top_up_wallet", language), amount },
       execution,
       lastIntent: "top_up_wallet",
+    };
+  }
+
+  if (current?.section === "contribution_now_amount") {
+    const amount = extractAmount(text);
+    if (!amount) {
+      return {
+        parsed: menuIntent("record_contribution", language, 0.8),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw" ? "Step 2: Tuma amount ya contribution, mfano 500. Reply 0 kurudi menu." : "Step 2: Send the contribution amount, for example 500. Reply 0 to go back.",
+          result: { missing: ["amount"], menu: current },
+          nextState: sessionWithMenu(current),
+        },
+        lastIntent: "record_contribution",
+      };
+    }
+
+    const execution = await startContributionMpesaPayment(supabase, profile, roles, message.phone, amount, "general", language);
+    return {
+      parsed: { ...menuIntent("record_contribution", language), amount, contribution_type: "general", payment_method: "mpesa" },
+      execution,
+      lastIntent: "record_contribution",
     };
   }
 
@@ -6437,6 +7065,53 @@ async function handleNumberedMenu(
     }
   }
 
+  if (section === "contribution") {
+    if (number === 1) {
+      return {
+        parsed: menuIntent("record_contribution", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw" ? "Step 2: Unataka kuchangia KSh ngapi sasa? Mfano: 500" : "Step 2: How much do you want to contribute now? Example: 500",
+          result: { missing: ["amount"], menu: "contribution_now" },
+          nextState: sessionWithMenu(menuState("contribution_now_amount")),
+        },
+        lastIntent: "record_contribution",
+      };
+    }
+    if (number === 2) {
+      return {
+        parsed: menuIntent("record_contribution", language),
+        execution: {
+          actionStatus: "completed",
+          reply: language === "sw"
+            ? "Sawa, hakuna payment imeanzishwa. Ukiwa ready, reply CONTRIBUTION 500 au MENU."
+            : "Okay, no payment has been started. When ready, reply CONTRIBUTION 500 or MENU.",
+          result: { contribution_later: true },
+          nextState: {},
+        },
+        lastIntent: "record_contribution",
+      };
+    }
+    if (number === 3) {
+      return {
+        parsed: menuIntent("record_contribution", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma payment proof kwa format hii: PAID 500 welfare REF QJD123ABC. Unaweza pia kupaste M-Pesa/bank message kamili."
+            : "Send the payment proof like this: PAID 500 welfare REF QJD123ABC. You can also paste the full M-Pesa/bank message.",
+          result: { missing: ["amount", "reference_number", "purpose"], menu: "record_paid_contribution" },
+          nextState: {
+            pending_intent: { intent: "record_contribution", confidence: 0.85, language, description: "Record a contribution already made" },
+            asked_for: ["amount", "reference_number", "purpose"],
+            updated_at: new Date().toISOString(),
+          },
+        },
+        lastIntent: "record_contribution",
+      };
+    }
+  }
+
   if (section === "kitty") {
     if (number === 1) {
       return {
@@ -6575,6 +7250,25 @@ async function handleNumberedMenu(
         lastIntent: "query_profile",
       };
     }
+    if (number === 7) {
+      return {
+        parsed: menuIntent("record_discipline", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma fine kwa format hii: ADD FINE 100 TO TS-00034 FOR missed meeting."
+            : "Send the fine like this: ADD FINE 100 TO TS-00034 FOR missed meeting.",
+          result: { missing: ["target_member", "amount", "reason"], menu: "record_discipline" },
+          nextState: {
+            pending_intent: { intent: "record_discipline", confidence: 0.85, language },
+            asked_for: ["target_member", "amount", "reason"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("official"),
+          },
+        },
+        lastIntent: "record_discipline",
+      };
+    }
   }
 
   if (section === "main") {
@@ -6590,15 +7284,9 @@ async function handleNumberedMenu(
         parsed: menuIntent("query_contributions", language),
         execution: {
           actionStatus: "completed",
-          reply: [
-            contributionSummaryReply(profile, context, language),
-            "",
-            language === "sw"
-              ? "Kulipa pending contributions: reply PAY. Kulipa amount fulani: reply CONTRIBUTION 500."
-              : "To pay pending contributions: reply PAY. To pay a specific amount: reply CONTRIBUTION 500.",
-          ].join("\n"),
+          reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language)}`,
           result: { menu: "contributions" },
-          nextState: sessionWithMenu(menuState("main")),
+          nextState: sessionWithMenu(menuState("contribution")),
         },
         lastIntent: "query_contributions",
       };
@@ -6685,6 +7373,8 @@ async function handleNumberedMenu(
           : "I did not find that option. Choose one number from this menu:",
         current?.section === "wallet"
           ? walletMenuReply(context, language)
+          : current?.section === "contribution"
+            ? contributionOptionsReply(language)
           : current?.section === "welfare"
             ? welfareMenuReply(language)
             : current?.section === "official"
@@ -6694,7 +7384,7 @@ async function handleNumberedMenu(
             : mainMenuReply(profile, roles, language),
       ].join("\n\n"),
       result: { invalid_menu_selection: number, current_menu: current?.section || "main" },
-      nextState: sessionWithMenu(menuState(current?.section === "wallet" || current?.section === "welfare" || current?.section === "kitty" || current?.section === "official" ? current.section : "main")),
+      nextState: sessionWithMenu(menuState(current?.section === "wallet" || current?.section === "contribution" || current?.section === "welfare" || current?.section === "kitty" || current?.section === "official" ? current.section : "main")),
     },
     lastIntent: "menu",
   };
@@ -6752,6 +7442,9 @@ async function welfareReply(supabase: SupabaseClient, language: "auto" | "en" | 
   for (const row of rows) {
     lines.push(welfareCaseLine(row));
   }
+  lines.push(language === "sw"
+    ? "Kuchangia: reply 'contribute 500 for jina la case', au chagua option 2 kwa M-Pesa / 3 kwa wallet kwenye Welfare menu."
+    : "To contribute: reply 'contribute 500 for case name', or choose option 2 for M-Pesa / 3 for wallet in the Welfare menu.");
   return lines.join("\n");
 }
 
@@ -6777,8 +7470,8 @@ async function kittiesReply(supabase: SupabaseClient, language: "auto" | "en" | 
     lines.push(`- ${row.title} (${row.category}): ${balance} raised of ${target}${deadline}`);
   }
   lines.push(language === "sw"
-    ? "Kuchangia, reply MENU kisha chagua Kitties, au andika 'contribute 500 to kitty'."
-    : "To contribute, reply MENU and choose Kitties, or type 'contribute 500 to kitty'.");
+    ? "Kuchangia: reply 'contribute 500 to jina la kitty', au chagua option 2 kwa M-Pesa / 3 kwa wallet kwenye Kitties menu."
+    : "To contribute: reply 'contribute 500 to kitty name', or choose option 2 for M-Pesa / 3 for wallet in the Kitties menu.");
   return lines.join("\n");
 }
 
@@ -6805,6 +7498,33 @@ async function receiptsReply(supabase: SupabaseClient, profile: Profile, languag
   return lines.join("\n");
 }
 
+function isMpesaConfigurationFailure(reason: string | null | undefined): boolean {
+  return /\b(?:initiator information is invalid|invalid initiator|invalid shortcode|invalid passkey|invalid access token|invalid credentials|securitycredential|credential|paybill)\b/i.test(reason || "");
+}
+
+function friendlyMpesaFailureReason(reason: string | null | undefined, language: "auto" | "en" | "sw"): string {
+  const clean = cleanString(reason);
+  if (isMpesaConfigurationFailure(clean)) {
+    return language === "sw"
+      ? "M-Pesa imekataa setup ya payment. Nimeweka hii ionekane kwa treasurer/admin ili waangalie Paybill/STK credentials. Pesa yako haijarekodiwa kama received."
+      : "M-Pesa rejected the payment setup. I have kept this visible for the treasurer/admin to check the Paybill/STK credentials. Your money has not been recorded as received.";
+  }
+
+  if (/\b(?:ds timeout|user cannot be reached|request timed out|timeout|timed out)\b/i.test(clean || "")) {
+    return language === "sw"
+      ? "Prompt haikufika au haikukamilika kwa muda. Reply RETRY kuituma tena, au tuma amount mpya kama unataka kubadilisha kiasi."
+      : "The prompt did not reach/complete on time. Reply RETRY to send it again, or send a new amount if you want to change it.";
+  }
+
+  if (/\b(?:cancelled|canceled|user cancelled|cancel)\b/i.test(clean || "")) {
+    return language === "sw"
+      ? "Inaonekana prompt ilicanceliwa. Reply RETRY kuituma tena."
+      : "It looks like the prompt was cancelled. Reply RETRY to send it again.";
+  }
+
+  return clean || (language === "sw" ? "M-Pesa haijathibitisha payment." : "M-Pesa did not confirm the payment.");
+}
+
 async function recentSmartMpesaTransaction(
   supabase: SupabaseClient,
   profile: Profile,
@@ -6815,7 +7535,7 @@ async function recentSmartMpesaTransaction(
     .from("mpesa_transactions")
     .select("id, transaction_type, amount, status, result_desc, mpesa_receipt_number, checkout_request_id, phone_number, created_at, updated_at")
     .eq("member_id", profile.id)
-    .in("transaction_type", ["wallet_topup", "kitty_contribution", "welfare_contribution"])
+    .in("transaction_type", ["wallet_topup", "contribution", "kitty_contribution", "welfare_contribution"])
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -6937,7 +7657,9 @@ function formatSmartPaymentFollowUpReply(
     ? (language === "sw" ? "wallet top-up" : "wallet top-up")
     : transaction.transaction_type === "welfare_contribution"
       ? (language === "sw" ? "welfare contribution" : "welfare contribution")
-    : (language === "sw" ? "kitty contribution" : "kitty contribution");
+    : transaction.transaction_type === "kitty_contribution"
+      ? (language === "sw" ? "kitty contribution" : "kitty contribution")
+      : (language === "sw" ? "contribution" : "contribution");
   const amount = formatMoney(Number(transaction.amount || 0));
   const receipt = cleanString(transaction.mpesa_receipt_number);
   const status = String(transaction.status || "pending").toLowerCase();
@@ -6947,27 +7669,31 @@ function formatSmartPaymentFollowUpReply(
       ? [
         `Nimeona ${purpose} ya ${amount} imekamilika.`,
         receipt ? `Receipt: ${receipt}` : "Receipt number bado inasync.",
-        transaction.transaction_type === "wallet_topup" ? "Reply WALLET ku-refresh salio." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE kuona welfare cases active." : "Reply KITTY kuona kitties active.",
+        transaction.transaction_type === "wallet_topup" ? "Reply WALLET ku-refresh salio." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE kuona welfare cases active." : transaction.transaction_type === "kitty_contribution" ? "Reply KITTY kuona kitties active." : "Reply RECEIPTS kuona malipo yaliyothibitishwa.",
       ].join("\n")
       : [
         `I can see the ${purpose} for ${amount} is completed.`,
         receipt ? `Receipt: ${receipt}` : "The receipt number is still syncing.",
-        transaction.transaction_type === "wallet_topup" ? "Reply WALLET to refresh your balance." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE to view active welfare cases." : "Reply KITTY to view active kitties.",
+        transaction.transaction_type === "wallet_topup" ? "Reply WALLET to refresh your balance." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE to view active welfare cases." : transaction.transaction_type === "kitty_contribution" ? "Reply KITTY to view active kitties." : "Reply RECEIPTS to view confirmed payments.",
       ].join("\n");
   }
 
-  if (status === "failed") {
-    const reason = cleanString(transaction.result_desc) || (language === "sw" ? "M-Pesa haijathibitisha payment." : "M-Pesa did not confirm the payment.");
+  if (["failed", "request_timeout", "user_cancelled", "cancelled", "timeout"].includes(status)) {
+    const reason = friendlyMpesaFailureReason(transaction.result_desc, language);
     return language === "sw"
       ? [
         `${purpose} ya ${amount} haijakamilika.`,
         reason,
-        transaction.transaction_type === "wallet_topup" ? "Reply FUND 500 kujaribu tena." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE kuchagua welfare case na kujaribu tena." : "Reply KITTY kuchagua kitty na kujaribu tena.",
+        isMpesaConfigurationFailure(transaction.result_desc)
+          ? "Treasurer/admin amepewa alert ya kuangalia setup."
+          : "Reply RETRY kuituma tena, au tuma amount mpya kubadilisha kiasi.",
       ].join("\n")
       : [
         `That ${purpose} for ${amount} did not complete.`,
         reason,
-        transaction.transaction_type === "wallet_topup" ? "Reply FUND 500 to try again." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE to choose a welfare case and try again." : "Reply KITTY to choose a kitty and try again.",
+        isMpesaConfigurationFailure(transaction.result_desc)
+          ? "The treasurer/admin has visibility to check the setup."
+          : "Reply RETRY to send it again, or send a new amount to change the amount.",
       ].join("\n");
   }
 
@@ -6976,28 +7702,33 @@ function formatSmartPaymentFollowUpReply(
     ? [
       `Bado nasubiri confirmation ya M-Pesa kwa ${purpose} ya ${amount} iliyotumwa kwa ${phone}.`,
       "Kama umeweka PIN, subiri kidogo; receipt hutumwa hapa M-Pesa ikithibitisha.",
-      transaction.transaction_type === "wallet_topup" ? "Reply WALLET kuangalia salio." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE kuona welfare cases active." : "Reply KITTY kuona kitties active.",
+      transaction.transaction_type === "wallet_topup" ? "Reply WALLET kuangalia salio." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE kuona welfare cases active." : transaction.transaction_type === "kitty_contribution" ? "Reply KITTY kuona kitties active." : "Reply RECEIPTS kuona malipo yaliyothibitishwa.",
     ].join("\n")
     : [
       `I am still waiting for M-Pesa confirmation for your ${purpose} of ${amount} sent to ${phone}.`,
       "If you already entered your PIN, give it a minute; the receipt is sent here automatically when M-Pesa confirms.",
-      transaction.transaction_type === "wallet_topup" ? "Reply WALLET to check your balance." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE to view active welfare cases." : "Reply KITTY to view active kitties.",
+      transaction.transaction_type === "wallet_topup" ? "Reply WALLET to check your balance." : transaction.transaction_type === "welfare_contribution" ? "Reply WELFARE to view active welfare cases." : transaction.transaction_type === "kitty_contribution" ? "Reply KITTY to view active kitties." : "Reply RECEIPTS to view confirmed payments.",
     ].join("\n");
 }
 
-function registeredMemberRegistrationGuidanceReply(profile: Profile, language: "auto" | "en" | "sw"): string {
+function registeredMemberRegistrationGuidanceReply(profile: Profile, language: "auto" | "en" | "sw", roles: string[] = []): string {
+  const official = isOfficial(roles);
   if (language === "sw") {
     return [
       `Tayari uko registered, ${memberGreetingName(profile)}.`,
       "Kusajili mtu mwingine, huyo mtu atume ujumbe kwa WhatsApp hii akitumia nambari yake mwenyewe na reply JOIN.",
-      "Kama wewe ni official unaongeza members, tumia dashboard ya Members ili phone, approval, na audit trail vihifadhiwe vizuri.",
+      official
+        ? "Kwa role yako ya official/admin, unaweza pia kutumia dashboard ya Members, kisha approve kwa WhatsApp: APPROVE MEMBER <membership no/phone>."
+        : "Kama official anaongeza members, atumie dashboard ya Members ili phone, approval, na audit trail vihifadhiwe vizuri.",
     ].join("\n");
   }
 
   return [
     `You are already registered, ${memberGreetingName(profile)}.`,
     "To register another person, they should message this WhatsApp number from their own phone and reply JOIN.",
-    "If you are an official adding members, use the dashboard Members area so phone ownership, approval, and the audit trail are captured correctly.",
+    official
+      ? "With your official/admin role, you can also use the Members dashboard, then approve through WhatsApp: APPROVE MEMBER <membership no/phone>."
+      : "If an official is adding members, use the Members dashboard so phone ownership, approval, and the audit trail are captured correctly.",
   ].join("\n");
 }
 
@@ -7239,6 +7970,57 @@ function membershipReply(profile: Profile, context: FinanceContext, language: "a
   return lines.join("\n");
 }
 
+function memberBenefitsReply(language: "auto" | "en" | "sw"): string {
+  if (language === "sw") {
+    return [
+      "Faida za member wa Turuturu Stars ni:",
+      "1. Welfare support wakati wa shida/emergency.",
+      "2. Structured savings na michango ya maendeleo.",
+      "3. Community network kwa biashara, mentorship, na opportunities.",
+      "4. Transparent records: wallet, receipts, contributions, announcements, meetings.",
+      "5. Governance: member voice, voting, accountability, na official follow-up.",
+      "Reply WELFARE, KITTIES, WALLET, or MEETING kuona huduma husika.",
+    ].join("\n");
+  }
+
+  return [
+    "Turuturu Stars member benefits include:",
+    "1. Welfare support during emergencies and difficult moments.",
+    "2. Structured savings and organized community contributions.",
+    "3. Community networking, mentorship, and growth opportunities.",
+    "4. Transparent records for wallet, receipts, contributions, announcements, and meetings.",
+    "5. Member voice through voting, governance, accountability, and official follow-up.",
+    "Reply WELFARE, KITTIES, WALLET, or MEETING to open the matching service.",
+  ].join("\n");
+}
+
+function adminCapabilityReply(roles: string[], language: "auto" | "en" | "sw"): string {
+  const roleText = roles.length ? roles.map(roleDisplayName).join(", ") : "member";
+  if (language === "sw") {
+    return [
+      `Nakuona na roles: ${roleText}.`,
+      "Admin/official commands unazoweza kutumia hapa ni:",
+      "1. ANNOUNCE title: Meeting content: Meeting is Saturday at 10",
+      "2. ADD WELFARE CASE medical for Mary target 20000",
+      "3. VERIFY QJD123ABC",
+      "4. APPROVE MEMBER TS-00034",
+      "5. ADD FINE 100 TO TS-00034 FOR missed meeting",
+      "Reply OFFICIAL TOOLS au MENU kisha 12 kuona official menu.",
+    ].join("\n");
+  }
+
+  return [
+    `I see your roles as: ${roleText}.`,
+    "You can use these admin/official commands here:",
+    "1. ANNOUNCE title: Meeting content: Meeting is Saturday at 10",
+    "2. ADD WELFARE CASE medical for Mary target 20000",
+    "3. VERIFY QJD123ABC",
+    "4. APPROVE MEMBER TS-00034",
+    "5. ADD FINE 100 TO TS-00034 FOR missed meeting",
+    "Reply OFFICIAL TOOLS or MENU then 12 to open the official menu.",
+  ].join("\n");
+}
+
 function supportReply(language: "auto" | "en" | "sw", profile: Profile): string {
   if (language === "sw") {
     return [
@@ -7356,6 +8138,7 @@ function conversationMemoryForResult(
 ): Record<string, unknown> {
   const previous = sessionConversationSummary(session);
   const registration = execution.nextState?.registration || session?.state?.registration;
+  const paymentRetry = execution.nextState?.payment_retry || null;
   const paymentReference = parsed.reference_number || (isSmartReceiptIssueText(inboundText) ? extractReference(inboundText) : null);
   const unresolved = execution.actionStatus === "needs_clarification" || execution.actionStatus === "failed" || execution.actionStatus === "blocked"
     ? {
@@ -7379,6 +8162,16 @@ function conversationMemoryForResult(
     last_assistant_reply: clampPlainWhatsAppText(execution.reply, 360),
     last_seen_at: new Date().toISOString(),
     registration_stage: registration?.step || null,
+    payment_retry: paymentRetry
+      ? {
+        kind: paymentRetry.kind,
+        amount: paymentRetry.amount,
+        contribution_type: paymentRetry.contribution_type || null,
+        kitty_title: paymentRetry.kitty_title || null,
+        welfare_case_title: paymentRetry.welfare_case_title || null,
+        updated_at: paymentRetry.updated_at || new Date().toISOString(),
+      }
+      : null,
     last_unresolved_issue: unresolved,
     recent_payment_or_ref: paymentReference
       ? {
@@ -7622,7 +8415,7 @@ function liveCommandGuide(roles: string[]): string {
     "HELP or MENU: show member options.",
     "BALANCE or 'niko na deni gani': show pending contributions and arrears.",
     "PAY: pay pending contributions with M-Pesa.",
-    "CONTRIBUTE 500: record/start a contribution for a specific amount.",
+    "CONTRIBUTE 500: choose/start a contribution for a specific amount; RECORD PAID 500 REF ABC123 records proof for verification.",
     "WALLET or 'salio la wallet': show wallet balance.",
     "FUND 500 or TOP UP WALLET 500: start a wallet top-up by M-Pesa.",
     "KITTY or WELFARE: show active kitties/welfare cases.",
@@ -7640,6 +8433,7 @@ function liveCommandGuide(roles: string[]): string {
     lines.push(
       "Official/admin: RECORD EXPENSE 1200 fare ref BUS12.",
       "Official/admin: ADD WELFARE CASE medical for Mary target 20000.",
+      "Official/admin: ADD FINE 100 TO TS-00034 FOR missed meeting.",
       "Official/admin: APPROVALS shows pending approval queues.",
     );
   }
@@ -8199,12 +8993,12 @@ async function createAnnouncementFromWhatsApp(
     };
   }
 
-  if (!draft.title || !draft.content || draft.content.length < 8) {
+  if (isVagueAnnouncementRequest(inboundText) || !draft.title || !draft.content || draft.content.length < 8) {
     return {
       actionStatus: "needs_clarification",
       reply: language === "sw"
-        ? "Tuma tangazo kwa format hii: ANNOUNCE title: Mkutano content: Kutakuwa na mkutano Jumamosi saa 10."
-        : "Send the announcement like this: ANNOUNCE title: Meeting content: There will be a meeting on Saturday at 10.",
+        ? "Niko tayari kuongeza tangazo. Tuma title na content. Format: ANNOUNCE title: Mkutano content: Kutakuwa na mkutano Jumamosi saa 10."
+        : "I can add the announcement. Send the title and content. Format: ANNOUNCE title: Meeting content: There will be a meeting on Saturday at 10.",
       result: { missing: ["title", "content"] },
       nextState: {
         pending_intent: { ...intent, intent: "create_announcement" },
@@ -8547,10 +9341,155 @@ async function approveMemberFromWhatsApp(
   };
 }
 
+function isGenericTargetMember(value: string | null | undefined): boolean {
+  return !value || /^(?:member|members|mwanachama|wanachama|someone|person|people|user|account|a member|the member|add|record|create|to|for|a|the)$/i.test(value.trim());
+}
+
+async function recordDisciplineFromWhatsApp(
+  supabase: SupabaseClient,
+  intent: ParsedIntent,
+  profile: Profile,
+  roles: string[],
+  inboundText: string,
+  language: "auto" | "en" | "sw",
+): Promise<ExecutionResult> {
+  if (!canRecordDiscipline(roles)) {
+    return {
+      actionStatus: "blocked",
+      reply: language === "sw"
+        ? "Ni admin au organizing secretary pekee anaweza kuongeza fine/discipline record kupitia WhatsApp."
+        : "Only an admin or organizing secretary can add a fine/discipline record through WhatsApp.",
+      result: { roles },
+      nextState: {},
+    };
+  }
+
+  const targetMember = intent.target_member || extractTargetMemberForAdminCommand(inboundText);
+  const amount = intent.amount ? parsePositiveAmount(intent.amount) : null;
+  const reason = extractDisciplineReason(inboundText);
+  const missing: string[] = [];
+  if (isGenericTargetMember(targetMember)) missing.push("target_member");
+  if (!amount || amount <= 0) missing.push("amount");
+  if (!reason) missing.push("reason");
+
+  if (missing.length > 0) {
+    return {
+      actionStatus: "needs_clarification",
+      reply: language === "sw"
+        ? "Tuma fine ikiwa na member, amount, na sababu. Mfano: ADD FINE 100 TO TS-00034 FOR missed meeting."
+        : "Send the fine with member, amount, and reason. Example: ADD FINE 100 TO TS-00034 FOR missed meeting.",
+      result: { missing, target_member: targetMember || null, amount: amount || null },
+      nextState: {
+        pending_intent: { ...intent, intent: "record_discipline" },
+        asked_for: missing,
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  const target = await resolveContributionProfile(supabase, profile, roles, targetMember);
+  if (target.needsClarification) {
+    return {
+      actionStatus: "needs_clarification",
+      reply: target.needsClarification,
+      result: { missing: ["target_member"], target_member: targetMember || null },
+      nextState: {
+        pending_intent: { ...intent, intent: "record_discipline" },
+        asked_for: ["target_member"],
+        updated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  const incidentType = inferDisciplineIncidentType(inboundText, intent.category || intent.case_type);
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("discipline_records")
+    .insert({
+      member_id: target.profile.id,
+      incident_type: incidentType,
+      description: reason,
+      incident_date: today,
+      fine_amount: amount,
+      fine_paid: false,
+      status: "pending",
+      recorded_by: profile.id,
+    })
+    .select("id, member_id, incident_type, fine_amount, status, created_at")
+    .single();
+
+  if (error || !data) throw new HttpError(500, "Failed to record discipline/fine from WhatsApp", error);
+
+  await logAdminAction(supabase, profile, roles, "whatsapp_discipline_fine_recorded", "discipline_record", String((data as Record<string, unknown>).id), {
+    target_member: target.profile.id,
+    amount,
+    incident_type: incidentType,
+    reason,
+  });
+
+  return {
+    actionStatus: "completed",
+    reply: language === "sw"
+      ? `Nimeongeza fine ya ${formatMoney(amount)} kwa ${target.profile.full_name}. Sababu: ${reason}. Status: pending.`
+      : `I added a ${formatMoney(amount)} fine for ${target.profile.full_name}. Reason: ${reason}. Status: pending.`,
+    result: data as Record<string, unknown>,
+    nextState: {},
+  };
+}
+
 function isPendingContributionPayRequest(text: string): boolean {
   const clean = text.trim().toLowerCase();
   if (/^(pay|pay pending|pay contributions?|lipa|lipia|lipa deni)$/i.test(clean)) return true;
   return /(pay|lipa|clear).*(pending|arrears|deni|owed|owe|contribution|mchango|michango)/i.test(clean);
+}
+
+function wantsContributionMpesaPrompt(text: string, intent: ParsedIntent): boolean {
+  const source = `${text} ${cleanString(intent.description) || ""}`.toLowerCase();
+  if (intent.reference_number || extractReference(source)) return false;
+  if (/\b(?:paid|sent|done|completed|receipt|receipts|ref|reference|confirmed|nimelipa|nimetuma|nimechangia|risiti|stakabadhi)\b/i.test(source)) return false;
+  return /\b(?:contribute|contiribute|contribution|pay|lipa|lipia|changia|weka mchango|make payment)\b/i.test(source) ||
+    /^contribution\s+\d/i.test(source);
+}
+
+function isManualPaymentRecordContext(text: string, intent: ParsedIntent): boolean {
+  const pending = (intent.raw as Record<string, unknown> | undefined)?.pending as Record<string, unknown> | undefined;
+  const source = [
+    text,
+    cleanString(intent.description),
+    cleanString(pending?.description),
+    cleanString((pending?.raw as Record<string, unknown> | undefined)?.description),
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  return Boolean(intent.reference_number || extractReference(source)) ||
+    /\b(?:already\s+paid|paid|sent|done|completed|receipt|receipts|ref|reference|confirmed|manual|bank|cash|till|paybill|via\s+(?:your|you|the)\s+account|nimelipa|nimetuma|nimechangia|risiti|stakabadhi)\b/i.test(source);
+}
+
+function requiresTargetForOfficialContributionRecord(text: string, roles: string[], intent: ParsedIntent): boolean {
+  if (!isOfficial(roles)) return false;
+  if (intent.target_member && !/^(?:member|members|mwanachama|wanachama|someone|person)$/i.test(intent.target_member.trim())) return false;
+  const pending = (intent.raw as Record<string, unknown> | undefined)?.pending as Record<string, unknown> | undefined;
+  const source = [
+    text,
+    cleanString(intent.description),
+    cleanString(pending?.description),
+  ].filter(Boolean).join(" ");
+  return /\b(?:member|mwanachama|for someone|for another|on behalf)\b/i.test(source) ||
+    /\b(?:record|add|verify|manual)\b[\s\S]{0,80}\b(?:contribution|payment|mchango|malipo)\b/i.test(source);
+}
+
+function contributionProofPrompt(language: "auto" | "en" | "sw", amount: number, contributionType: string, targetName?: string): string {
+  const target = targetName ? ` for ${targetName}` : "";
+  return language === "sw"
+    ? [
+      `Nimepata amount ${formatMoney(amount)} (${contributionType})${target}, lakini siwezi ku-record bila proof.`,
+      "Tuma M-Pesa/bank message kamili au reference number, na purpose kama haijulikani.",
+      `Mfano: PAID ${amount} ${contributionType} REF QJD123ABC for ${targetName || "member"}.`,
+    ].join("\n")
+    : [
+      `I have the amount ${formatMoney(amount)} (${contributionType})${target}, but I should not record it without proof.`,
+      "Send the full M-Pesa/bank message or a reference number, plus the purpose if it is not clear.",
+      `Example: PAID ${amount} ${contributionType} REF QJD123ABC for ${targetName || "member"}.`,
+    ].join("\n");
 }
 
 function pendingContributionRows(context: FinanceContext): FinanceContext["contributions"] {
@@ -8758,7 +9697,7 @@ async function executeIntent(
       actionStatus: "completed",
       reply: await kittiesReply(supabase, language),
       result: { source: "kitties" },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("kitty")),
     };
   }
 
@@ -8836,8 +9775,8 @@ async function executeIntent(
   if (intent.intent === "query_membership") {
     return {
       actionStatus: "completed",
-      reply: membershipReply(profile, context, language),
-      result: { source: "profiles", profile_id: profile.id },
+      reply: isMemberBenefitsQuestion(inboundText) ? memberBenefitsReply(language) : membershipReply(profile, context, language),
+      result: { source: isMemberBenefitsQuestion(inboundText) ? "member_benefits" : "profiles", profile_id: profile.id },
       nextState: {},
     };
   }
@@ -8942,6 +9881,10 @@ async function executeIntent(
     };
   }
 
+  if (intent.intent === "record_discipline") {
+    return await recordDisciplineFromWhatsApp(supabase, intent, profile, roles, inboundText, language);
+  }
+
   if (intent.intent === "record_contribution") {
     if (!canRecordFinance(profile, roles)) {
       return {
@@ -8987,6 +9930,21 @@ async function executeIntent(
     }
 
     if (!intent.amount) {
+      if (requiresTargetForOfficialContributionRecord(inboundText, roles, intent)) {
+        return {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Unarekodi contribution ya member gani? Tuma membership number/phone/name pamoja na amount, purpose, na proof/ref. Mfano: RECORD PAID 500 FOR TS-00034 welfare REF QJD123ABC."
+            : "Which member is this contribution for? Send membership number/phone/name with amount, purpose, and proof/ref. Example: RECORD PAID 500 FOR TS-00034 welfare REF QJD123ABC.",
+          result: { missing: ["target_member", "amount", "reference_number", "purpose"] },
+          nextState: {
+            pending_intent: intent,
+            asked_for: ["target_member", "amount", "reference_number", "purpose"],
+            updated_at: new Date().toISOString(),
+          },
+        };
+      }
+
       if (isPendingContributionPayRequest(inboundText)) {
         const pendingRows = pendingContributionRows(context);
         const total = pendingRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -9017,15 +9975,21 @@ async function executeIntent(
 
       return {
         actionStatus: "needs_clarification",
-        reply: language === "sw"
-          ? "Umetaja mchango, lakini sijapata kiasi. Ni KSh ngapi nirekodi?"
-          : "I understood this as a contribution, but I need the amount. How much should I record?",
-        result: { missing: ["amount"] },
-        nextState: {
-          pending_intent: intent,
-          asked_for: ["amount"],
-          updated_at: new Date().toISOString(),
-        },
+        reply: isManualPaymentRecordContext(inboundText, intent)
+          ? (language === "sw"
+            ? "Unaweza ku-record payment iliyofanyika, lakini nahitaji amount, purpose, na M-Pesa/bank reference au message kamili. Mfano: PAID 500 welfare REF QJD123ABC."
+            : "You can record a payment already made, but I need the amount, purpose, and M-Pesa/bank reference or full message. Example: PAID 500 welfare REF QJD123ABC.")
+          : contributionOptionsReply(language),
+        result: isManualPaymentRecordContext(inboundText, intent)
+          ? { missing: ["amount", "reference_number", "purpose"] }
+          : { menu: "contribution_options" },
+        nextState: isManualPaymentRecordContext(inboundText, intent)
+          ? {
+            pending_intent: intent,
+            asked_for: ["amount", "reference_number", "purpose"],
+            updated_at: new Date().toISOString(),
+          }
+          : sessionWithMenu(menuState("contribution")),
       };
     }
 
@@ -9046,6 +10010,30 @@ async function executeIntent(
     const amount = parsePositiveAmount(intent.amount);
     const contributionType = normalizeContributionType(intent.contribution_type, inboundText);
     const referenceNumber = intent.reference_number || null;
+    if (!referenceNumber && (target.profile.id !== profile.id || isManualPaymentRecordContext(inboundText, intent))) {
+      return {
+        actionStatus: "needs_clarification",
+        reply: contributionProofPrompt(language, amount, contributionType, target.profile.full_name),
+        result: { missing: ["reference_number", "payment_proof"], amount, contribution_type: contributionType, target_member: target.profile.id },
+        nextState: {
+          pending_intent: {
+            ...intent,
+            intent: "record_contribution",
+            amount,
+            contribution_type: contributionType,
+            target_member: target.profile.id === profile.id ? null : target.profile.membership_number || target.profile.phone || target.profile.full_name,
+            description: intent.description || inboundText,
+          },
+          asked_for: ["reference_number", "payment_proof"],
+          updated_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    if (!referenceNumber && target.profile.id === profile.id && wantsContributionMpesaPrompt(inboundText, intent)) {
+      return await startContributionMpesaPayment(supabase, profile, roles, profile.phone, amount, contributionType, language);
+    }
+
     if (referenceNumber) {
       const { data: existingRows, error: existingError } = await supabase
         .from("contributions")
@@ -9630,8 +10618,9 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
   }
 
   if (isRegisteredMemberJoinText(message.text) || isRegisterOtherMemberRequestText(message.text)) {
+    const registrationRoles = normalizeBotRoles(await getUserRoles(supabase, profile.id));
     await upsertSession(supabase, message.phone, profile);
-    await sendAndLogReply(supabase, message, profile, registeredMemberRegistrationGuidanceReply(profile, initialLanguage));
+    await sendAndLogReply(supabase, message, profile, registeredMemberRegistrationGuidanceReply(profile, initialLanguage, registrationRoles));
     return;
   }
 
@@ -9682,6 +10671,38 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
 
   if (session.state?.community_knowledge) {
     await handleCommunityKnowledgeSession(supabase, message, profile, session, detectLanguage(message.text));
+    return;
+  }
+
+  if (isMemberBenefitsQuestion(message.text)) {
+    const parsed = menuIntent("query_membership", initialLanguage, 0.94);
+    const execution: ExecutionResult = {
+      actionStatus: "completed",
+      reply: memberBenefitsReply(initialLanguage),
+      result: { source: "member_benefits" },
+      nextState: session.state ?? {},
+    };
+    const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, parsed);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+    await completeAction(supabase, actionId, execution, outboundMessageId);
+    await updateSessionState(supabase, message.phone, execution.nextState ?? {}, "query_membership");
+    await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
+    return;
+  }
+
+  if (isAdminCapabilityQuestion(message.text) && isOfficial(roles)) {
+    const parsed = menuIntent("query_approvals", initialLanguage, 0.92);
+    const execution: ExecutionResult = {
+      actionStatus: "completed",
+      reply: adminCapabilityReply(roles, initialLanguage),
+      result: { source: "admin_capabilities", roles },
+      nextState: sessionWithMenu(menuState("official")),
+    };
+    const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, parsed);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+    await completeAction(supabase, actionId, execution, outboundMessageId);
+    await updateSessionState(supabase, message.phone, execution.nextState ?? {}, "query_approvals");
+    await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
     return;
   }
 

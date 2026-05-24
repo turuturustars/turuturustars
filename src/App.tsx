@@ -94,7 +94,7 @@ const ContributionsPage = lazy(() => import("./pages/dashboard/ContributionsPage
 const WelfarePage = lazy(() => import("./pages/dashboard/WelfarePage"));
 const WelfareManagement = lazy(() => import("./pages/dashboard/WelfareManagement"));
 const ProfilePage = lazy(() => import("./pages/dashboard/ProfilePage"));
-const AnnouncementsPage = lazy(() => import("./pages/dashboard/AnnouncementsPage"));
+const CommunicationsPage = lazy(() => import("./pages/dashboard/CommunicationsPage"));
 const MembersPage = lazy(() => import("./pages/dashboard/MembersPage"));
 const ApprovalsPage = lazy(() => import("./pages/dashboard/ApprovalsPage"));
 const JobsModerationPage = lazy(() => import("./pages/dashboard/JobsModerationPage"));
@@ -111,11 +111,11 @@ const DisciplinePage = lazy(() => import("./pages/dashboard/DisciplinePage"));
 const VotingPage = lazy(() => import("./pages/dashboard/VotingPage"));
 const RoleHandoverPage = lazy(() => import("./pages/dashboard/RoleHandoverPage"));
 const PrivateMessagesPage = lazy(() => import("./pages/dashboard/PrivateMessagesPage"));
-const NotificationsPage = lazy(() => import("./pages/dashboard/NotificationsPage"));
 const WalletPage = lazy(() => import("./pages/dashboard/WalletPage"));
 const KittiesPage = lazy(() => import("./pages/dashboard/KittiesPage"));
 const KittyDetailPage = lazy(() => import("./pages/dashboard/KittyDetailPage"));
 const InsuranceBenefitsPage = lazy(() => import("./pages/dashboard/InsuranceBenefitsPage"));
+const FinancialComingSoonPage = lazy(() => import("./pages/dashboard/FinancialComingSoonPage"));
 const WhatsAppAutomationPage = lazy(() => import("./pages/dashboard/WhatsAppAutomationPage"));
 
 // QueryClient configuration with better defaults
@@ -299,6 +299,9 @@ const App = () => {
                     <Route path="wallet" element={<WalletPage />} />
                     <Route path="kitties" element={<KittiesPage />} />
                     <Route path="kitties/:id" element={<KittyDetailPage />} />
+                    <Route path="loans" element={<FinancialComingSoonPage feature="loans" />} />
+                    <Route path="savings" element={<FinancialComingSoonPage feature="savings" />} />
+                    <Route path="investments" element={<FinancialComingSoonPage feature="investments" />} />
                     <Route
                       path="mpesa"
                       element={
@@ -345,9 +348,10 @@ const App = () => {
 
                   {/* Communication */}
                   <Route path="communication">
-                    <Route path="announcements" element={<AnnouncementsPage />} />
+                    <Route index element={<CommunicationsPage />} />
+                    <Route path="announcements" element={<CommunicationsPage defaultView="announcements" />} />
                     <Route path="messages" element={<PrivateMessagesPage />} />
-                    <Route path="notifications" element={<NotificationsPage />} />
+                    <Route path="notifications" element={<CommunicationsPage />} />
                     <Route path="whatsapp" element={<WhatsAppAutomationPage />} />
                   </Route>
 
@@ -434,12 +438,15 @@ const App = () => {
                   <Route path="role-handover" element={<Navigate to="/dashboard/governance/handover" replace />} />
                   <Route path="secretary-dashboard" element={<Navigate to="/dashboard/governance/secretary-dashboard" replace />} />
                   <Route path="announcements" element={<Navigate to="/dashboard/communication/announcements" replace />} />
-                  <Route path="notifications" element={<Navigate to="/dashboard/communication/notifications" replace />} />
+                  <Route path="notifications" element={<Navigate to="/dashboard/communication" replace />} />
                   <Route path="community" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="chat" element={<Navigate to="/dashboard/communication/messages" replace />} />
                   <Route path="whatsapp" element={<Navigate to="/dashboard/communication/whatsapp" replace />} />
                   <Route path="approvals" element={<Navigate to="/dashboard/admin-panel/approvals" replace />} />
                   <Route path="jobs" element={<Navigate to="/dashboard/admin-panel/jobs" replace />} />
+                  <Route path="loans" element={<Navigate to="/dashboard/finance/loans" replace />} />
+                  <Route path="savings" element={<Navigate to="/dashboard/finance/savings" replace />} />
+                  <Route path="investments" element={<Navigate to="/dashboard/finance/investments" replace />} />
                 </Route>
 
                 {/* ==================== ERROR PAGES ==================== */}

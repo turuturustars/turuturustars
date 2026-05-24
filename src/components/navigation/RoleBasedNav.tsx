@@ -77,8 +77,8 @@ const RoleBasedNav = () => {
       roles: ['secretary', 'vice_secretary', 'admin'],
     },
     {
-      title: 'Announcements',
-      href: '/dashboard/communication/announcements',
+      title: 'Communications',
+      href: '/dashboard/communication',
       icon: <Bell className="w-4 h-4" />,
       roles: ['chairperson', 'vice_chairman', 'admin'],
     },

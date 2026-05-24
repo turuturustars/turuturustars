@@ -16,7 +16,7 @@ export async function waitForProfileByEmail(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     if (options?.signal?.aborted) {
-      // eslint-disable-next-line no-console
+
       console.debug('waitForProfileByEmail aborted');
       return null;
     }
@@ -29,17 +29,17 @@ export async function waitForProfileByEmail(
         .maybeSingle();
 
       if (!error && data) {
-        // eslint-disable-next-line no-console
+
         console.debug(`waitForProfileByEmail: found profile for ${email} on attempt ${attempt + 1}`);
         return data as Record<string, unknown>;
       }
 
       if (error) {
-        // eslint-disable-next-line no-console
+
         console.warn('waitForProfileByEmail supabase error', error);
       }
     } catch (e) {
-      // eslint-disable-next-line no-console
+
       console.warn('waitForProfileByEmail attempt error', e);
     }
 
@@ -53,11 +53,11 @@ export async function waitForProfileByEmail(
       console.debug('waitForProfileByEmail onAttempt callback failed', e);
     }
 
-    // eslint-disable-next-line no-await-in-loop
+
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
-  // eslint-disable-next-line no-console
+
   console.warn(`waitForProfileByEmail: profile for ${email} not found after ${attempts} attempts`);
   return null;
 }

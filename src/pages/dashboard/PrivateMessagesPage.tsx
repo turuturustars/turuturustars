@@ -57,6 +57,7 @@ export default function PrivateMessagesPage() {
   const [editingContent, setEditingContent] = useState('');
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
+  const memberFetchIdRef = useRef(0);
   const { preferences: notificationPreferences } = useNotificationPreferences(user?.id);
   const debouncedMemberSearchTerm = useDebounce(memberSearchTerm.trim(), 300);
 
@@ -150,6 +151,7 @@ export default function PrivateMessagesPage() {
   // Fetch a bounded member picker result for new conversations.
   const fetchMembers = useCallback(async () => {
     if (!user) return;
+    const fetchId = ++memberFetchIdRef.current;
     setLoadingMembers(true);
     try {
       let query = supabase
@@ -211,12 +213,17 @@ export default function PrivateMessagesPage() {
         };
       });
 
+      if (fetchId !== memberFetchIdRef.current) return;
       setMembers(rowsWithPresence);
     } catch (err) {
       console.error('Error fetching members:', err);
-      showError('Unable to load member list right now.', 2500);
+      if (fetchId === memberFetchIdRef.current) {
+        showError('Unable to load member list right now.', 2500);
+      }
     } finally {
-      setLoadingMembers(false);
+      if (fetchId === memberFetchIdRef.current) {
+        setLoadingMembers(false);
+      }
     }
   }, [debouncedMemberSearchTerm, showError, user]);
 
@@ -463,7 +470,7 @@ export default function PrivateMessagesPage() {
                       <Badge variant="secondary">{filteredOnlineMembersCount} online in results</Badge>
                     </div>
                     <ScrollArea className="h-64">
-                      {loadingMembers ? (
+                      {loadingMembers && members.length === 0 ? (
                         <div className="flex items-center justify-center py-8">
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>

@@ -169,7 +169,7 @@ export function useStatus() {
     isVisible: false,
   });
 
-  const show = (message: string, type: StatusType = 'info', duration?: number) => {
+  const show = React.useCallback((message: string, type: StatusType = 'info', duration?: number) => {
     setStatus({ message, type, isVisible: true });
 
     if (duration) {
@@ -177,16 +177,28 @@ export function useStatus() {
         setStatus((prev) => ({ ...prev, isVisible: false }));
       }, duration);
     }
-  };
+  }, []);
 
-  const hide = () => {
+  const hide = React.useCallback(() => {
     setStatus((prev) => ({ ...prev, isVisible: false }));
-  };
+  }, []);
 
-  const showSuccess = (message: string, duration = 3000) => show(message, 'success', duration);
-  const showError = (message: string, duration = 5000) => show(message, 'error', duration);
-  const showWarning = (message: string, duration = 4000) => show(message, 'warning', duration);
-  const showInfo = (message: string, duration = 3000) => show(message, 'info', duration);
+  const showSuccess = React.useCallback(
+    (message: string, duration = 3000) => show(message, 'success', duration),
+    [show]
+  );
+  const showError = React.useCallback(
+    (message: string, duration = 5000) => show(message, 'error', duration),
+    [show]
+  );
+  const showWarning = React.useCallback(
+    (message: string, duration = 4000) => show(message, 'warning', duration),
+    [show]
+  );
+  const showInfo = React.useCallback(
+    (message: string, duration = 3000) => show(message, 'info', duration),
+    [show]
+  );
 
   return {
     status,

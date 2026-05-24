@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, Trash2, DollarSign, HandHeart, Megaphone, UserCheck, Settings, Calendar, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +14,7 @@ import { cn } from '@/lib/utils';
 
 const NotificationBell = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useRealtimeNotifications();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -287,10 +289,10 @@ const NotificationBell = () => {
               className="w-full h-9 text-xs font-medium hover:bg-accent/80 rounded-lg transition-all hover:scale-[1.02] active:scale-95"
               onClick={() => {
                 setIsOpen(false);
-                // Navigate to notifications page if you have one
+                navigate('/dashboard/communication');
               }}
             >
-              View all notifications
+              View communications
             </Button>
           </div>
         )}

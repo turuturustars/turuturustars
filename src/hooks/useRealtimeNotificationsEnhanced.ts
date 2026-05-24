@@ -29,12 +29,17 @@ interface RawNotification {
   updated_at?: string;
 }
 
-export const useRealtimeNotificationsEnhanced = () => {
+type UseRealtimeNotificationsOptions = {
+  applyPreferences?: boolean;
+};
+
+export const useRealtimeNotificationsEnhanced = (options: UseRealtimeNotificationsOptions = {}) => {
   const { user } = useAuth();
   const { delivery, isTypeEnabled } = useNotificationPreferences(user?.id);
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const applyPreferences = options.applyPreferences ?? true;
 
   // Handler for INSERT events
   const handleInsertNotification = useCallback((payload: { new: Record<string, unknown> }) => {
@@ -86,7 +91,7 @@ export const useRealtimeNotificationsEnhanced = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('notifications')
-        .select('id, user_id, title, message, type, read, sent_via, created_at, updated_at')
+        .select('id, user_id, title, message, type, read, action_url, sent_via, created_at, updated_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -162,9 +167,10 @@ export const useRealtimeNotificationsEnhanced = () => {
   }, [user?.id, fetchNotifications, handleInsertNotification, handleUpdateNotification, handleDeleteNotification]);
 
   const notifications = useMemo(() => {
+    if (!applyPreferences) return allNotifications;
     if (!(delivery.inApp ?? true)) return [];
     return allNotifications.filter(notification => isTypeEnabled(notification.type));
-  }, [allNotifications, delivery.inApp, isTypeEnabled]);
+  }, [allNotifications, applyPreferences, delivery.inApp, isTypeEnabled]);
 
   useEffect(() => {
     const unread = notifications.filter(n => !n.read).length;

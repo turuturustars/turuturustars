@@ -92,6 +92,7 @@ export const GOVERNANCE_ROUTES = {
 export const COMMUNICATION_ROUTES = {
   BASE: '/dashboard/communication',
   ANNOUNCEMENTS: '/dashboard/communication/announcements',
+  NOTIFICATIONS: '/dashboard/communication/notifications',
   MESSAGES: '/dashboard/communication/messages',
 } as const;
 
@@ -210,14 +211,14 @@ export const DASHBOARD_MENU: RouteConfig[] = [
   },
   {
     path: COMMUNICATION_ROUTES.BASE,
-    label: 'Communication',
+    label: 'Communications',
     icon: 'MessageSquare',
-    description: 'Announcements and messages',
+    description: 'Member updates and messages',
     children: [
       {
-        path: COMMUNICATION_ROUTES.ANNOUNCEMENTS,
-        label: 'Announcements',
-        icon: 'Megaphone',
+        path: COMMUNICATION_ROUTES.BASE,
+        label: 'Inbox',
+        icon: 'Bell',
       },
       {
         path: COMMUNICATION_ROUTES.MESSAGES,
