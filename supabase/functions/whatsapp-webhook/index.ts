@@ -1819,6 +1819,11 @@ function isSmartPaymentFollowUpText(text: string): boolean {
     /\b(?:status|confirm|confirmed|received|complete|completed|went through|imeingia|imefika|imekubali)\b[\s\S]{0,80}\b(?:payment|mpesa|m-pesa|stk|transaction|wallet top|top\s*up|fund|kitty|welfare|contribution|mchango)\b/i.test(text);
 }
 
+function isPublicDonationRequest(text: string): boolean {
+  return /\b(?:donate|donation|support|changia|msaada)\b/i.test(text) &&
+    (extractAmount(text) !== null || /\b(?:prompt|stk|mpesa|m-pesa|pay|lipa|send)\b/i.test(text));
+}
+
 function isRegisteredMemberJoinText(text: string): boolean {
   return /^(?:join|register|registration|membership|jiunge|sajili|usajili)$/i.test(text.trim());
 }
@@ -2081,6 +2086,23 @@ function registrationCancelledReply(language: "en" | "sw"): string {
   return language === "sw"
     ? "Nimesitisha usajili huu. Reply REGISTER ukitaka kuanza tena."
     : "I have cancelled this registration flow. Reply REGISTER whenever you want to start again.";
+}
+
+function publicDonationReply(language: "en" | "sw", amount: number | null): string {
+  const amountText = amount ? ` ${formatMoney(amount)}` : "";
+  if (language === "sw") {
+    return [
+      `Naweza kusaidia na donation${amountText}, lakini kwa sasa WhatsApp STK iko kwa members walioregisteriwa.`,
+      "Tafadhali tumia donation page au malizia registration kwanza ili tuprompt nambari yako kwa usalama.",
+      siteUrl("/donate"),
+    ].join("\n");
+  }
+
+  return [
+    `I can help with a${amountText} donation, but WhatsApp STK prompts are currently available for registered members.`,
+    "Please use the donation page or finish registration first so we can safely prompt your number.",
+    siteUrl("/donate"),
+  ].join("\n");
 }
 
 function generateOtpCode(): string {
@@ -2600,7 +2622,7 @@ const PROFILE_REQUIRED_KEYS: Array<"full_name" | "phone" | "id_number" | "locati
 ];
 
 const PROFILE_LABEL_LOOKAHEAD =
-  "(?:full\\s*name|name|jina|id(?:\\s*number)?|kitambulisho|email|location|mahali|mtaa|kijiji|occupation|job|work|kazi|employment|ajira|education|elimu|interests?|notes?|maelezo)";
+  "(?:full\\s*name|name|jina|id(?:\\s*number)?|kitambulisho|email|location|loaction|locaton|lacation|lcoation|place|area|village|estate|mahali|mtaa|kijiji|occupation|job|work|kazi|employment|ajira|education|elimu|interests?|notes?|maelezo)";
 
 const PROFILE_FIELD_LABELS_EN: Record<string, string> = {
   full_name: "full name",
@@ -2759,7 +2781,7 @@ function extractProfileUpdates(text: string, explicit?: unknown): ProfileUpdates
   if (idNumber) updates.id_number = idNumber;
 
   const location =
-    extractLabeledProfileValue(text, "(?:location|place|area|village|estate|mahali|mtaa|kijiji)", 100) ||
+    extractLabeledProfileValue(text, "(?:location|loaction|locaton|lacation|lcoation|place|area|village|estate|mahali|mtaa|kijiji)", 100) ||
     firstProfileMatch(text, [
       /\b(?:i\s+live\s+in|i\s+stay\s+in|i\s+am\s+based\s+in|am\s+based\s+in|naishi|nakaa|natoka)\s+([^,;.\n]{2,100})/i,
       /\bniko\s+(?!na\b)(?:kwa\s+)?([^,;.\n]{2,100})/i,
@@ -3037,6 +3059,16 @@ function inferPlainRequiredProfileUpdates(
     id_number: "id_number" in current ? current.id_number : null,
     location: "location" in current ? current.location : null,
   });
+
+  const nameIdLocation = clean.match(
+    /^\s*([a-z][a-z\s.'-]{2,100}?)\s*(?:,|\s)+(?:id|id\s*number|national\s+id|kitambulisho)\s*(?:is|ni|:|#|-)?\s*(\d{6,8})\s*(?:,|\s)+(?:(?:location|loaction|locaton|lacation|lcoation|place|area|village|estate|mahali|mtaa|kijiji)\s*(?:is|ni|:|=|-)?\s*)?([^,;.\n]{2,100})\s*$/i,
+  );
+  if (nameIdLocation) {
+    if (missing.includes("full_name")) updates.full_name = cleanProfileValue(nameIdLocation[1], 120) || undefined;
+    if (missing.includes("id_number")) updates.id_number = normalizeIdNumberValue(nameIdLocation[2]) || undefined;
+    if (missing.includes("location")) updates.location = cleanProfileValue(nameIdLocation[3], 100) || undefined;
+    return updates;
+  }
 
   const bundled = clean.match(/^([a-z][a-z\s.'-]{2,80})\s+(\d{6,8})\s+(.{2,100})$/i);
   if (bundled) {
@@ -4994,6 +5026,11 @@ async function handleUnregisteredNumber(
 
   if (!text) {
     await sendAndLogReply(supabase, message, null, registrationGateReply(language));
+    return;
+  }
+
+  if (isPublicDonationRequest(text)) {
+    await sendAndLogReply(supabase, message, null, publicDonationReply(language, extractAmount(text)));
     return;
   }
 
