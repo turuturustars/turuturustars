@@ -27,6 +27,13 @@ type WhatsAppSessionRow = {
   last_outbound_at: string | null;
 };
 
+type AnnouncementRow = {
+  id: string;
+  title: string | null;
+  content: string | null;
+  priority: string | null;
+};
+
 type ProcessWhatsAppRequest = {
   limit?: number;
   abandonment_limit?: number;
@@ -233,6 +240,125 @@ function queueTemplateParameters(row: WhatsAppQueueRow): string[] {
   }
 
   return [row.message].filter(Boolean).slice(0, 1);
+}
+
+function configuredSiteUrl(): string {
+  const raw =
+    Deno.env.get("WHATSAPP_SITE_URL")?.trim() ||
+    Deno.env.get("SITE_URL")?.trim() ||
+    Deno.env.get("VITE_SITE_URL")?.trim() ||
+    "https://turuturustars.co.ke";
+  return raw.replace(/\/+$/, "");
+}
+
+function siteUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${configuredSiteUrl()}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function clampText(value: string, max = 4096): string {
+  const clean = value.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ").trim();
+  return clean.length > max ? `${clean.slice(0, max - 3).trimEnd()}...` : clean;
+}
+
+function sentenceCase(value: string): string {
+  const clean = value.trim();
+  if (!clean) return clean;
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function cleanAnnouncementCopy(value: string): string {
+  return value
+    .replace(/\bturuturu stars\b/gi, "Turuturu Stars")
+    .replace(/\bannoucements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\banoucements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\banouncements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\bpurporse\b/gi, "purpose")
+    .replace(/\bwhatapp\b/gi, "WhatsApp")
+    .replace(/\bwatsapp\b/gi, "WhatsApp")
+    .replace(/\bits\b/gi, "it's")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function repairAnnouncementPayload(titleValue: string | null | undefined, contentValue: string | null | undefined): { title: string; content: string } {
+  let title = cleanAnnouncementCopy(titleValue || "Announcement");
+  let content = cleanAnnouncementCopy(contentValue || "");
+
+  const titleContentSplit = title.match(/^(.{3,100}?)\s+content\s*[:=-]\s*(.{5,1000})$/i);
+  if (titleContentSplit) {
+    title = cleanAnnouncementCopy(titleContentSplit[1]);
+    content = cleanAnnouncementCopy(content || titleContentSplit[2]);
+  }
+
+  const bodyContentSplit = content.match(/^(.{3,100}?)\s+content\s*[:=-]\s*(.{5,2000})$/i);
+  if ((!title || /^announcement$/i.test(title)) && bodyContentSplit) {
+    title = cleanAnnouncementCopy(bodyContentSplit[1]);
+    content = cleanAnnouncementCopy(bodyContentSplit[2]);
+  } else if (bodyContentSplit && cleanAnnouncementCopy(bodyContentSplit[1]).toLowerCase() === title.toLowerCase()) {
+    content = cleanAnnouncementCopy(bodyContentSplit[2]);
+  }
+
+  if (!content) content = title;
+  if (content.toLowerCase() === title.toLowerCase()) {
+    content = "";
+  }
+  if (!title || /^new announcement$/i.test(title)) {
+    title = cleanAnnouncementCopy(content.split(/[.!?]/)[0] || "Announcement");
+  }
+
+  return {
+    title: sentenceCase(title),
+    content: sentenceCase(content),
+  };
+}
+
+function formatAnnouncementNotification(announcement: AnnouncementRow | null, fallbackMessage: string): string {
+  const fallback = fallbackMessage.replace(/^New announcement:\s*/i, "").trim();
+  const payload = repairAnnouncementPayload(announcement?.title || null, announcement?.content || fallback);
+  const actionUrl = siteUrl(`/dashboard/communication/announcements${announcement?.id ? `#${announcement.id}` : ""}`);
+  const priority = String(announcement?.priority || "").toLowerCase();
+  const priorityLine = priority && !["normal", "null", "undefined"].includes(priority)
+    ? `Priority: ${priority.toUpperCase()}`
+    : "";
+
+  const lines = [
+    "Turuturu Stars Announcement",
+    "",
+    payload.title,
+    ...(priorityLine ? [priorityLine] : []),
+    "",
+    payload.content,
+    "",
+    "View this notice in your member portal:",
+    actionUrl,
+  ];
+
+  return clampText(lines.join("\n"), 3900);
+}
+
+async function messageForQueueRow(
+  supabase: ReturnType<typeof createServiceClient>,
+  row: WhatsAppQueueRow,
+): Promise<string> {
+  if (row.event_type !== "announcement" || !row.event_id) return row.message;
+
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("id, title, content, priority")
+    .eq("id", row.event_id)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("Failed to refresh announcement WhatsApp message", {
+      queue_id: row.id,
+      event_id: row.event_id,
+      error: error.message,
+    });
+    return formatAnnouncementNotification(null, row.message);
+  }
+
+  return formatAnnouncementNotification((data as AnnouncementRow | null) || null, row.message);
 }
 
 function configuredTemplateForEvent(eventType: string): string | null {
@@ -635,8 +761,10 @@ serve(async (req) => {
         }
 
         try {
-          const template = templateOptionsForRow(row);
-          const result = await sendViaWhatsAppCloud(row.phone, row.message, template);
+          const message = await messageForQueueRow(supabase, row);
+          const deliveryRow = { ...row, message };
+          const template = templateOptionsForRow(deliveryRow);
+          const result = await sendViaWhatsAppCloud(row.phone, message, template);
           queueSent += 1;
 
           const { data: messageRows, error: messageError } = await supabase
@@ -647,7 +775,7 @@ serve(async (req) => {
               phone: row.phone,
               profile_id: row.user_id,
               message_type: template ? "template" : "text",
-              body: row.message,
+              body: message,
               status: "sent",
               provider_response: result.providerResponse,
               raw_payload: {
@@ -669,6 +797,7 @@ serve(async (req) => {
             .update({
               status: "sent",
               attempts: nextAttempts,
+              message,
               provider_message_id: result.providerMessageId,
               provider_response: result.providerResponse,
               whatsapp_message_id: messageRows?.[0]?.id ?? null,
