@@ -263,6 +263,7 @@ type IntentName =
   | "contribute_kitty"
   | "contribute_community_knowledge"
   | "create_announcement"
+  | "create_member"
   | "verify_contribution"
   | "approve_member"
   | "record_contribution"
@@ -413,6 +414,7 @@ const INTENTS = new Set<IntentName>([
   "contribute_kitty",
   "contribute_community_knowledge",
   "create_announcement",
+  "create_member",
   "verify_contribution",
   "approve_member",
   "record_contribution",
@@ -428,6 +430,7 @@ const FINANCE_ROLES = new Set(["admin", "treasurer"]);
 const DISCIPLINE_ROLES = new Set(["admin", "organizing_secretary"]);
 const ANNOUNCEMENT_ROLES = new Set(["admin", "chairperson", "vice_chairman", "secretary", "vice_secretary", "treasurer", "organizing_secretary"]);
 const MEMBER_APPROVAL_ROLES = new Set(["admin"]);
+const MEMBER_CREATION_ROLES = new Set(["admin"]);
 const OFFICIAL_ROLES = new Set([
   "admin",
   "chairperson",
@@ -1129,6 +1132,11 @@ function accessLinkForIntent(intent: IntentName, roles: string[]): AccessLinkCon
       swLabel: "matangazo",
       path: "/dashboard/communication/announcements",
     },
+    create_member: {
+      label: "members",
+      swLabel: "members",
+      path: "/dashboard/members",
+    },
     query_meetings: {
       label: "meetings",
       swLabel: "mikutano",
@@ -1342,6 +1350,10 @@ function canVerifyContribution(roles: string[]): boolean {
 
 function canApproveMember(roles: string[]): boolean {
   return hasAnyBotRole(roles, MEMBER_APPROVAL_ROLES);
+}
+
+function canCreateMember(roles: string[]): boolean {
+  return hasAnyBotRole(roles, MEMBER_CREATION_ROLES);
 }
 
 function canRecordDiscipline(roles: string[]): boolean {
@@ -1803,20 +1815,40 @@ function isRegisteredMemberJoinText(text: string): boolean {
   return /^(?:join|register|registration|membership|jiunge|sajili|usajili)$/i.test(text.trim());
 }
 
+const MEMBER_WORD_PATTERN = "(?:member|members|meber|mebers|memebr|memebrs|memeber|memebers|membr|mbr|mwanachama|wanachama)";
+
+function isAdminCreateMemberRequestText(text: string): boolean {
+  const normalized = text.trim();
+  if (!normalized) return false;
+  if (/\b(?:announcement|announcements|announce|notice|tangazo|matangazo|fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure|approval|approvals|approve|activate|accept|pending)\b/i.test(normalized)) {
+    return false;
+  }
+
+  const memberWord = new RegExp(`\\b${MEMBER_WORD_PATTERN}\\b`, "i");
+  if (!memberWord.test(normalized)) return false;
+
+  return new RegExp(`\\b(?:add|create|register|registration|enroll|enrol|onboard|sign\\s*up|make|ongeza|sajili)\\b[\\s\\S]{0,100}\\b${MEMBER_WORD_PATTERN}\\b`, "i").test(normalized) ||
+    new RegExp(`\\b${MEMBER_WORD_PATTERN}\\b[\\s\\S]{0,100}\\b(?:add|create|register|registration|adding|onboard|sajili|ongeza)\\b`, "i").test(normalized) ||
+    /\bmake\s+someone\s+(?:a\s+)?member\b/i.test(normalized);
+}
+
 function isRegisterOtherMemberRequestText(text: string): boolean {
   const normalized = text.trim();
   if (/\b(?:announcement|announcements|announce|notice|tangazo|matangazo|fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure)\b/i.test(normalized)) {
     return false;
   }
 
-  return /\b(?:register|registration|add|create|enroll|enrol|onboard|sign\s*up|sajili)\b[\s\S]{0,80}\b(?:member|members|meber|mebers|person|people|account|user|users|mwanachama|wanachama)\b/i.test(normalized) ||
-    /\b(?:member|members|meber|mebers|mwanachama|wanachama)\b[\s\S]{0,80}\b(?:register|registration|adding|add|create|onboard|sajili)\b/i.test(text) ||
+  return new RegExp(`\\b(?:register|registration|add|create|enroll|enrol|onboard|sign\\s*up|sajili)\\b[\\s\\S]{0,80}\\b(?:${MEMBER_WORD_PATTERN}|person|people|account|user|users)\\b`, "i").test(normalized) ||
+    new RegExp(`\\b${MEMBER_WORD_PATTERN}\\b[\\s\\S]{0,80}\\b(?:register|registration|adding|add|create|onboard|sajili)\\b`, "i").test(text) ||
     /\bneed\s+to\s+be\s+able\s+to\s+register\b/i.test(normalized);
 }
 
 function isMemberBenefitsQuestion(text: string): boolean {
-  return /\b(?:member|members|membership|wanachama|mwanachama)\b[\s\S]{0,60}\b(?:benefit|benefits|faida|advantages?|privileges?)\b/i.test(text) ||
-    /\b(?:benefit|benefits|faida|advantages?|privileges?)\b[\s\S]{0,60}\b(?:member|members|membership|wanachama|mwanachama)\b/i.test(text);
+  const memberWord = new RegExp(`\\b(?:${MEMBER_WORD_PATTERN}|membership)\\b`, "i");
+  const benefitWord = /\b(?:benefit|benefits|benefiting|faida|advantages?|privileges?|gain|get\s+out\s+of)\b/i;
+  return (memberWord.test(text) && benefitWord.test(text)) ||
+    /\b(?:what|how|why)\b[\s\S]{0,50}\b(?:benefit|benefits|gain|get)\b/i.test(text) ||
+    /\b(?:i\s+need\s+to\s+understand|explain|show|tell\s+me)\b[\s\S]{0,80}\b(?:benefit|benefits|faida)\b/i.test(text);
 }
 
 function isAdminCapabilityQuestion(text: string): boolean {
@@ -1827,6 +1859,30 @@ function isAdminCapabilityQuestion(text: string): boolean {
 function isRecordDisciplineRequest(text: string): boolean {
   return /\b(?:add|record|create|charge|issue|weka|ongeza)\b[\s\S]{0,80}\b(?:fine|fines|faini|penalty|discipline|disciplinary|adhabu|nidhamu)\b/i.test(text) ||
     /\b(?:fine|fines|faini|penalty|discipline|disciplinary|adhabu|nidhamu)\b[\s\S]{0,80}\b(?:member|mwanachama|for|to|kwa|ya)\b/i.test(text);
+}
+
+function isFrustrationOnlyText(text: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/[.!?]+$/g, "").replace(/\s+/g, " ");
+  return /^(?:too\s+)?(?:stupid|foolish|fool|mad|nonsense|useless|dumb|idiot|you are mad|you'?re mad|you are stupid|very stupid|mjinga|upumbavu)$/i.test(normalized);
+}
+
+function frustrationResetReply(profile: Profile, roles: string[], language: "auto" | "en" | "sw"): string {
+  const name = memberGreetingName(profile);
+  if (language === "sw") {
+    return [
+      `Pole ${name}, nilishikilia step ya zamani. Nimeifuta sasa.`,
+      isOfficial(roles)
+        ? "Unaweza kusema moja kwa moja: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune; au ANNOUNCE title: ... content: ..."
+        : "Niambie unahitaji nini kwa sentensi moja, au reply MENU kuona options.",
+    ].join("\n");
+  }
+
+  return [
+    `Sorry ${name}, I was stuck on the previous step. I have cleared it now.`,
+    isOfficial(roles)
+      ? "You can say: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune; or ANNOUNCE title: ... content: ..."
+      : "Tell me what you need in one sentence, or reply MENU to see options.",
+  ].join("\n");
 }
 
 function isCasualGreetingText(text: string): boolean {
@@ -2241,7 +2297,7 @@ function isMemberApprovalRequest(text: string): boolean {
   if (!normalized) return false;
 
   return /\b(approve|activate|accept|kubali|idhinisha|fungua)\b/i.test(normalized) &&
-    /\b(member|user|registration|account|mwanachama|usajili|profile)\b/i.test(normalized);
+    new RegExp(`\\b(?:${MEMBER_WORD_PATTERN}|user|registration|account|mwanachama|usajili|profile)\\b`, "i").test(normalized);
 }
 
 function isPaymentProofText(text: string): boolean {
@@ -2583,6 +2639,154 @@ function profileUpdateClarificationReply(language: "auto" | "en" | "sw"): string
   ].join("\n");
 }
 
+type AdminMemberDetails = ProfileUpdates & {
+  phone?: string | null;
+};
+
+function extractAdminMemberPhone(text: string): string | null {
+  const matches = text.match(/(?:\+?254|0)?[17]\d(?:[\s-]?\d){7}/g) || [];
+  for (const match of matches) {
+    const normalized = normalizePhoneForProfile(match);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
+function stripAdminMemberCommandWords(text: string): string {
+  return text
+    .replace(/(?:\+?254|0)?[17]\d(?:[\s-]?\d){7}/gi, " ")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, " ")
+    .replace(/\b(?:id(?:\s*number)?|national\s+id|kitambulisho)\s*(?:is|ni|:|#|-)?\s*\d{6,8}\b/gi, " ")
+    .replace(/\b(?:add|create|register|registration|enroll|enrol|onboard|sign\s*up|make|new|another|other|person|user|account|as\s+an?\s+admin|from\s+admin|through\s+whatsapp|ongeza|sajili)\b/gi, " ")
+    .replace(new RegExp(`\\b${MEMBER_WORD_PATTERN}\\b`, "gi"), " ")
+    .replace(/\b(?:phone|mobile|number|simu|nambari|email|location|place|area|village|estate|mahali|mtaa|kijiji|occupation|job|work|kazi|education|elimu|interests?|notes?)\b\s*(?:is|ni|:|=|-)?/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPlausibleAdminMemberName(value: string | null | undefined): value is string {
+  const candidate = cleanProfileValue(value, 120);
+  if (!candidate) return false;
+  if (!/[a-z]/i.test(candidate)) return false;
+  if (/\b(?:admin|member|meber|memebr|memeber|phone|number|id|location|email|dashboard|whatsapp|another|someone|person|details?)\b/i.test(candidate)) return false;
+  return candidate.split(/\s+/).filter(Boolean).length >= 2;
+}
+
+function extractAdminMemberName(text: string): string | null {
+  const labeled = extractProfileUpdates(text).full_name;
+  if (isPlausibleAdminMemberName(labeled)) return labeled;
+
+  const afterCommand = text.match(new RegExp(`\\b(?:add|create|register|onboard|enroll|enrol|sajili|ongeza)\\s+(?:a\\s+|new\\s+|another\\s+)?${MEMBER_WORD_PATTERN}\\s+([^,;\\n]{3,120})`, "i"));
+  if (afterCommand) {
+    const candidate = afterCommand[1]
+      .replace(/(?:\+?254|0)?[17]\d(?:[\s-]?\d){7}[\s\S]*$/i, " ")
+      .replace(/\b(?:id|national\s+id|location|email|phone|simu|nambari|as\s+an?\s+admin)\b[\s\S]*$/i, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (isPlausibleAdminMemberName(candidate)) return shorten(candidate, 120);
+  }
+
+  const stripped = stripAdminMemberCommandWords(text);
+  if (isPlausibleAdminMemberName(stripped)) return shorten(stripped, 120);
+  return null;
+}
+
+function extractAdminMemberProfileUpdates(text: string, existing: ProfileUpdates = {}): ProfileUpdates {
+  const updates: ProfileUpdates = {
+    ...existing,
+    ...extractProfileUpdates(text),
+  };
+
+  if (!updates.full_name) {
+    const name = extractAdminMemberName(text);
+    if (name) updates.full_name = name;
+  }
+
+  if (!updates.id_number) {
+    const idMatch = text.match(/\b(?:id(?:\s*number)?|national\s+id|kitambulisho)\s*(?:is|ni|:|#|-)?\s*(\d{6,8})\b/i);
+    const idNumber = normalizeIdNumberValue(idMatch?.[1]);
+    if (idNumber) updates.id_number = idNumber;
+  }
+
+  return updates;
+}
+
+function adminMemberDetailsFromIntent(intent: ParsedIntent, inboundText: string): AdminMemberDetails {
+  const pendingUpdates = (intent.profile_updates || {}) as ProfileUpdates;
+  const profileUpdates = extractAdminMemberProfileUpdates(inboundText, pendingUpdates);
+  const phone = normalizePhoneForProfile(intent.target_member || "") || extractAdminMemberPhone(inboundText);
+  return {
+    ...profileUpdates,
+    phone,
+  };
+}
+
+function adminMemberMissing(details: AdminMemberDetails): Array<"full_name" | "phone" | "id_number" | "location"> {
+  return profileRequiredMissing({
+    full_name: details.full_name,
+    phone: details.phone,
+    id_number: details.id_number,
+    location: details.location,
+  });
+}
+
+function adminMemberDetailsPrompt(
+  language: "auto" | "en" | "sw",
+  details: AdminMemberDetails,
+  missing: Array<"full_name" | "phone" | "id_number" | "location">,
+): string {
+  const missingText = formatFieldList(missing, language);
+  const captured = [
+    details.full_name ? `name ${details.full_name}` : null,
+    details.phone ? `phone ${displayPhone(details.phone)}` : null,
+    details.id_number ? "ID captured" : null,
+    details.location ? `location ${details.location}` : null,
+    details.email ? `email ${details.email}` : null,
+  ].filter(Boolean).join(", ");
+
+  if (language === "sw") {
+    return [
+      "Naweza kuongeza member mwingine hapa kwa role yako ya admin.",
+      captured ? `Nimepata: ${captured}.` : null,
+      `Bado nahitaji: ${missingText}.`,
+      "Tuma kwa format: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune.",
+      "Email ni optional. Default password ya portal itakuwa National ID.",
+    ].filter(Boolean).join("\n");
+  }
+
+  return [
+    "I can add another member here using your admin role.",
+    captured ? `Captured so far: ${captured}.` : null,
+    `I still need: ${missingText}.`,
+    "Send it like: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune.",
+    "Email is optional. The first portal password will be the National ID.",
+  ].filter(Boolean).join("\n");
+}
+
+function adminMemberCreatedReply(
+  language: "auto" | "en" | "sw",
+  member: WhatsappRegisteredMember,
+  details: AdminMemberDetails,
+): string {
+  const memberNumber = member.membership_number || "pending assignment";
+  const status = member.status || "active";
+  if (language === "sw") {
+    return [
+      `Nimeongeza ${member.full_name} kama member.`,
+      `Membership No: ${memberNumber}. Status: ${status}.`,
+      `Aweze kuingia portal kwa phone ${displayPhone(member.phone)} au membership number, na password ya kwanza ni National ID ${details.id_number}.`,
+      "Akiingia portal anaweza kubadilisha password.",
+    ].join("\n");
+  }
+
+  return [
+    `I added ${member.full_name} as a member.`,
+    `Membership No: ${memberNumber}. Status: ${status}.`,
+    `They can sign in with phone ${displayPhone(member.phone)} or membership number, and the first password is National ID ${details.id_number}.`,
+    "They can change the password after signing in.",
+  ].join("\n");
+}
+
 function isSkipOptionalProfile(text: string): boolean {
   return /^(skip|done|finish|finished|no|none|nothing|hakuna|ruka|maliza|sina)$/i.test(text.trim());
 }
@@ -2823,6 +3027,17 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
     };
   }
 
+  if (isAdminCreateMemberRequestText(text)) {
+    return {
+      ...base,
+      intent: "create_member",
+      confidence: 0.88,
+      target_member: extractAdminMemberPhone(text),
+      profile_updates: profileUpdateKeys(extractAdminMemberProfileUpdates(text)).length ? extractAdminMemberProfileUpdates(text) : null,
+      description: text,
+    };
+  }
+
   if (isProfileUpdateLike(text)) {
     return {
       ...base,
@@ -3053,7 +3268,7 @@ async function aiInterpretMessage(
             "Use the supplied member roles as authoritative context. Chairman means chairperson. Treasurer and admin can handle finance verification. Chairperson, secretary, treasurer, organizing secretary, and admin can publish announcements when their stored roles allow it.",
             "Use conversation_summary and recent_conversation only for continuity and pronoun/context resolution. The latest message must still clearly ask for the action.",
             "Return JSON only with keys: intent, confidence, language, amount, contribution_type, payment_method, transaction_date, title, description, category, case_type, payee, reference_number, target_member, profile_updates.",
-            "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, query_kitties, query_receipts, query_notifications, query_jobs, query_voting, query_discipline, query_refunds, query_approvals, query_membership, query_support, query_community, top_up_wallet, contribute_welfare, contribute_kitty, contribute_community_knowledge, create_announcement, verify_contribution, approve_member, record_contribution, record_expenditure, record_discipline, create_welfare_case, unknown.",
+            "Allowed intent values: help, query_profile, update_profile, query_contributions, query_wallet, query_announcements, query_meetings, query_welfare, query_kitties, query_receipts, query_notifications, query_jobs, query_voting, query_discipline, query_refunds, query_approvals, query_membership, query_support, query_community, top_up_wallet, contribute_welfare, contribute_kitty, contribute_community_knowledge, create_announcement, create_member, verify_contribution, approve_member, record_contribution, record_expenditure, record_discipline, create_welfare_case, unknown.",
             "Use query_contributions when the member asks to check, view, see, list, or ask about contribution balance, pending contributions, arrears, or contribution status.",
             "Use record_contribution when a member says they paid, sent money, made a transaction, contributed, donated, wants to record a member payment, or asks to start a general contribution payment such as CONTRIBUTE 500.",
             "Use top_up_wallet when the member wants to add money to their wallet by M-Pesa.",
@@ -3061,6 +3276,7 @@ async function aiInterpretMessage(
             "Use contribute_kitty when the member wants to contribute to a community kitty/fundraiser. Set payment_method to wallet if they explicitly say wallet, otherwise use mpesa.",
             "Use record_expenditure when an official says money was spent, something was bought, or an expense should be recorded.",
             "Use record_discipline when an admin/organizing secretary asks to add or record a fine, penalty, discipline case, faini, adhabu, or nidhamu for a member. Put the member name/phone/membership number in target_member, fine amount in amount, and reason in description.",
+            "Use create_member when an admin asks to add, create, register, onboard, or make another person a member from WhatsApp. Do not use update_profile for another person's details. Put the new member phone in target_member and name, ID, email, location, occupation, education, interests, or notes in profile_updates.",
             "Use create_welfare_case when an official/admin asks to add, open, or create a welfare case. Put the case title in title, case type in case_type, target amount in amount, and beneficiary/member name or phone in target_member when available.",
             "Use create_announcement when an official/admin asks to publish, post, send, alert members, notify watu, send notice, weka announcement, tuma tangazo, or add an announcement/notice. Put the announcement title in title, body in description, and priority in category when available.",
             "Use verify_contribution when a treasurer/admin asks to verify, approve, confirm, or mark a manual contribution/payment as paid. Put the M-Pesa receipt/reference in reference_number and member name/phone/membership number in target_member when available.",
@@ -3118,6 +3334,7 @@ async function interpretMessage(
     deterministic.confidence >= 0.7 &&
     (
       deterministic.intent === "create_announcement" ||
+      deterministic.intent === "create_member" ||
       deterministic.intent === "record_discipline" ||
       (deterministic.intent === "query_membership" && isMemberBenefitsQuestion(text))
     )
@@ -3143,10 +3360,14 @@ function mergeWithPendingIntent(intent: ParsedIntent, session: WhatsappSession |
     pending.intent !== "contribute_welfare" &&
     pending.intent !== "contribute_kitty" &&
     pending.intent !== "create_announcement" &&
+    pending.intent !== "create_member" &&
     pending.intent !== "verify_contribution" &&
     pending.intent !== "approve_member"
   ) return intent;
-  if (intent.intent !== "unknown" && intent.intent !== pending.intent) return intent;
+  const canMergeDifferentIntent =
+    pending.intent === "create_member" &&
+    (intent.intent === "unknown" || intent.intent === "update_profile");
+  if (intent.intent !== "unknown" && intent.intent !== pending.intent && !canMergeDifferentIntent) return intent;
 
   return {
     ...pending,
@@ -3548,6 +3769,187 @@ async function tryConvertWhatsappRegistration(
   }
 }
 
+async function createMemberFromWhatsappAdmin(
+  supabase: SupabaseClient,
+  adminProfile: Profile,
+  roles: string[],
+  details: AdminMemberDetails,
+  inboundText: string,
+): Promise<WhatsappRegisteredMember> {
+  const fullName = cleanProfileValue(details.full_name, 120);
+  const phone = normalizePhoneForProfile(details.phone || "");
+  const idNumber = normalizeIdNumberValue(details.id_number);
+  const location = cleanProfileValue(details.location, 100);
+  const email = details.email ? extractEmail(details.email) : null;
+
+  if (!fullName || !phone || !idNumber || !location) {
+    throw new HttpError(400, "Required member details are incomplete.");
+  }
+  if (idNumber.length < 6) {
+    throw new HttpError(400, "National ID must be at least 6 characters to create the first password.");
+  }
+
+  await ensureNoExistingMemberProfile(supabase, "phone", phone, "phone number");
+  await ensureNoExistingMemberProfile(supabase, "id_number", idNumber, "National ID");
+  await ensureNoExistingMemberProfile(supabase, "email", email, "email address");
+
+  const effectiveEmail = email || syntheticWhatsappEmail(phone);
+  const { data: created, error: createError } = await getAuthAdmin(supabase).createUser({
+    email: effectiveEmail,
+    password: idNumber,
+    email_confirm: true,
+    phone,
+    user_metadata: {
+      full_name: fullName,
+      phone,
+      id_number: idNumber,
+      location,
+      occupation: cleanProfileValue(details.occupation, 100),
+      employment_status: cleanProfileValue(details.employment_status, 80),
+      education_level: cleanProfileValue(details.education_level, 80),
+      interests: details.interests || [],
+      additional_notes: cleanProfileValue(details.additional_notes, 300),
+      registration_source: "whatsapp_admin",
+      whatsapp_admin_id: adminProfile.id,
+      whatsapp_admin_name: adminProfile.full_name,
+    },
+  });
+
+  if (createError || !created?.user?.id) {
+    const detail = createError?.message ?? "no user returned";
+    throw new HttpError(
+      isDuplicateAuthError(detail) ? 409 : 500,
+      mapWhatsappRegistrationAuthError(detail),
+      { detail },
+    );
+  }
+
+  const newUserId = created.user.id;
+  const now = new Date().toISOString();
+  const { data: existingCreatedProfile, error: existingCreatedProfileError } = await supabase
+    .from("profiles")
+    .select("membership_number, joined_at")
+    .eq("id", newUserId)
+    .maybeSingle();
+
+  if (existingCreatedProfileError) {
+    await cleanupCreatedAuthUser(supabase, newUserId);
+    throw new HttpError(500, "Failed to prepare admin-created member profile", existingCreatedProfileError);
+  }
+
+  const generatedMembershipNumber = existingCreatedProfile?.membership_number
+    ? null
+    : await generateMembershipNumber(supabase);
+  const membershipNumber =
+    (existingCreatedProfile?.membership_number as string | null | undefined) ??
+    generatedMembershipNumber ??
+    `TS-${Date.now()}`;
+
+  const profilePayload: Record<string, unknown> = {
+    id: newUserId,
+    full_name: fullName,
+    phone,
+    email,
+    id_number: idNumber,
+    location,
+    occupation: cleanProfileValue(details.occupation, 100),
+    employment_status: cleanProfileValue(details.employment_status, 80),
+    education_level: cleanProfileValue(details.education_level, 80),
+    interests: details.interests || [],
+    additional_notes: cleanProfileValue(details.additional_notes, 300),
+    status: "active",
+    registration_fee_paid: false,
+    membership_fee_paid: false,
+    registration_progress: 100,
+    registration_completed_at: now,
+    updated_at: now,
+    joined_at: (existingCreatedProfile?.joined_at as string | null | undefined) ?? now,
+    membership_number: membershipNumber,
+  };
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .upsert(profilePayload, { onConflict: "id" });
+
+  if (profileError) {
+    await cleanupCreatedAuthUser(supabase, newUserId);
+    throw new HttpError(500, "Failed to save admin-created member profile", profileError);
+  }
+
+  const { error: roleError } = await supabase
+    .from("user_roles")
+    .upsert({ user_id: newUserId, role: "member" }, { onConflict: "user_id,role" });
+
+  if (roleError) {
+    await cleanupCreatedAuthUser(supabase, newUserId);
+    throw new HttpError(500, "Failed to assign admin-created member role", roleError);
+  }
+
+  const { error: trackingError } = await supabase
+    .from("contribution_tracking")
+    .upsert({ member_id: newUserId }, { onConflict: "member_id" });
+
+  if (trackingError) {
+    console.warn("Failed to initialize admin-created member contribution tracking", {
+      userId: newUserId,
+      error: trackingError.message,
+    });
+  }
+
+  const { error: notificationPrefsError } = await supabase
+    .from("notification_preferences")
+    .upsert({ user_id: newUserId }, { onConflict: "user_id" });
+
+  if (notificationPrefsError) {
+    console.warn("Failed to initialize admin-created member notification preferences", {
+      userId: newUserId,
+      error: notificationPrefsError.message,
+    });
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from("profiles")
+    .select("id, full_name, phone, email, membership_number, status")
+    .eq("id", newUserId)
+    .maybeSingle();
+
+  if (memberError || !member) {
+    await cleanupCreatedAuthUser(supabase, newUserId);
+    throw new HttpError(500, "Member account was created but profile could not be loaded", memberError);
+  }
+
+  await notifyMember(
+    supabase,
+    newUserId,
+    "Membership Created",
+    `Your Turuturu Stars membership account has been created. Membership No: ${membershipNumber}. Your first password is your National ID; change it after signing in.`,
+    "welcome",
+  );
+
+  const { error: queueError } = await supabase.rpc("queue_whatsapp_notification", {
+    _user_id: newUserId,
+    _event_type: "welcome",
+    _event_id: newUserId,
+    _message: `Welcome to Turuturu Stars, ${fullName}. Your membership number is ${membershipNumber}. Sign in with your phone or membership number. Your first password is your National ID; change it after signing in.`,
+    _priority: "normal",
+    _dedupe_key: `whatsapp-admin-created-${newUserId}`,
+  });
+  if (queueError) {
+    console.warn("Failed to queue WhatsApp welcome for admin-created member", {
+      userId: newUserId,
+      error: queueError.message,
+    });
+  }
+
+  await logAdminAction(supabase, adminProfile, roles, "whatsapp_member_created", "member", newUserId, {
+    target_phone: phone,
+    membership_number: membershipNumber,
+    original_message: inboundText,
+  });
+
+  return member as WhatsappRegisteredMember;
+}
+
 async function upsertAnonymousSession(supabase: SupabaseClient, phone: string): Promise<WhatsappSession> {
   const now = new Date().toISOString();
   const { data, error } = await supabase
@@ -3642,11 +4044,24 @@ async function maybeSendWelcomeBack(
   language: "auto" | "en" | "sw",
 ): Promise<void> {
   if (!shouldSendWelcomeBack(session)) return;
+  if (message.text.trim() && isTopLevelInterruptionText(message.text)) return;
   if (session.state?.registration?.step && message.text.trim()) return;
   if (session.state?.menu?.section && session.state.menu.section !== "main" && message.text.trim()) return;
   if (session.state?.payment_retry && message.text.trim()) return;
   await sendAndLogReply(supabase, message, profile, welcomeBackReply(profile, session, language), false);
   await markWelcomeBackSent(supabase, message.phone);
+}
+
+function isTopLevelInterruptionText(text: string): boolean {
+  const normalized = text.trim();
+  return isAdminCreateMemberRequestText(normalized) ||
+    isMemberBenefitsQuestion(normalized) ||
+    isAdminCapabilityQuestion(normalized) ||
+    isRoleCheckText(normalized) ||
+    isFrustrationOnlyText(normalized) ||
+    isMemberApprovalRequest(normalized) ||
+    isAnnouncementCreationRequest(normalized) ||
+    /^(?:menu|munu|help|support|official tools|approvals?|pending members?)$/i.test(normalized);
 }
 
 function registrationStateFromRequest(request: RegistrationRequest | null): RegistrationState | null {
@@ -5026,6 +5441,9 @@ function conversationContextLabel(state: SessionState | null | undefined, langua
   if (pendingIntent === "create_welfare_case") {
     return sw ? "tulikuwa tunafungua welfare case" : "we were opening that welfare case";
   }
+  if (pendingIntent === "create_member") {
+    return sw ? "tulikuwa tunaongeza member mpya" : "we were adding a new member";
+  }
   if (pendingIntent === "update_profile") {
     return sw ? "tulikuwa tunasasisha profile yako" : "we were updating your profile";
   }
@@ -5208,6 +5626,7 @@ function helpReply(language: "auto" | "en" | "sw", roles: string[] = [], profile
       if (canCreateAnnouncement(roles)) lines.push("10. ANNOUNCE title: Mkutano content: Mkutano ni Jumamosi saa 10 - itaarifu members kwa dashboard na WhatsApp");
       if (canVerifyContribution(roles)) lines.push("11. VERIFY QJD123ABC kuthibitisha manual payment");
       if (canApproveMember(roles)) lines.push("12. APPROVE MEMBER TS-00034 ku-activate pending member");
+      if (canCreateMember(roles)) lines.push("13. ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune");
       lines.push("Nitatumia role zako kukupa huduma za member na official/admin.");
     } else {
       lines.push("Nitakuelewa na kukusaidia moja kwa moja.");
@@ -5237,6 +5656,7 @@ function helpReply(language: "auto" | "en" | "sw", roles: string[] = [], profile
     if (canCreateAnnouncement(roles)) lines.push("10. ANNOUNCE title: Meeting content: Meeting is Saturday at 10 - alerts members in dashboard and WhatsApp");
     if (canVerifyContribution(roles)) lines.push("11. VERIFY QJD123ABC to verify a manual payment");
     if (canApproveMember(roles)) lines.push("12. APPROVE MEMBER TS-00034 to activate a pending member");
+    if (canCreateMember(roles)) lines.push("13. ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune");
     lines.push("I will use your roles to unlock the member and official/admin actions available to you.");
   } else {
     lines.push("I will understand and guide the next step.");
@@ -5696,6 +6116,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "5. Publish announcement",
       "6. My role",
       "7. Add fine/discipline record",
+      "8. Add member",
       "",
       "0. Back to main menu",
     ]
@@ -5710,6 +6131,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "5. Publish announcement",
       "6. My role",
       "7. Add fine/discipline record",
+      "8. Add member",
       "",
       "0. Back to main menu",
     ];
@@ -7269,6 +7691,28 @@ async function handleNumberedMenu(
         lastIntent: "record_discipline",
       };
     }
+    if (number === 8) {
+      const allowed = canCreateMember(roles);
+      return {
+        parsed: menuIntent("create_member", language),
+        execution: {
+          actionStatus: allowed ? "needs_clarification" : "blocked",
+          reply: allowed
+            ? adminMemberDetailsPrompt(language, {}, ["full_name", "phone", "id_number", "location"])
+            : (language === "sw" ? "Ni admin pekee anaweza kuongeza member mpya kupitia WhatsApp." : "Only an admin can add a new member through WhatsApp."),
+          result: { menu: "create_member" },
+          nextState: allowed
+            ? {
+              pending_intent: { intent: "create_member", confidence: 0.85, language },
+              asked_for: ["full_name", "phone", "id_number", "location"],
+              updated_at: new Date().toISOString(),
+              menu: menuState("official"),
+            }
+            : sessionWithMenu(menuState("official")),
+        },
+        lastIntent: "create_member",
+      };
+    }
   }
 
   if (section === "main") {
@@ -7718,7 +8162,7 @@ function registeredMemberRegistrationGuidanceReply(profile: Profile, language: "
       `Tayari uko registered, ${memberGreetingName(profile)}.`,
       "Kusajili mtu mwingine, huyo mtu atume ujumbe kwa WhatsApp hii akitumia nambari yake mwenyewe na reply JOIN.",
       official
-        ? "Kwa role yako ya official/admin, unaweza pia kutumia dashboard ya Members, kisha approve kwa WhatsApp: APPROVE MEMBER <membership no/phone>."
+        ? "Kwa role yako ya admin/official, unaweza pia kuongeza member hapa: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune."
         : "Kama official anaongeza members, atumie dashboard ya Members ili phone, approval, na audit trail vihifadhiwe vizuri.",
     ].join("\n");
   }
@@ -7727,7 +8171,7 @@ function registeredMemberRegistrationGuidanceReply(profile: Profile, language: "
     `You are already registered, ${memberGreetingName(profile)}.`,
     "To register another person, they should message this WhatsApp number from their own phone and reply JOIN.",
     official
-      ? "With your official/admin role, you can also use the Members dashboard, then approve through WhatsApp: APPROVE MEMBER <membership no/phone>."
+      ? "With your admin/official role, you can also add the member here: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune."
       : "If an official is adding members, use the Members dashboard so phone ownership, approval, and the audit trail are captured correctly.",
   ].join("\n");
 }
@@ -8005,6 +8449,7 @@ function adminCapabilityReply(roles: string[], language: "auto" | "en" | "sw"): 
       "3. VERIFY QJD123ABC",
       "4. APPROVE MEMBER TS-00034",
       "5. ADD FINE 100 TO TS-00034 FOR missed meeting",
+      "6. ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune",
       "Reply OFFICIAL TOOLS au MENU kisha 12 kuona official menu.",
     ].join("\n");
   }
@@ -8017,6 +8462,7 @@ function adminCapabilityReply(roles: string[], language: "auto" | "en" | "sw"): 
     "3. VERIFY QJD123ABC",
     "4. APPROVE MEMBER TS-00034",
     "5. ADD FINE 100 TO TS-00034 FOR missed meeting",
+    "6. ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune",
     "Reply OFFICIAL TOOLS or MENU then 12 to open the official menu.",
   ].join("\n");
 }
@@ -8434,6 +8880,7 @@ function liveCommandGuide(roles: string[]): string {
       "Official/admin: RECORD EXPENSE 1200 fare ref BUS12.",
       "Official/admin: ADD WELFARE CASE medical for Mary target 20000.",
       "Official/admin: ADD FINE 100 TO TS-00034 FOR missed meeting.",
+      "Admin: ADD MEMBER name: Mary Wanjiku, phone: 0712345678, ID: 12345678, location: Gatune.",
       "Official/admin: APPROVALS shows pending approval queues.",
     );
   }
@@ -9247,7 +9694,7 @@ async function approveMemberFromWhatsApp(
   }
 
   const targetMember = intent.target_member || extractTargetMemberForAdminCommand(inboundText);
-  if (!targetMember) {
+  if (!targetMember || isGenericTargetMember(targetMember)) {
     return {
       actionStatus: "needs_clarification",
       reply: await pendingMemberApprovalsReply(supabase, language),
@@ -9342,7 +9789,7 @@ async function approveMemberFromWhatsApp(
 }
 
 function isGenericTargetMember(value: string | null | undefined): boolean {
-  return !value || /^(?:member|members|mwanachama|wanachama|someone|person|people|user|account|a member|the member|add|record|create|to|for|a|the)$/i.test(value.trim());
+  return !value || /^(?:member|members|meber|mebers|memebr|memebrs|memeber|memebers|mwanachama|wanachama|someone|person|people|user|account|a member|the member|add|record|create|to|for|a|the)$/i.test(value.trim());
 }
 
 async function recordDisciplineFromWhatsApp(
@@ -9766,6 +10213,71 @@ async function executeIntent(
 
   if (intent.intent === "verify_contribution") {
     return await verifyManualContribution(supabase, intent, profile, roles, inboundText, language);
+  }
+
+  if (intent.intent === "create_member") {
+    if (!canCreateMember(roles)) {
+      return {
+        actionStatus: "blocked",
+        reply: language === "sw"
+          ? "Ni admin pekee anaweza kuongeza member mpya kupitia WhatsApp."
+          : "Only an admin can add a new member through WhatsApp.",
+        result: { roles },
+        nextState: {},
+      };
+    }
+
+    const details = adminMemberDetailsFromIntent(intent, inboundText);
+    const missing = adminMemberMissing(details);
+    if (missing.length > 0) {
+      return {
+        actionStatus: "needs_clarification",
+        reply: adminMemberDetailsPrompt(language, details, missing),
+        result: { missing, captured: profileUpdateKeys(details), phone: details.phone || null },
+        nextState: {
+          pending_intent: {
+            ...intent,
+            intent: "create_member",
+            target_member: details.phone || intent.target_member || null,
+            profile_updates: extractAdminMemberProfileUpdates(inboundText, (intent.profile_updates || {}) as ProfileUpdates),
+          },
+          asked_for: missing,
+          updated_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    try {
+      const member = await createMemberFromWhatsappAdmin(supabase, profile, roles, details, inboundText);
+      return {
+        actionStatus: "completed",
+        reply: adminMemberCreatedReply(language, member, details),
+        result: { member_id: member.id, membership_number: member.membership_number, phone: member.phone },
+        nextState: {},
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status = error instanceof HttpError && error.status < 500 ? "blocked" : "failed";
+      return {
+        actionStatus: status,
+        reply: language === "sw"
+          ? `Sijaweza kuongeza member huyo: ${message}`
+          : `I could not add that member: ${message}`,
+        result: { error: message },
+        nextState: status === "blocked"
+          ? {}
+          : {
+            pending_intent: {
+              ...intent,
+              intent: "create_member",
+              target_member: details.phone || intent.target_member || null,
+              profile_updates: details,
+            },
+            asked_for: ["full_name", "phone", "id_number", "location"],
+            updated_at: new Date().toISOString(),
+          },
+      };
+    }
   }
 
   if (intent.intent === "approve_member") {
@@ -10617,10 +11129,39 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     return;
   }
 
+  if (isAdminCreateMemberRequestText(message.text)) {
+    const roles = normalizeBotRoles(await getUserRoles(supabase, profile.id));
+    const session = await upsertSession(supabase, message.phone, profile);
+    const parsed: ParsedIntent = {
+      ...fallbackInterpretMessage(message.text),
+      intent: "create_member",
+      confidence: 0.95,
+      target_member: extractAdminMemberPhone(message.text),
+      profile_updates: extractAdminMemberProfileUpdates(message.text),
+      description: message.text,
+    };
+    const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, parsed);
+    const rawExecution = await executeIntent(supabase, parsed, profile, roles, { contributions: [], wallet: null }, message.text);
+    const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, initialLanguage);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+    await completeAction(supabase, actionId, execution, outboundMessageId);
+    await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
+    await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
+    return;
+  }
+
   if (isRegisteredMemberJoinText(message.text) || isRegisterOtherMemberRequestText(message.text)) {
     const registrationRoles = normalizeBotRoles(await getUserRoles(supabase, profile.id));
     await upsertSession(supabase, message.phone, profile);
     await sendAndLogReply(supabase, message, profile, registeredMemberRegistrationGuidanceReply(profile, initialLanguage, registrationRoles));
+    return;
+  }
+
+  if (isFrustrationOnlyText(message.text)) {
+    const roles = normalizeBotRoles(await getUserRoles(supabase, profile.id));
+    await upsertSession(supabase, message.phone, profile);
+    await updateSessionState(supabase, message.phone, {}, "conversation_reset");
+    await sendAndLogReply(supabase, message, profile, frustrationResetReply(profile, roles, initialLanguage), false);
     return;
   }
 
