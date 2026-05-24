@@ -292,6 +292,14 @@ type ParsedIntent = {
   raw?: Record<string, unknown>;
 };
 
+type AnnouncementPriority = "low" | "normal" | "high" | "urgent";
+
+type AnnouncementDraft = {
+  title: string;
+  content: string;
+  priority: AnnouncementPriority;
+};
+
 type ExecutionResult = {
   actionStatus: "completed" | "needs_clarification" | "failed" | "blocked";
   reply: string;
@@ -1816,11 +1824,16 @@ function isRegisteredMemberJoinText(text: string): boolean {
 }
 
 const MEMBER_WORD_PATTERN = "(?:member|members|meber|mebers|memebr|memebrs|memeber|memebers|membr|mbr|mwanachama|wanachama)";
+const ANNOUNCEMENT_WORD_PATTERN = "(?:announce|announcement|announcements|annoucement|annoucements|anoucement|anoucements|anouncement|anouncements|announcment|announcments|notice|notices|update|updates|news|tangazo|matangazo|broadcast|alert|notify)";
+
+function hasAnnouncementWord(text: string): boolean {
+  return new RegExp(`\\b${ANNOUNCEMENT_WORD_PATTERN}\\b`, "i").test(text);
+}
 
 function isAdminCreateMemberRequestText(text: string): boolean {
   const normalized = text.trim();
   if (!normalized) return false;
-  if (/\b(?:announcement|announcements|announce|notice|tangazo|matangazo|fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure|approval|approvals|approve|activate|accept|pending)\b/i.test(normalized)) {
+  if (hasAnnouncementWord(normalized) || /\b(?:fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure|approval|approvals|approve|activate|accept|pending)\b/i.test(normalized)) {
     return false;
   }
 
@@ -1834,7 +1847,7 @@ function isAdminCreateMemberRequestText(text: string): boolean {
 
 function isRegisterOtherMemberRequestText(text: string): boolean {
   const normalized = text.trim();
-  if (/\b(?:announcement|announcements|announce|notice|tangazo|matangazo|fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure)\b/i.test(normalized)) {
+  if (hasAnnouncementWord(normalized) || /\b(?:fine|fines|faini|penalty|discipline|contribution|payment|kitty|welfare|expense|expenditure)\b/i.test(normalized)) {
     return false;
   }
 
@@ -2185,20 +2198,21 @@ function extractReference(text: string): string | null {
 function isAnnouncementCreationRequest(text: string): boolean {
   const normalized = text.trim();
   if (!normalized) return false;
+  const announcementWord = new RegExp(`\\b${ANNOUNCEMENT_WORD_PATTERN}\\b`, "i");
 
-  return /^(dry\s*run\s+)?(announce|announcement|notice|tangazo|matangazo|alert|notify|broadcast|send\s+notice|tuma\s+tangazo|tuma\s+notice|notify\s+watu|alert\s+members|weka\s+announcement)\s*[:;-]/i.test(normalized) ||
+  return new RegExp(`^(?:dry\\s*run\\s+)?(?:${ANNOUNCEMENT_WORD_PATTERN}|send\\s+notice|tuma\\s+tangazo|tuma\\s+notice|notify\\s+watu|alert\\s+members|weka\\s+${ANNOUNCEMENT_WORD_PATTERN})\\s*[:;-]`, "i").test(normalized) ||
     (
-      /\b(dry\s*run|preview|test|create|add|post|publish|send|share|write|weka|tuma|tangaza|ongeza|alert|notify|broadcast|julisha|arifu|waarifu|taarifu)\b/i.test(normalized) &&
-      /\b(announcement|announcements|notice|update|news|tangazo|matangazo|members|watu|wanachama|everyone|officials)\b/i.test(normalized)
+      /\b(dry\s*run|preview|test|create|add|post|publish|send|share|write|draft|prepare|polish|weka|tuma|tangaza|ongeza|alert|notify|broadcast|julisha|arifu|waarifu|taarifu)\b/i.test(normalized) &&
+      (announcementWord.test(normalized) || /\b(members|watu|wanachama|everyone|officials)\b/i.test(normalized))
     );
 }
 
 function isAnnouncementDryRunRequest(text: string): boolean {
-  return /\b(?:dry\s*run|preview|test)\b[\s\S]{0,80}\b(?:announcement|notice|tangazo|matangazo|alert|notify|broadcast)\b/i.test(text) ||
-    /\b(?:announcement|notice|tangazo|matangazo|alert|notify|broadcast)\b[\s\S]{0,80}\b(?:dry\s*run|preview|test)\b/i.test(text);
+  const announcementWord = new RegExp(`\\b${ANNOUNCEMENT_WORD_PATTERN}\\b`, "i");
+  return /\b(?:dry\s*run|simulate)\b/i.test(text) && announcementWord.test(text);
 }
 
-function normalizeAnnouncementPriority(value: unknown, text = ""): "low" | "normal" | "high" | "urgent" {
+function normalizeAnnouncementPriority(value: unknown, text = ""): AnnouncementPriority {
   const raw = `${cleanString(value) || ""} ${text}`.toLowerCase();
   if (/\b(urgent|emergency|important sana|haraka|dharura)\b/i.test(raw)) return "urgent";
   if (/\b(high|important|priority|muhimu)\b/i.test(raw)) return "high";
@@ -2208,7 +2222,7 @@ function normalizeAnnouncementPriority(value: unknown, text = ""): "low" | "norm
 
 function stripAnnouncementCommand(text: string): string {
   return plainWhatsAppText(text)
-    .replace(/^\s*(?:please\s+)?(?:dry\s*run|preview|test)?\s*(?:create|add|post|publish|send|share|write|weka|tuma|tangaza|ongeza|alert|notify|broadcast|julisha|arifu|waarifu|taarifu)?\s*(?:an?\s+)?(?:announcement|announcements|notice|update|news|tangazo|matangazo|members|watu|wanachama|officials)?\s*[:;-]?\s*/i, "")
+    .replace(new RegExp(`^\\s*(?:please\\s+)?(?:dry\\s*run|preview|test)?\\s*(?:create|add|post|publish|send|share|write|draft|prepare|polish|weka|tuma|tangaza|ongeza|alert|notify|broadcast|julisha|arifu|waarifu|taarifu)?\\s*(?:an?\\s+)?(?:${ANNOUNCEMENT_WORD_PATTERN}|members|watu|wanachama|officials)?\\s*[:;-]?\\s*`, "i"), "")
     .replace(/\b(?:priority|kipaumbele)\s*[:=-]?\s*(?:urgent|high|normal|low|dharura|muhimu)\b/gi, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -2217,7 +2231,7 @@ function stripAnnouncementCommand(text: string): string {
 function extractAnnouncementDraft(
   text: string,
   explicit: Partial<Pick<ParsedIntent, "title" | "description" | "category">> = {},
-): { title: string | null; content: string | null; priority: "low" | "normal" | "high" | "urgent" } {
+): { title: string | null; content: string | null; priority: AnnouncementPriority } {
   const priority = normalizeAnnouncementPriority(explicit.category, text);
   const explicitTitle = cleanString(explicit.title);
   const explicitContent = cleanString(explicit.description);
@@ -2233,6 +2247,15 @@ function extractAnnouncementDraft(
   const cleaned = explicitContent || stripAnnouncementCommand(text);
   if (!cleaned) {
     return { title: explicitTitle ? shorten(explicitTitle, 90) : null, content: null, priority };
+  }
+
+  const contentSplit = cleaned.match(/^[:\s]*(.{3,100}?)\s+(?:content|message|body)\s*[:=-]\s*(.{8,1200})$/i);
+  if (contentSplit) {
+    return {
+      title: shorten(explicitTitle || contentSplit[1].trim(), 90),
+      content: clampPlainWhatsAppText(contentSplit[2].trim(), 1200),
+      priority,
+    };
   }
 
   const split = cleaned.match(/^(.{4,90}?)(?:\s+[-|]\s+|\s*::\s*)(.{8,1200})$/);
@@ -2264,9 +2287,217 @@ function extractAnnouncementDraft(
 function isVagueAnnouncementRequest(text: string): boolean {
   const normalized = text.trim();
   if (/\btitle\s*[:=-].+\b(?:content|message|body)\s*[:=-]/i.test(normalized)) return false;
-  if (/^(?:announce|announcement|notice|tangazo|matangazo)\s*[:;-]\s*.{8,}/i.test(normalized)) return false;
-  return /\b(?:help|assist|guide|how|let us|can we|nataka|naomba)\b[\s\S]{0,120}\b(?:announcement|announcements|notice|tangazo|matangazo)\b/i.test(normalized) ||
-    /\b(?:announcement|announcements|notice|tangazo|matangazo)\b[\s\S]{0,120}\b(?:help|assist|guide|how|kindly)\b/i.test(normalized);
+  if (new RegExp(`^(?:${ANNOUNCEMENT_WORD_PATTERN})\\s*[:;-]\\s*.{8,}`, "i").test(normalized)) return false;
+  const announcementWord = new RegExp(`\\b${ANNOUNCEMENT_WORD_PATTERN}\\b`, "i");
+  return announcementWord.test(normalized) && (
+    /\b(?:help|assist|guide|how|let us|can we|nataka|naomba|kindly)\b/i.test(normalized) ||
+    /\b(?:add|create|post|publish|send|share|write|weka|tuma)\b/i.test(normalized)
+  );
+}
+
+function isAnnouncementDeliveryQuestion(text: string): boolean {
+  const normalized = text.trim();
+  if (!hasAnnouncementWord(normalized)) return false;
+  return /\b(?:whatsapp|whatapp|watsapp|alert|alerts|notify|notification|sent|send|receive|received|deliver|delivery|queue|queued|active\s+members?|members?|wanachama)\b/i.test(normalized) &&
+    /\b(?:why|mbona|kwa nini|not|never|no|didn'?t|wasn'?t|failed|status|sent|receive|received|deliver|delivery|queue|queued)\b/i.test(normalized);
+}
+
+function isAnnouncementDraftCancel(text: string): boolean {
+  return /^(?:cancel|stop|discard|ignore|clear|forget|acha|sitaki)(?:\s+(?:draft|announcement|tangazo))?$/i.test(text.trim());
+}
+
+function isAnnouncementPublishConfirmation(text: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/[.!]+$/g, "");
+  if (!normalized) return false;
+  if (/\b(?:title|content|message|body)\s*[:=-]/i.test(normalized)) return false;
+  return /^(?:yes|y|yeah|yep|ok|okay|correct|approved?|confirm|publish|send|send it|post|share|go ahead|publish it|send now|tuma|tuma sasa|ndio|ndiyo|sawa)$/i.test(normalized);
+}
+
+function isAnnouncementRewriteRequest(text: string): boolean {
+  return /^(?:polish|improve|rewrite|redraft|fix|correct|shorten|make it shorter|make it better|make it professional|make it clearer|translate|weka vizuri|rekebisha)(?:\s+(?:it|draft|announcement|tangazo))?/i.test(text.trim());
+}
+
+function draftFromParsedIntentLike(value: Partial<ParsedIntent> | null | undefined): AnnouncementDraft | null {
+  const title = cleanString(value?.title);
+  const content = cleanString(value?.description);
+  if (!title || !content) return null;
+  return {
+    title: shorten(title, 90),
+    content: clampPlainWhatsAppText(content, 1200),
+    priority: normalizeAnnouncementPriority(value?.category),
+  };
+}
+
+function pendingAnnouncementDraft(intent: ParsedIntent): AnnouncementDraft | null {
+  const pending = intent.raw?.pending as Partial<ParsedIntent> | undefined;
+  return draftFromParsedIntentLike(pending) || draftFromParsedIntentLike(intent);
+}
+
+function isGenericAnnouncementDraftText(value: string): boolean {
+  return /^(?:(?:to|for)\s+)?(?:our\s+)?(?:members|member|watu|wanachama|everyone|all|all members|officials)$/i.test(value.trim());
+}
+
+function correctAnnouncementTypos(value: string): string {
+  return value
+    .replace(/\bturuturu stars\b/gi, "Turuturu Stars")
+    .replace(/\bannoucements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\banoucements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\banouncements?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "announcements" : "announcement")
+    .replace(/\bpurporse\b/gi, "purpose")
+    .replace(/\bmeme?brs?\b/gi, (match) => match.toLowerCase().endsWith("s") ? "members" : "member")
+    .replace(/\bwhatapp\b/gi, "WhatsApp")
+    .replace(/\bwatsapp\b/gi, "WhatsApp")
+    .replace(/\brecieve\b/gi, "receive")
+    .replace(/\bits\b/gi, "it's")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function localPolishAnnouncementDraft(draft: AnnouncementDraft, sourceText = ""): AnnouncementDraft {
+  let title = correctAnnouncementTypos(draft.title);
+  let content = correctAnnouncementTypos(draft.content);
+  const raw = `${sourceText} ${title} ${content}`.toLowerCase();
+
+  if (content.length <= 40 && /\b(test|testing|system test|trial)\b/i.test(raw)) {
+    title = "Turuturu Stars System Test";
+    content = "We are testing the Turuturu Stars WhatsApp announcement system. If you receive this message, please ignore it; no action is required.";
+  }
+
+  if (!/[.!?]$/.test(content)) content = `${content}.`;
+  if (title.length < 4) title = shorten(content.replace(/[.!?].*$/, ""), 70) || "Announcement";
+  if (/\b(shorten|shorter|brief|fupi)\b/i.test(sourceText) && content.length > 260) {
+    const firstSentence = content.match(/^(.{80,240}?[.!?])\s+/);
+    content = firstSentence?.[1] || `${content.slice(0, 230).trimEnd()}...`;
+  }
+
+  return {
+    title: shorten(title, 90),
+    content: clampPlainWhatsAppText(content, 1200),
+    priority: draft.priority,
+  };
+}
+
+async function polishAnnouncementDraft(
+  draft: AnnouncementDraft,
+  sourceText: string,
+  language: "auto" | "en" | "sw",
+): Promise<AnnouncementDraft> {
+  const fallback = localPolishAnnouncementDraft(draft, sourceText);
+  const aiReply = await runAiChat({
+    purpose: "knowledge",
+    temperature: 0.2,
+    timeoutMs: 5000,
+    maxTokens: 500,
+    jsonSchema: {
+      name: "announcement_draft",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          content: { type: "string" },
+          priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+        },
+        required: ["title", "content", "priority"],
+      },
+    },
+    messages: [
+      {
+        role: "system",
+        content: [
+          "You polish WhatsApp announcements for Turuturu Stars, a Kenyan community organization.",
+          "Correct spelling and grammar, make the message clear and respectful, but do not invent dates, venues, amounts, names, or decisions not provided.",
+          "Keep the message concise enough for WhatsApp. Return only JSON.",
+        ].join(" "),
+      },
+      {
+        role: "user",
+        content: JSON.stringify({
+          language,
+          sourceText,
+          draft: fallback,
+        }),
+      },
+    ],
+  });
+
+  if (!aiReply) return fallback;
+  const parsed = parseAiJsonObject(aiReply.content);
+  const title = shorten(cleanString(parsed?.title) || fallback.title, 90);
+  const content = clampPlainWhatsAppText(cleanString(parsed?.content) || fallback.content, 1200);
+  const priority = normalizeAnnouncementPriority(parsed?.priority || fallback.priority);
+  return localPolishAnnouncementDraft({ title, content, priority }, sourceText);
+}
+
+function applyAnnouncementDraftEdit(base: AnnouncementDraft, text: string): AnnouncementDraft | null {
+  const trimmed = plainWhatsAppText(text).trim();
+  const titleMatch = trimmed.match(/^(?:edit|change|set|update|use)?\s*(?:the\s+)?title\s*[:=-]\s*(.{3,100})$/i);
+  const contentMatch = trimmed.match(/^(?:edit|change|set|update|use)?\s*(?:the\s+)?(?:content|message|body)\s*[:=-]\s*(.{5,1200})$/i);
+  const priorityMatch = trimmed.match(/^(?:edit|change|set|update|use)?\s*(?:the\s+)?priority\s*[:=-]?\s*(urgent|high|normal|low|dharura|muhimu)$/i);
+
+  if (titleMatch) {
+    return { ...base, title: shorten(titleMatch[1].trim(), 90) };
+  }
+  if (contentMatch) {
+    return { ...base, content: clampPlainWhatsAppText(contentMatch[1].trim(), 1200) };
+  }
+  if (priorityMatch) {
+    return { ...base, priority: normalizeAnnouncementPriority(priorityMatch[1]) };
+  }
+
+  return null;
+}
+
+function announcementDraftPreviewReply(draft: AnnouncementDraft, audienceCount: number, language: "auto" | "en" | "sw"): string {
+  const lines = language === "sw"
+    ? [
+      "Nimeandaa draft ya tangazo. Hakuna kilichotumwa bado.",
+      "",
+      `Title: ${draft.title}`,
+      `Priority: ${draft.priority}`,
+      `Audience: ${audienceCount} active members wenye WhatsApp/phone valid`,
+      "",
+      "Message:",
+      draft.content,
+      "",
+      "Reply SEND au YES ku-publish.",
+      "Reply EDIT TITLE: ... au EDIT CONTENT: ... kubadilisha.",
+      "Reply PRIORITY urgent/high/normal/low kubadilisha priority.",
+      "Reply CANCEL kufuta draft.",
+    ]
+    : [
+      "I prepared this announcement draft. Nothing has been sent yet.",
+      "",
+      `Title: ${draft.title}`,
+      `Priority: ${draft.priority}`,
+      `Audience: ${audienceCount} active members with valid WhatsApp/phone numbers`,
+      "",
+      "Message:",
+      draft.content,
+      "",
+      "Reply SEND or YES to publish.",
+      "Reply EDIT TITLE: ... or EDIT CONTENT: ... to change it.",
+      "Reply PRIORITY urgent/high/normal/low to change priority.",
+      "Reply CANCEL to discard the draft.",
+    ];
+  return lines.join("\n");
+}
+
+function announcementDraftState(draft: AnnouncementDraft, language: "auto" | "en" | "sw"): SessionState {
+  return {
+    pending_intent: {
+      intent: "create_announcement",
+      confidence: 0.92,
+      language,
+      title: draft.title,
+      description: draft.content,
+      category: draft.priority,
+      raw: { draft_ready: true },
+    },
+    asked_for: ["confirm_or_edit_announcement"],
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function isContributionVerificationRequest(text: string): boolean {
@@ -3095,6 +3326,16 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
     };
   }
 
+  if (isAnnouncementDeliveryQuestion(text)) {
+    return {
+      ...base,
+      intent: "query_announcements",
+      confidence: 0.9,
+      category: "delivery_status",
+      description: text,
+    };
+  }
+
   if (/(notification|notifications|alerts?|unread|ujumbe mpya|taarifa mpya|notisi)/i.test(lower)) {
     return { ...base, intent: "query_notifications", confidence: 0.78 };
   }
@@ -3222,7 +3463,7 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
     return { ...base, intent: "query_wallet", confidence: 0.86 };
   }
 
-  if (/(announcement|notice|update|habari|tangazo|matangazo)/i.test(lower)) {
+  if (hasAnnouncementWord(lower) || /\bhabari\b/i.test(lower)) {
     return { ...base, intent: "query_announcements", confidence: 0.78 };
   }
 
@@ -3278,7 +3519,7 @@ async function aiInterpretMessage(
             "Use record_discipline when an admin/organizing secretary asks to add or record a fine, penalty, discipline case, faini, adhabu, or nidhamu for a member. Put the member name/phone/membership number in target_member, fine amount in amount, and reason in description.",
             "Use create_member when an admin asks to add, create, register, onboard, or make another person a member from WhatsApp. Do not use update_profile for another person's details. Put the new member phone in target_member and name, ID, email, location, occupation, education, interests, or notes in profile_updates.",
             "Use create_welfare_case when an official/admin asks to add, open, or create a welfare case. Put the case title in title, case type in case_type, target amount in amount, and beneficiary/member name or phone in target_member when available.",
-            "Use create_announcement when an official/admin asks to publish, post, send, alert members, notify watu, send notice, weka announcement, tuma tangazo, or add an announcement/notice. Put the announcement title in title, body in description, and priority in category when available.",
+            "Use create_announcement when an official/admin asks to draft, prepare, polish, publish, post, send, alert members, notify watu, send notice, weka announcement, tuma tangazo, or add an announcement/notice, including typo-heavy words like annoucement or anoucement. Put the announcement title in title, body in description, and priority in category when available.",
             "Use verify_contribution when a treasurer/admin asks to verify, approve, confirm, or mark a manual contribution/payment as paid. Put the M-Pesa receipt/reference in reference_number and member name/phone/membership number in target_member when available.",
             "Use approve_member when an admin asks to approve, activate, or accept a pending member registration. Put the member name, phone, or membership number in target_member.",
             "Use update_profile when a member wants to add, correct, or complete profile details. Put only safe editable fields inside profile_updates: full_name, id_number, email, location, occupation, employment_status, education_level, interests, additional_notes.",
@@ -3336,6 +3577,7 @@ async function interpretMessage(
       deterministic.intent === "create_announcement" ||
       deterministic.intent === "create_member" ||
       deterministic.intent === "record_discipline" ||
+      (deterministic.intent === "query_announcements" && isAnnouncementDeliveryQuestion(text)) ||
       (deterministic.intent === "query_membership" && isMemberBenefitsQuestion(text))
     )
   ) {
@@ -3368,6 +3610,35 @@ function mergeWithPendingIntent(intent: ParsedIntent, session: WhatsappSession |
     pending.intent === "create_member" &&
     (intent.intent === "unknown" || intent.intent === "update_profile");
   if (intent.intent !== "unknown" && intent.intent !== pending.intent && !canMergeDifferentIntent) return intent;
+
+  if (pending.intent === "create_announcement") {
+    const latestIsAnnouncement = intent.intent === "create_announcement";
+    return {
+      ...pending,
+      amount: intent.amount ?? pending.amount ?? null,
+      reference_number: intent.reference_number ?? pending.reference_number ?? null,
+      description: latestIsAnnouncement && intent.description ? intent.description : pending.description ?? intent.description ?? null,
+      category: latestIsAnnouncement && intent.category ? intent.category : pending.category ?? intent.category ?? null,
+      payee: intent.payee ?? pending.payee ?? null,
+      payment_method: intent.payment_method ?? pending.payment_method ?? null,
+      transaction_date: intent.transaction_date ?? pending.transaction_date ?? null,
+      contribution_type: intent.contribution_type ?? pending.contribution_type ?? null,
+      case_type: intent.case_type ?? pending.case_type ?? null,
+      title: latestIsAnnouncement && intent.title ? intent.title : pending.title ?? intent.title ?? null,
+      target_member: intent.target_member ?? pending.target_member ?? null,
+      profile_updates: {
+        ...((pending.profile_updates || {}) as ProfileUpdates),
+        ...((intent.profile_updates || {}) as ProfileUpdates),
+      },
+      intent: "create_announcement",
+      confidence: Math.max(intent.confidence, Number(pending.confidence || 0.5)),
+      language: intent.language === "auto" ? ((pending.language as "auto" | "en" | "sw" | undefined) || "auto") : intent.language,
+      raw: {
+        pending,
+        latest: intent,
+      },
+    };
+  }
 
   return {
     ...pending,
@@ -5443,6 +5714,9 @@ function conversationContextLabel(state: SessionState | null | undefined, langua
   }
   if (pendingIntent === "create_member") {
     return sw ? "tulikuwa tunaongeza member mpya" : "we were adding a new member";
+  }
+  if (pendingIntent === "create_announcement") {
+    return sw ? "tulikuwa tunaandaa announcement draft" : "we were preparing an announcement draft";
   }
   if (pendingIntent === "update_profile") {
     return sw ? "tulikuwa tunasasisha profile yako" : "we were updating your profile";
@@ -7649,8 +7923,8 @@ async function handleNumberedMenu(
           actionStatus: canCreateAnnouncement(roles) ? "needs_clarification" : "blocked",
           reply: canCreateAnnouncement(roles)
             ? (language === "sw"
-              ? "Tuma tangazo kwa format hii: ANNOUNCE title: Mkutano content: Kutakuwa na mkutano Jumamosi saa 10."
-              : "Send the announcement like this: ANNOUNCE title: Meeting content: There will be a meeting on Saturday at 10.")
+              ? "Tuma title/topic ya tangazo au draft message. Nitaitengeneza vizuri, nikuonyeshe preview, kisha utasema SEND ku-publish."
+              : "Send the announcement title/topic or draft message. I will polish it, show you a preview, then you can reply SEND to publish.")
             : (language === "sw" ? "Role yako haina ruhusa ya kupublish announcements." : "Your role cannot publish announcements."),
           result: { menu: "create_announcement" },
           nextState: canCreateAnnouncement(roles)
@@ -9407,6 +9681,198 @@ async function announcementAudienceCount(supabase: SupabaseClient): Promise<numb
   return count || 0;
 }
 
+type AnnouncementQueueStatus = {
+  total: number;
+  pending: number;
+  processing: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  sampleError: string | null;
+};
+
+function emptyAnnouncementQueueStatus(): AnnouncementQueueStatus {
+  return { total: 0, pending: 0, processing: 0, sent: 0, failed: 0, skipped: 0, sampleError: null };
+}
+
+async function whatsappQueueStatusForAnnouncement(
+  supabase: SupabaseClient,
+  announcementId: string,
+): Promise<AnnouncementQueueStatus> {
+  const { data, error } = await supabase
+    .from("whatsapp_notifications_queue")
+    .select("status, last_error")
+    .eq("event_type", "announcement")
+    .eq("event_id", announcementId)
+    .limit(10000);
+
+  if (error) throw new HttpError(500, "Failed to load announcement WhatsApp queue status", error);
+
+  const status = emptyAnnouncementQueueStatus();
+  for (const row of (data || []) as Array<Record<string, unknown>>) {
+    const value = String(row.status || "pending");
+    status.total += 1;
+    if (value === "pending") status.pending += 1;
+    else if (value === "processing") status.processing += 1;
+    else if (value === "sent") status.sent += 1;
+    else if (value === "failed") status.failed += 1;
+    else if (value === "skipped") status.skipped += 1;
+    if (!status.sampleError && row.last_error) status.sampleError = String(row.last_error);
+  }
+  return status;
+}
+
+async function ensureAnnouncementAlertsQueued(
+  supabase: SupabaseClient,
+  announcementId: string,
+  title: string,
+  content: string,
+  priority: string,
+): Promise<{ rpcQueued: number; status: AnnouncementQueueStatus }> {
+  const { data, error } = await supabase.rpc("enqueue_announcement_member_alerts", {
+    p_announcement_id: announcementId,
+    p_title: title,
+    p_message: content,
+    p_priority: priority,
+  });
+
+  if (error) {
+    console.warn("Failed to explicitly enqueue announcement WhatsApp alerts", {
+      announcementId,
+      error: error.message,
+    });
+  }
+
+  return {
+    rpcQueued: Number(data || 0),
+    status: await whatsappQueueStatusForAnnouncement(supabase, announcementId),
+  };
+}
+
+async function runWhatsAppAnnouncementWorkerNow(limit = 100): Promise<{ attempted: boolean; ok: boolean; result?: unknown; error?: string }> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.replace(/\/$/, "");
+  const secret = (
+    Deno.env.get("WHATSAPP_NOTIFICATIONS_JOB_SECRET") ||
+    Deno.env.get("WHATSAPP_NOTIFICATION_SECRET") ||
+    ""
+  ).trim();
+
+  if (!supabaseUrl || !secret) {
+    return {
+      attempted: false,
+      ok: false,
+      error: "WhatsApp worker secret is not configured for immediate processing.",
+    };
+  }
+
+  try {
+    const response = await fetchWithRetry(`${supabaseUrl}/functions/v1/whatsapp-notification-worker`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-whatsapp-job-secret": secret,
+      },
+      body: JSON.stringify({
+        limit,
+        include_abandonment: false,
+        include_event_types: ["announcement"],
+      }),
+    }, 2, 300);
+    const payload = await safeJson(response);
+    if (!response.ok) {
+      return {
+        attempted: true,
+        ok: false,
+        error: cleanString((payload as Record<string, unknown>)?.error) || `Worker returned ${response.status}`,
+        result: payload,
+      };
+    }
+    return { attempted: true, ok: true, result: payload };
+  } catch (error) {
+    return {
+      attempted: true,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+function formatAnnouncementQueueStatus(status: AnnouncementQueueStatus): string {
+  return `${status.total} queued: ${status.sent} sent, ${status.pending} pending, ${status.processing} processing, ${status.failed} failed, ${status.skipped} skipped`;
+}
+
+async function latestAnnouncementDeliveryReply(
+  supabase: SupabaseClient,
+  language: "auto" | "en" | "sw",
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("announcements")
+    .select("id, title, content, priority, published_at, created_at")
+    .eq("published", true)
+    .order("published_at", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new HttpError(500, "Failed to load latest announcement delivery status", error);
+  if (!data) {
+    return language === "sw"
+      ? "Sijaona announcement iliyopublished bado."
+      : "I do not see a published announcement yet.";
+  }
+
+  const announcement = data as Record<string, unknown>;
+  const announcementId = String(announcement.id);
+  const title = String(announcement.title || "Announcement");
+  const content = String(announcement.content || title);
+  const priority = String(announcement.priority || "normal");
+  const activeMembers = await announcementAudienceCount(supabase);
+  const before = await ensureAnnouncementAlertsQueued(supabase, announcementId, title, content, priority);
+  const worker = before.status.pending > 0 || before.status.processing > 0
+    ? await runWhatsAppAnnouncementWorkerNow(Math.max(50, Math.min(500, before.status.pending + before.status.processing + 20)))
+    : { attempted: false, ok: false };
+  const after = worker.attempted ? await whatsappQueueStatusForAnnouncement(supabase, announcementId) : before.status;
+
+  const lines = language === "sw"
+    ? [
+      `Delivery ya announcement "${title}":`,
+      `Active members: ${activeMembers}.`,
+      `WhatsApp queue: ${formatAnnouncementQueueStatus(after)}.`,
+    ]
+    : [
+      `Announcement delivery for "${title}":`,
+      `Active members: ${activeMembers}.`,
+      `WhatsApp queue: ${formatAnnouncementQueueStatus(after)}.`,
+    ];
+
+  if (before.status.total === 0 && after.total > 0) {
+    lines.push(language === "sw"
+      ? "Queue ilikuwa missing, nimeibackfill sasa."
+      : "The queue was missing, so I backfilled it now.");
+  }
+  if (worker.attempted) {
+    lines.push(worker.ok
+      ? (language === "sw" ? "Nime-trigger WhatsApp worker sasa." : "I triggered the WhatsApp worker now.")
+      : (language === "sw" ? `Worker haikuweza ku-run sasa: ${worker.error || "unknown error"}.` : `The worker could not run immediately: ${worker.error || "unknown error"}.`));
+  } else if (after.pending > 0) {
+    lines.push(language === "sw"
+      ? "Pending rows zinahitaji whatsapp-notification-worker i-run kila dakika 1-5."
+      : "Pending rows need whatsapp-notification-worker to run every 1-5 minutes.");
+  }
+  if (after.failed > 0 || after.skipped > 0) {
+    lines.push(language === "sw"
+      ? `Failed/skipped rows ziko kwa WhatsApp automation dashboard.${after.sampleError ? ` Sample error: ${after.sampleError}` : ""}`
+      : `Failed/skipped rows are visible in the WhatsApp automation dashboard.${after.sampleError ? ` Sample error: ${after.sampleError}` : ""}`);
+  }
+  if (after.sent < activeMembers && after.pending === 0 && after.processing === 0 && after.failed === 0 && after.skipped === 0) {
+    lines.push(language === "sw"
+      ? "Kama count iko chini kuliko active members, angalia members wenye phone number invalid/missing."
+      : "If this count is lower than active members, check for members with missing or invalid phone numbers.");
+  }
+
+  return lines.join("\n");
+}
+
 async function createAnnouncementFromWhatsApp(
   supabase: SupabaseClient,
   intent: ParsedIntent,
@@ -9426,26 +9892,60 @@ async function createAnnouncementFromWhatsApp(
     };
   }
 
-  const draft = extractAnnouncementDraft(inboundText, intent);
+  const existingDraft = pendingAnnouncementDraft(intent);
+
+  if (existingDraft && isAnnouncementDraftCancel(inboundText)) {
+    return {
+      actionStatus: "completed",
+      reply: language === "sw"
+        ? "Nimefuta announcement draft. Hakuna kilichotumwa."
+        : "I discarded the announcement draft. Nothing was sent.",
+      result: { cancelled: true },
+      nextState: {},
+    };
+  }
+
+  if (existingDraft && isAnnouncementPublishConfirmation(inboundText)) {
+    return await publishAnnouncementDraftFromWhatsApp(supabase, existingDraft, profile, roles, language);
+  }
+
+  const editDraft = existingDraft ? applyAnnouncementDraftEdit(existingDraft, inboundText) : null;
+  const wantsRewrite = Boolean(existingDraft && isAnnouncementRewriteRequest(inboundText));
+  const extracted = extractAnnouncementDraft(inboundText, intent);
+  const hasIncomingDraft = Boolean(extracted.title && extracted.content && extracted.content.length >= 5 && !wantsRewrite && !isAnnouncementPublishConfirmation(inboundText));
+  const rawDraft = editDraft || (hasIncomingDraft
+    ? {
+      title: extracted.title || existingDraft?.title || "Announcement",
+      content: extracted.content || existingDraft?.content || "",
+      priority: extracted.priority || existingDraft?.priority || "normal",
+    }
+    : existingDraft);
+
   if (isAnnouncementDryRunRequest(inboundText)) {
     const count = await announcementAudienceCount(supabase);
-    const title = draft.title || intent.title || "Announcement";
+    const title = rawDraft?.title || intent.title || "Announcement";
     return {
       actionStatus: "completed",
       reply: language === "sw"
         ? `Dry run: tangazo "${title}" lingetengeneza dashboard notification na WhatsApp queue row kwa ${count} active members. Hakuna kitu kimepublishiwa au kutumwa.`
         : `Dry run: announcement "${title}" would create a dashboard notification and WhatsApp queue row for ${count} active members. Nothing was published or sent.`,
-      result: { dry_run: true, audience_count: count, title, priority: draft.priority },
+      result: { dry_run: true, audience_count: count, title, priority: rawDraft?.priority || "normal" },
       nextState: {},
     };
   }
 
-  if (isVagueAnnouncementRequest(inboundText) || !draft.title || !draft.content || draft.content.length < 8) {
+  if (
+    !rawDraft ||
+    (isVagueAnnouncementRequest(inboundText) && !existingDraft && isGenericAnnouncementDraftText(rawDraft.content)) ||
+    !rawDraft.title ||
+    !rawDraft.content ||
+    rawDraft.content.length < 5
+  ) {
     return {
       actionStatus: "needs_clarification",
       reply: language === "sw"
-        ? "Niko tayari kuongeza tangazo. Tuma title na content. Format: ANNOUNCE title: Mkutano content: Kutakuwa na mkutano Jumamosi saa 10."
-        : "I can add the announcement. Send the title and content. Format: ANNOUNCE title: Meeting content: There will be a meeting on Saturday at 10.",
+        ? "Niko tayari kuandaa tangazo. Tuma title/topic au draft message. Mfano: ANNOUNCE title: Mkutano content: Kutakuwa na mkutano Jumamosi saa 10. Nitakuonyesha preview kabla ya kutuma."
+        : "I can prepare the announcement. Send the title/topic or draft message. Example: ANNOUNCE title: Meeting content: There will be a meeting on Saturday at 10. I will show a preview before sending.",
       result: { missing: ["title", "content"] },
       nextState: {
         pending_intent: { ...intent, intent: "create_announcement" },
@@ -9455,6 +9955,23 @@ async function createAnnouncementFromWhatsApp(
     };
   }
 
+  const polished = await polishAnnouncementDraft(rawDraft, inboundText, language);
+  const audienceCount = await announcementAudienceCount(supabase);
+  return {
+    actionStatus: "needs_clarification",
+    reply: announcementDraftPreviewReply(polished, audienceCount, language),
+    result: { draft: polished, audience_count: audienceCount, awaiting_confirmation: true },
+    nextState: announcementDraftState(polished, language),
+  };
+}
+
+async function publishAnnouncementDraftFromWhatsApp(
+  supabase: SupabaseClient,
+  draft: AnnouncementDraft,
+  profile: Profile,
+  roles: string[],
+  language: "auto" | "en" | "sw",
+): Promise<ExecutionResult> {
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("announcements")
@@ -9470,17 +9987,44 @@ async function createAnnouncementFromWhatsApp(
     .single();
 
   if (error || !data) throw new HttpError(500, "Failed to publish WhatsApp announcement", error);
+  const announcementId = String((data as Record<string, unknown>).id);
+  const queued = await ensureAnnouncementAlertsQueued(supabase, announcementId, draft.title, draft.content, draft.priority);
+  const worker = queued.status.pending > 0
+    ? await runWhatsAppAnnouncementWorkerNow(Math.max(50, Math.min(500, queued.status.pending + 20)))
+    : { attempted: false, ok: false };
+  const finalQueueStatus = worker.attempted
+    ? await whatsappQueueStatusForAnnouncement(supabase, announcementId)
+    : queued.status;
 
-  await logAdminAction(supabase, profile, roles, "announcement_published_whatsapp", "announcement", String((data as Record<string, unknown>).id), {
+  await logAdminAction(supabase, profile, roles, "announcement_published_whatsapp", "announcement", announcementId, {
     title: draft.title,
     priority: draft.priority,
+    whatsapp_queue: finalQueueStatus,
+    worker,
   });
+
+  const queueLine = language === "sw"
+    ? `WhatsApp delivery: ${formatAnnouncementQueueStatus(finalQueueStatus)}.`
+    : `WhatsApp delivery: ${formatAnnouncementQueueStatus(finalQueueStatus)}.`;
+  const workerLine = worker.attempted && worker.ok
+    ? (language === "sw" ? "Nime-trigger WhatsApp worker sasa." : "I triggered the WhatsApp worker now.")
+    : worker.attempted
+      ? (language === "sw" ? `Worker haikuweza ku-run sasa: ${worker.error || "unknown error"}.` : `The worker could not run immediately: ${worker.error || "unknown error"}.`)
+      : "";
 
   return {
     actionStatus: "completed",
     reply: language === "sw"
-      ? `Tangazo "${draft.title}" limepublishiwa members. Dashboard notifications na WhatsApp alerts zimewekwa kwenye queue. Priority: ${draft.priority}.`
-      : `Announcement "${draft.title}" has been published to members. Dashboard notifications and WhatsApp alerts are queued. Priority: ${draft.priority}.`,
+      ? [
+        `Tangazo "${draft.title}" limepublishiwa members. Priority: ${draft.priority}.`,
+        queueLine,
+        workerLine,
+      ].filter(Boolean).join("\n")
+      : [
+        `Announcement "${draft.title}" has been published to members. Priority: ${draft.priority}.`,
+        queueLine,
+        workerLine,
+      ].filter(Boolean).join("\n"),
     result: data as Record<string, unknown>,
     nextState: {},
   };
@@ -10109,6 +10653,15 @@ async function executeIntent(
   }
 
   if (intent.intent === "query_announcements") {
+    if (intent.category === "delivery_status" || isAnnouncementDeliveryQuestion(inboundText)) {
+      return {
+        actionStatus: "completed",
+        reply: await latestAnnouncementDeliveryReply(supabase, language),
+        result: { source: "whatsapp_notifications_queue", category: "announcement_delivery" },
+        nextState: {},
+      };
+    }
+
     return {
       actionStatus: "completed",
       reply: await announcementsReply(supabase, language),
