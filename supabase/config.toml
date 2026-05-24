@@ -70,6 +70,9 @@ verify_jwt = false
 [functions.auth-signup]
 verify_jwt = false
 
+[functions.background-job-worker]
+verify_jwt = false
+
 [functions.whatsapp-webhook]
 verify_jwt = false
 
