@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": [
+      "deno.ns",
+      "dom",
+      "dom.iterable",
+      "es2022"
+    ],
+    "noImplicitAny": false,
+    "strict": false,
+    "strictNullChecks": false
+  },
+  "lock": false
+}

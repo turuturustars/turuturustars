@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import type {} from "../deno-edge.d.ts";
 import { HttpError, corsHeaders, errorResponse, isOptionsRequest, jsonResponse } from "../_shared/http.ts";
 import { escapeHtml, sendBrevoEmail } from "../_shared/brevo.ts";
 import {
@@ -3223,6 +3223,7 @@ function normalizeParsedIntent(value: Record<string, unknown>, originalText: str
   const rawIntent = cleanString(value.intent) as IntentName | null;
   const intent = rawIntent && INTENTS.has(rawIntent) ? rawIntent : "unknown";
   const amount = value.amount == null ? extractAmount(originalText) : Number(value.amount);
+  const normalizedAmount = Number.isFinite(amount) ? Number(amount) : NaN;
   const profileUpdates = extractProfileUpdates(originalText, value.profile_updates);
   const detectedLanguage = detectLanguage(originalText);
   const modelLanguage = value.language === "sw" ? "sw" : value.language === "en" ? "en" : detectedLanguage;
@@ -3231,7 +3232,7 @@ function normalizeParsedIntent(value: Record<string, unknown>, originalText: str
     intent,
     confidence: clampConfidence(value.confidence),
     language: detectedLanguage === "sw" ? "sw" : modelLanguage,
-    amount: Number.isFinite(amount) && amount > 0 ? Number(amount.toFixed(2)) : null,
+    amount: normalizedAmount > 0 ? Number(normalizedAmount.toFixed(2)) : null,
     contribution_type: normalizeContributionType(value.contribution_type, originalText),
     payment_method: normalizePaymentMethod(value.payment_method, originalText),
     transaction_date: cleanString(value.transaction_date),
@@ -9439,7 +9440,7 @@ async function notifyOfficialsOfWhatsappEscalation(
   const officialIds = Array.from(new Set(
     (data || [])
       .map((row: Record<string, unknown>) => cleanString(row.user_id))
-      .filter((userId): userId is string => Boolean(userId)),
+      .filter((userId: string | null): userId is string => Boolean(userId)),
   ));
   if (officialIds.length === 0) return;
 
@@ -10394,10 +10395,11 @@ async function recordDisciplineFromWhatsApp(
 
   const targetMember = intent.target_member || extractTargetMemberForAdminCommand(inboundText);
   const amount = intent.amount ? parsePositiveAmount(intent.amount) : null;
+  const fineAmount = amount && amount > 0 ? amount : null;
   const reason = extractDisciplineReason(inboundText);
   const missing: string[] = [];
   if (isGenericTargetMember(targetMember)) missing.push("target_member");
-  if (!amount || amount <= 0) missing.push("amount");
+  if (!fineAmount) missing.push("amount");
   if (!reason) missing.push("reason");
 
   if (missing.length > 0) {
@@ -10406,7 +10408,7 @@ async function recordDisciplineFromWhatsApp(
       reply: language === "sw"
         ? "Tuma fine ikiwa na member, amount, na sababu. Mfano: ADD FINE 100 TO TS-00034 FOR missed meeting."
         : "Send the fine with member, amount, and reason. Example: ADD FINE 100 TO TS-00034 FOR missed meeting.",
-      result: { missing, target_member: targetMember || null, amount: amount || null },
+      result: { missing, target_member: targetMember || null, amount: fineAmount },
       nextState: {
         pending_intent: { ...intent, intent: "record_discipline" },
         asked_for: missing,
@@ -10414,6 +10416,7 @@ async function recordDisciplineFromWhatsApp(
       },
     };
   }
+  if (!fineAmount) throw new HttpError(400, "Fine amount is required");
 
   const target = await resolveContributionProfile(supabase, profile, roles, targetMember);
   if (target.needsClarification) {
@@ -10438,7 +10441,7 @@ async function recordDisciplineFromWhatsApp(
       incident_type: incidentType,
       description: reason,
       incident_date: today,
-      fine_amount: amount,
+      fine_amount: fineAmount,
       fine_paid: false,
       status: "pending",
       recorded_by: profile.id,
@@ -10450,7 +10453,7 @@ async function recordDisciplineFromWhatsApp(
 
   await logAdminAction(supabase, profile, roles, "whatsapp_discipline_fine_recorded", "discipline_record", String((data as Record<string, unknown>).id), {
     target_member: target.profile.id,
-    amount,
+    amount: fineAmount,
     incident_type: incidentType,
     reason,
   });
@@ -10458,8 +10461,8 @@ async function recordDisciplineFromWhatsApp(
   return {
     actionStatus: "completed",
     reply: language === "sw"
-      ? `Nimeongeza fine ya ${formatMoney(amount)} kwa ${target.profile.full_name}. Sababu: ${reason}. Status: pending.`
-      : `I added a ${formatMoney(amount)} fine for ${target.profile.full_name}. Reason: ${reason}. Status: pending.`,
+      ? `Nimeongeza fine ya ${formatMoney(fineAmount)} kwa ${target.profile.full_name}. Sababu: ${reason}. Status: pending.`
+      : `I added a ${formatMoney(fineAmount)} fine for ${target.profile.full_name}. Reason: ${reason}. Status: pending.`,
     result: data as Record<string, unknown>,
     nextState: {},
   };
@@ -12050,7 +12053,7 @@ function webhookHealthResponse(): Response {
   });
 }
 
-serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (isOptionsRequest(req)) {
     return new Response("ok", { headers: corsHeaders });
   }
