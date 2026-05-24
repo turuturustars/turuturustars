@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
+import { startNewSessionPolicy } from '@/utils/sessionPolicy';
 
 export type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 export type UserRoleRow = Database['public']['Tables']['user_roles']['Row'];
@@ -48,20 +49,51 @@ export interface PasswordRecoveryResult {
   identifierType: 'email' | 'membership_number';
 }
 
+export type SignOutScope = 'global' | 'local' | 'others';
+
 export interface AuthRequestError extends Error {
   status?: number;
   code?: string;
+  email?: string;
 }
 
-const toAuthRequestError = (error: { message: string; status?: number; code?: string }): AuthRequestError => {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_NOT_CONFIRMED_MESSAGE =
+  'Your password is correct, but your email is not confirmed yet. Check your inbox for the confirmation link, then sign in again.';
+
+const toAuthRequestError = (error: {
+  message: string;
+  status?: number;
+  code?: string;
+  email?: string;
+}): AuthRequestError => {
   const authError = new Error(error.message) as AuthRequestError;
   authError.status = error.status;
   authError.code = error.code;
+  authError.email = error.email;
   return authError;
 };
 
+const isEmailNotConfirmedMessage = (message?: string | null) => {
+  const normalized = (message || '').toLowerCase();
+  return normalized.includes('email not confirmed') || normalized.includes('email address not confirmed');
+};
+
+const normalizeNationalIdValue = (value?: string | null) => (value || '').replace(/\s+/g, '').trim();
+
+const didUseNationalIdPassword = async (userId: string, password: string) => {
+  try {
+    const profile = await fetchProfile(userId);
+    const idNumber = normalizeNationalIdValue(profile?.id_number);
+    return Boolean(idNumber && idNumber === normalizeNationalIdValue(password));
+  } catch (error) {
+    console.warn('Unable to check initial password state', error);
+    return false;
+  }
+};
+
 const isPhoneAlreadyRegisteredError = (
-  error: ({ code?: string; message?: string } & Record<string, unknown>) | null
+  error: { code?: string; message?: string; details?: unknown } | null
 ) => {
   const message = `${error?.message || ''} ${typeof error?.details === 'string' ? error.details : ''}`.toLowerCase();
   return (
@@ -139,6 +171,39 @@ export async function signInWithEmail(payload: SignInPayload) {
     throw new Error('Enter your email or phone.');
   }
 
+  const normalizedEmail = normalizedIdentifier.toLowerCase();
+  if (EMAIL_REGEX.test(normalizedEmail)) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: payload.password,
+      options: {
+        captchaToken: payload.captchaToken,
+      },
+    });
+
+    if (error) {
+      throw toAuthRequestError({
+        message: isEmailNotConfirmedMessage(error.message) ? EMAIL_NOT_CONFIRMED_MESSAGE : error.message,
+        status: error.status,
+        code: isEmailNotConfirmedMessage(error.message) ? 'email_not_confirmed' : error.code,
+        email: isEmailNotConfirmedMessage(error.message) ? normalizedEmail : undefined,
+      });
+    }
+
+    if (!data.session || !data.user) {
+      throw new Error('Unable to start your session.');
+    }
+
+    startNewSessionPolicy(data.user.id);
+
+    return {
+      user: data.user,
+      session: data.session,
+      identifierType: 'email' as const,
+      usedIdNumberPassword: await didUseNationalIdPassword(data.user.id, payload.password),
+    };
+  }
+
   const { data, error } = await supabase.functions.invoke('auth-signin', {
     body: {
       identifier: normalizedIdentifier,
@@ -148,7 +213,13 @@ export async function signInWithEmail(payload: SignInPayload) {
   });
 
   if (error) {
-    throw new Error(await extractFunctionError(error));
+    const errorInfo = await extractFunctionErrorInfo(error);
+    throw toAuthRequestError({
+      message: errorInfo.message,
+      status: error.status,
+      code: errorInfo.code || error.code,
+      email: errorInfo.email,
+    });
   }
 
   const payloadData = data as {
@@ -171,6 +242,10 @@ export async function signInWithEmail(payload: SignInPayload) {
 
   if (sessionError) {
     throw new Error(sessionError.message || 'Unable to start your session.');
+  }
+
+  if (sessionData.user?.id) {
+    startNewSessionPolicy(sessionData.user.id);
   }
 
   return {
@@ -219,23 +294,31 @@ type SmsVerificationConfirmResponse = {
   expiresInSeconds: number;
 };
 
-async function extractFunctionError(error: unknown): Promise<string> {
+async function extractFunctionErrorInfo(error: unknown): Promise<{ message: string; code?: string; email?: string }> {
   if (error && typeof error === 'object') {
     const context = (error as { context?: unknown }).context;
     if (context instanceof Response) {
       try {
         const payload = (await context.clone().json()) as {
           error?: string;
-          details?: { error?: string; message?: string; response?: { message?: string } };
+          details?: {
+            code?: string;
+            email?: string;
+            error?: string;
+            message?: string;
+            response?: { message?: string };
+          };
         };
+        const code = typeof payload.details?.code === 'string' ? payload.details.code : undefined;
+        const email = typeof payload.details?.email === 'string' ? payload.details.email : undefined;
         if (typeof payload.error === 'string' && payload.error.trim()) {
-          return payload.error;
+          return { message: payload.error, code, email };
         }
         if (payload.details && typeof payload.details.error === 'string' && payload.details.error.trim()) {
-          return payload.details.error;
+          return { message: payload.details.error, code, email };
         }
         if (payload.details && typeof payload.details.message === 'string' && payload.details.message.trim()) {
-          return payload.details.message;
+          return { message: payload.details.message, code, email };
         }
         if (
           payload.details &&
@@ -243,7 +326,7 @@ async function extractFunctionError(error: unknown): Promise<string> {
           typeof payload.details.response.message === 'string' &&
           payload.details.response.message.trim()
         ) {
-          return payload.details.response.message;
+          return { message: payload.details.response.message, code, email };
         }
       } catch {
         // Fall back to generic message extraction.
@@ -251,11 +334,16 @@ async function extractFunctionError(error: unknown): Promise<string> {
     }
 
     if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-      return (error as { message: string }).message;
+      return { message: (error as { message: string }).message };
     }
   }
 
-  return 'Request failed';
+  return { message: 'Request failed' };
+}
+
+async function extractFunctionError(error: unknown): Promise<string> {
+  const { message } = await extractFunctionErrorInfo(error);
+  return message;
 }
 
 export async function sendSignupSmsCode(phone: string): Promise<SmsVerificationSendResponse> {
@@ -458,6 +546,6 @@ export async function fetchRoles(userId: string) {
   return (data || []).map((r) => r.role) as UserRoleRow['role'][];
 }
 
-export async function signOut() {
-  await supabase.auth.signOut();
+export async function signOut(options: { scope?: SignOutScope } = {}) {
+  await supabase.auth.signOut({ scope: options.scope ?? 'local' });
 }

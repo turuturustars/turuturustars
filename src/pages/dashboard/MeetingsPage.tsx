@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { 
   sendMeetingNotifications, 
   playNotificationSound,
-  getNotificationRecipients,
   type MeetingNotificationType,
   type MeetingRecipientScope,
 } from '@/lib/meetingNotificationService';
@@ -50,18 +49,11 @@ interface MeetingAttendance {
   };
 }
 
-interface Profile {
-  id: string;
-  full_name: string;
-  membership_number: string | null;
-  status: string;
-}
-
 export default function MeetingsPage() {
   const { user, hasRole } = useAuth();
   const { status, showSuccess } = useStatus();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [members, setMembers] = useState<Profile[]>([]);
+  const [activeMemberCount, setActiveMemberCount] = useState(0);
   const [attendance, setAttendance] = useState<MeetingAttendance[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,11 +96,11 @@ export default function MeetingsPage() {
   };
 
   const fetchMembers = async () => {
-    const { data } = await supabase
+    const { count } = await supabase
       .from('profiles')
-      .select('id, full_name, membership_number, status')
+      .select('id', { count: 'exact', head: true })
       .eq('status', 'active');
-    setMembers(data || []);
+    setActiveMemberCount(count || 0);
   };
 
   const fetchAttendance = async (meetingId: string) => {
@@ -158,10 +150,7 @@ export default function MeetingsPage() {
       return;
     }
 
-    const recipients = await getNotificationRecipients(newMeeting.meeting_type, newMeeting.recipient_scope);
-    
-    // Send notifications
-    await sendMeetingNotifications(
+    void sendMeetingNotifications(
       {
         meetingId: data.id,
         title: newMeeting.title,
@@ -172,29 +161,24 @@ export default function MeetingsPage() {
         createdBy: user?.id,
         recipientScope: newMeeting.recipient_scope,
       },
-      recipients
-    );
+      []
+    ).catch((notifyError) => {
+      console.error('Failed to queue meeting notifications:', notifyError);
+    });
 
     // Play notification sound
     playNotificationSound(0.6);
 
-    toast.success('Meeting scheduled successfully and notifications sent');
+    toast.success('Meeting scheduled successfully. Notifications are being queued.');
     setShowCreateDialog(false);
     setNewMeeting({ title: '', meeting_type: 'member', recipient_scope: 'all_members', scheduled_date: '', venue: '', agenda: '' });
     fetchMeetings();
   };
 
   const initializeAttendance = async (meetingId: string) => {
-    const attendanceRecords = members.map(member => ({
-      meeting_id: meetingId,
-      member_id: member.id,
-      attended: false,
-      marked_by: user?.id
-    }));
-
-    const { error } = await supabase.from('meeting_attendance').upsert(attendanceRecords, {
-      onConflict: 'meeting_id,member_id'
-    });
+    const { error } = await supabase.rpc('initialize_meeting_attendance' as never, {
+      p_meeting_id: meetingId,
+    } as never);
 
     if (error) {
       toast.error('Failed to initialize attendance');
@@ -238,8 +222,7 @@ export default function MeetingsPage() {
 
     // Send cancellation notifications if status is changed to cancelled
     if (newStatus === 'cancelled') {
-      const recipients = await getNotificationRecipients(meeting.meeting_type, meeting.recipient_scope);
-      await sendMeetingNotifications(
+      void sendMeetingNotifications(
         {
           meetingId: meeting.id,
           title: meeting.title,
@@ -250,8 +233,10 @@ export default function MeetingsPage() {
           createdBy: meeting.created_by,
           recipientScope: meeting.recipient_scope,
         },
-        recipients
-      );
+        []
+      ).catch((notifyError) => {
+        console.error('Failed to queue meeting cancellation notifications:', notifyError);
+      });
       playNotificationSound(0.5);
     }
 
@@ -406,7 +391,7 @@ export default function MeetingsPage() {
             <div className="flex items-center gap-4">
               <Users className="h-8 w-8 text-blue-500" />
               <div>
-                <p className="text-2xl font-bold">{members.length}</p>
+                <p className="text-2xl font-bold">{activeMemberCount}</p>
                 <p className="text-sm text-muted-foreground">Active Members</p>
               </div>
             </div>

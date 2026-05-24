@@ -6,7 +6,7 @@ import { useState, useCallback } from 'react';
 
 export interface BulkActionItem {
   id: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export function useBulkActions<T extends BulkActionItem>() {

@@ -1,7 +1,7 @@
 import { FC, useEffect } from 'react';
 
 interface StructuredDataProps {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   type?: string;
 }
 

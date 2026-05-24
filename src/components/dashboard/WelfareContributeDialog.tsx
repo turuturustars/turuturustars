@@ -22,6 +22,8 @@ interface WelfareContributeDialogProps {
 
 type PaymentStep = 'form' | 'processing' | 'success';
 
+const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
+
 const WelfareContributeDialog = ({
   welfareCaseId,
   welfareCaseTitle,
@@ -79,10 +81,17 @@ const WelfareContributeDialog = ({
 
   const amountError = touched.amount ? validateAmount(amount) : null;
   const phoneError = touched.phone ? validatePhone(phone) : null;
-  const isValid = !amountError && !phoneError && amount.trim() && phone.trim();
+  const isValid = !amountError && !phoneError && Boolean(amount.trim()) && Boolean(phone.trim());
+  const numericAmount = Number.parseInt(amount || '0', 10) || 0;
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
+  };
+
+  const handleQuickAmount = (value: number) => {
+    setAmount(String(value));
+    setSubmitError(null);
+    setTouched((prev) => ({ ...prev, amount: true }));
   };
 
   const handleContribute = async () => {
@@ -125,7 +134,7 @@ const WelfareContributeDialog = ({
 
       createdContributionId = contribution.id;
       setPaymentStep('processing');
-      setStatusMessage('Sending an M-Pesa request to your phone...');
+      setStatusMessage('Starting Pay with M-Pesa on your phone...');
 
       const formattedPhone = formatPhoneNumber(phone);
       const result = await initiateSTKPush({
@@ -138,14 +147,14 @@ const WelfareContributeDialog = ({
       });
 
       if (result.ResponseCode !== '0') {
-        throw new Error(result.ResponseDescription || 'Failed to initiate M-Pesa payment');
+        throw new Error(result.ResponseDescription || 'Failed to start Pay with M-Pesa');
       }
 
       stkStarted = true;
       setCheckoutRequestId(result.CheckoutRequestID);
       setStatusMessage('Check your phone and enter your M-Pesa PIN.');
 
-      toast.success('M-Pesa request sent to your phone');
+      toast.success('Pay with M-Pesa sent to your phone');
 
       const transaction = await MpesaTransactionService.pollTransactionStatus(result.CheckoutRequestID, {
         onStatusChange: (status) => setStatusMessage(status),
@@ -189,53 +198,65 @@ const WelfareContributeDialog = ({
             className="gap-2 text-green-700 border-green-200 hover:bg-green-50 hover:text-green-800 w-full"
           >
             <Heart className="w-4 h-4" />
-            Contribute via M-Pesa
+            Pay with M-Pesa
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogContent className="max-w-md overflow-hidden border-green-100 bg-cyan-50 p-0 shadow-2xl">
+        <DialogHeader className="px-6 pb-3 pt-6">
           <DialogTitle className="flex items-center gap-2">
             <Heart className="w-5 h-5 text-green-600" />
             Welfare Contribution
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-blue-900/75">
             Pay with M-Pesa using your phone number.
           </DialogDescription>
         </DialogHeader>
 
         {paymentStep === 'success' ? (
-          <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-center space-y-2">
+          <div className="mx-6 mb-6 rounded-lg border border-green-200 bg-green-50 p-5 text-center space-y-2">
             <CheckCircle2 className="w-10 h-10 text-green-600 mx-auto" />
             <p className="font-semibold text-green-900">Payment Successful</p>
             <p className="text-sm text-green-700">Your welfare contribution has been recorded.</p>
           </div>
         ) : paymentStep === 'processing' ? (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-3">
+          <div className="mx-6 mb-6 rounded-lg border border-green-200 bg-green-50 p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-              <p className="font-semibold text-blue-900">Processing M-Pesa payment</p>
+              <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+              <p className="font-semibold text-green-900">Pay with M-Pesa in progress</p>
             </div>
-            <p className="text-sm text-blue-800">{statusMessage}</p>
+            <p className="text-sm text-green-800">{statusMessage}</p>
             {checkoutRequestId && (
-              <p className="text-xs text-blue-700 break-all">Payment reference: {checkoutRequestId}</p>
+              <p className="text-xs text-green-700 break-all">Payment reference: {checkoutRequestId}</p>
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 px-6 pb-6">
             {targetAmount && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <div className="flex items-start gap-2">
-                  <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <Info className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm">
-                    <p className="text-blue-900 font-medium">Remaining target: KES {remainingAmount?.toLocaleString()}</p>
+                    <p className="text-green-900 font-medium">Remaining target: KES {remainingAmount?.toLocaleString()}</p>
                     {collectedAmount > 0 && (
-                      <p className="text-blue-700 text-xs mt-1">KES {collectedAmount.toLocaleString()} already collected</p>
+                      <p className="text-green-700 text-xs mt-1">KES {collectedAmount.toLocaleString()} already collected</p>
                     )}
                   </div>
                 </div>
               </div>
             )}
+
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+              <div className="flex gap-2">
+                <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-950">Simple and secure</p>
+                  <p className="mt-1 text-xs leading-relaxed text-green-800">
+                    Pay with M-Pesa will appear on your phone. Enter your PIN and this contribution confirms automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <Label htmlFor="welfare-phone" className="text-sm font-medium flex items-center gap-2">
@@ -249,12 +270,21 @@ const WelfareContributeDialog = ({
                 value={phone}
                 onChange={(event) => setPhone(event.target.value)}
                 onBlur={() => handleBlur('phone')}
-                className={cn(touched.phone && phoneError && 'border-red-500 focus:ring-red-500')}
+                className={cn(
+                  'border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500',
+                  touched.phone && phoneError && 'border-red-500 focus-visible:ring-red-500'
+                )}
               />
               {touched.phone && phoneError && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   {phoneError}
+                </p>
+              )}
+              {!phoneError && phone.trim() && (
+                <p className="text-xs text-green-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Ready to receive the M-Pesa prompt
                 </p>
               )}
             </div>
@@ -272,7 +302,10 @@ const WelfareContributeDialog = ({
                   value={amount}
                   onChange={(event) => setAmount(event.target.value.replace(/[^\d]/g, ''))}
                   onBlur={() => handleBlur('amount')}
-                  className={cn('pl-12', touched.amount && amountError && 'border-red-500 focus:ring-red-500')}
+                  className={cn(
+                    'pl-12 border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500',
+                    touched.amount && amountError && 'border-red-500 focus-visible:ring-red-500'
+                  )}
                 />
               </div>
               {touched.amount && amountError && (
@@ -281,6 +314,23 @@ const WelfareContributeDialog = ({
                   {amountError}
                 </p>
               )}
+              <div className="grid grid-cols-5 gap-2 pt-1">
+                {QUICK_AMOUNTS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleQuickAmount(value)}
+                    className={cn(
+                      'rounded-md border px-2 py-2 text-xs font-semibold transition-colors',
+                      numericAmount === value
+                        ? 'border-green-600 bg-green-600 text-white'
+                        : 'border-green-200 bg-white text-green-700 hover:bg-green-50'
+                    )}
+                  >
+                    {value >= 1000 ? `${value / 1000}k` : value}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -292,7 +342,7 @@ const WelfareContributeDialog = ({
                 placeholder="Add a message of support..."
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                className="w-full p-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-16 text-sm"
+                className="w-full min-h-16 rounded-md border border-cyan-200 bg-cyan-50/70 p-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
 
@@ -303,7 +353,7 @@ const WelfareContributeDialog = ({
             <Button
               onClick={handleContribute}
               disabled={!isValid || isProcessing}
-              className="w-full gap-2 bg-green-600 hover:bg-green-700"
+              className="h-12 w-full gap-2 bg-green-600 text-white hover:bg-green-700"
             >
               {isProcessing ? (
                 <>

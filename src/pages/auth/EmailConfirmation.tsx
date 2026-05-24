@@ -35,6 +35,16 @@ const EmailConfirmation = () => {
   useEffect(() => {
     const confirmEmail = async () => {
       try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        if (code) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            throw new Error(exchangeError.message);
+          }
+        }
+
         // Check if user session is already established
         // (Supabase automatically processes the confirmation token in the URL)
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -86,7 +96,7 @@ const EmailConfirmation = () => {
             .eq('id', user.id)
             .maybeSingle();
 
-          if (!isProfileComplete(profile as any)) {
+          if (!isProfileComplete(profile)) {
             const pending = getPendingSignup();
             const metadata = user.user_metadata || {};
             const fullName = pending?.fullName || (metadata.full_name as string) || '';

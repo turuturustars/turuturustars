@@ -511,11 +511,11 @@ For inquiries, contact the treasurer.
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         <div className={cn('p-3 rounded-lg', {
-                          'bg-blue-100': transaction.payment_method === 'mpesa',
+                          'bg-green-100': transaction.payment_method === 'mpesa',
                           'bg-purple-100': transaction.payment_method === 'bank',
                           'bg-green-100': transaction.payment_method === 'cash',
                         })}>
-                          {transaction.payment_method === 'mpesa' && <Smartphone className="w-5 h-5 text-blue-600" />}
+                          {transaction.payment_method === 'mpesa' && <Smartphone className="w-5 h-5 text-green-600" />}
                           {transaction.payment_method === 'bank' && <CreditCard className="w-5 h-5 text-purple-600" />}
                           {transaction.payment_method === 'cash' && <Banknote className="w-5 h-5 text-green-600" />}
                         </div>
@@ -594,17 +594,19 @@ For inquiries, contact the treasurer.
                       className={cn(
                         'p-4 rounded-lg border-2 transition-all text-center',
                         paymentMethod === method
-                          ? 'border-primary bg-primary/5'
+                          ? method === 'mpesa'
+                            ? 'border-green-500 bg-green-50'
+                            : 'border-primary bg-primary/5'
                           : 'border-border hover:border-muted-foreground'
                       )}
                     >
                       <div className="mb-2">
-                        {method === 'mpesa' && <Smartphone className="w-6 h-6 mx-auto text-blue-600" />}
+                        {method === 'mpesa' && <Smartphone className="w-6 h-6 mx-auto text-green-600" />}
                         {method === 'bank' && <CreditCard className="w-6 h-6 mx-auto text-purple-600" />}
                         {method === 'cash' && <Banknote className="w-6 h-6 mx-auto text-green-600" />}
                       </div>
                       <p className="font-medium text-sm capitalize">
-                        {method === 'mpesa' ? 'M-Pesa' : method === 'bank' ? 'Bank' : 'Cash'}
+                        {method === 'mpesa' ? 'Pay with M-Pesa' : method === 'bank' ? 'Bank' : 'Cash'}
                       </p>
                     </button>
                   ))}
@@ -613,7 +615,7 @@ For inquiries, contact the treasurer.
 
               {/* M-Pesa Form */}
               {paymentMethod === 'mpesa' && (
-                <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="space-y-4 rounded-lg border border-green-200 bg-cyan-50 p-4">
                   <div className="space-y-2">
                     <Label htmlFor="mpesa-phone">M-Pesa Phone Number</Label>
                     <div className="relative">
@@ -629,7 +631,10 @@ For inquiries, contact the treasurer.
                             setErrors((prev) => ({ ...prev, mpesaPhone: error }));
                           }
                         }}
-                        className={cn(errors.mpesaPhone && touched.mpesaPhone && 'border-red-500')}
+                        className={cn(
+                          'border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500',
+                          errors.mpesaPhone && touched.mpesaPhone && 'border-red-500'
+                        )}
                       />
                       <button
                         type="button"
@@ -647,10 +652,10 @@ For inquiries, contact the treasurer.
                       <p className="text-sm text-red-600">{errors.mpesaPhone}</p>
                     )}
                   </div>
-                  <div className="bg-white p-3 rounded border border-blue-100 text-sm">
+                  <div className="rounded border border-green-100 bg-white p-3 text-sm">
                     <p className="font-medium mb-1">How it works:</p>
                     <ol className="text-xs space-y-1 list-decimal list-inside">
-                      <li>We'll send an M-Pesa request to your phone</li>
+                      <li>Pay with M-Pesa appears on your phone</li>
                       <li>Enter your M-Pesa PIN on your phone</li>
                       <li>Payment will be confirmed automatically</li>
                       <li>You'll receive a digital receipt</li>
@@ -737,7 +742,10 @@ For inquiries, contact the treasurer.
                 <Button
                   onClick={handleInitiatePayment}
                   disabled={isProcessing}
-                  className="gap-2 flex-1"
+                  className={cn(
+                    'gap-2 flex-1',
+                    paymentMethod === 'mpesa' && 'bg-green-600 text-white hover:bg-green-700'
+                  )}
                 >
                   {isProcessing ? (
                     <>

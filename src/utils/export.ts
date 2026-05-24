@@ -8,7 +8,7 @@ export interface ExportOptions {
   includeHeaders?: boolean;
 }
 
-export function exportToCSV<T extends Record<string, any>>(
+export function exportToCSV<T extends Record<string, unknown>>(
   data: T[],
   columns: (keyof T)[],
   options: ExportOptions = {}
@@ -35,10 +35,10 @@ export function exportToCSV<T extends Record<string, any>>(
     .map((row) =>
       columns
         .map((col) => {
-          let value: any = row[col] ?? '';
+          let value: unknown = row[col] ?? '';
           // Format dates
-          if (value && typeof value === 'object' && 'toISOString' in value) {
-            value = (value as Date).toISOString().split('T')[0];
+          if (value instanceof Date) {
+            value = value.toISOString().split('T')[0];
           }
           return escapeCSV(String(value));
         })
@@ -53,7 +53,7 @@ export function exportToCSV<T extends Record<string, any>>(
 /**
  * Export data as JSON
  */
-export function exportToJSON<T extends Record<string, any>>(
+export function exportToJSON<T extends Record<string, unknown>>(
   data: T[],
   filename: string = `export_${new Date().toISOString().split('T')[0]}.json`
 ): void {
@@ -64,7 +64,7 @@ export function exportToJSON<T extends Record<string, any>>(
 /**
  * Export data as TXT (formatted as table)
  */
-export function exportToTXT<T extends Record<string, any>>(
+export function exportToTXT<T extends Record<string, unknown>>(
   data: T[],
   columns: (keyof T)[],
   filename: string = `export_${new Date().toISOString().split('T')[0]}.txt`

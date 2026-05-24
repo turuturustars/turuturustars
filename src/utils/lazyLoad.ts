@@ -1,11 +1,11 @@
-import { lazy } from 'react';
+import { lazy, type ComponentType } from 'react';
 
 /**
  * Lazy load a component with a small delay to prevent hydration mismatches
  * Improves performance by code-splitting heavy components
  */
 export const lazyLoadComponent = (
-  importFunc: () => Promise<{ default: React.ComponentType<any> }>,
+  importFunc: () => Promise<{ default: ComponentType<unknown> }>,
   delayMs = 0
 ) => {
   return lazy(async () => {

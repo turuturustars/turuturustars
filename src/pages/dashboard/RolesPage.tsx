@@ -2,9 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AccessibleButton, AccessibleStatus, useStatus } from '@/components/accessible';
 import { useAuth } from '@/hooks/useAuth';
-import { normalizeRoles } from '@/lib/rolePermissions';
-
-type UserRole = string;
+import { normalizeRoles, type UserRole } from '@/lib/rolePermissions';
 import {
   Crown,
   Users,
@@ -19,6 +17,7 @@ import {
 
 interface Role {
   id: string;
+  accessRole: UserRole;
   title: string;
   path: string;
   description: string;
@@ -38,6 +37,7 @@ const RolesPage = () => {
   const availableRoles: Role[] = [
     {
       id: 'chairperson',
+      accessRole: 'chairperson',
       title: 'Chairperson',
       path: '/dashboard/roles/chairperson',
       description: 'Overall organization leadership and decision-making',
@@ -47,6 +47,7 @@ const RolesPage = () => {
     },
     {
       id: 'vice-chairperson',
+      accessRole: 'vice_chairman',
       title: 'Vice Chairperson',
       path: '/dashboard/roles/vice-chairperson',
       description: 'Support chairperson and deputize when needed',
@@ -56,6 +57,7 @@ const RolesPage = () => {
     },
     {
       id: 'secretary',
+      accessRole: 'secretary',
       title: 'Secretary',
       path: '/dashboard/roles/secretary',
       description: 'Documentation, correspondence, and record keeping',
@@ -65,6 +67,7 @@ const RolesPage = () => {
     },
     {
       id: 'treasurer',
+      accessRole: 'treasurer',
       title: 'Treasurer',
       path: '/dashboard/roles/treasurer',
       description: 'Financial management and fund administration',
@@ -74,6 +77,7 @@ const RolesPage = () => {
     },
     {
       id: 'organizing-secretary',
+      accessRole: 'organizing_secretary',
       title: 'Organizing Secretary',
       path: '/dashboard/roles/organizing-secretary',
       description: 'Event planning and organizational coordination',
@@ -83,6 +87,7 @@ const RolesPage = () => {
     },
     {
       id: 'patron',
+      accessRole: 'patron',
       title: 'Patron',
       path: '/dashboard/roles/patron',
       description: 'Advisory and mentorship role',
@@ -92,6 +97,7 @@ const RolesPage = () => {
     },
     {
       id: 'admin',
+      accessRole: 'admin',
       title: 'Administrator',
       path: '/dashboard/roles/admin',
       description: 'System administration and oversight',
@@ -103,12 +109,12 @@ const RolesPage = () => {
 
   const visibleRoles = availableRoles.filter((role) => {
     if (canSeeEverything) return true;
-    if (canSeeBroad) return !['admin', 'patron'].includes(role.id);
-    return userRolesList.includes(role.id as any);
+    if (canSeeBroad) return !['admin', 'patron'].includes(role.accessRole);
+    return userRolesList.includes(role.accessRole);
   });
 
   const handleRoleNavigation = (role: Role) => {
-    if (userRolesList.includes(role.id as any) || canSeeEverything || (canSeeBroad && !['admin', 'patron'].includes(role.id))) {
+    if (userRolesList.includes(role.accessRole) || canSeeEverything || (canSeeBroad && !['admin', 'patron'].includes(role.accessRole))) {
       navigate(role.path);
       showSuccess(`Navigating to ${role.title} dashboard`);
     }
@@ -128,9 +134,9 @@ const RolesPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {visibleRoles.map((role) => {
           const hasAccess =
-            userRolesList.includes(role.id as any) ||
+            userRolesList.includes(role.accessRole) ||
             canSeeEverything ||
-            (canSeeBroad && !['admin', 'patron'].includes(role.id));
+            (canSeeBroad && !['admin', 'patron'].includes(role.accessRole));
 
           return (
             <Card

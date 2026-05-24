@@ -80,7 +80,7 @@ const Donate = () => {
 
     setIsSubmitting(true);
     try {
-      const { data: donation, error } = await (supabase as any)
+      const { data: donation, error } = await supabase
         .from('donations')
         .insert({
           donor_name: displayName,

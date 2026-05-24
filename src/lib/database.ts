@@ -217,6 +217,10 @@ export async function fetchAuditLogs(
 
 // Valid table names for count and batch operations
 type CountableTable = 'profiles' | 'contributions' | 'announcements' | 'meetings' | 'welfare_cases';
+type CountQueryResult = { count: number | null; error: unknown };
+type CountQuery = PromiseLike<CountQueryResult> & {
+  eq(column: string, value: string | number | boolean): CountQuery;
+};
 
 /**
  * Count total records (for pagination)
@@ -225,9 +229,9 @@ export async function countRecords(
   table: CountableTable,
   filters?: Record<string, unknown>
 ) {
-  let query: any = supabase
+  let query = supabase
     .from(table)
-    .select('id', { count: 'exact', head: true });
+    .select('id', { count: 'exact', head: true }) as unknown as CountQuery;
 
   if (filters) {
     Object.entries(filters).forEach(([key, value]) => {

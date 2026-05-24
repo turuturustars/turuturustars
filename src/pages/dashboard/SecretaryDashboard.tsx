@@ -40,7 +40,7 @@ interface Document {
   cloudinary_url: string;
   file_name: string;
   file_size: number | null;
-  is_public: boolean;
+  is_public: boolean | null;
   tags: string[] | null;
   created_at: string;
   uploaded_by: string;
@@ -55,7 +55,7 @@ interface MeetingMinutes {
   agenda: string | null;
   minutes_content: string | null;
   action_items: unknown;
-  status: string;
+  status: string | null;
   created_at: string;
 }
 
@@ -94,11 +94,11 @@ const SecretaryDashboard = () => {
   const fetchDocuments = async () => {
     const { data, error } = await supabase
       .from('documents')
-      .select('id, title, created_at, cloudinary_url, created_by')
+      .select('id, title, description, document_type, cloudinary_url, file_name, file_size, is_public, tags, created_at, uploaded_by')
       .order('created_at', { ascending: false });
     
     if (!error && data) {
-      setDocuments(data as any);
+      setDocuments(data);
     }
     setIsLoading(false);
   };
@@ -106,11 +106,11 @@ const SecretaryDashboard = () => {
   const fetchMeetings = async () => {
     const { data, error } = await supabase
       .from('meeting_minutes')
-      .select('id, title, meeting_date, created_at, description')
+      .select('id, title, meeting_date, meeting_type, attendees, agenda, minutes_content, action_items, status, created_at')
       .order('meeting_date', { ascending: false });
     
     if (!error && data) {
-      setMeetings(data as any);
+      setMeetings(data);
     }
   };
 
@@ -144,10 +144,10 @@ const SecretaryDashboard = () => {
       setUploadDialogOpen(false);
       resetUploadForm();
       fetchDocuments();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Upload Failed',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unable to upload document.',
         variant: 'destructive',
       });
     } finally {
@@ -187,10 +187,10 @@ const SecretaryDashboard = () => {
       setMeetingDialogOpen(false);
       resetMeetingForm();
       fetchMeetings();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: error instanceof Error ? error.message : 'Unable to create meeting.',
         variant: 'destructive',
       });
     }

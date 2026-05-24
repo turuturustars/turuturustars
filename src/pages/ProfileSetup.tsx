@@ -42,7 +42,8 @@ const ProfileSetup = () => {
 
   useEffect(() => {
     if (profile) {
-      const isOtherLocation = profile.location && !MEMBER_LOCATIONS.slice(0, -1).includes(profile.location as any);
+      const knownLocations = MEMBER_LOCATIONS.slice(0, -1) as readonly string[];
+      const isOtherLocation = profile.location && !knownLocations.includes(profile.location);
       setForm({
         fullName: profile.full_name || '',
         phone: profile.phone || '',
@@ -62,7 +63,8 @@ const ProfileSetup = () => {
     }
 
     if (status === 'ready' || status === 'pending-approval' || status === 'suspended') {
-      const target = (location.state as any)?.from ?? '/dashboard';
+      const routeState = location.state as { from?: string | { pathname?: string; search?: string; hash?: string } } | null;
+      const target = routeState?.from ?? '/dashboard';
       navigate(target, { replace: true });
     }
   }, [user, status, navigate, location.state]);

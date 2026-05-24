@@ -1,8 +1,9 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import {
   AuthStatus,
+  SignOutScope,
   ensureProfileForUser,
   fetchProfile,
   fetchRoles,
@@ -11,6 +12,13 @@ import {
 } from './authApi';
 import { supabase } from '@/integrations/supabase/client';
 import type { ProfileRow, UserRoleRow } from './authApi';
+import {
+  clearSessionPolicy,
+  ensureSessionPolicy,
+  getSessionPolicyState,
+  SESSION_ACTIVITY_THROTTLE_MS,
+  touchSessionActivity,
+} from '@/utils/sessionPolicy';
 
 type AuthContextValue = {
   user: User | null;
@@ -20,10 +28,27 @@ type AuthContextValue = {
   status: AuthStatus;
   refreshProfile: () => Promise<ProfileRow | null>;
   refreshSession: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (options?: { scope?: SignOutScope }) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AUTH_HYDRATION_TIMEOUT_MS = 8000;
+
+const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${AUTH_HYDRATION_TIMEOUT_MS}ms`));
+    }, AUTH_HYDRATION_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
@@ -31,6 +56,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [roles, setRoles] = useState<UserRoleRow['role'][]>([]);
   const [status, setStatus] = useState<AuthStatus>('checking');
+  const hydrationRunRef = useRef(0);
+  const authEventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  const clearAuthState = useCallback(() => {
+    setSession(null);
+    setUser(null);
+    setProfile(null);
+    setRoles([]);
+    setStatus('signed-out');
+  }, []);
 
   const resolveStatus = useCallback(
     (nextUser: User | null, nextProfile: ProfileRow | null) => {
@@ -45,60 +81,79 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  const loadProfile = useCallback(
-    async (currentUser: User) => {
-      try {
-        const ensured = await ensureProfileForUser(currentUser);
-        setProfile(ensured);
-        resolveStatus(currentUser, ensured);
-        return ensured;
-      } catch (error) {
-        console.warn('Failed to load profile', error);
-        resolveStatus(currentUser, null);
-        return null;
-      }
-    },
-    [resolveStatus]
-  );
-
-  const loadRoles = useCallback(async (userId: string) => {
-    try {
-      const nextRoles = await fetchRoles(userId);
-      setRoles(nextRoles);
-    } catch (error) {
-      console.warn('Failed to fetch roles', error);
-    }
-  }, []);
-
   const hydrateFromSession = useCallback(
     async (nextSession: Session | null) => {
+      const runId = ++hydrationRunRef.current;
       setSession(nextSession);
       const nextUser = nextSession?.user ?? null;
       setUser(nextUser);
 
       if (!nextUser) {
-        setProfile(null);
-        setRoles([]);
-        resolveStatus(null, null);
+        clearAuthState();
         return;
       }
 
-      await Promise.all([loadProfile(nextUser), loadRoles(nextUser.id)]);
+      const sessionPolicy = ensureSessionPolicy(nextUser.id);
+      if (sessionPolicy.expired) {
+        clearSessionPolicy(nextUser.id);
+        await supabaseSignOut({ scope: 'local' });
+        if (!mountedRef.current || runId !== hydrationRunRef.current) return;
+        clearAuthState();
+        return;
+      }
+
+      setStatus('checking');
+
+      const [profileResult, rolesResult] = await Promise.allSettled([
+        withTimeout(ensureProfileForUser(nextUser), 'Profile hydration'),
+        withTimeout(fetchRoles(nextUser.id), 'Role hydration'),
+      ]);
+
+      if (!mountedRef.current || runId !== hydrationRunRef.current) return;
+
+      const nextProfile = profileResult.status === 'fulfilled' ? profileResult.value : null;
+      const nextRoles = rolesResult.status === 'fulfilled' ? rolesResult.value : [];
+
+      if (profileResult.status === 'rejected') {
+        console.warn('Failed to load profile', profileResult.reason);
+      }
+      if (rolesResult.status === 'rejected') {
+        console.warn('Failed to fetch roles', rolesResult.reason);
+      }
+
+      setProfile(nextProfile);
+      setRoles(nextRoles);
+      resolveStatus(nextUser, nextProfile);
     },
-    [loadProfile, loadRoles, resolveStatus]
+    [clearAuthState, resolveStatus]
   );
 
   useEffect(() => {
+    mountedRef.current = true;
+
     supabase.auth
       .getSession()
       .then(({ data }) => hydrateFromSession(data.session))
       .catch(() => resolveStatus(null, null));
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      hydrateFromSession(nextSession);
+      if (authEventTimerRef.current) {
+        clearTimeout(authEventTimerRef.current);
+      }
+
+      authEventTimerRef.current = setTimeout(() => {
+        authEventTimerRef.current = null;
+        void hydrateFromSession(nextSession);
+      }, 0);
     });
 
     return () => {
+      mountedRef.current = false;
+      hydrationRunRef.current += 1;
+      if (authEventTimerRef.current) {
+        clearTimeout(authEventTimerRef.current);
+        authEventTimerRef.current = null;
+      }
       listener.subscription.unsubscribe();
     };
   }, [hydrateFromSession, resolveStatus]);
@@ -127,14 +182,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await hydrateFromSession(data.session);
   }, [hydrateFromSession]);
 
-  const signOut = useCallback(async () => {
-    await supabaseSignOut();
-    setSession(null);
-    setUser(null);
-    setProfile(null);
-    setRoles([]);
-    setStatus('signed-out');
-  }, []);
+  const signOut = useCallback(async (options: { scope?: SignOutScope } = {}) => {
+    if (user?.id) {
+      clearSessionPolicy(user.id);
+    }
+    await supabaseSignOut({ scope: options.scope ?? 'local' });
+    clearAuthState();
+  }, [clearAuthState, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+
+    let disposed = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let lastActivityWriteAt = 0;
+
+    const expireSession = () => {
+      if (disposed) return;
+      void signOut();
+    };
+
+    const scheduleExpiryCheck = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      const state = getSessionPolicyState(user.id);
+      if (state.expired) {
+        expireSession();
+        return;
+      }
+
+      timeoutId = setTimeout(scheduleExpiryCheck, Math.max(1000, state.msUntilExpiry + 250));
+    };
+
+    const recordActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityWriteAt < SESSION_ACTIVITY_THROTTLE_MS) return;
+
+      lastActivityWriteAt = now;
+      const state = touchSessionActivity(user.id, now);
+      if (state.expired) {
+        expireSession();
+        return;
+      }
+
+      scheduleExpiryCheck();
+    };
+
+    const recordVisibleActivity = () => {
+      if (document.visibilityState === 'visible') {
+        recordActivity();
+      }
+    };
+
+    ensureSessionPolicy(user.id);
+    scheduleExpiryCheck();
+
+    window.addEventListener('pointerdown', recordActivity);
+    window.addEventListener('keydown', recordActivity);
+    window.addEventListener('scroll', recordActivity, { passive: true });
+    window.addEventListener('focus', recordActivity);
+    document.addEventListener('visibilitychange', recordVisibleActivity);
+
+    return () => {
+      disposed = true;
+      if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener('pointerdown', recordActivity);
+      window.removeEventListener('keydown', recordActivity);
+      window.removeEventListener('scroll', recordActivity);
+      window.removeEventListener('focus', recordActivity);
+      document.removeEventListener('visibilitychange', recordVisibleActivity);
+    };
+  }, [signOut, user?.id]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

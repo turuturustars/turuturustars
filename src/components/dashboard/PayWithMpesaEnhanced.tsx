@@ -152,7 +152,7 @@ const PayWithMpesa = ({
         contributionId,
       });
 
-      console.log("M-Pesa payment request result:", result);
+      console.log("Pay with M-Pesa result:", result);
 
       if (result.ResponseCode === '0') {
         // Record transaction
@@ -175,7 +175,7 @@ const PayWithMpesa = ({
             onPaymentSuccess(refId);
           }
           toast({
-            title: 'M-Pesa request sent',
+            title: 'Pay with M-Pesa sent',
             description: `Check your phone (${formatted}) and enter your M-Pesa PIN`,
           });
         }, 1500);
@@ -186,10 +186,10 @@ const PayWithMpesa = ({
       } else {
         throw new Error(result.ResponseDescription || 'Failed to initiate payment');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Payment error:', err);
       // Use the actual error message from backend
-      const errorMessage = err?.message || 'Payment initiation failed';
+      const errorMessage = err instanceof Error ? err.message : 'Payment initiation failed';
       console.log('Displaying error to user:', errorMessage);
       
       setErrors(prev => ({
@@ -221,15 +221,15 @@ const PayWithMpesa = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2 bg-green-600 text-white hover:bg-green-700">
             <Smartphone className="w-4 h-4" />
             Pay with M-Pesa
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="w-full max-w-md p-0 overflow-hidden" aria-describedby="mpesa-payment-description">
+      <DialogContent className="w-full max-w-md overflow-hidden border-green-100 bg-cyan-50 p-0" aria-describedby="mpesa-payment-description">
         <div id="mpesa-payment-description" className="sr-only">
-          M-Pesa payment dialog for Turuturu Stars contributions
+          Pay with M-Pesa dialog for Turuturu Stars contributions
         </div>
         {paymentStep === 'success' ? (
           // Success State
@@ -239,10 +239,10 @@ const PayWithMpesa = ({
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-2">Success!</h3>
             <p className="text-sm text-gray-700 text-center mb-2">
-              Payment of <span className="font-bold text-lg">KES {parseInt(amount).toLocaleString()}</span> initiated
+              Pay with M-Pesa for <span className="font-bold text-lg">KES {parseInt(amount).toLocaleString()}</span> started
             </p>
             <p className="text-xs text-gray-600 text-center mb-6">
-              Check your phone ({phone.replace(/(.{3})(?=.{4})/g, '$1***')}) for the M-Pesa request
+              Check your phone ({phone.replace(/(.{3})(?=.{4})/g, '$1***')}) for Pay with M-Pesa
             </p>
             <Card className="w-full bg-white/80 border-green-200 mb-6">
               <CardContent className="pt-4 text-center">
@@ -260,7 +260,7 @@ const PayWithMpesa = ({
               </Button>
               <Button
                 onClick={() => window.location.href = '/dashboard/finance/mpesa'}
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 bg-green-600 text-white hover:bg-green-700"
               >
                 <TrendingUp className="w-4 h-4" />
                 View History
@@ -269,28 +269,28 @@ const PayWithMpesa = ({
           </div>
         ) : paymentStep === 'processing' ? (
           // Processing State
-          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 min-h-[400px]">
-            <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-6 animate-pulse">
-              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-cyan-50 via-green-50 to-emerald-50 min-h-[400px]">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-6 animate-pulse">
+              <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Processing Payment</h3>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Pay with M-Pesa in progress</h3>
             <p className="text-sm text-gray-700 text-center mb-6">
-              Sending an M-Pesa request to<br />
+              Starting Pay with M-Pesa on<br />
               <span className="font-semibold">{phone.replace(/(.{3})(?=.{4})/g, '$1***')}</span>
             </p>
 
             {/* Countdown Timer */}
-            <Card className="w-full bg-white/80 border-blue-200 mb-6">
+            <Card className="w-full bg-white/80 border-green-200 mb-6">
               <CardContent className="pt-6 text-center">
                 <div className="flex items-center justify-center gap-2 mb-4">
-                  <Clock className="w-5 h-5 text-blue-600" />
+                  <Clock className="w-5 h-5 text-green-600" />
                   <p className="text-sm font-medium text-gray-700">
                     Check your phone in
                   </p>
                 </div>
-                <p className="text-4xl font-bold text-blue-600">{estimatedTime}s</p>
+                <p className="text-4xl font-bold text-green-600">{estimatedTime}s</p>
                 <p className="text-xs text-gray-500 mt-3">
-                  A M-Pesa request will appear on your phone
+                  Pay with M-Pesa will appear on your phone
                 </p>
               </CardContent>
             </Card>
@@ -298,11 +298,11 @@ const PayWithMpesa = ({
             {/* Steps */}
             <div className="w-full space-y-3 mb-6">
               <div className="flex gap-3 items-start">
-                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0 text-sm font-bold">
+                <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0 text-sm font-bold">
                   1
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">M-Pesa request arrives</p>
+                  <p className="text-sm font-medium text-gray-900">Pay with M-Pesa appears</p>
                   <p className="text-xs text-gray-600">You'll see it on your phone</p>
                 </div>
               </div>
@@ -340,9 +340,9 @@ const PayWithMpesa = ({
         ) : (
           // Form State
           <>
-            <DialogHeader className="p-6 pb-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <DialogHeader className="p-6 pb-4 border-b border-green-100 bg-cyan-50">
               <div className="flex items-center gap-3 w-full">
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-lg bg-green-600 flex items-center justify-center flex-shrink-0">
                   <Smartphone className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex-1">
@@ -356,7 +356,7 @@ const PayWithMpesa = ({
               </div>
             </DialogHeader>
 
-            <div className="p-6 space-y-5">
+            <div className="p-6 space-y-5 bg-cyan-50">
               {/* Amount Summary */}
               {defaultAmount ? (
                 <Card className="bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200">
@@ -373,7 +373,7 @@ const PayWithMpesa = ({
                     Amount (KES)
                   </Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-600" />
                     <Input
                       id="amount"
                       type="text"
@@ -382,7 +382,7 @@ const PayWithMpesa = ({
                       onChange={handleAmountChange}
                       onBlur={() => handleBlur('amount')}
                       className={cn(
-                        'pl-10 text-lg font-semibold',
+                        'pl-10 text-lg font-semibold border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500',
                         amountError && touched.amount && 'border-red-500 focus-visible:ring-red-200'
                       )}
                     />
@@ -405,7 +405,7 @@ const PayWithMpesa = ({
                   M-Pesa Number
                 </Label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Smartphone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-600" />
                   <Input
                     id="phone"
                     type="text"
@@ -414,7 +414,7 @@ const PayWithMpesa = ({
                     onChange={handlePhoneChange}
                     onBlur={() => handleBlur('phone')}
                     className={cn(
-                      'pl-10 pr-10',
+                      'pl-10 pr-10 border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500',
                       phoneError && touched.phone && 'border-red-500 focus-visible:ring-red-200'
                     )}
                   />
@@ -435,15 +435,15 @@ const PayWithMpesa = ({
               </div>
 
               {/* Info Box */}
-              <Card className="bg-blue-50 border-blue-200">
-                <CardContent className="pt-4 text-sm text-blue-900 space-y-2">
+              <Card className="bg-green-50 border-green-200">
+                <CardContent className="pt-4 text-sm text-green-900 space-y-2">
                   <div className="flex gap-2">
                     <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="font-medium mb-1">How it works:</p>
                       <ol className="text-xs space-y-1 list-decimal list-inside">
                         <li>Enter your M-Pesa number</li>
-                        <li>We'll send an M-Pesa request to your phone</li>
+                        <li>Pay with M-Pesa appears on your phone</li>
                         <li>Enter your M-Pesa PIN to complete</li>
                         <li>Get instant confirmation</li>
                       </ol>
@@ -473,7 +473,7 @@ const PayWithMpesa = ({
                 <Button
                   onClick={handlePay}
                   disabled={isProcessing || !isValid}
-                  className="flex-1 gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  className="flex-1 gap-2 bg-green-600 text-white hover:bg-green-700"
                 >
                   {isProcessing ? (
                     <>

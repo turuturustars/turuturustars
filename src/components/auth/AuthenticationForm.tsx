@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Eye, EyeOff, AlertCircle, Mail, Lock } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertCircle, Mail, Lock, Phone } from 'lucide-react';
 import { z } from 'zod';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { isProfileComplete } from '@/utils/profileCompletion';
 import { registerWithEmail, signInUser } from '@/lib/authService';
+import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -23,6 +24,7 @@ const loginSchema = z.object({
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
+  phone: z.string().refine((value) => normalizeKenyanPhone(value) !== null, formatKenyanPhoneError()),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -32,6 +34,7 @@ const signupSchema = z.object({
 
 interface FormErrors {
   email?: string;
+  phone?: string;
   password?: string;
   confirmPassword?: string;
   submit?: string;
@@ -66,6 +69,7 @@ const AuthenticationForm = ({
 
   const [signupData, setSignupData] = useState({
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
   });
@@ -144,7 +148,7 @@ const AuthenticationForm = ({
           .eq('id', session.user.id)
           .maybeSingle();
 
-        if (isProfileComplete(profile as any)) {
+        if (isProfileComplete(profile)) {
           navigate('/dashboard', { replace: true });
         } else {
           navigate('/register', { replace: true });
@@ -180,8 +184,9 @@ const AuthenticationForm = ({
     try {
       const response = await registerWithEmail({
         email: signupData.email,
+        phone: signupData.phone,
         password: signupData.password,
-        redirectTo: buildSiteUrl('/auth/confirm'),
+        redirectTo: buildSiteUrl('/auth/callback'),
       });
 
       toast({
@@ -319,6 +324,28 @@ const AuthenticationForm = ({
                 <p className="text-sm text-destructive">{errors.email}</p>
               )}
             </div>
+
+            {/* Phone field (signup only) */}
+            {mode === 'signup' && (
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  Phone
+                </Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="07XXXXXXXX or +2547XXXXXXXX"
+                  value={signupData.phone}
+                  onChange={(e) => setSignupData(prev => ({ ...prev, phone: e.target.value }))}
+                  className={errors.phone ? 'border-destructive' : ''}
+                  disabled={isLoading}
+                />
+                {errors.phone && (
+                  <p className="text-sm text-destructive">{errors.phone}</p>
+                )}
+              </div>
+            )}
 
             {/* Password field */}
             <div className="space-y-2">

@@ -45,6 +45,24 @@ interface PendingMembershipFee {
   due_date: string | null;
 }
 
+interface MemberDashboardStatsRpcRow {
+  total_contributions: number | string | null;
+  pending_contributions: number | string | null;
+  active_welfare_cases: number | string | null;
+  unread_notifications: number | string | null;
+  pending_membership_fee_amount: number | string | null;
+  pending_membership_fee_due_date: string | null;
+}
+
+const toNumber = (value: number | string | null | undefined): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
 const encouragements = [
   'Small, steady contributions build big change.',
   'Progress loves consistency. One action today matters.',
@@ -116,6 +134,59 @@ const DashboardHome = () => {
   }, [roles, navigate, location.pathname]);
 
   useEffect(() => {
+    const fetchDashboardData = async () => {
+      const profileId = profile?.id;
+      if (!profileId) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const fetchPromise = supabase
+          .rpc('get_member_dashboard_stats' as never)
+          .maybeSingle();
+
+        const timeoutPromise = new Promise<'timeout'>((resolve) => {
+          setTimeout(() => resolve('timeout'), 4500);
+        });
+
+        const result = await Promise.race([fetchPromise, timeoutPromise]);
+
+        if (result === 'timeout') {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data, error } = result;
+        if (error) {
+          throw error;
+        }
+
+        const row = data as MemberDashboardStatsRpcRow | null;
+        const pendingMembershipFeeAmount = row?.pending_membership_fee_amount;
+
+        if (pendingMembershipFeeAmount !== null && pendingMembershipFeeAmount !== undefined) {
+          setPendingMembershipFee({
+            amount: toNumber(pendingMembershipFeeAmount),
+            due_date: row?.pending_membership_fee_due_date || null,
+          });
+        } else {
+          setPendingMembershipFee(null);
+        }
+
+        setStats({
+          totalContributions: toNumber(row?.total_contributions),
+          pendingContributions: toNumber(row?.pending_contributions),
+          activeWelfareCases: toNumber(row?.active_welfare_cases),
+          unreadNotifications: toNumber(row?.unread_notifications),
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchDashboardData();
   }, [profile?.id]);
 
@@ -146,7 +217,7 @@ const DashboardHome = () => {
         type: 'signup',
         email: emailAddress,
         options: {
-          emailRedirectTo: buildSiteUrl('/auth/confirm'),
+          emailRedirectTo: buildSiteUrl('/auth/callback'),
         },
       });
 
@@ -172,76 +243,6 @@ const DashboardHome = () => {
       });
     } finally {
       setIsResendingEmail(false);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    if (!profile?.id) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const fetchPromise = Promise.all([
-        supabase.from('contributions').select('status, amount').eq('member_id', profile.id),
-        supabase.from('welfare_cases').select('id').eq('status', 'active'),
-        supabase.from('notifications').select('id').eq('user_id', profile.id).eq('read', false),
-        supabase
-          .from('contributions')
-          .select('amount, due_date')
-          .eq('member_id', profile.id)
-          .eq('contribution_type', 'membership_fee')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(1),
-      ]);
-
-      const timeoutPromise = new Promise<'timeout'>((resolve) => {
-        setTimeout(() => resolve('timeout'), 4500);
-      });
-
-      const result = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (result === 'timeout') {
-        setIsLoading(false);
-        return;
-      }
-
-      const [contributionsRes, welfareCasesRes, notificationsRes, membershipFeeRes] = result;
-
-      if (contributionsRes.error || welfareCasesRes.error || notificationsRes.error) {
-        console.error('Dashboard data errors:', {
-          contributions: contributionsRes.error,
-          welfareCases: welfareCasesRes.error,
-          notifications: notificationsRes.error,
-        });
-      }
-
-      if (membershipFeeRes?.data && membershipFeeRes.data.length > 0) {
-        setPendingMembershipFee({
-          amount: Number(membershipFeeRes.data[0].amount),
-          due_date: membershipFeeRes.data[0].due_date || null,
-        });
-      } else {
-        setPendingMembershipFee(null);
-      }
-
-      const totalPaid = contributionsRes.data
-        ?.filter((c) => c.status === 'paid')
-        .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
-
-      const pendingCount = contributionsRes.data?.filter((c) => c.status === 'pending').length || 0;
-
-      setStats({
-        totalContributions: totalPaid,
-        pendingContributions: pendingCount,
-        activeWelfareCases: welfareCasesRes.data?.length || 0,
-        unreadNotifications: notificationsRes.data?.length || 0,
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -642,7 +643,7 @@ const DashboardHome = () => {
                     </div>
                     <div className="text-left flex-1">
                       <div className="font-semibold text-sm">Pay with M-Pesa</div>
-                      <div className="text-xs opacity-90">Phone + amount, quick M-Pesa request</div>
+                      <div className="text-xs opacity-90">Phone + amount, Pay with M-Pesa</div>
                     </div>
                     <ArrowRight className="w-4 h-4" />
                   </AccessibleButton>

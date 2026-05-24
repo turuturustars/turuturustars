@@ -79,7 +79,7 @@ async function sendWhatsAppPaymentUpdate(
       successfulServiceLine,
     ].filter(Boolean).join("\n")
     : [
-      "M-Pesa payment was not completed.",
+      "Pay with M-Pesa was not completed.",
       resultDescription || "Please try again or contact the treasurer.",
     ].join("\n");
 
@@ -152,11 +152,43 @@ async function getKittyTitle(supabase: SupabaseClient, kittyId: string | null): 
   return typeof data?.title === "string" && data.title.trim() ? data.title.trim() : null;
 }
 
+async function getWelfareCaseTitleForContribution(supabase: SupabaseClient, contributionId: string | null): Promise<string | null> {
+  if (!contributionId) return null;
+
+  const { data: contribution, error: contributionError } = await supabase
+    .from("contributions")
+    .select("welfare_case_id")
+    .eq("id", contributionId)
+    .maybeSingle();
+
+  if (contributionError) {
+    console.error("Failed to load welfare contribution for WhatsApp confirmation:", contributionError);
+    return null;
+  }
+
+  const welfareCaseId = typeof contribution?.welfare_case_id === "string" ? contribution.welfare_case_id : null;
+  if (!welfareCaseId) return null;
+
+  const { data, error } = await supabase
+    .from("welfare_cases")
+    .select("title")
+    .eq("id", welfareCaseId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Failed to load welfare title for WhatsApp confirmation:", error);
+    return null;
+  }
+
+  return typeof data?.title === "string" && data.title.trim() ? data.title.trim() : null;
+}
+
 function transactionAlertTitle(transactionType: string | null, success: boolean): string {
   const status = success ? "completed" : "failed";
   if (transactionType === "wallet_topup") return `Wallet top-up ${status}`;
   if (transactionType === "kitty_contribution") return `Kitty contribution ${status}`;
-  return `M-Pesa payment ${status}`;
+  if (transactionType === "welfare_contribution") return `Welfare contribution ${status}`;
+  return `Pay with M-Pesa ${status}`;
 }
 
 async function notifyTreasurersForMpesaTransaction(
@@ -173,7 +205,9 @@ async function notifyTreasurersForMpesaTransaction(
 
   const details = transaction.transaction_type === "kitty_contribution"
     ? await getKittyTitle(supabase, transaction.kitty_id)
-    : null;
+    : transaction.transaction_type === "welfare_contribution"
+      ? await getWelfareCaseTitleForContribution(supabase, transaction.contribution_id)
+      : null;
 
   await notifyTreasurersOfMoneyEvent(supabase, {
     title: transactionAlertTitle(transaction.transaction_type, success),
@@ -185,7 +219,9 @@ async function notifyTreasurersForMpesaTransaction(
     reference: receiptNumber || transaction.checkout_request_id || checkoutRequestId,
     checkoutRequestId,
     transactionId: transaction.id,
-    details: details ? `Kitty: ${details}. ${resultDescription || ""}`.trim() : resultDescription || null,
+    details: details
+      ? `${transaction.transaction_type === "welfare_contribution" ? "Welfare" : "Kitty"}: ${details}. ${resultDescription || ""}`.trim()
+      : resultDescription || null,
   });
 }
 
@@ -209,11 +245,19 @@ async function sendSmartWhatsAppPaymentUpdate(
   const kittyTitle = transaction.transaction_type === "kitty_contribution"
     ? await getKittyTitle(supabase, transaction.kitty_id)
     : null;
-  const successfulServiceLine = transaction.transaction_type === "wallet_topup"
-    ? "Your wallet top-up has been confirmed."
-    : kittyTitle
-      ? `Your contribution to ${kittyTitle} has been confirmed.`
-      : "Your kitty contribution has been confirmed.";
+  const welfareTitle = transaction.transaction_type === "welfare_contribution"
+    ? await getWelfareCaseTitleForContribution(supabase, transaction.contribution_id)
+    : null;
+  let successfulServiceLine = "Your kitty contribution has been confirmed.";
+  if (transaction.transaction_type === "wallet_topup") {
+    successfulServiceLine = "Your wallet top-up has been confirmed.";
+  } else if (transaction.transaction_type === "welfare_contribution") {
+    successfulServiceLine = welfareTitle
+      ? `Your welfare contribution to ${welfareTitle} has been confirmed.`
+      : "Your welfare contribution has been confirmed.";
+  } else if (kittyTitle) {
+    successfulServiceLine = `Your contribution to ${kittyTitle} has been confirmed.`;
+  }
 
   const body = success
     ? [
@@ -222,7 +266,7 @@ async function sendSmartWhatsAppPaymentUpdate(
       successfulServiceLine,
     ].filter(Boolean).join("\n")
     : [
-      "M-Pesa payment was not completed.",
+      "Pay with M-Pesa was not completed.",
       resultDescription || "Please try again or contact the treasurer.",
     ].join("\n");
 
@@ -497,24 +541,65 @@ serve(async (req) => {
 
     if (mpesaSucceeded && transaction?.contribution_id) {
       try {
-        const { data: currentContribution } = await supabase
+        const { data: updatedContribution, error: contributionUpdateError } = await supabase
           .from("contributions")
-          .select("status, paid_at")
+          .update({
+            status: "paid",
+            paid_at: new Date().toISOString(),
+            reference_number: mpesaReceiptNumber,
+          })
           .eq("id", transaction.contribution_id)
-          .single();
+          .neq("status", "paid")
+          .select("status, paid_at, welfare_case_id, amount, contribution_type")
+          .maybeSingle();
 
-        if (currentContribution?.status !== "paid") {
-          await supabase
-            .from("contributions")
-            .update({
-              status: "paid",
-              paid_at: new Date().toISOString(),
-              reference_number: mpesaReceiptNumber,
-            })
-            .eq("id", transaction.contribution_id);
+        if (contributionUpdateError) {
+          throw contributionUpdateError;
         }
 
-        if (transaction.member_id) {
+        const contributionJustMarkedPaid = updatedContribution as Record<string, unknown> | null;
+        const welfareCaseId = typeof contributionJustMarkedPaid?.welfare_case_id === "string"
+          ? contributionJustMarkedPaid.welfare_case_id
+          : null;
+        if (welfareCaseId) {
+          const welfareAmount = expectedAmount || Number(contributionJustMarkedPaid?.amount || 0);
+          const { data: welfareCase, error: welfareLoadError } = await supabase
+            .from("welfare_cases")
+            .select("collected_amount")
+            .eq("id", welfareCaseId)
+            .maybeSingle();
+
+          if (welfareLoadError) {
+            console.error("Error loading welfare case for M-Pesa contribution:", welfareLoadError);
+          } else {
+            await supabase
+              .from("welfare_cases")
+              .update({ collected_amount: Number(welfareCase?.collected_amount || 0) + welfareAmount })
+              .eq("id", welfareCaseId);
+          }
+
+          if (transaction.member_id) {
+            const { error: welfareTransactionError } = await supabase
+              .from("welfare_transactions")
+              .insert({
+                welfare_case_id: welfareCaseId,
+                amount: welfareAmount,
+                transaction_type: "contribution",
+                mpesa_code: mpesaReceiptNumber || CheckoutRequestID,
+                recorded_by_id: transaction.member_id,
+                notes: "WhatsApp M-Pesa welfare contribution",
+                status: "completed",
+              });
+
+            if (welfareTransactionError) {
+              console.error("Error recording welfare transaction from M-Pesa:", welfareTransactionError);
+            }
+          } else {
+            console.error("Cannot record welfare transaction without member_id", { transactionId: transaction.id });
+          }
+        }
+
+        if (contributionJustMarkedPaid && transaction.member_id) {
           const { data: existingTracking } = await supabase
             .from("contribution_tracking")
             .select("id")
@@ -534,6 +619,22 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error("Error updating contribution:", error);
+      }
+    }
+
+    if (!mpesaSucceeded && transaction?.transaction_type === "welfare_contribution" && transaction.contribution_id) {
+      try {
+        const { error: deleteContributionError } = await supabase
+          .from("contributions")
+          .delete()
+          .eq("id", transaction.contribution_id)
+          .eq("status", "pending");
+
+        if (deleteContributionError) {
+          console.error("Error deleting failed WhatsApp welfare contribution:", deleteContributionError);
+        }
+      } catch (error) {
+        console.error("Error cleaning failed WhatsApp welfare contribution:", error);
       }
     }
 
@@ -592,6 +693,26 @@ serve(async (req) => {
           }
         }
 
+        if (mpesaSucceeded && intent.payment_purpose === "wallet_topup" && transaction?.id) {
+          const canonicalWalletAmount = expectedAmount || amount || intent.amount;
+          const { error: canonicalWalletCreditError } = await supabase.rpc("process_wallet_transaction", {
+            _user_id: transaction.member_id || intent.member_id,
+            _type: "topup",
+            _direction: "credit",
+            _amount: canonicalWalletAmount,
+            _description: `M-Pesa wallet top-up (${mpesaReceiptNumber || CheckoutRequestID})`,
+            _reference: mpesaReceiptNumber || CheckoutRequestID,
+            _mpesa_transaction_id: transaction.id,
+            _contribution_id: null,
+            _welfare_case_id: null,
+            _discipline_id: null,
+          });
+
+          if (canonicalWalletCreditError) {
+            console.error("Error crediting canonical wallet top-up:", canonicalWalletCreditError);
+          }
+        }
+
         if (!mpesaSucceeded && intent.payment_purpose === "wallet_topup" && intent.wallet_transaction_id) {
           const { error: walletFailureError } = await supabase
             .from("member_wallet_transactions")
@@ -634,8 +755,8 @@ serve(async (req) => {
           user_id: intent.member_id,
           title: mpesaSucceeded ? "Payment received" : "Payment failed",
           message: mpesaSucceeded
-            ? `M-Pesa payment of KES ${amount || intent.amount} has been received. Receipt: ${mpesaReceiptNumber || "pending"}`
-            : `M-Pesa payment was not completed: ${effectiveResultDesc}`,
+            ? `Pay with M-Pesa of KES ${amount || intent.amount} has been received. Receipt: ${mpesaReceiptNumber || "pending"}`
+            : `Pay with M-Pesa was not completed: ${effectiveResultDesc}`,
           type: intent.payment_purpose === "wallet_topup" ? "wallet" : "contribution",
           sent_via: ["whatsapp"],
           whatsapp_status: whatsappStatus,
@@ -648,7 +769,7 @@ serve(async (req) => {
         transactionJustResolved &&
         transaction?.member_id &&
         transaction.phone_number &&
-        (transaction.transaction_type === "wallet_topup" || transaction.transaction_type === "kitty_contribution")
+        (transaction.transaction_type === "wallet_topup" || transaction.transaction_type === "kitty_contribution" || transaction.transaction_type === "welfare_contribution")
       ) {
         const notificationAmount = expectedAmount || amount;
         let sendResult: SmartPaymentSendResult | null = null;
@@ -679,14 +800,16 @@ serve(async (req) => {
             : "skipped";
         const notificationType = transaction.transaction_type === "wallet_topup"
           ? "wallet_topup"
-          : "kitty_contribution";
+          : transaction.transaction_type === "welfare_contribution"
+            ? "welfare_contribution"
+            : "kitty_contribution";
 
         await supabase.from("notifications").insert({
           user_id: transaction.member_id,
           title: mpesaSucceeded ? "Payment received" : "Payment failed",
           message: mpesaSucceeded
-            ? `M-Pesa payment of KES ${formatKesAmount(notificationAmount)} has been received. Receipt: ${mpesaReceiptNumber || "pending"}`
-            : `M-Pesa payment was not completed: ${effectiveResultDesc}`,
+            ? `Pay with M-Pesa of KES ${formatKesAmount(notificationAmount)} has been received. Receipt: ${mpesaReceiptNumber || "pending"}`
+            : `Pay with M-Pesa was not completed: ${effectiveResultDesc}`,
           type: notificationType,
           sent_via: ["whatsapp"],
           whatsapp_status: whatsappStatus,

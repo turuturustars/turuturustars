@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.1";
 import { HttpError, corsHeaders, errorResponse, isOptionsRequest, jsonResponse } from "../_shared/http.ts";
 
 type SignInIdentifierKind = "email" | "phone" | "membership_number";
@@ -23,8 +23,43 @@ type ProfileLookupRow = {
   id_number: string | null;
 };
 
+type AuthErrorLike = {
+  message?: string;
+  status?: number;
+  code?: string;
+};
+
+type AuthAdminClient = {
+  getUserById: (userId: string) => Promise<{
+    data: {
+      user?: {
+        email?: string | null;
+      } | null;
+    } | null;
+    error: AuthErrorLike | null;
+  }>;
+};
+
+type PasswordSignInResult =
+  | {
+    success: true;
+    session: {
+      access_token: string;
+      refresh_token: string;
+    };
+    user: {
+      id: string;
+      email?: string;
+    };
+  }
+  | {
+    success: false;
+    error: AuthErrorLike | null;
+  };
+
 const INVALID_CREDENTIALS_MESSAGE = "Invalid credentials. Use your email/phone and password.";
-const DEFAULT_SITE_URL = "https://turuturustars.co.ke";
+const EMAIL_NOT_CONFIRMED_MESSAGE =
+  "Your password is correct, but your email is not confirmed yet. Check your inbox for the confirmation link, then sign in again.";
 
 function createAdminClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -50,6 +85,10 @@ function createAnonClient() {
   return createClient(supabaseUrl, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+function getAuthAdmin(supabaseAdmin: ReturnType<typeof createAdminClient>): AuthAdminClient {
+  return supabaseAdmin.auth.admin as unknown as AuthAdminClient;
 }
 
 function parseMembershipNumber(value: string): string | null {
@@ -97,8 +136,48 @@ function resolveIdentifier(rawIdentifier: string): IdentifierLookup | null {
   return null;
 }
 
-function normalizeSecret(value: string | null | undefined): string {
-  return (value || "").replace(/\s+/g, "").toUpperCase();
+function authErrorMessage(error: AuthErrorLike | null): string {
+  return (error?.message || "").trim();
+}
+
+function normalizedAuthErrorMessage(error: AuthErrorLike | null): string {
+  return authErrorMessage(error).toLowerCase();
+}
+
+function isEmailNotConfirmedError(error: AuthErrorLike | null): boolean {
+  const message = normalizedAuthErrorMessage(error);
+  return message.includes("email not confirmed") || message.includes("email address not confirmed");
+}
+
+function isInvalidCredentialsError(error: AuthErrorLike | null): boolean {
+  const message = normalizedAuthErrorMessage(error);
+  return (
+    !message ||
+    message.includes("invalid login credentials") ||
+    message.includes("invalid credentials") ||
+    message.includes("invalid grant")
+  );
+}
+
+function isCaptchaError(error: AuthErrorLike | null): boolean {
+  const message = normalizedAuthErrorMessage(error);
+  return message.includes("captcha") || message.includes("verification process failed");
+}
+
+function passwordSignInFailureStatus(error: AuthErrorLike | null): number {
+  if (typeof error?.status === "number" && error.status >= 400 && error.status < 500) {
+    return error.status;
+  }
+  return 400;
+}
+
+function normalizeNationalId(value: string | null | undefined): string {
+  return (value || "").replace(/\s+/g, "").trim();
+}
+
+function usedNationalIdPassword(profile: ProfileLookupRow | null, password: string): boolean {
+  const idNumber = normalizeNationalId(profile?.id_number);
+  return Boolean(idNumber && idNumber === normalizeNationalId(password));
 }
 
 async function resolveProfile(
@@ -113,8 +192,8 @@ async function resolveProfile(
   const { data, error } = lookup.kind === "phone"
     ? await query.eq("phone", lookup.normalized).maybeSingle()
     : lookup.kind === "membership_number"
-      ? await query.ilike("membership_number", lookup.normalized).maybeSingle()
-      : await query.ilike("email", lookup.normalized).maybeSingle();
+      ? await query.eq("membership_number", lookup.normalized).maybeSingle()
+      : await query.eq("email", lookup.normalized).maybeSingle();
 
   if (error) {
     throw new HttpError(500, "Failed to resolve account profile", error);
@@ -131,7 +210,7 @@ async function resolveProfileAuthEmail(
   if (profileEmail) return profileEmail;
   if (!profile?.id) return "";
 
-  const { data, error } = await (supabaseAdmin.auth.admin as any).getUserById(profile.id);
+  const { data, error } = await getAuthAdmin(supabaseAdmin).getUserById(profile.id);
   if (error) {
     console.warn("Failed to resolve auth email for profile", profile.id, error.message);
     return "";
@@ -145,7 +224,7 @@ async function tryPasswordSignIn(
   email: string,
   password: string,
   captchaToken: string | undefined,
-) {
+): Promise<PasswordSignInResult> {
   const { data, error } = await supabaseAnon.auth.signInWithPassword({
     email,
     password,
@@ -155,58 +234,16 @@ async function tryPasswordSignIn(
   });
 
   if (error || !data.session || !data.user) {
-    return null;
+    return {
+      success: false,
+      error: (error as AuthErrorLike | null) ?? null,
+    };
   }
 
   return {
+    success: true,
     session: data.session,
     user: data.user,
-    usedIdNumberPassword: false,
-  };
-}
-
-async function tryIdNumberFallbackSignIn(
-  supabaseAdmin: ReturnType<typeof createAdminClient>,
-  supabaseAnon: ReturnType<typeof createAnonClient>,
-  profile: ProfileLookupRow | null,
-  email: string,
-  providedPassword: string,
-) {
-  if (!profile || !email) return null;
-
-  const expectedIdPassword = normalizeSecret(profile.id_number);
-  if (!expectedIdPassword) return null;
-  if (normalizeSecret(providedPassword) !== expectedIdPassword) return null;
-
-  const redirectTo = Deno.env.get("SITE_URL")?.trim() || DEFAULT_SITE_URL;
-  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-    type: "magiclink",
-    email,
-    options: { redirectTo },
-  });
-
-  if (linkError) {
-    throw new HttpError(500, "Unable to process ID-number login", linkError);
-  }
-
-  const tokenHash = (linkData as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token;
-  if (!tokenHash) {
-    throw new HttpError(500, "Unable to process ID-number login");
-  }
-
-  const { data: verifyData, error: verifyError } = await supabaseAnon.auth.verifyOtp({
-    type: "magiclink",
-    token_hash: tokenHash,
-  });
-
-  if (verifyError || !verifyData.session || !verifyData.user) {
-    throw new HttpError(400, INVALID_CREDENTIALS_MESSAGE);
-  }
-
-  return {
-    session: verifyData.session,
-    user: verifyData.user,
-    usedIdNumberPassword: true,
   };
 }
 
@@ -260,11 +297,11 @@ serve(async (req) => {
     }
 
     const passwordSignIn = await tryPasswordSignIn(supabaseAnon, resolvedEmail, password, captchaToken);
-    if (passwordSignIn) {
+    if (passwordSignIn.success) {
       return jsonResponse({
         success: true,
         identifierType: lookup.kind,
-        usedIdNumberPassword: false,
+        usedIdNumberPassword: usedNationalIdPassword(profile, password),
         user: {
           id: passwordSignIn.user.id,
           email: passwordSignIn.user.email,
@@ -274,19 +311,30 @@ serve(async (req) => {
       });
     }
 
-    const idFallbackSignIn = await tryIdNumberFallbackSignIn(supabaseAdmin, supabaseAnon, profile, resolvedEmail, password);
-    if (idFallbackSignIn) {
-      return jsonResponse({
-        success: true,
+    if (isEmailNotConfirmedError(passwordSignIn.error)) {
+      throw new HttpError(403, EMAIL_NOT_CONFIRMED_MESSAGE, {
+        code: "email_not_confirmed",
         identifierType: lookup.kind,
-        usedIdNumberPassword: true,
-        user: {
-          id: idFallbackSignIn.user.id,
-          email: idFallbackSignIn.user.email,
-        },
-        accessToken: idFallbackSignIn.session.access_token,
-        refreshToken: idFallbackSignIn.session.refresh_token,
+        email: resolvedEmail,
       });
+    }
+
+    if (isCaptchaError(passwordSignIn.error)) {
+      throw new HttpError(passwordSignInFailureStatus(passwordSignIn.error), authErrorMessage(passwordSignIn.error), {
+        code: passwordSignIn.error?.code ?? "captcha_verification_failed",
+        identifierType: lookup.kind,
+      });
+    }
+
+    if (!isInvalidCredentialsError(passwordSignIn.error)) {
+      throw new HttpError(
+        passwordSignInFailureStatus(passwordSignIn.error),
+        authErrorMessage(passwordSignIn.error) || "Unable to sign in right now. Please try again.",
+        {
+          code: passwordSignIn.error?.code ?? "signin_failed",
+          identifierType: lookup.kind,
+        },
+      );
     }
 
     throw new HttpError(400, INVALID_CREDENTIALS_MESSAGE);

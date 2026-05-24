@@ -10,15 +10,18 @@ It can:
 - Greet registered members by name when the number is recognized.
 - Ask registered members to rate the chat with emoji choices `😍 😊 😐 🙁 😡` and store those ratings.
 - Guide unknown numbers through a registration-interest flow:
-  confirm the WhatsApp number, collect email, send an email OTP, collect required profile details, and create the member account.
+  confirm the WhatsApp number, optionally collect email, verify email by OTP when available, collect required profile details, and create the member account.
 - Understand natural English, Kiswahili, and mixed Kenyan phrasing.
+- Store a rolling `whatsapp_sessions.conversation_summary` for continuity, including preferred language, unresolved issue, recent payment/reference concern, registration stage, and role capabilities.
 - Offer an M-Pesa-style numbered menu while still accepting normal conversation.
 - Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
 - Start wallet top-ups by M-Pesa STK push using the main `wallets` and `wallet_transactions` ledger.
 - Let members list active kitties and contribute to a kitty by M-Pesa or from their wallet.
 - Record member transaction/contribution notices as `contributions.status = pending`.
 - Let treasurers/admins record expenditures as `expenditures.status = pending_approval`.
-- Unlock official/admin actions by the registered sender number and roles, including creating welfare cases.
+- Unlock official/admin actions by the registered sender number and roles, including creating welfare cases, publishing announcements, verifying payments, and approval queues.
+- Queue every published announcement as both an in-app notification and a WhatsApp alert for active members.
+- Let officials confirm their detected roles with `MY ROLE` / `WHO AM I`, and use role-specific commands such as `PENDING PAYMENTS`, `VERIFY <ref>`, `TODAY MONEY`, and `ANNOUNCE ...`.
 - Answer trainable support questions from `ai_knowledge_base`, with optional Groq/OpenAI wording when configured.
 - Keep an audit trail in `whatsapp_sessions`, `whatsapp_messages`, and `whatsapp_actions`.
 - Keep service feedback in `whatsapp_conversation_ratings`.
@@ -76,6 +79,8 @@ Set `WHATSAPP_AI_PROVIDER="off"` to force the local English/Kiswahili parser onl
 
 Knowledge answers can use the last few logged WhatsApp turns for continuity. Tune that with `WHATSAPP_AI_CONVERSATION_TURNS`, default `8`; the AI still may not perform payments, updates, approvals, voting, or registration unless the deterministic command flow has already done it.
 
+Intent extraction also receives the rolling session summary, so it can remember a member's recent unresolved receipt issue or registration stage without sending the whole conversation history to the model.
+
 Do not commit AI keys or paste production keys into docs or code. Store them only as Supabase Edge Function secrets, and rotate any key that has been shared in chat or logs.
 
 Member and official replies also append a clickable access link when the answer has a matching dashboard or public page. For example, a wallet reply ends with `Press here to access your wallet: https://turuturustars.co.ke/dashboard/finance/wallet`. Set `WHATSAPP_SITE_URL` if the production domain changes.
@@ -116,11 +121,19 @@ Add welfare case medical for Mary target 20000
 Open welfare case for TS-00034 school fees target 15000
 Record expense 1200 fare to Nyeri ref BUS12
 Tumetumia 3500 kununua stationery kwa office
+MY ROLE
+PENDING PAYMENTS
+VERIFY QJD123ABC
+TODAY MONEY
+ANNOUNCE title: Meeting content: Meeting is Saturday at 10
+Dry run announcement title: Meeting content: Meeting is Saturday at 10
 ```
 
 Contribution records created from WhatsApp are pending until finance verifies them. Expenditures created from WhatsApp remain pending approval through the normal governance workflow. Welfare cases created from WhatsApp are opened as active cases and linked to the official who created them.
 
-Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, provide an email or reply `NO EMAIL`, verify email by OTP when available, then provide full name, National ID, and location. Once required details are complete, the bot creates an auth/profile member account with the National ID as the first password. By default the new member is `pending`, so member-priority services stay locked until an admin approves the account.
+Announcement publishing is unified through the database helper `enqueue_announcement_member_alerts`. Whether an announcement is published from the portal or WhatsApp, active members receive the dashboard notification and a WhatsApp queue row, with duplicate sends prevented per announcement/member. Officials can dry-run an announcement from WhatsApp to see the active-member recipient count before publishing.
+
+Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, then either provide an email or reply `SKIP` / `NO EMAIL`. Email is optional, and users may send profile details directly at the email step. If an email is provided, the bot verifies it by OTP when possible, but registration can continue without blocking on email delivery. Once full name, National ID, and location are complete, the bot creates an auth/profile member account with the National ID as the default password. By default the new member is `pending`, so member-priority services stay locked until an admin approves the account.
 
 After registered-member replies, the assistant appends:
 
@@ -134,6 +147,10 @@ When the member replies with one of those emojis, the rating is saved and the bo
 
 When the assistant is waiting for a reply, such as registration OTP, missing transaction amount, or welfare case title, it marks the session as awaiting response. The `whatsapp-notification-worker` job also checks those sessions. If the user has not replied after `WHATSAPP_ABANDONMENT_MINUTES` minutes, default `3`, it sends one warm pause message with a day/evening/night wish and stops nudging.
 
-Run the `whatsapp-notification-worker` job frequently with `WHATSAPP_NOTIFICATIONS_JOB_SECRET`. It also accepts the older `WHATSAPP_NOTIFICATION_SECRET` secret name for compatibility. The same worker still processes queued WhatsApp notifications. The included GitHub workflow runs it every 5 minutes; use Supabase Scheduled Functions or another scheduler at about 1-minute frequency when you need the pause message to land as close as possible to the 3-minute mark.
+Run the `whatsapp-notification-worker` job frequently with `WHATSAPP_NOTIFICATIONS_JOB_SECRET`. It also accepts the older `WHATSAPP_NOTIFICATION_SECRET` secret name for compatibility. The same worker processes queued WhatsApp notifications with retries, `next_attempt_at`, and `dead_lettered_at` visibility. The included GitHub workflow runs it every 5 minutes; use Supabase Scheduled Functions or another scheduler at about 1-minute frequency when you need the pause message to land as close as possible to the 3-minute mark.
+
+For proactive alerts outside an active WhatsApp chat window, configure an approved Meta template with `WHATSAPP_NOTIFICATION_TEMPLATE_NAME`, or event-specific names such as `WHATSAPP_ANNOUNCEMENT_TEMPLATE_NAME`. Queue rows can also carry `template_name`, `template_language`, and `template_parameters`.
+
+Officials can monitor queued, sent, failed, and dead-lettered alerts in the WhatsApp Automation dashboard. That page can run the worker, retry failed queue rows, send test WhatsApps, and simulate inbound messages against the live `whatsapp-webhook` path.
 
 When the user comes back, the bot recognizes the paused session and sends a varied welcome-back message that mentions where the conversation stopped before continuing with the new message.

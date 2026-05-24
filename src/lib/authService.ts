@@ -7,12 +7,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { getEmailConfig } from '@/config/emailConfig';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
+import {
+  resendVerificationEmail as resendVerificationEmailViaAuthApi,
+  signInWithEmail as signInWithEmailViaAuthApi,
+  signUpWithEmail as signUpWithEmailViaAuthApi,
+} from '@/features/auth/authApi';
 
 export interface AuthUser {
   id: string;
   email?: string;
   email_confirmed_at?: string;
-  user_metadata?: Record<string, any>;
+  user_metadata?: Record<string, unknown>;
 }
 
 export interface SignUpData {
@@ -92,7 +97,6 @@ export async function signUpUser(data: SignUpData) {
  * Register user via edge function (consistent email + membership handling)
  */
 export async function registerWithEmail(data: SignUpData) {
-  const redirectUrl = data.redirectTo || buildSiteUrl('/auth/confirm');
   if (!data.email) {
     throw new Error('Email is required');
   }
@@ -100,39 +104,25 @@ export async function registerWithEmail(data: SignUpData) {
     throw new Error('Password must be at least 8 characters');
   }
   const normalizedPhone = data.phone ? normalizeKenyanPhone(data.phone) : null;
-  if (data.phone && !normalizedPhone) {
+  if (!normalizedPhone) {
     throw new Error(formatKenyanPhoneError());
   }
 
-  const { data: response, error } = await supabase.auth.signUp({
+  const response = await signUpWithEmailViaAuthApi({
     email: data.email,
     password: data.password,
-    options: {
-      emailRedirectTo: redirectUrl,
-      data: {
-        full_name: data.fullName,
-        phone: normalizedPhone ?? undefined,
-        id_number: data.idNumber,
-        location: data.location,
-        occupation: data.occupation,
-        employment_status: data.employmentStatus,
-        interests: data.interests,
-        education_level: data.educationLevel,
-        additional_notes: data.additionalNotes,
-        is_student: data.isStudent,
-      },
-    },
+    fullName: data.fullName,
+    phone: normalizedPhone,
+    idNumber: data.idNumber,
+    location: data.location,
+    occupation: data.occupation,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
 
   return {
     success: true,
-    userId: response.user?.id,
+    userId: response.user?.id ?? undefined,
     email: response.user?.email ?? data.email,
-    requiresEmailVerification: !response.session,
+    requiresEmailVerification: response.requiresEmailVerification,
   };
 }
 
@@ -140,17 +130,7 @@ export async function registerWithEmail(data: SignUpData) {
  * Resend verification email via edge function
  */
 export async function resendVerificationEmail(email: string, redirectTo?: string) {
-  const { error } = await supabase.auth.resend({
-    type: 'signup',
-    email,
-    options: {
-      emailRedirectTo: redirectTo || buildSiteUrl('/auth/confirm'),
-    },
-  });
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  await resendVerificationEmailViaAuthApi(email);
 
   return { success: true, message: 'Verification email resent' };
 }
@@ -159,14 +139,10 @@ export async function resendVerificationEmail(email: string, redirectTo?: string
  * Sign in user with email and password
  */
 export async function signInUser(data: SignInData) {
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email: data.email,
+  const authData = await signInWithEmailViaAuthApi({
+    identifier: data.email,
     password: data.password,
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
 
   return {
     success: true,
@@ -234,7 +210,7 @@ export async function resetPassword(token: string, newPassword: string) {
  * Sign out user
  */
 export async function signOutUser() {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
 
   if (error) {
     throw new Error(error.message);
@@ -246,7 +222,7 @@ export async function signOutUser() {
 /**
  * Update user metadata
  */
-export async function updateUserMetadata(metadata: Record<string, any>) {
+export async function updateUserMetadata(metadata: Record<string, unknown>) {
   const { data, error } = await supabase.auth.updateUser({
     data: metadata,
   });

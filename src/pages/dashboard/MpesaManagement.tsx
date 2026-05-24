@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { initiateSTKPush, queryTransactionStatus, generateQRCode, registerUrls, formatPhoneNumber } from '@/lib/mpesa';
+import { initiateSTKPush, generateQRCode, formatPhoneNumber } from '@/lib/mpesa';
 import { useToast } from '@/hooks/use-toast';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 import { format } from 'date-fns';
 import { 
   Smartphone, 
@@ -26,6 +28,8 @@ import {
   History,
   Loader2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface MpesaTransaction {
@@ -55,18 +59,54 @@ interface AuditLog {
   metadata: Record<string, unknown> | null;
 }
 
+interface MpesaManagementStats {
+  completedAmount: number;
+  pendingAmount: number;
+  totalTransactions: number;
+  successRate: number;
+}
+
+type NumericValue = number | string | null | undefined;
+
+const toNumber = (value: NumericValue): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
 const MpesaManagement = () => {
   const { user, hasRole } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<MpesaTransaction[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [stats, setStats] = useState<MpesaManagementStats>({
+    completedAmount: 0,
+    pendingAmount: 0,
+    totalTransactions: 0,
+    successRate: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const transactionPagination = usePaginationState(50);
+  const auditPagination = usePaginationState(50);
+  const {
+    page: transactionPage,
+    pageSize: transactionPageSize,
+    updateTotal: updateTransactionTotal,
+  } = transactionPagination;
+  const {
+    page: auditPage,
+    pageSize: auditPageSize,
+    updateTotal: updateAuditTotal,
+  } = auditPagination;
   const [stkDialogOpen, setStkDialogOpen] = useState(false);
   const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   
-  // M-Pesa request form
+  // Pay with M-Pesa form
   const [stkPhone, setStkPhone] = useState('');
   const [stkAmount, setStkAmount] = useState('');
   const [stkReference, setStkReference] = useState('');
@@ -76,41 +116,65 @@ const MpesaManagement = () => {
 
   const canManageFinances = hasRole('admin') || hasRole('treasurer') || hasRole('chairperson');
 
-  useEffect(() => {
-    if (user && canManageFinances) {
-      fetchTransactions();
-      fetchAuditLogs();
-    }
-  }, [user, canManageFinances]);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    const offset = (transactionPage - 1) * transactionPageSize;
     // Use correct column names from database schema
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('mpesa_transactions')
-      .select('id, transaction_type, checkout_request_id, merchant_request_id, mpesa_receipt_number, amount, phone_number, status, result_code, result_desc, created_at, updated_at, initiated_by, member_id')
+      .select('id, transaction_type, checkout_request_id, merchant_request_id, mpesa_receipt_number, amount, phone_number, status, result_code, result_desc, created_at, updated_at, initiated_by, member_id', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(100);
+      .range(offset, offset + transactionPageSize - 1);
     
     if (!error && data) {
       setTransactions(data as MpesaTransaction[]);
+      updateTransactionTotal(count ?? data.length);
     }
-    setIsLoading(false);
-  };
+  }, [transactionPage, transactionPageSize, updateTransactionTotal]);
 
-  const fetchAuditLogs = async () => {
-    const { data, error } = await supabase
+  const fetchAuditLogs = useCallback(async () => {
+    const offset = (auditPage - 1) * auditPageSize;
+    const { data, error, count } = await supabase
       .from('audit_logs')
-      .select('id, action_type, action_description, performed_by_name, performed_by_role, created_at, metadata')
+      .select('id, action_type, action_description, performed_by_name, performed_by_role, created_at, metadata', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .limit(50);
+      .range(offset, offset + auditPageSize - 1);
     
     if (!error && data) {
       setAuditLogs(data.map(log => ({
         ...log,
         metadata: log.metadata as Record<string, unknown> | null
       })));
+      updateAuditTotal(count ?? data.length);
     }
-  };
+  }, [auditPage, auditPageSize, updateAuditTotal]);
+
+  const fetchStats = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_mpesa_management_stats' as never);
+    if (error) {
+      console.error('Error fetching M-Pesa stats:', error);
+      return;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    setStats({
+      completedAmount: toNumber((row as { completed_amount?: NumericValue } | null)?.completed_amount),
+      pendingAmount: toNumber((row as { pending_amount?: NumericValue } | null)?.pending_amount),
+      totalTransactions: toNumber((row as { total_transactions?: NumericValue } | null)?.total_transactions),
+      successRate: toNumber((row as { success_rate?: NumericValue } | null)?.success_rate),
+    });
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([fetchTransactions(), fetchAuditLogs(), fetchStats()]);
+    setIsLoading(false);
+  }, [fetchAuditLogs, fetchStats, fetchTransactions]);
+
+  useEffect(() => {
+    if (user && canManageFinances) {
+      void loadData();
+    }
+  }, [canManageFinances, loadData, user]);
 
   const handleSTKPush = async () => {
     if (!stkPhone || !stkAmount) return;
@@ -127,14 +191,14 @@ const MpesaManagement = () => {
       
       if (result.ResponseCode === '0') {
         toast({
-          title: 'M-Pesa request sent',
-          description: 'Check the phone and approve the M-Pesa request',
+          title: 'Pay with M-Pesa sent',
+          description: 'Check the phone and approve Pay with M-Pesa',
         });
         setStkDialogOpen(false);
         resetStkForm();
-        fetchTransactions();
+        void loadData();
       } else {
-        throw new Error(result.ResponseDescription || 'M-Pesa payment failed');
+        throw new Error(result.ResponseDescription || 'Pay with M-Pesa failed');
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -188,12 +252,17 @@ const MpesaManagement = () => {
 
   const handleCheckStatus = async (checkoutRequestId: string) => {
     try {
-      const result = await queryTransactionStatus(checkoutRequestId);
-      toast({
-        title: 'Status Updated',
-        description: result.ResultDesc || 'Transaction status checked',
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'mpesa_status_recheck',
+        payload: { checkoutRequestId },
+        priority: 3,
+        dedupeKey: `mpesa_status_recheck:${checkoutRequestId}`,
+        maxAttempts: 8,
       });
-      fetchTransactions();
+      toast({
+        title: 'Status check queued',
+        description: `M-Pesa status will be checked in the background. Job ${shortJobId(jobId)}.`,
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
@@ -207,12 +276,17 @@ const MpesaManagement = () => {
   const handleRegisterUrls = async () => {
     setIsProcessing(true);
     try {
-      await registerUrls();
-      toast({
-        title: 'URLs Registered',
-        description: 'M-Pesa confirmation URLs have been registered',
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'mpesa_url_registration',
+        payload: { requestedAt: new Date().toISOString() },
+        priority: 2,
+        dedupeKey: 'mpesa_url_registration',
+        maxAttempts: 3,
       });
-      fetchAuditLogs();
+      toast({
+        title: 'URL registration queued',
+        description: `M-Pesa URL registration is processing as job ${shortJobId(jobId)}.`,
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast({
@@ -239,17 +313,6 @@ const MpesaManagement = () => {
     };
     return <StatusBadge status={statusMap[txStatus] || txStatus} icon={iconMap[txStatus]} />;
   };
-
-  // Calculate stats
-  const totalCompleted = transactions
-    .filter(t => t.status === 'completed')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalPending = transactions
-    .filter(t => t.status === 'pending')
-    .reduce((sum, t) => sum + Number(t.amount), 0);
-  const successRate = transactions.length > 0
-    ? Math.round((transactions.filter(t => t.status === 'completed').length / transactions.length) * 100)
-    : 0;
 
   if (!canManageFinances) {
     return (
@@ -291,7 +354,7 @@ const MpesaManagement = () => {
                 <CheckCircle className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">KSh {totalCompleted.toLocaleString()}</p>
+                <p className="text-2xl font-bold">KSh {stats.completedAmount.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">Completed</p>
               </div>
             </div>
@@ -304,7 +367,7 @@ const MpesaManagement = () => {
                 <Clock className="w-5 h-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">KSh {totalPending.toLocaleString()}</p>
+                <p className="text-2xl font-bold">KSh {stats.pendingAmount.toLocaleString()}</p>
                 <p className="text-sm text-muted-foreground">Pending</p>
               </div>
             </div>
@@ -317,7 +380,7 @@ const MpesaManagement = () => {
                 <DollarSign className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{transactions.length}</p>
+                <p className="text-2xl font-bold">{stats.totalTransactions}</p>
                 <p className="text-sm text-muted-foreground">Total Transactions</p>
               </div>
             </div>
@@ -330,7 +393,7 @@ const MpesaManagement = () => {
                 <RefreshCw className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{successRate}%</p>
+                <p className="text-2xl font-bold">{Math.round(stats.successRate)}%</p>
                 <p className="text-sm text-muted-foreground">Success Rate</p>
               </div>
             </div>
@@ -342,14 +405,17 @@ const MpesaManagement = () => {
       <div className="flex flex-wrap gap-3">
         <Dialog open={stkDialogOpen} onOpenChange={setStkDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-green-600 text-white hover:bg-green-700">
               <Send className="w-4 h-4 mr-2" />
-              Send M-Pesa Request
+              Pay with M-Pesa
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="border-green-100 bg-cyan-50">
             <DialogHeader>
-              <DialogTitle>Send M-Pesa Request</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <Smartphone className="w-5 h-5 text-green-600" />
+                Pay with M-Pesa
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -358,6 +424,7 @@ const MpesaManagement = () => {
                   value={stkPhone}
                   onChange={(e) => setStkPhone(e.target.value)}
                   placeholder="0712345678 or 0112345678"
+                  className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
                 />
               </div>
               <div>
@@ -367,6 +434,7 @@ const MpesaManagement = () => {
                   value={stkAmount}
                   onChange={(e) => setStkAmount(e.target.value)}
                   placeholder="500"
+                  className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
                 />
               </div>
               <div>
@@ -375,22 +443,23 @@ const MpesaManagement = () => {
                   value={stkReference}
                   onChange={(e) => setStkReference(e.target.value)}
                   placeholder="Welfare contribution"
+                  className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
                 />
               </div>
               <Button 
                 onClick={handleSTKPush} 
                 disabled={!stkPhone || !stkAmount || isProcessing}
-                className="w-full"
+                className="w-full bg-green-600 text-white hover:bg-green-700"
               >
                 {isProcessing ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
+                    Opening Pay with M-Pesa...
                   </>
                 ) : (
                   <>
                     <Smartphone className="w-4 h-4 mr-2" />
-                    Send Payment Request
+                    Pay with M-Pesa
                   </>
                 )}
               </Button>
@@ -583,6 +652,36 @@ const MpesaManagement = () => {
                 </TableBody>
                 </Table>
               </div>
+              {transactions.length > 0 && (
+                <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(transactionPagination.page - 1) * transactionPagination.pageSize + 1}
+                    -{Math.min(transactionPagination.page * transactionPagination.pageSize, transactionPagination.totalItems)}
+                    {' '}of {transactionPagination.totalItems}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => transactionPagination.goToPage(transactionPagination.page - 1)}
+                      disabled={transactionPagination.page === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {transactionPagination.page} of {Math.max(1, transactionPagination.totalPages)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => transactionPagination.goToPage(transactionPagination.page + 1)}
+                      disabled={transactionPagination.page === transactionPagination.totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -649,6 +748,36 @@ const MpesaManagement = () => {
                 </TableBody>
                 </Table>
               </div>
+              {auditLogs.length > 0 && (
+                <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(auditPagination.page - 1) * auditPagination.pageSize + 1}
+                    -{Math.min(auditPagination.page * auditPagination.pageSize, auditPagination.totalItems)}
+                    {' '}of {auditPagination.totalItems}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => auditPagination.goToPage(auditPagination.page - 1)}
+                      disabled={auditPagination.page === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {auditPagination.page} of {Math.max(1, auditPagination.totalPages)}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => auditPagination.goToPage(auditPagination.page + 1)}
+                      disabled={auditPagination.page === auditPagination.totalPages}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

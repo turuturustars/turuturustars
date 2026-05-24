@@ -21,7 +21,14 @@ const sortAnnouncements = (items: Announcement[]) =>
     })
     .slice(0, 10);
 
-export const useRealtimeAnnouncements = () => {
+interface UseRealtimeAnnouncementsOptions {
+  realtime?: boolean;
+  toastOnInsert?: boolean;
+  limit?: number;
+}
+
+export const useRealtimeAnnouncements = (options: UseRealtimeAnnouncementsOptions = {}) => {
+  const { realtime = false, toastOnInsert = false, limit = 10 } = options;
   const { toast } = useToast();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +41,7 @@ export const useRealtimeAnnouncements = () => {
         .select('id, title, content, priority, published, published_at, created_at, created_by')
         .eq('published', true)
         .order('published_at', { ascending: false })
-        .limit(10);
+        .limit(limit);
 
       if (error) {
         console.error('Error fetching announcements:', error);
@@ -46,9 +53,13 @@ export const useRealtimeAnnouncements = () => {
 
     fetchAnnouncements();
 
+    if (!realtime) {
+      return undefined;
+    }
+
     // Subscribe to real-time announcements
     const channel = supabase
-      .channel('public-announcements')
+      .channel(`public-announcements-${limit}`)
       .on(
         'postgres_changes',
         {
@@ -66,10 +77,12 @@ export const useRealtimeAnnouncements = () => {
               return sortAnnouncements([newAnnouncement, ...prev]);
             });
 
-            toast({
-              title: 'New announcement',
-              description: newAnnouncement.title,
-            });
+            if (toastOnInsert) {
+              toast({
+                title: 'New announcement',
+                description: newAnnouncement.title,
+              });
+            }
           }
         }
       )
@@ -119,7 +132,7 @@ export const useRealtimeAnnouncements = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [toast]);
+  }, [limit, realtime, toast, toastOnInsert]);
 
   return {
     announcements,

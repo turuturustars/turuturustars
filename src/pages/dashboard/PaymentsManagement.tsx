@@ -39,15 +39,15 @@ const PaymentsManagement = () => {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+        <Card className="border-green-100 bg-cyan-50/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-green-600" />
-              M-Pesa Payments
+              Pay with M-Pesa
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Member enters phone and amount, then receives an M-Pesa request.</p>
+            <p className="text-sm text-muted-foreground">Member enters phone and amount, then completes Pay with M-Pesa on their phone.</p>
           </CardContent>
         </Card>
         <Card>

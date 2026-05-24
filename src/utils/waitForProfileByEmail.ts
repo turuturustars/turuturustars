@@ -49,7 +49,9 @@ export async function waitForProfileByEmail(
 
     try {
       options?.onAttempt?.(attempt + 1, delay);
-    } catch (e) {}
+    } catch (e) {
+      console.debug('waitForProfileByEmail onAttempt callback failed', e);
+    }
 
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, delay));

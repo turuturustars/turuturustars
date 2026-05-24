@@ -93,8 +93,7 @@ export const useRealtimeNotificationsEnhanced = () => {
 
       if (error) throw error;
 
-      const typedData = ((data || []) as unknown[]).map((n: any) => {
-        const rawN = n as RawNotification;
+      const typedData = (data || []).map((rawN: RawNotification) => {
         const notification: Notification = {
           id: rawN.id,
           user_id: rawN.user_id,

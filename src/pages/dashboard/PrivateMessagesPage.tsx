@@ -4,6 +4,7 @@ import { useInteractionGuard } from '@/hooks/useInteractionGuard';
 import { usePrivateMessages, PrivateConversation } from '@/hooks/usePrivateMessages';
 import { usePrivateMessageNotifications } from '@/hooks/usePrivateMessageNotifications';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
+import { useDebounce } from '@/hooks/useDebounce';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,7 +28,7 @@ interface MemberProfile {
   };
 }
 
-const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
+const PRESENCE_ACTIVE_WINDOW_MS = 6 * 60 * 1000;
 
 function formatPresenceLabel(lastSeen: string | null, isOnline: boolean) {
   if (isOnline) return 'Online now';
@@ -57,6 +58,7 @@ export default function PrivateMessagesPage() {
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement | null>(null);
   const { preferences: notificationPreferences } = useNotificationPreferences(user?.id);
+  const debouncedMemberSearchTerm = useDebounce(memberSearchTerm.trim(), 300);
 
   const { 
     conversations, 
@@ -145,16 +147,24 @@ export default function PrivateMessagesPage() {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [selectedConversationId, messages.length]);
 
-  // Fetch members for new conversation with live presence details.
+  // Fetch a bounded member picker result for new conversations.
   const fetchMembers = useCallback(async () => {
     if (!user) return;
     setLoadingMembers(true);
     try {
-      const { data: profilesData, error: profilesError } = await supabase
+      let query = supabase
         .from('profiles')
         .select('id, full_name, photo_url')
+        .eq('status', 'active')
         .neq('id', user.id)
-        .order('full_name');
+        .order('full_name')
+        .limit(50);
+
+      if (debouncedMemberSearchTerm) {
+        query = query.ilike('full_name', `%${debouncedMemberSearchTerm}%`);
+      }
+
+      const { data: profilesData, error: profilesError } = await query;
 
       if (profilesError) throw profilesError;
 
@@ -208,32 +218,13 @@ export default function PrivateMessagesPage() {
     } finally {
       setLoadingMembers(false);
     }
-  }, [showError, user]);
+  }, [debouncedMemberSearchTerm, showError, user]);
 
   useEffect(() => {
     if (showNewConversation) {
       void fetchMembers();
     }
   }, [fetchMembers, showNewConversation]);
-
-  useEffect(() => {
-    if (!showNewConversation || !user) return;
-
-    const memberStatusChannel = supabase
-      .channel(`private-members-presence-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_status' },
-        () => {
-          void fetchMembers();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(memberStatusChannel);
-    };
-  }, [fetchMembers, showNewConversation, user]);
 
   const handleStartConversation = async (memberId: string) => {
     if (!assertCanInteract('start new conversations')) return;
@@ -259,7 +250,6 @@ export default function PrivateMessagesPage() {
 
     try {
       await sendPrivateMessage(messageToSend);
-      await refreshMessages();
       showSuccess('Message sent', 1200);
     } catch (err) {
       console.error('Error sending message:', err);
@@ -307,7 +297,8 @@ export default function PrivateMessagesPage() {
       const { error } = await supabase
         .from('private_messages')
         .update({ content: editingContent.trim() })
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .eq('sender_id', user?.id ?? '');
 
       if (error) throw error;
       
@@ -330,7 +321,8 @@ export default function PrivateMessagesPage() {
       const { error } = await supabase
         .from('private_messages')
         .delete()
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .eq('sender_id', user?.id ?? '');
 
       if (error) throw error;
       
@@ -466,7 +458,7 @@ export default function PrivateMessagesPage() {
                       />
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <Badge variant="secondary">{members.length} members</Badge>
+                      <Badge variant="secondary">{members.length} shown</Badge>
                       <Badge variant="secondary">{onlineMembersCount} online</Badge>
                       <Badge variant="secondary">{filteredOnlineMembersCount} online in results</Badge>
                     </div>

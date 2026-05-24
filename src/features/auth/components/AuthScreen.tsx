@@ -11,13 +11,16 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
   requestPasswordResetByIdentifier,
+  resendVerificationEmail,
   signInWithOAuth,
   signInWithEmail,
   signUpWithEmail,
 } from '../authApi';
+import type { AuthRequestError } from '../authApi';
 import TurnstileWidget from '@/components/auth/TurnstileWidget';
 import { useVerifyTurnstile } from '@/hooks/useVerifyTurnstile';
 import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhone';
+import { markDefaultPasswordChangeRequired } from '@/utils/defaultPasswordChange';
 import logo from '@/assets/turuturustarslogo.png';
 
 type Mode = 'signin' | 'signup';
@@ -82,6 +85,8 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     supportPhone?: string;
     emailHint?: string | null;
   } | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [isResendingConfirmation, setIsResendingConfirmation] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ identifier: '', password: '' });
   const [signupForm, setSignupForm] = useState({
@@ -249,6 +254,34 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
     }
   };
 
+  const isEmailNotConfirmedError = (error: unknown, message: string) => {
+    const code = typeof error === 'object' && error !== null ? (error as AuthRequestError).code : undefined;
+    const normalized = message.toLowerCase();
+    return (
+      code === 'email_not_confirmed' ||
+      normalized.includes('email not confirmed') ||
+      normalized.includes('email is not confirmed') ||
+      normalized.includes('email address is not confirmed')
+    );
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!unconfirmedEmail) return;
+    setIsResendingConfirmation(true);
+    try {
+      await resendVerificationEmail(unconfirmedEmail);
+      toast({
+        title: 'Confirmation email sent',
+        description: `Check ${unconfirmedEmail} for the confirmation link.`,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not resend confirmation email.';
+      toast({ title: 'Resend failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsResendingConfirmation(false);
+    }
+  };
+
   const renderGoogleAuthOption = (authMode: Mode) => (
     <div className="space-y-4">
       <Button
@@ -392,14 +425,24 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
 
     setIsSubmitting(true);
     try {
-      await signInWithEmail({
+      setUnconfirmedEmail(null);
+      const result = await signInWithEmail({
         ...loginForm,
         captchaToken: loginCaptchaToken || undefined,
       });
       setRequiresManualCheck((prev) => ({ ...prev, signin: false }));
       setManualCheckPassed((prev) => ({ ...prev, signin: false }));
-      toast({ title: 'Welcome back', description: 'You are now signed in.' });
-      navigate(redirectPath, { replace: true });
+      if (result.usedIdNumberPassword && result.user?.id) {
+        markDefaultPasswordChangeRequired(result.user.id);
+        toast({
+          title: 'Welcome',
+          description: 'Your first password is your National ID. Please change it now.',
+        });
+        navigate('/dashboard/profile?changePassword=1', { replace: true });
+      } else {
+        toast({ title: 'Welcome back', description: 'You are now signed in.' });
+        navigate(redirectPath, { replace: true });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed';
       if (isPotentialCaptchaServerError(error) && loginCaptchaToken) {
@@ -410,6 +453,19 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
         toast({
           title: 'Automatic verification failed',
           description: `Use the Cloudflare manual check button, then sign in again.${configHint}`,
+          variant: 'destructive',
+        });
+      } else if (isEmailNotConfirmedError(error, message)) {
+        const identifier = loginForm.identifier.trim().toLowerCase();
+        const errorEmail =
+          typeof error === 'object' && error !== null ? (error as AuthRequestError).email?.trim().toLowerCase() : '';
+        const email = errorEmail || (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier) ? identifier : null);
+        setUnconfirmedEmail(email);
+        toast({
+          title: 'Confirm your email',
+          description: email
+            ? 'Your password is correct, but your email still needs confirmation. You can resend the link below.'
+            : message,
           variant: 'destructive',
         });
       } else {
@@ -649,7 +705,7 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                 <form className="space-y-5" onSubmit={handleLogin}>
                   <div className="space-y-2">
                     <Label htmlFor="login-identifier" className="text-sm font-medium text-foreground/80">
-                      Email/Phone
+                      Email, Phone, or TS Number
                     </Label>
                     <div className="relative">
                       <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -657,11 +713,14 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                         id="login-identifier"
                         type="text"
                         autoComplete="username"
-                        placeholder="Email or phone"
+                        placeholder="Email, phone, or TS-00001"
                         required
                         className="pl-9 border-border/60 bg-background/70 focus-visible:ring-primary/30 focus-visible:border-primary/60 transition"
                         value={loginForm.identifier}
-                        onChange={(e) => setLoginForm((prev) => ({ ...prev, identifier: e.target.value }))}
+                        onChange={(e) => {
+                          setLoginForm((prev) => ({ ...prev, identifier: e.target.value }));
+                          setUnconfirmedEmail(null);
+                        }}
                       />
                     </div>
                   </div>
@@ -782,6 +841,33 @@ export const AuthScreen = ({ defaultMode = 'signin', redirectPath = '/dashboard/
                             </div>
                           )}
                         </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {unconfirmedEmail && (
+                    <Alert className="border-amber-400/50 bg-amber-50/80 text-amber-900">
+                      <AlertDescription className="space-y-3">
+                        <p className="text-sm">
+                          Your password is correct, but {unconfirmedEmail} still needs email confirmation.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full border-amber-300 bg-amber-100/80 text-amber-900 hover:bg-amber-200"
+                          onClick={handleResendConfirmation}
+                          disabled={isResendingConfirmation}
+                        >
+                          {isResendingConfirmation ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            'Resend confirmation email'
+                          )}
+                        </Button>
                       </AlertDescription>
                     </Alert>
                   )}

@@ -20,7 +20,7 @@ import { formatKenyanPhoneError, normalizeKenyanPhone } from '@/utils/kenyanPhon
  */
 export async function sendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/confirm'));
+    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/callback'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';
@@ -65,7 +65,7 @@ export async function signupWithEmailVerification(
       phone: normalizedPhone,
       idNumber: profileData.idNumber,
       location: profileData.location,
-      redirectTo: buildSiteUrl('/auth/confirm'),
+      redirectTo: buildSiteUrl('/auth/callback'),
     });
 
     // Step 3: Store pending signup info in localStorage for recovery
@@ -191,7 +191,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{ success: 
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   try {
-    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/confirm'));
+    await resendVerificationEmailFromAuth(email, buildSiteUrl('/auth/callback'));
     return { success: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to resend email';

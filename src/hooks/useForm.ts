@@ -17,7 +17,7 @@ interface UseFormOptions<T> {
   onError?: (error: Error) => void;
 }
 
-export function useForm<T extends Record<string, any>>({
+export function useForm<T extends Record<string, unknown>>({
   initialValues,
   onSubmit,
   validate,
@@ -32,7 +32,7 @@ export function useForm<T extends Record<string, any>>({
     isSubmitting: false,
   });
 
-  const setFieldValue = useCallback((field: keyof T, value: any) => {
+  const setFieldValue = useCallback(<K extends keyof T>(field: K, value: T[K]) => {
     setState((prev) => ({
       ...prev,
       values: {

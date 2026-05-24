@@ -7,7 +7,7 @@ export class AppError extends Error {
     public code: string,
     message: string,
     public statusCode: number = 500,
-    public details?: Record<string, any>
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'AppError';
@@ -15,14 +15,14 @@ export class AppError extends Error {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super('VALIDATION_ERROR', message, 400, details);
     this.name = 'ValidationError';
   }
 }
 
 export class AuthError extends AppError {
-  constructor(message: string, details?: Record<string, any>) {
+  constructor(message: string, details?: Record<string, unknown>) {
     super('AUTH_ERROR', message, 401, details);
     this.name = 'AuthError';
   }
@@ -168,12 +168,12 @@ export async function retryAsync<T>(
 export function formatApiError(error: unknown): {
   message: string;
   code: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 } {
   const message = getErrorMessage(error);
   const code = getErrorCode(error);
 
-  let details: Record<string, any> | undefined;
+  let details: Record<string, unknown> | undefined;
 
   if (error instanceof AppError) {
     details = error.details;

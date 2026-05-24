@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import {
+  AlertTriangle,
   Bot,
   CheckCircle,
+  Clock,
   MessageCircle,
+  PlayCircle,
   PlusCircle,
   RefreshCw,
+  RotateCcw,
   Save,
   Send,
   Smartphone,
@@ -31,6 +35,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 import { cn } from '@/lib/utils';
 
 type BotScope = 'public' | 'member' | 'both';
@@ -52,6 +57,34 @@ type WhatsAppNotification = Pick<
   Tables<'notifications'>,
   'id' | 'title' | 'message' | 'type' | 'created_at' | 'whatsapp_status' | 'whatsapp_error' | 'whatsapp_sent_at'
 >;
+type WhatsAppQueueRow = {
+  id: string;
+  user_id: string;
+  event_type: string;
+  event_id: string | null;
+  phone: string;
+  message: string;
+  priority: string;
+  status: string;
+  attempts: number;
+  provider_message_id: string | null;
+  whatsapp_message_id: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  processed_at: string | null;
+  next_attempt_at: string | null;
+  last_attempt_at: string | null;
+  dead_lettered_at: string | null;
+  template_name: string | null;
+  template_language: string | null;
+};
+type QueueProfile = {
+  id: string;
+  full_name: string | null;
+  membership_number: string | null;
+  phone: string | null;
+};
 type CommunitySubmission = Tables<'community_knowledge_submissions'> & {
   profiles?: {
     full_name: string | null;
@@ -91,15 +124,20 @@ const WhatsAppAutomationPage = () => {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [payments, setPayments] = useState<PaymentIntent[]>([]);
   const [notifications, setNotifications] = useState<WhatsAppNotification[]>([]);
+  const [queueRows, setQueueRows] = useState<WhatsAppQueueRow[]>([]);
+  const [queueProfiles, setQueueProfiles] = useState<Record<string, QueueProfile>>({});
   const [submissions, setSubmissions] = useState<CommunitySubmission[]>([]);
   const [form, setForm] = useState<KnowledgeForm>(emptyForm);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [isSimulating, setIsSimulating] = useState(false);
   const [processingSubmissionId, setProcessingSubmissionId] = useState<string | null>(null);
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('Hello from Turuturu Stars WhatsApp assistant.');
+  const [simulatePhone, setSimulatePhone] = useState('');
+  const [simulateText, setSimulateText] = useState('MY ROLE');
 
   const stats = useMemo(() => {
     const activeKnowledge = knowledge.filter((entry) => entry.is_active).length;
@@ -107,14 +145,16 @@ const WhatsAppAutomationPage = () => {
     const inboundMessages = messages.filter((message) => message.direction === 'inbound').length;
     const pendingPayments = payments.filter((payment) => ['pending', 'stk_requested'].includes(payment.status)).length;
     const failedPayments = payments.filter((payment) => payment.status === 'failed').length;
-    const queuedNotifications = notifications.filter((notification) => notification.whatsapp_status === 'queued').length;
+    const queuedNotifications = queueRows.filter((row) => ['pending', 'processing'].includes(row.status)).length;
+    const sentAlerts = queueRows.filter((row) => row.status === 'sent').length;
+    const failedAlerts = queueRows.filter((row) => row.status === 'failed' || row.status === 'skipped' || row.dead_lettered_at).length;
 
-    return { activeKnowledge, pendingSubmissions, inboundMessages, pendingPayments, failedPayments, queuedNotifications };
-  }, [knowledge, messages, payments, notifications, submissions]);
+    return { activeKnowledge, pendingSubmissions, inboundMessages, pendingPayments, failedPayments, queuedNotifications, sentAlerts, failedAlerts };
+  }, [knowledge, messages, payments, queueRows, submissions]);
 
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
-    const [knowledgeResult, submissionResult, messageResult, paymentResult, notificationResult] = await Promise.all([
+    const [knowledgeResult, submissionResult, messageResult, paymentResult, notificationResult, queueResult] = await Promise.all([
       supabase
         .from('ai_knowledge_base')
         .select('*')
@@ -140,14 +180,39 @@ const WhatsAppAutomationPage = () => {
         .not('whatsapp_status', 'is', null)
         .order('created_at', { ascending: false })
         .limit(40),
+      supabase
+        .from('whatsapp_notifications_queue' as never)
+        .select('id, user_id, event_type, event_id, phone, message, priority, status, attempts, provider_message_id, whatsapp_message_id, last_error, created_at, updated_at, processed_at, next_attempt_at, last_attempt_at, dead_lettered_at, template_name, template_language')
+        .order('created_at', { ascending: false })
+        .limit(80),
     ]);
 
-    if (knowledgeResult.error || submissionResult.error || messageResult.error || paymentResult.error || notificationResult.error) {
+    if (knowledgeResult.error || submissionResult.error || messageResult.error || paymentResult.error || notificationResult.error || queueResult.error) {
       toast({
         title: 'WhatsApp data not loaded',
-        description: knowledgeResult.error?.message || submissionResult.error?.message || messageResult.error?.message || paymentResult.error?.message || notificationResult.error?.message,
+        description: knowledgeResult.error?.message || submissionResult.error?.message || messageResult.error?.message || paymentResult.error?.message || notificationResult.error?.message || queueResult.error?.message,
         variant: 'destructive',
       });
+    }
+
+    const queued = (queueResult.data ?? []) as unknown as WhatsAppQueueRow[];
+    const profileIds = Array.from(new Set(queued.map((row) => row.user_id).filter(Boolean)));
+    let profilesById: Record<string, QueueProfile> = {};
+    if (profileIds.length > 0) {
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, membership_number, phone')
+        .in('id', profileIds);
+
+      if (profileError) {
+        toast({
+          title: 'Queue members not loaded',
+          description: profileError.message,
+          variant: 'destructive',
+        });
+      } else {
+        profilesById = Object.fromEntries(((profileRows ?? []) as QueueProfile[]).map((profile) => [profile.id, profile]));
+      }
     }
 
     setKnowledge((knowledgeResult.data ?? []) as KnowledgeEntry[]);
@@ -155,6 +220,8 @@ const WhatsAppAutomationPage = () => {
     setMessages((messageResult.data ?? []) as WhatsAppMessage[]);
     setPayments((paymentResult.data ?? []) as PaymentIntent[]);
     setNotifications((notificationResult.data ?? []) as WhatsAppNotification[]);
+    setQueueRows(queued);
+    setQueueProfiles(profilesById);
     setIsLoading(false);
   }, [toast]);
 
@@ -257,26 +324,69 @@ const WhatsAppAutomationPage = () => {
     fetchDashboardData();
   };
 
-  const handleDispatchQueuedNotifications = async () => {
+  const handleRunNotificationWorker = async (retryFailed = false) => {
     setIsDispatching(true);
-    const { data, error } = await supabase.functions.invoke('whatsapp-notifications', {
-      body: { limit: 25 },
-    });
-    setIsDispatching(false);
+    try {
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'whatsapp_bulk',
+        payload: {
+          limit: 100,
+          includeAbandonment: false,
+          retryFailed,
+        },
+        priority: retryFailed ? 4 : 5,
+        dedupeKey: `whatsapp_bulk:${retryFailed ? 'retry' : 'pending'}`,
+      });
 
-    const response = data as { ok?: boolean; error?: string; count?: number } | null;
-    if (error || response?.ok === false) {
+      toast({
+        title: retryFailed ? 'Failed alerts requeue queued' : 'WhatsApp queue dispatch queued',
+        description: `Background job ${shortJobId(jobId)} will process the WhatsApp queue.`,
+      });
+      fetchDashboardData();
+    } catch (error) {
       toast({
         title: 'Notification dispatch failed',
-        description: error?.message || response?.error || 'WhatsApp notification dispatcher returned an error.',
+        description: error instanceof Error ? error.message : 'Could not queue WhatsApp notification worker.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDispatching(false);
+    }
+  };
+
+  const handleSimulateInbound = async () => {
+    if (!simulatePhone.trim() || !simulateText.trim()) {
+      toast({
+        title: 'Missing simulation',
+        description: 'Add a WhatsApp number and inbound message.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSimulating(true);
+    const { data, error } = await supabase.functions.invoke('whatsapp-webhook', {
+      body: {
+        simulate: true,
+        from: simulatePhone.trim(),
+        text: simulateText.trim(),
+      },
+    });
+    setIsSimulating(false);
+
+    const response = data as { ok?: boolean; error?: string } | null;
+    if (error || response?.ok === false) {
+      toast({
+        title: 'Simulation failed',
+        description: error?.message || response?.error || 'WhatsApp webhook simulation returned an error.',
         variant: 'destructive',
       });
       return;
     }
 
     toast({
-      title: 'Queued notifications processed',
-      description: `${response?.count ?? 0} WhatsApp notifications were processed.`,
+      title: 'Inbound message simulated',
+      description: 'The webhook handled the message using the live assistant path.',
     });
     fetchDashboardData();
   };
@@ -406,23 +516,27 @@ const WhatsAppAutomationPage = () => {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
         <StatCard icon={Bot} label="Active answers" value={stats.activeKnowledge} />
         <StatCard icon={MessageCircle} label="Pending memories" value={stats.pendingSubmissions} tone={stats.pendingSubmissions > 0 ? 'attention' : 'normal'} />
         <StatCard icon={MessageCircle} label="Recent inbound" value={stats.inboundMessages} />
         <StatCard icon={Smartphone} label="Payment requests" value={stats.pendingPayments} />
-        <StatCard icon={Send} label="Queued notices" value={stats.queuedNotifications} />
+        <StatCard icon={Clock} label="Queued alerts" value={stats.queuedNotifications} tone={stats.queuedNotifications > 0 ? 'attention' : 'normal'} />
+        <StatCard icon={Send} label="Sent alerts" value={stats.sentAlerts} />
+        <StatCard icon={AlertTriangle} label="Failed alerts" value={stats.failedAlerts} tone={stats.failedAlerts > 0 ? 'danger' : 'normal'} />
         <StatCard icon={XCircle} label="Failed payments" value={stats.failedPayments} tone={stats.failedPayments > 0 ? 'danger' : 'normal'} />
       </div>
 
       <Tabs defaultValue="knowledge" className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-grid sm:w-auto sm:grid-cols-6">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:inline-grid sm:w-auto sm:grid-cols-8">
           <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
           <TabsTrigger value="submissions">Submissions</TabsTrigger>
           <TabsTrigger value="messages">Messages</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="queue">Queue</TabsTrigger>
           <TabsTrigger value="notifications">Notices</TabsTrigger>
           <TabsTrigger value="send">Test Send</TabsTrigger>
+          <TabsTrigger value="simulate">Simulate</TabsTrigger>
         </TabsList>
 
         <TabsContent value="knowledge" className="space-y-4">
@@ -673,11 +787,78 @@ const WhatsAppAutomationPage = () => {
           </Card>
         </TabsContent>
 
+        <TabsContent value="queue">
+          <Card>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-lg">WhatsApp Alert Queue</CardTitle>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button onClick={() => handleRunNotificationWorker(false)} disabled={isDispatching} className="gap-2">
+                  <PlayCircle className="h-4 w-4" />
+                  {isDispatching ? 'Running...' : 'Run Worker'}
+                </Button>
+                <Button onClick={() => handleRunNotificationWorker(true)} disabled={isDispatching} variant="outline" className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Retry Failed
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Message</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Attempts</TableHead>
+                    <TableHead>Delivery</TableHead>
+                    <TableHead>Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queueRows.map((row) => {
+                    const profile = queueProfiles[row.user_id];
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell className="min-w-44">
+                          <div className="font-medium">{profile?.full_name || row.phone || 'Member'}</div>
+                          <div className="text-xs text-muted-foreground">{profile?.membership_number || profile?.phone || row.user_id}</div>
+                        </TableCell>
+                        <TableCell className="min-w-36">
+                          <div className="font-medium">{titleCase(row.event_type)}</div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <Badge variant="outline">{row.priority}</Badge>
+                            {row.template_name && <Badge variant="secondary">{row.template_name}</Badge>}
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          <p className="line-clamp-2 text-sm">{row.message}</p>
+                        </TableCell>
+                        <TableCell>
+                          <DeliveryStatusBadge status={row.status} />
+                        </TableCell>
+                        <TableCell>{row.attempts}</TableCell>
+                        <TableCell className="min-w-44 text-xs text-muted-foreground">
+                          <div>Created {formatDate(row.created_at)}</div>
+                          {row.next_attempt_at && <div>Next {formatDate(row.next_attempt_at)}</div>}
+                          {row.dead_lettered_at && <div className="text-destructive">Dead-letter {formatDate(row.dead_lettered_at)}</div>}
+                          {row.processed_at && <div>Processed {formatDate(row.processed_at)}</div>}
+                        </TableCell>
+                        <TableCell className="max-w-64 truncate text-xs text-muted-foreground">{row.last_error || row.provider_message_id || '-'}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="notifications">
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-lg">WhatsApp Notifications</CardTitle>
-              <Button onClick={handleDispatchQueuedNotifications} disabled={isDispatching} className="gap-2">
+              <Button onClick={() => handleRunNotificationWorker(false)} disabled={isDispatching} className="gap-2">
                 <Send className="h-4 w-4" />
                 {isDispatching ? 'Sending...' : 'Send Queued'}
               </Button>
@@ -745,6 +926,38 @@ const WhatsAppAutomationPage = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="simulate">
+          <Card className="max-w-2xl">
+            <CardHeader>
+              <CardTitle className="text-lg">Simulate Inbound Message</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="simulate-phone">Member WhatsApp number</Label>
+                <Input
+                  id="simulate-phone"
+                  value={simulatePhone}
+                  onChange={(event) => setSimulatePhone(event.target.value)}
+                  placeholder="2547..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="simulate-text">Inbound message</Label>
+                <Textarea
+                  id="simulate-text"
+                  rows={4}
+                  value={simulateText}
+                  onChange={(event) => setSimulateText(event.target.value)}
+                />
+              </div>
+              <Button onClick={handleSimulateInbound} disabled={isSimulating} className="gap-2">
+                <PlayCircle className="h-4 w-4" />
+                {isSimulating ? 'Simulating...' : 'Simulate Message'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -793,6 +1006,11 @@ const StatusBadge = ({ active }: { active: boolean }) => (
 
 const PaymentStatusBadge = ({ status }: { status: string }) => {
   const variant = status === 'completed' ? 'secondary' : status === 'failed' ? 'destructive' : 'outline';
+  return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>;
+};
+
+const DeliveryStatusBadge = ({ status }: { status: string }) => {
+  const variant = status === 'sent' ? 'secondary' : ['failed', 'skipped'].includes(status) ? 'destructive' : 'outline';
   return <Badge variant={variant}>{status.replace('_', ' ')}</Badge>;
 };
 

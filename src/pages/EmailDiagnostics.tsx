@@ -166,7 +166,7 @@ export default function EmailDiagnostics() {
         email: testEmail,
         password: testPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/register?mode=complete-profile`
+          emailRedirectTo: `${window.location.origin}/auth/callback`
         }
       });
 

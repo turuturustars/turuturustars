@@ -4,8 +4,17 @@ import ChatWindowEnhanced from './ChatWindowEnhanced';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { useAuth } from '@/hooks/useAuth';
 
-// Mock components - replace with your actual imports
-const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, title, disabled }: any) => (
+interface ButtonProps {
+  children: React.ReactNode;
+  variant?: 'default' | 'ghost' | 'primary';
+  size?: 'default' | 'icon';
+  className?: string;
+  onClick?: () => void;
+  title?: string;
+  disabled?: boolean;
+}
+
+const Button = ({ children, variant = 'default', size = 'default', className = '', onClick, title, disabled }: ButtonProps) => (
   <button
     onClick={onClick}
     disabled={disabled}
@@ -20,62 +29,11 @@ const Button = ({ children, variant = 'default', size = 'default', className = '
   </button>
 );
 
-const ChatWindow = ({ messages, meId, isLoading }: any) => (
-  <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 scroll-smooth">
-    {isLoading ? (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-3 text-muted-foreground">
-          <div className="relative">
-            <Circle className="w-8 h-8 animate-ping absolute opacity-20" />
-            <Circle className="w-8 h-8 animate-spin" style={{ animationDuration: '3s' }} />
-          </div>
-          <p className="text-sm">Loading messages...</p>
-        </div>
-      </div>
-    ) : messages.length === 0 ? (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6">
-        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-          <MessageCircle className="w-8 h-8 text-primary/60" />
-        </div>
-        <h3 className="font-semibold text-lg mb-2">No messages yet</h3>
-        <p className="text-sm text-muted-foreground max-w-xs">
-          Be the first to start the conversation! Say hello to the community.
-        </p>
-      </div>
-    ) : (
-      messages.map((msg: any, i: number) => (
-        <div
-          key={i}
-          className={`flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ${
-            msg.userId === meId ? 'flex-row-reverse' : ''
-          }`}
-        >
-          <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-xs
-            ${msg.userId === meId ? 'bg-primary text-primary-foreground' : 'bg-gradient-to-br from-purple-500 to-pink-500 text-white'}`}>
-            {msg.userName?.[0]?.toUpperCase() || 'U'}
-          </div>
-          <div className={`flex flex-col gap-1 max-w-[75%] ${msg.userId === meId ? 'items-end' : ''}`}>
-            <span className="text-xs font-medium text-muted-foreground px-1">
-              {msg.userId === meId ? 'You' : msg.userName || 'User'}
-            </span>
-            <div className={`rounded-2xl px-4 py-2.5 shadow-sm ${
-              msg.userId === meId
-                ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                : 'bg-muted rounded-tl-sm'
-            }`}>
-              <p className="text-sm leading-relaxed break-words">{msg.text}</p>
-            </div>
-            <span className="text-xs text-muted-foreground/60 px-1">
-              {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </div>
-        </div>
-      ))
-    )}
-  </div>
-);
+interface ChatInputProps {
+  onSend: (message: string) => Promise<unknown>;
+}
 
-const ChatInput = ({ onSend }: any) => {
+const ChatInput = ({ onSend }: ChatInputProps) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const suggestions = ['Introduce yourself', 'Ask a question', 'Share an update'];

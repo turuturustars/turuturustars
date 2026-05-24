@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = await resp.text();
     if (!resp.ok) return res.status(resp.status).send(body);
     return res.status(200).send(body);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Proxy error:', err);
     return res.status(502).json({ error: 'Bad gateway', detail: String(err) });
   }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import WalletBalanceCard from '@/components/wallet/WalletBalanceCard';
 import WalletTopUpDialog from '@/components/wallet/WalletTopUpDialog';
 import WalletTransactionList from '@/components/wallet/WalletTransactionList';
@@ -6,18 +6,33 @@ import { useWallet } from '@/hooks/useWallet';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Clock3, Loader2, RefreshCw, Shield } from 'lucide-react';
+import { queryTransactionStatus } from '@/lib/mpesa';
+
+const PENDING_TOPUP_STATUSES = new Set(['pending', 'incomplete', 'unknown']);
+const TOPUP_SYNC_COOLDOWN_MS = 60_000;
 
 const WalletPage = () => {
   const { wallet, transactions, topUps, loading, refresh } = useWallet();
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncingTopUps, setSyncingTopUps] = useState(false);
+  const lastTopUpSyncRef = useRef<Record<string, number>>({});
 
   const balance = Number(wallet?.balance ?? 0);
-  const pendingTopUps = topUps.filter((topUp) =>
-    ['pending', 'incomplete', 'unknown'].includes(topUp.status || 'pending')
+  const pendingTopUps = useMemo(
+    () => topUps.filter((topUp) => PENDING_TOPUP_STATUSES.has(topUp.status || 'pending')),
+    [topUps]
   );
-  const failedTopUps = topUps.filter((topUp) =>
-    ['failed', 'request_timeout', 'user_cancelled'].includes(topUp.status || '')
+  const failedTopUps = useMemo(
+    () => topUps.filter((topUp) => ['failed', 'request_timeout', 'user_cancelled'].includes(topUp.status || '')),
+    [topUps]
+  );
+  const pendingTopUpSyncKey = useMemo(
+    () =>
+      pendingTopUps
+        .map((topUp) => `${topUp.checkout_request_id || topUp.id}:${topUp.status || 'pending'}`)
+        .join('|'),
+    [pendingTopUps]
   );
   const totals = useMemo(
     () =>
@@ -47,6 +62,47 @@ const WalletPage = () => {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    const syncableTopUps = pendingTopUps.filter((topUp) => Boolean(topUp.checkout_request_id)).slice(0, 5);
+    if (syncableTopUps.length === 0) return;
+
+    let cancelled = false;
+    const runSync = async () => {
+      const now = Date.now();
+      const dueTopUps = syncableTopUps.filter((topUp) => {
+        const key = topUp.checkout_request_id || topUp.id;
+        return now - (lastTopUpSyncRef.current[key] || 0) >= TOPUP_SYNC_COOLDOWN_MS;
+      });
+
+      if (dueTopUps.length === 0) return;
+
+      setSyncingTopUps(true);
+      try {
+        for (const topUp of dueTopUps) {
+          if (cancelled || !topUp.checkout_request_id) break;
+          lastTopUpSyncRef.current[topUp.checkout_request_id] = now;
+          try {
+            await queryTransactionStatus(topUp.checkout_request_id);
+          } catch (error) {
+            console.error('Unable to sync M-Pesa wallet top-up status', error);
+          }
+        }
+
+        if (!cancelled) {
+          await refresh();
+        }
+      } finally {
+        if (!cancelled) setSyncingTopUps(false);
+      }
+    };
+
+    void runSync();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingTopUps, pendingTopUpSyncKey, refresh]);
 
   if (loading && !wallet) {
     return (
@@ -99,8 +155,14 @@ const WalletPage = () => {
             <div className="grid gap-2">
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="flex items-center gap-2">
-                  <Clock3 className="h-4 w-4 text-amber-600" />
-                  <span className="text-muted-foreground">Pending top-ups</span>
+                  {syncingTopUps ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-green-600" />
+                  ) : (
+                    <Clock3 className="h-4 w-4 text-amber-600" />
+                  )}
+                  <span className="text-muted-foreground">
+                    {syncingTopUps ? 'Syncing M-Pesa' : 'Waiting for confirmation'}
+                  </span>
                 </div>
                 <span className="font-semibold tabular-nums">{pendingTopUps.length}</span>
               </div>
@@ -125,7 +187,7 @@ const WalletPage = () => {
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 <div>
                   <p className="font-medium">Some top-ups need attention</p>
-                  <p className="text-xs opacity-80">Check the activity list for failed or timed-out M-Pesa requests.</p>
+                  <p className="text-xs opacity-80">Check the activity list for failed or timed-out Pay with M-Pesa attempts.</p>
                 </div>
               </div>
             )}
@@ -136,10 +198,18 @@ const WalletPage = () => {
       {pendingTopUps.length > 0 && (
         <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-2">
-            <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
+            {syncingTopUps ? (
+              <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+            ) : (
+              <Clock3 className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
             <div>
-              <p className="font-medium">Waiting for M-Pesa confirmation</p>
-              <p className="text-xs opacity-80">Your wallet will update automatically after M-Pesa confirms the payment.</p>
+              <p className="font-medium">
+                {syncingTopUps ? 'Checking M-Pesa confirmation' : 'Waiting for M-Pesa confirmation'}
+              </p>
+              <p className="text-xs opacity-80">
+                If you already entered your PIN successfully, this page will sync the payment and credit your wallet.
+              </p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2 bg-background/70">

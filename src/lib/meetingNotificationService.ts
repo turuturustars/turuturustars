@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sendNotification } from './notificationService';
 import { BrowserNotificationService } from './notificationService';
+import { enqueueBackgroundJob } from '@/lib/backgroundJobs';
 
 export type MeetingNotificationType = 'created' | 'scheduled' | 'cancelled' | 'reminder';
 export type MeetingRecipientScope = 'all_members' | 'officials';
@@ -21,15 +21,25 @@ export interface MeetingNotificationPayload {
  */
 export const sendMeetingNotifications = async (
   payload: MeetingNotificationPayload,
-  stakeholderIds: string[]
+  _stakeholderIds: string[] = []
 ) => {
   try {
-    const { title, scheduledDate, type, venue } = payload;
+    const { meetingId, title, scheduledDate, type, venue, recipientScope } = payload;
     
-    // Format the notification message based on type
-    let notificationTitle = '';
-    let notificationMessage = '';
-    
+    const jobId = await enqueueBackgroundJob({
+      jobType: 'meeting_notifications',
+      payload: {
+        meetingId,
+        title,
+        scheduledDate,
+        type,
+        venue: venue || null,
+        recipientScope: recipientScope || 'all_members',
+      },
+      priority: type === 'cancelled' ? 2 : 4,
+      dedupeKey: `meeting_notifications:${meetingId}:${type}:${recipientScope || 'all_members'}`,
+    });
+
     const meetingDate = new Date(scheduledDate).toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -38,39 +48,12 @@ export const sendMeetingNotifications = async (
       minute: '2-digit',
     });
 
-    switch (type) {
-      case 'created':
-      case 'scheduled':
-        notificationTitle = `📅 Meeting Scheduled: ${title}`;
-        notificationMessage = `A new meeting "${title}" has been scheduled for ${meetingDate}${venue ? ` at ${venue}` : ''}`;
-        break;
-      case 'cancelled':
-        notificationTitle = `❌ Meeting Cancelled: ${title}`;
-        notificationMessage = `The meeting "${title}" scheduled for ${meetingDate} has been cancelled`;
-        break;
-      case 'reminder':
-        notificationTitle = `⏰ Meeting Reminder: ${title}`;
-        notificationMessage = `Reminder: "${title}" is happening ${meetingDate}`;
-        break;
-      default:
-        notificationTitle = `Meeting Update: ${title}`;
-        notificationMessage = `There's an update about the meeting "${title}"`;
-    }
-
-    // Send notifications to each stakeholder
-    const notificationPromises = stakeholderIds.map(userId =>
-      sendNotification({
-        userId,
-        title: notificationTitle,
-        message: notificationMessage,
-        type: 'meeting',
-        actionUrl: `/dashboard/governance/meetings`,
-      }).catch(err => {
-        console.error(`Failed to send notification to user ${userId}:`, err);
-      })
-    );
-
-    await Promise.all(notificationPromises);
+    const notificationTitle = type === 'cancelled'
+      ? `Meeting Cancelled: ${title}`
+      : `Meeting Scheduled: ${title}`;
+    const notificationMessage = type === 'cancelled'
+      ? `The meeting "${title}" scheduled for ${meetingDate} has been cancelled`
+      : `A new meeting "${title}" has been scheduled for ${meetingDate}${venue ? ` at ${venue}` : ''}`;
 
     // Show browser notification to current user if they're a stakeholder
     if (BrowserNotificationService.isEnabled()) {
@@ -80,7 +63,7 @@ export const sendMeetingNotifications = async (
       });
     }
 
-    return { success: true };
+    return { success: true, queued: true, jobId, count: 0 };
   } catch (error) {
     console.error('Error sending meeting notifications:', error);
     throw error;

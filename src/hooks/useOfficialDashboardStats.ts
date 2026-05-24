@@ -47,22 +47,58 @@ const defaultStats: OfficialDashboardStats = {
   unreadPrivateMessages: 0,
 };
 
-const resolvedDisciplineStatuses = new Set(['resolved', 'closed', 'completed', 'dismissed']);
-const inactiveWelfareStatuses = new Set(['resolved', 'closed', 'completed', 'inactive']);
+type OfficialDashboardStatsRpcRow = {
+  total_members?: number | string | null;
+  active_members?: number | string | null;
+  pending_approvals?: number | string | null;
+  upcoming_meetings?: number | string | null;
+  published_announcements?: number | string | null;
+  total_collected_amount?: number | string | null;
+  collected_this_month_amount?: number | string | null;
+  pending_contributions_count?: number | string | null;
+  pending_contributions_amount?: number | string | null;
+  missed_contributions_count?: number | string | null;
+  mpesa_completed_count?: number | string | null;
+  mpesa_this_month_count?: number | string | null;
+  documents_count?: number | string | null;
+  meeting_minutes_draft_count?: number | string | null;
+  meeting_minutes_approved_count?: number | string | null;
+  discipline_open_cases?: number | string | null;
+  discipline_resolved_this_month?: number | string | null;
+  fines_outstanding_amount?: number | string | null;
+  welfare_active_cases?: number | string | null;
+  unread_private_messages?: number | string | null;
+};
 
 const toNumber = (value: unknown) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const isWithinThisMonth = (isoDate: string | null, monthStart: Date) => {
-  if (!isoDate) return false;
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return false;
-  return date >= monthStart;
-};
+const toCount = (value: unknown) => Math.trunc(toNumber(value));
 
-const lower = (value: unknown) => String(value ?? '').trim().toLowerCase();
+const mapStatsRow = (row: OfficialDashboardStatsRpcRow | null | undefined): OfficialDashboardStats => ({
+  totalMembers: toCount(row?.total_members),
+  activeMembers: toCount(row?.active_members),
+  pendingApprovals: toCount(row?.pending_approvals),
+  upcomingMeetings: toCount(row?.upcoming_meetings),
+  publishedAnnouncements: toCount(row?.published_announcements),
+  totalCollectedAmount: toNumber(row?.total_collected_amount),
+  collectedThisMonthAmount: toNumber(row?.collected_this_month_amount),
+  pendingContributionsCount: toCount(row?.pending_contributions_count),
+  pendingContributionsAmount: toNumber(row?.pending_contributions_amount),
+  missedContributionsCount: toCount(row?.missed_contributions_count),
+  mpesaCompletedCount: toCount(row?.mpesa_completed_count),
+  mpesaThisMonthCount: toCount(row?.mpesa_this_month_count),
+  documentsCount: toCount(row?.documents_count),
+  meetingMinutesDraftCount: toCount(row?.meeting_minutes_draft_count),
+  meetingMinutesApprovedCount: toCount(row?.meeting_minutes_approved_count),
+  disciplineOpenCases: toCount(row?.discipline_open_cases),
+  disciplineResolvedThisMonth: toCount(row?.discipline_resolved_this_month),
+  finesOutstandingAmount: toNumber(row?.fines_outstanding_amount),
+  welfareActiveCases: toCount(row?.welfare_active_cases),
+  unreadPrivateMessages: toCount(row?.unread_private_messages),
+});
 
 export const formatKES = (amount: number) =>
   new Intl.NumberFormat('en-KE', {
@@ -76,168 +112,18 @@ export const useOfficialDashboardStats = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const safeCount = async (
-    label: string,
-    runner: () => PromiseLike<{ count: number | null; error: unknown }>
-  ) => {
-    try {
-      const { count, error: queryError } = await runner();
-      if (queryError) {
-        console.warn(`[dashboard-stats] ${label} count failed`, queryError);
-        return 0;
-      }
-      return count ?? 0;
-    } catch (caughtError) {
-      console.warn(`[dashboard-stats] ${label} count threw`, caughtError);
-      return 0;
-    }
-  };
-
-  const safeRows = async <TRow extends Record<string, unknown>>(
-    label: string,
-    runner: () => PromiseLike<{ data: TRow[] | null; error: unknown }>
-  ) => {
-    try {
-      const { data, error: queryError } = await runner();
-      if (queryError) {
-        console.warn(`[dashboard-stats] ${label} rows failed`, queryError);
-        return [] as TRow[];
-      }
-      return (data ?? []) as TRow[];
-    } catch (caughtError) {
-      console.warn(`[dashboard-stats] ${label} rows threw`, caughtError);
-      return [] as TRow[];
-    }
-  };
-
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
     try {
-      const [
-        totalMembers,
-        activeMembers,
-        pendingApprovals,
-        upcomingMeetings,
-        publishedAnnouncements,
-        documentsCount,
-        unreadPrivateMessages,
-        contributionRows,
-        mpesaRows,
-        meetingMinutesRows,
-        disciplineRows,
-        welfareRows,
-      ] = await Promise.all([
-        safeCount('profiles.total', () =>
-          supabase.from('profiles').select('id', { count: 'exact', head: true })
-        ),
-        safeCount('profiles.active', () =>
-          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'active')
-        ),
-        safeCount('profiles.pending', () =>
-          supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('status', 'pending')
-        ),
-        safeCount('meetings.upcoming', () =>
-          supabase
-            .from('meetings')
-            .select('id', { count: 'exact', head: true })
-            .eq('status', 'scheduled')
-            .gte('scheduled_date', new Date().toISOString())
-        ),
-        safeCount('announcements.published', () =>
-          supabase
-            .from('announcements')
-            .select('id', { count: 'exact', head: true })
-            .eq('published', true)
-        ),
-        safeCount('documents.total', () =>
-          supabase.from('documents').select('id', { count: 'exact', head: true })
-        ),
-        safeCount('private_messages.unread', () =>
-          supabase.from('private_messages').select('id', { count: 'exact', head: true }).is('read_at', null)
-        ),
-        safeRows<{ amount: number; status: string | null; created_at: string | null }>('contributions.summary', () =>
-          supabase.from('contributions').select('amount, status, created_at')
-        ),
-        safeRows<{ status: string | null; created_at: string }>('mpesa.summary', () =>
-          supabase.from('mpesa_transactions').select('status, created_at')
-        ),
-        safeRows<{ status: string | null }>('meeting_minutes.summary', () =>
-          supabase.from('meeting_minutes').select('status')
-        ),
-        safeRows<{ status: string | null; fine_amount: number | null; fine_paid: boolean | null; updated_at: string | null }>(
-          'discipline.summary',
-          () => supabase.from('discipline_records').select('status, fine_amount, fine_paid, updated_at')
-        ),
-        safeRows<{ status: string | null }>('welfare.summary', () =>
-          supabase.from('welfare_cases').select('status')
-        ),
-      ]);
+      const { data, error: rpcError } = await supabase
+        .rpc('get_official_dashboard_stats' as never)
+        .maybeSingle();
 
-      const paidContributions = contributionRows.filter((row) => lower(row.status) === 'paid');
-      const pendingContributions = contributionRows.filter((row) => lower(row.status) === 'pending');
-      const missedContributionsCount = contributionRows.filter((row) => lower(row.status) === 'missed').length;
+      if (rpcError) throw rpcError;
 
-      const totalCollectedAmount = paidContributions.reduce((sum, row) => sum + toNumber(row.amount), 0);
-      const collectedThisMonthAmount = paidContributions
-        .filter((row) => isWithinThisMonth(row.created_at, monthStart))
-        .reduce((sum, row) => sum + toNumber(row.amount), 0);
-      const pendingContributionsAmount = pendingContributions.reduce(
-        (sum, row) => sum + toNumber(row.amount),
-        0
-      );
-
-      const mpesaCompletedCount = mpesaRows.filter((row) => {
-        const status = lower(row.status);
-        return status === 'completed' || status === 'success';
-      }).length;
-      const mpesaThisMonthCount = mpesaRows.filter((row) => isWithinThisMonth(row.created_at, monthStart)).length;
-
-      const meetingMinutesDraftCount = meetingMinutesRows.filter((row) => lower(row.status) === 'draft').length;
-      const meetingMinutesApprovedCount = meetingMinutesRows.filter((row) => lower(row.status) === 'approved').length;
-
-      const disciplineOpenCases = disciplineRows.filter(
-        (row) => !resolvedDisciplineStatuses.has(lower(row.status))
-      ).length;
-      const disciplineResolvedThisMonth = disciplineRows.filter(
-        (row) => resolvedDisciplineStatuses.has(lower(row.status)) && isWithinThisMonth(row.updated_at, monthStart)
-      ).length;
-      const finesOutstandingAmount = disciplineRows.reduce((sum, row) => {
-        if (row.fine_paid) return sum;
-        return sum + toNumber(row.fine_amount);
-      }, 0);
-
-      const welfareActiveCases = welfareRows.filter(
-        (row) => !inactiveWelfareStatuses.has(lower(row.status))
-      ).length;
-
-      setStats({
-        totalMembers,
-        activeMembers,
-        pendingApprovals,
-        upcomingMeetings,
-        publishedAnnouncements,
-        totalCollectedAmount,
-        collectedThisMonthAmount,
-        pendingContributionsCount: pendingContributions.length,
-        pendingContributionsAmount,
-        missedContributionsCount,
-        mpesaCompletedCount,
-        mpesaThisMonthCount,
-        documentsCount,
-        meetingMinutesDraftCount,
-        meetingMinutesApprovedCount,
-        disciplineOpenCases,
-        disciplineResolvedThisMonth,
-        finesOutstandingAmount,
-        welfareActiveCases,
-        unreadPrivateMessages,
-      });
+      setStats(mapStatsRow(data as OfficialDashboardStatsRpcRow | null));
     } catch (caughtError) {
       console.error('Failed to refresh official dashboard stats', caughtError);
       setError('Unable to load fresh dashboard metrics');

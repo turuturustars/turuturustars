@@ -1,7 +1,31 @@
 import { HttpError } from "./http.ts";
 import { logCallbackAudit, normalizeKenyanPhone, normalizeReceipt, optionalEnv } from "./mpesa.ts";
 
-type SupabaseClient = any;
+type SupabaseError = { message?: string; code?: string; details?: unknown };
+type SupabaseQueryResult<T> = { data: T | null; error: SupabaseError | null };
+type SupabaseQuery<T> = PromiseLike<SupabaseQueryResult<T>> & {
+  select(columns: string): SupabaseQuery<T>;
+  eq(column: string, value: unknown): SupabaseQuery<T>;
+  order(column: string, options?: { ascending?: boolean }): SupabaseQuery<T>;
+  limit(count: number): SupabaseQuery<T>;
+  maybeSingle(): SupabaseQuery<T>;
+  insert(payload: unknown): SupabaseQuery<T>;
+  update(payload: Record<string, unknown>): SupabaseQuery<T>;
+};
+type SupabaseClient = {
+  from(table: string): SupabaseQuery<unknown>;
+};
+
+type CallbackAuditRow = {
+  id: string;
+  event_type: string;
+  checkout_request_id: string | null;
+  result_code: number | string | null;
+  payload: Record<string, unknown> | null;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
 
 type TillSubmissionRow = {
   id: string;
@@ -48,7 +72,7 @@ function safeNormalizePhone(value: unknown): string | null {
   }
 }
 
-function payloadAmountAndPhone(payload: Record<string, any>): { amount: number | null; phone: string | null } {
+function payloadAmountAndPhone(payload: Record<string, unknown>): { amount: number | null; phone: string | null } {
   if (payload.TransAmount != null || payload.MSISDN != null) {
     return {
       amount: asNumber(payload.TransAmount),
@@ -56,16 +80,20 @@ function payloadAmountAndPhone(payload: Record<string, any>): { amount: number |
     };
   }
 
-  const items = payload?.Body?.stkCallback?.CallbackMetadata?.Item;
+  const body = asRecord(payload.Body);
+  const stkCallback = asRecord(body?.stkCallback);
+  const callbackMetadata = asRecord(stkCallback?.CallbackMetadata);
+  const items = callbackMetadata?.Item;
   if (Array.isArray(items)) {
     let amount: number | null = null;
     let phone: string | null = null;
 
-    for (const item of items) {
+    for (const rawItem of items) {
+      const item = asRecord(rawItem);
       if (item?.Name === "Amount") {
-        amount = asNumber(item?.Value);
+        amount = asNumber(item.Value);
       }
-      if (item?.Name === "PhoneNumber" && item?.Value != null) {
+      if (item?.Name === "PhoneNumber" && item.Value != null) {
         phone = safeNormalizePhone(item.Value);
       }
     }
@@ -93,9 +121,11 @@ async function findCallbackEvidence(
     throw new HttpError(500, "Failed to read callback audit logs", error);
   }
 
-  for (const row of data ?? []) {
-    const payload = (row.payload ?? {}) as Record<string, any>;
-    const statusCode = Number(row.result_code ?? payload?.Body?.stkCallback?.ResultCode ?? payload?.ResultCode ?? 0);
+  for (const row of (data ?? []) as CallbackAuditRow[]) {
+    const payload = row.payload ?? {};
+    const body = asRecord(payload.Body);
+    const stkCallback = asRecord(body?.stkCallback);
+    const statusCode = Number(row.result_code ?? stkCallback?.ResultCode ?? payload.ResultCode ?? 0);
     const success = statusCode === 0 || row.event_type === "c2b_confirmation";
 
     if (!success) {

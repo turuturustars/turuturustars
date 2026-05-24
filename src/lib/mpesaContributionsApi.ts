@@ -70,6 +70,19 @@ export interface FinanceApproval {
   created_at: string;
 }
 
+export interface FinanceApprovalStats {
+  completedAmount: number;
+  failedCount: number;
+  awaitingAmount: number;
+  awaitingCount: number;
+  expenditureAmount: number;
+  expenditureCount: number;
+  refundAmount: number;
+  refundCount: number;
+  totalQueueAmount: number;
+  totalQueueCount: number;
+}
+
 export interface TillSubmission {
   id: string;
   member_id: string | null;
@@ -160,6 +173,7 @@ type UntypedQueryBuilder<T> = PromiseLike<SupabaseListResponse<T>> & {
   not: (column: string, operator: string, value: unknown) => UntypedQueryBuilder<T>;
   order: (column: string, options?: { ascending?: boolean }) => UntypedQueryBuilder<T>;
   limit: (count: number) => UntypedQueryBuilder<T>;
+  range: (from: number, to: number) => UntypedQueryBuilder<T>;
   maybeSingle: () => PromiseLike<SupabaseSingleResponse<T>>;
 };
 type UntypedSupabase = {
@@ -194,7 +208,7 @@ export async function initiateStkPushPayment(input: InitiateStkPushInput): Promi
   });
 
   if (error || !data?.ok) {
-    throw parseFunctionError(error ?? data, data?.error || 'Failed to start M-Pesa payment');
+    throw parseFunctionError(error ?? data, data?.error || 'Failed to start Pay with M-Pesa');
   }
 
   return {
@@ -324,13 +338,13 @@ export async function fetchPaymentByCheckoutId(checkoutRequestId: string): Promi
   return { ...data, amount: toNumber(data.amount) };
 }
 
-export async function fetchAwaitingApprovalPayments(limit = 100): Promise<CboPayment[]> {
+export async function fetchAwaitingApprovalPayments(limit = 100, offset = 0): Promise<CboPayment[]> {
   const { data, error } = await db
     .from<CboPayment>('payments')
     .select('id, member_id, phone, amount, method, checkout_request_id, merchant_request_id, mpesa_receipt, status, verified_at, created_at')
     .eq('status', 'awaiting_approval')
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(error.message || 'Failed to fetch awaiting approvals');
   return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
@@ -345,6 +359,40 @@ export async function fetchFinancePayments(limit = 200): Promise<CboPayment[]> {
 
   if (error) throw new Error(error.message || 'Failed to fetch payment records');
   return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
+}
+
+export async function fetchFinanceApprovalStats(): Promise<FinanceApprovalStats> {
+  const { data, error } = await supabase
+    .rpc('get_finance_approval_stats' as never)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message || 'Failed to fetch finance approval stats');
+
+  const row = data as {
+    completed_amount?: unknown;
+    failed_count?: unknown;
+    awaiting_amount?: unknown;
+    awaiting_count?: unknown;
+    expenditure_amount?: unknown;
+    expenditure_count?: unknown;
+    refund_amount?: unknown;
+    refund_count?: unknown;
+    total_queue_amount?: unknown;
+    total_queue_count?: unknown;
+  } | null;
+
+  return {
+    completedAmount: toNumber(row?.completed_amount),
+    failedCount: toNumber(row?.failed_count),
+    awaitingAmount: toNumber(row?.awaiting_amount),
+    awaitingCount: toNumber(row?.awaiting_count),
+    expenditureAmount: toNumber(row?.expenditure_amount),
+    expenditureCount: toNumber(row?.expenditure_count),
+    refundAmount: toNumber(row?.refund_amount),
+    refundCount: toNumber(row?.refund_count),
+    totalQueueAmount: toNumber(row?.total_queue_amount),
+    totalQueueCount: toNumber(row?.total_queue_count),
+  };
 }
 
 export async function fetchRefundableContributionsForMember(memberId: string, limit = 100): Promise<RefundableContribution[]> {
@@ -378,13 +426,13 @@ export async function fetchRefundRequestsForMember(memberId: string, limit = 50)
   }));
 }
 
-export async function fetchPendingRefundRequests(limit = 100): Promise<CboRefundRequest[]> {
+export async function fetchPendingRefundRequests(limit = 100, offset = 0): Promise<CboRefundRequest[]> {
   const { data, error } = await db
     .from<CboRefundRequest>('refund_requests')
     .select('id, member_id, contribution_id, contribution_type, original_amount, requested_amount, payout_amount, reason, status, rejection_reason, created_at, resolved_at')
     .eq('status', 'pending_approval')
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(error.message || 'Failed to fetch pending refund requests');
   return (data ?? []).map((row) => ({
@@ -406,13 +454,13 @@ export async function fetchExpenditures(limit = 200): Promise<CboExpenditure[]> 
   return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));
 }
 
-export async function fetchPendingExpenditures(limit = 100): Promise<CboExpenditure[]> {
+export async function fetchPendingExpenditures(limit = 100, offset = 0): Promise<CboExpenditure[]> {
   const { data, error } = await db
     .from<CboExpenditure>('expenditures')
     .select('id, amount, category, description, payment_method, expense_date, payee, reference_number, receipt_url, fund, account_code, notes, initiated_by, status, approved_at, rejection_reason, created_at')
     .eq('status', 'pending_approval')
     .order('created_at', { ascending: false })
-    .limit(limit);
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(error.message || 'Failed to fetch pending expenditures');
   return (data ?? []).map((row) => ({ ...row, amount: toNumber(row.amount) }));

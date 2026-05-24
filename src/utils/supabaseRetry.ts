@@ -1,4 +1,8 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type RetryUpsertTable = 'profiles';
+type RetryUpsertRow = Database['public']['Tables']['profiles']['Insert'];
 
 /**
  * retryUpsert - attempt to upsert rows with retries and exponential backoff
@@ -9,8 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
  * @param initialDelayMs - initial backoff in ms (default 300)
  */
 export async function retryUpsert(
-  table: string,
-  row: Record<string, unknown> | Record<string, unknown>[],
+  table: RetryUpsertTable,
+  row: RetryUpsertRow | RetryUpsertRow[],
   options: { onConflict?: string } = {},
   attempts = 3,
   initialDelayMs = 300,
@@ -22,8 +26,9 @@ export async function retryUpsert(
         console.debug(`retryUpsert requestId=${meta.requestId} attempt=${attempt} table=${table}`);
       }
       
-      // Use type assertion to bypass strict table typing
-      const res = await (supabase.from(table as 'profiles') as any).upsert(row, options);
+      const res = Array.isArray(row)
+        ? await supabase.from(table).upsert(row, options)
+        : await supabase.from(table).upsert(row, options);
       
       if (!res.error) return res;
       

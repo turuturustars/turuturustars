@@ -348,19 +348,25 @@ export const generateHrefLang = (languages: Array<{ lang: string; url: string }>
 /**
  * Validate structured data JSON
  */
-export const validateStructuredData = (jsonLd: any): { isValid: boolean; errors: string[] } => {
+export const validateStructuredData = (jsonLd: unknown): { isValid: boolean; errors: string[] } => {
   const errors: string[] = [];
 
-  if (!jsonLd['@context']) {
+  if (!jsonLd || typeof jsonLd !== 'object' || Array.isArray(jsonLd)) {
+    errors.push('Structured data must be an object');
+    return {
+      isValid: false,
+      errors,
+    };
+  }
+
+  const data = jsonLd as Record<string, unknown>;
+
+  if (!data['@context']) {
     errors.push('Missing @context property');
   }
 
-  if (!jsonLd['@type']) {
+  if (!data['@type']) {
     errors.push('Missing @type property');
-  }
-
-  if (typeof jsonLd !== 'object') {
-    errors.push('Structured data must be an object');
   }
 
   return {
@@ -398,7 +404,7 @@ export const generateRobotsMeta = (options: {
 /**
  * Generate JSON-LD script tag
  */
-export const createJSONLDScript = (jsonLd: any): HTMLScriptElement => {
+export const createJSONLDScript = (jsonLd: unknown): HTMLScriptElement => {
   const script = document.createElement('script');
   script.type = 'application/ld+json';
   script.textContent = JSON.stringify(jsonLd);

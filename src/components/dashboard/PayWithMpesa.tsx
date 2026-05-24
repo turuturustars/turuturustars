@@ -32,6 +32,25 @@ interface Props {
 }
 
 const SUPPORT_EMAIL = 'support@turuturu.co.ke';
+const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
+
+const formatKES = (value: number) =>
+  new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    maximumFractionDigits: 0,
+  }).format(value);
+
+const maskPhone = (value: string) => {
+  const cleaned = value.replace(/\D/g, '');
+  if (cleaned.length <= 4) return cleaned;
+  return cleaned.replace(/\d(?=\d{4})/g, '*');
+};
+
+const formatPaymentLabel = (value?: string) => {
+  if (!value) return 'Contribution payment';
+  return `${value.replace(/_/g, ' ')} payment`;
+};
 
 const PayWithMpesa = ({
   contributionId,
@@ -92,7 +111,11 @@ const PayWithMpesa = ({
 
   const phoneError = touched.phone ? validatePhone(phone) : null;
   const amountError = touched.amount ? validateAmount(amount) : null;
-  const isValid = !phoneError && !amountError && phone.trim() && amount.trim();
+  const isValid = !phoneError && !amountError && Boolean(phone.trim()) && Boolean(amount.trim());
+  const numericAmount = Number.parseInt(amount || '0', 10) || 0;
+  const formattedAmount = numericAmount ? formatKES(numericAmount) : 'KES 0';
+  const maskedPhone = phone.trim() ? maskPhone(phone) : 'Not entered';
+  const paymentLabel = formatPaymentLabel(paymentType);
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
@@ -139,6 +162,12 @@ const PayWithMpesa = ({
     }
   };
 
+  const handleQuickAmount = (value: number) => {
+    setAmount(String(value));
+    setSubmitError(null);
+    setTouched((prev) => ({ ...prev, amount: true }));
+  };
+
   const handlePay = async () => {
     if (!assertCanInteract('initiate payment')) return;
 
@@ -151,7 +180,7 @@ const PayWithMpesa = ({
     setIsProcessing(true);
     setPaymentStep('processing');
     setSubmitError(null);
-    setStatusMessage('Initiating M-Pesa payment...');
+    setStatusMessage('Starting Pay with M-Pesa...');
     
     try {
       const formatted = formatPhoneNumber(phone);
@@ -173,12 +202,12 @@ const PayWithMpesa = ({
       setReferenceId(checkoutRequestId);
 
       toast({
-        title: 'M-Pesa request sent',
+        title: 'Pay with M-Pesa sent',
         description: `Check your phone (${formatted}) and enter your M-Pesa PIN within 30 seconds`,
       });
 
       // Poll for transaction status with improved handling
-      setStatusMessage('Waiting for payment confirmation...');
+      setStatusMessage('Waiting for Pay with M-Pesa confirmation...');
 
       const completedTransaction = await MpesaTransactionService.pollTransactionStatus(
         checkoutRequestId,
@@ -197,7 +226,7 @@ const PayWithMpesa = ({
 
       if (!completedTransaction) {
         // Transaction may still complete via callback
-        setStatusMessage('Payment status pending - check your phone');
+        setStatusMessage('Pay with M-Pesa is pending - check your phone');
         // Wait a bit more for callback
         await new Promise(resolve => setTimeout(resolve, 5000));
         
@@ -209,7 +238,7 @@ const PayWithMpesa = ({
         }
       }
 
-      // Reset form after 3 seconds
+      // Reset form after a short confirmation moment.
       setTimeout(() => {
         setOpen(false);
         setSuccess(false);
@@ -253,16 +282,26 @@ const PayWithMpesa = ({
   };
 
   const renderSuccessState = () => (
-    <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-green-50 to-emerald-50">
+    <div className="flex flex-col items-center justify-center bg-green-50 p-8 text-center">
       <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-in zoom-in">
         <CheckCircle className="w-8 h-8 text-green-600" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Successful!</h3>
-      <p className="text-sm text-gray-600 text-center mb-2">
-        Your payment has been processed
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Successful</h3>
+      <p className="text-sm text-gray-600 mb-4">
+        Your payment has been confirmed and recorded.
       </p>
+      <div className="w-full rounded-xl border border-green-200 bg-white p-4 text-left text-sm shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-gray-500">Amount</span>
+          <span className="font-semibold text-gray-950">{formattedAmount}</span>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-gray-500">Phone</span>
+          <span className="font-medium text-gray-800">{maskedPhone}</span>
+        </div>
+      </div>
       {referenceId && (
-        <p className="text-xs text-gray-500 text-center font-mono bg-gray-100 px-3 py-2 rounded">
+        <p className="mt-3 w-full rounded-lg bg-white/80 px-3 py-2 text-center font-mono text-xs text-gray-500">
           Ref: {referenceId}
         </p>
       )}
@@ -270,65 +309,95 @@ const PayWithMpesa = ({
   );
 
   const renderProcessingState = () => (
-    <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-br from-blue-50 to-indigo-50 min-h-[300px]">
-      <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4 animate-pulse">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+    <div className="flex flex-col items-center justify-center bg-cyan-50 p-8 min-h-[360px]">
+      <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-pulse">
+        <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Processing Payment</h3>
-      <p className="text-sm text-gray-600 text-center mb-4">
-        {statusMessage || 'Waiting for M-Pesa confirmation...'}
+      <h3 className="text-lg font-semibold text-gray-900 mb-2">Pay with M-Pesa in progress</h3>
+      <p className="text-sm text-gray-600 text-center mb-5">
+        {statusMessage || 'Waiting for Pay with M-Pesa confirmation...'}
       </p>
-      <div className="w-full max-w-xs">
-        <div className="bg-white rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-3">
-            <Smartphone className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-700">
-              Phone: {phone.slice(-4).padStart(phone.length, '*')}
-            </span>
+      <div className="w-full max-w-sm space-y-4">
+        <div className="rounded-xl border border-green-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-gray-500">Amount</span>
+            <span className="font-semibold text-gray-950">{formattedAmount}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <DollarSign className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-700">
-              Amount: KES {Number.parseInt(amount).toLocaleString()}
-            </span>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <span className="text-sm text-gray-500">Phone</span>
+            <span className="font-medium text-gray-800">{maskedPhone}</span>
           </div>
         </div>
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+          <div className="flex items-start gap-3">
+            <Smartphone className="w-5 h-5 text-green-600" />
+            <div>
+              <p className="text-sm font-semibold text-green-950">Check your phone</p>
+              <p className="mt-1 text-xs leading-relaxed text-green-800">
+                Enter your M-Pesa PIN when the prompt appears. Keep this window open while we confirm.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center text-[11px] font-medium text-gray-600">
+          <div className="rounded-lg bg-white px-2 py-2 text-green-700">Sent</div>
+          <div className="rounded-lg bg-white px-2 py-2 text-green-700">PIN</div>
+          <div className="rounded-lg bg-white px-2 py-2">Confirmed</div>
+        </div>
+        {referenceId && (
+          <div className="rounded-lg bg-white/80 px-3 py-2 text-center">
+            <p className="text-[11px] text-gray-500">Reference</p>
+            <p className="truncate font-mono text-xs text-gray-700">{referenceId}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 
   const renderFormState = () => (
     <>
-      <DialogHeader className="p-6 pb-5 border-b border-slate-200 bg-gradient-to-br from-sky-50 via-white to-emerald-50">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white shadow-sm border border-sky-100 flex items-center justify-center">
-            <Smartphone className="w-5 h-5 text-blue-600" />
+      <DialogHeader className="p-6 pb-5 border-b border-green-100 bg-cyan-50">
+        <div className="flex items-start gap-3">
+          <div className="w-11 h-11 rounded-xl bg-white shadow-sm border border-green-100 flex items-center justify-center">
+            <Smartphone className="w-5 h-5 text-green-600" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <DialogTitle className="text-lg text-slate-950">Pay with M-Pesa</DialogTitle>
-            <p className="text-xs text-gray-500 mt-1">Secure mobile money transfer</p>
+            <p className="text-xs text-blue-900/70 mt-1">Secure mobile money transfer</p>
+          </div>
+          <div className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+            Fast
           </div>
         </div>
       </DialogHeader>
 
-      <div className="p-6 space-y-5 bg-white">
-        {/* Info Box */}
-        <div className="bg-sky-50 border border-sky-200 rounded-xl p-4 flex gap-3 shadow-sm">
-          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0">
-            <Info className="w-4 h-4 text-blue-600" />
+      <div className="p-6 space-y-5 bg-cyan-50">
+        <div className="rounded-xl border border-green-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{paymentLabel}</p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-gray-950">{formattedAmount}</p>
+            </div>
+            <div className="rounded-full bg-green-100 p-3">
+              <DollarSign className="h-5 w-5 text-green-700" />
+            </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-sky-950">Approve on your phone</p>
-            <p className="text-xs leading-relaxed text-sky-800">
-              We'll send an M-Pesa request to this number. Enter your PIN on your phone to complete the payment.
-            </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg bg-cyan-50 px-3 py-2">
+              <p className="text-gray-500">Phone</p>
+              <p className="mt-0.5 truncate font-semibold text-gray-800">{maskedPhone}</p>
+            </div>
+            <div className="rounded-lg bg-green-50 px-3 py-2">
+              <p className="text-green-700">Confirmation</p>
+              <p className="mt-0.5 font-semibold text-green-900">Automatic</p>
+            </div>
           </div>
         </div>
 
         {/* Phone Field */}
         <div className="space-y-2">
           <Label htmlFor="phone" className="flex items-center gap-2 font-semibold text-gray-900">
-            <Smartphone className="w-4 h-4 text-blue-600" />
+            <Smartphone className="w-4 h-4 text-green-600" />
             Phone Number
           </Label>
           <div className="relative">
@@ -345,7 +414,7 @@ const PayWithMpesa = ({
                 'h-12 pr-10 text-base transition-all rounded-xl',
                 phoneError && touched.phone
                   ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                  : 'border-slate-200 bg-slate-50/70 focus:border-blue-500 focus:ring-blue-200'
+                  : 'border-cyan-200 bg-cyan-50/70 focus:border-green-500 focus:ring-green-200'
               )}
             />
             {phone && (
@@ -370,12 +439,15 @@ const PayWithMpesa = ({
               Valid phone number
             </p>
           )}
+          {!touched.phone && (
+            <p className="text-xs text-gray-500">Use the phone number that should receive the M-Pesa prompt.</p>
+          )}
         </div>
 
         {/* Amount Field */}
         <div className="space-y-2">
           <Label htmlFor="amount" className="flex items-center gap-2 font-semibold text-gray-900">
-            <DollarSign className="w-4 h-4 text-blue-600" />
+            <DollarSign className="w-4 h-4 text-green-600" />
             Amount (KES)
           </Label>
           <div className="relative">
@@ -394,7 +466,7 @@ const PayWithMpesa = ({
                 'h-12 pl-12 text-base transition-all rounded-xl',
                 amountError && touched.amount
                   ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-200'
-                  : 'border-slate-200 bg-slate-50/70 focus:border-blue-500 focus:ring-blue-200'
+                  : 'border-cyan-200 bg-cyan-50/70 focus:border-green-500 focus:ring-green-200'
               )}
             />
           </div>
@@ -414,6 +486,39 @@ const PayWithMpesa = ({
             </div>
           )}
           <p className="text-xs text-gray-500 mt-2">Min: KES 1 • Max: KES 150,000</p>
+          {!defaultAmount && (
+            <div className="grid grid-cols-5 gap-2 pt-2">
+              {QUICK_AMOUNTS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleQuickAmount(value)}
+                  className={cn(
+                    'rounded-lg border px-2 py-2 text-xs font-semibold transition-colors',
+                    numericAmount === value
+                      ? 'border-green-600 bg-green-600 text-white'
+                      : 'border-green-200 bg-white text-green-700 hover:bg-green-50'
+                  )}
+                >
+                  {value >= 1000 ? `${value / 1000}k` : value}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex gap-3 shadow-sm">
+          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0">
+            <Info className="w-4 h-4 text-green-600" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-green-950">What happens next</p>
+            <div className="grid grid-cols-3 gap-2 text-[11px] leading-tight text-green-800">
+              <span className="rounded-md bg-white px-2 py-2">Prompt appears</span>
+              <span className="rounded-md bg-white px-2 py-2">Enter PIN</span>
+              <span className="rounded-md bg-white px-2 py-2">Auto confirm</span>
+            </div>
+          </div>
         </div>
 
         {/* Submit Error */}
@@ -449,10 +554,10 @@ const PayWithMpesa = ({
             onClick={handlePay}
             disabled={!isValid || isProcessing}
             isLoading={isProcessing}
-            loadingText="Processing"
+            loadingText="Opening Pay with M-Pesa"
             ariaLabel="Pay with M-Pesa"
             className={cn(
-              'flex-1 gap-2 font-semibold transition-all',
+              'h-12 flex-1 gap-2 bg-green-600 font-semibold text-white transition-all hover:bg-green-700 focus-visible:ring-green-500',
               isProcessing && 'opacity-90'
             )}
           >
@@ -468,7 +573,7 @@ const PayWithMpesa = ({
             onClick={() => setOpen(false)}
             disabled={isProcessing}
             ariaLabel="Cancel payment"
-            className="px-4"
+            className="h-12 px-4 border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
           >
             Cancel
           </AccessibleButton>
@@ -478,7 +583,7 @@ const PayWithMpesa = ({
         <div className="pt-4 border-t border-gray-100">
           <p className="text-xs text-gray-500 text-center">
             Having trouble? Contact support at{' '}
-            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-600 hover:underline">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-green-700 hover:underline">
               {SUPPORT_EMAIL}
             </a>
           </p>
@@ -491,15 +596,15 @@ const PayWithMpesa = ({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {trigger ?? (
-          <AccessibleButton className="gap-2" ariaLabel="Pay with M-Pesa">
+          <AccessibleButton className="gap-2 bg-green-600 text-white hover:bg-green-700" ariaLabel="Pay with M-Pesa">
             <Smartphone className="w-4 h-4" />
             Pay with M-Pesa
           </AccessibleButton>
         )}
       </DialogTrigger>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0 overflow-hidden border-0 shadow-2xl sm:rounded-2xl">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md p-0 overflow-hidden border border-green-100 bg-cyan-50 shadow-2xl sm:rounded-2xl">
         <DialogDescription className="sr-only">
-          M-Pesa payment dialog for Turuturu Stars contributions
+          Pay with M-Pesa dialog for Turuturu Stars contributions
         </DialogDescription>
         {success && renderSuccessState()}
         {!success && paymentStep === 'processing' && renderProcessingState()}

@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { isProfileComplete } from '@/utils/profileCompletion';
+import { isDefaultPasswordChangeRequired } from '@/utils/defaultPasswordChange';
 import { normalizeRoles } from '@/lib/rolePermissions';
 import { Loader2 } from 'lucide-react';
 
@@ -61,8 +62,12 @@ export const ProtectedRoute = ({ children, requiredRoles, stealth = false }: Pro
   const profileGateBypass = status === 'pending-approval' || status === 'suspended';
 
   // Force profile completion before accessing protected pages
-  if (!profileGateBypass && (status === 'needs-profile' || !isProfileComplete(profile as any))) {
+  if (!profileGateBypass && (status === 'needs-profile' || !isProfileComplete(profile))) {
     return <Navigate to="/profile-setup" state={{ from: location }} replace />;
+  }
+
+  if (isDefaultPasswordChangeRequired(user.id) && location.pathname !== '/dashboard/profile') {
+    return <Navigate to="/dashboard/profile?changePassword=1" replace />;
   }
 
   // Check if user has required roles
@@ -150,7 +155,7 @@ export const PublicRoute = ({ children }: PublicRouteProps) => {
     if (status === 'pending-approval' || status === 'suspended') {
       return <Navigate to="/dashboard" replace />;
     }
-    if (status === 'ready' && isProfileComplete(profile as any)) {
+    if (status === 'ready' && isProfileComplete(profile)) {
       return <Navigate to="/dashboard" replace />;
     }
     if (status === 'needs-profile') return <Navigate to="/profile-setup" replace />;

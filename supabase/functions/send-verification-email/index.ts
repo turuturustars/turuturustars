@@ -152,7 +152,7 @@ serve(async (req: Request): Promise<Response> => {
       },
     });
 
-    const emailRedirectUrl = redirectTo || 'https://turuturustars.co.ke/auth/confirm';
+    const emailRedirectUrl = redirectTo || 'https://turuturustars.co.ke/auth/callback';
     const userData = {
       full_name: fullName || '',
       phone: phone || '',

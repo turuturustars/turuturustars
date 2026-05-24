@@ -199,7 +199,7 @@ const NotificationsPage = () => {
               </SelectContent>
             </Select>
 
-            <Select value={readFilter} onValueChange={(value: any) => setReadFilter(value)}>
+            <Select value={readFilter} onValueChange={(value) => setReadFilter(value as typeof readFilter)}>
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>

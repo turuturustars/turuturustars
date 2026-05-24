@@ -11,7 +11,7 @@ export interface ExportOptions {
 /**
  * Convert data to CSV format
  */
-export function convertToCSV<T extends Record<string, any>>(
+export function convertToCSV<T extends Record<string, unknown>>(
   data: T[],
   headers?: string[]
 ): string {
@@ -46,7 +46,7 @@ export function convertToCSV<T extends Record<string, any>>(
 /**
  * Export data as CSV file
  */
-export function exportAsCSV<T extends Record<string, any>>(
+export function exportAsCSV<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions
 ): void {
@@ -62,7 +62,7 @@ export function exportAsCSV<T extends Record<string, any>>(
 /**
  * Export data as JSON file
  */
-export function exportAsJSON<T extends Record<string, any>>(
+export function exportAsJSON<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions
 ): void {
@@ -79,7 +79,7 @@ export function exportAsJSON<T extends Record<string, any>>(
  * Create Excel-compatible TSV (tab-separated values)
  * Can be opened directly in Excel
  */
-export function exportAsExcel<T extends Record<string, any>>(
+export function exportAsExcel<T extends Record<string, unknown>>(
   data: T[],
   options: ExportOptions
 ): void {
@@ -134,10 +134,10 @@ function downloadFile(
 /**
  * Generate report with summary statistics
  */
-export function generateReport<T extends Record<string, any>>(
+export function generateReport<T extends Record<string, unknown>>(
   title: string,
   data: T[],
-  summary?: Record<string, any>
+  summary?: Record<string, unknown>
 ): string {
   const date = new Date().toLocaleString();
   let report = `${title}\n`;
@@ -165,8 +165,8 @@ export function generateReport<T extends Record<string, any>>(
  */
 export function printReport(
   title: string,
-  data: Record<string, any>[],
-  summary?: Record<string, any>
+  data: Record<string, unknown>[],
+  summary?: Record<string, unknown>
 ): void {
   const report = generateReport(title, data, summary);
 

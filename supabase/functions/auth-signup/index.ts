@@ -242,6 +242,7 @@ serve(async (req) => {
       throw new HttpError(500, "Unable to generate confirmation link.");
     }
 
+    const createdUserId = data?.user?.id || null;
     const emailContent = buildSignupEmail({
       actionLink,
       email,
@@ -249,14 +250,33 @@ serve(async (req) => {
     });
     const replyToEmail = Deno.env.get("BREVO_REPLY_TO_EMAIL")?.trim();
     const replyToName = Deno.env.get("BREVO_REPLY_TO_NAME")?.trim();
-    const brevoData = await sendBrevoEmail({
-      to: [{ email, name: body.fullName || undefined }],
-      subject: emailContent.subject,
-      htmlContent: emailContent.htmlContent,
-      textContent: emailContent.textContent,
-      replyTo: replyToEmail ? { email: replyToEmail, name: replyToName || undefined } : undefined,
-      tags: ["turuturu-stars", "signup"],
-    });
+    let brevoData: { messageId?: string };
+    try {
+      brevoData = await sendBrevoEmail({
+        to: [{ email, name: body.fullName || undefined }],
+        subject: emailContent.subject,
+        htmlContent: emailContent.htmlContent,
+        textContent: emailContent.textContent,
+        replyTo: replyToEmail ? { email: replyToEmail, name: replyToName || undefined } : undefined,
+        tags: ["turuturu-stars", "signup"],
+      });
+    } catch (sendError) {
+      if (createdUserId) {
+        const { error: cleanupError } = await supabaseAdmin.auth.admin.deleteUser(createdUserId, false);
+        if (cleanupError) {
+          console.warn("Failed to clean up user after signup email failure", {
+            userId: createdUserId,
+            error: cleanupError.message,
+          });
+        }
+      }
+
+      throw new HttpError(
+        502,
+        "We could not send the confirmation email. Please try registering again in a few minutes.",
+        sendError,
+      );
+    }
 
     return jsonResponse({
       success: true,

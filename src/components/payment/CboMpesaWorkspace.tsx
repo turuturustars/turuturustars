@@ -13,7 +13,7 @@ const CboMpesaWorkspace = () => {
       <CardHeader>
         <CardTitle>CBO M-Pesa Contributions</CardTitle>
         <CardDescription>
-          M-Pesa payment and till receipt workflows with finance approvals.
+          Pay with M-Pesa and till receipt workflows with finance approvals.
         </CardDescription>
       </CardHeader>
       <CardContent>

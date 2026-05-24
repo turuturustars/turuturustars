@@ -14,12 +14,14 @@ import {
   CboRefundRequest,
   FinanceEntityType,
   fetchAwaitingApprovalPayments,
-  fetchFinancePayments,
+  fetchFinanceApprovalStats,
   fetchPendingExpenditures,
   fetchPendingRefundRequests,
   formatCurrency,
+  FinanceApprovalStats,
 } from '@/lib/mpesaContributionsApi';
-import { CheckCircle2, CreditCard, Loader2, ReceiptText, RefreshCw, ShieldX, Undo2 } from 'lucide-react';
+import { usePaginationState, type UsePaginationStateReturn } from '@/hooks/usePaginationState';
+import { CheckCircle2, ChevronLeft, ChevronRight, CreditCard, Loader2, ReceiptText, RefreshCw, ShieldX, Undo2 } from 'lucide-react';
 
 type FinanceDecision = 'approved' | 'rejected';
 
@@ -28,12 +30,41 @@ const CboTreasurerApprovalPanel = () => {
   const { toast } = useToast();
 
   const [awaitingPayments, setAwaitingPayments] = useState<CboPayment[]>([]);
-  const [allPayments, setAllPayments] = useState<CboPayment[]>([]);
   const [pendingExpenditures, setPendingExpenditures] = useState<CboExpenditure[]>([]);
   const [pendingRefunds, setPendingRefunds] = useState<CboRefundRequest[]>([]);
+  const [financeStats, setFinanceStats] = useState<FinanceApprovalStats>({
+    completedAmount: 0,
+    failedCount: 0,
+    awaitingAmount: 0,
+    awaitingCount: 0,
+    expenditureAmount: 0,
+    expenditureCount: 0,
+    refundAmount: 0,
+    refundCount: 0,
+    totalQueueAmount: 0,
+    totalQueueCount: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [actingItemKey, setActingItemKey] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  const paymentPagination = usePaginationState(25);
+  const expenditurePagination = usePaginationState(25);
+  const refundPagination = usePaginationState(25);
+  const {
+    page: paymentPage,
+    pageSize: paymentPageSize,
+    updateTotal: updatePaymentTotal,
+  } = paymentPagination;
+  const {
+    page: expenditurePage,
+    pageSize: expenditurePageSize,
+    updateTotal: updateExpenditureTotal,
+  } = expenditurePagination;
+  const {
+    page: refundPage,
+    pageSize: refundPageSize,
+    updateTotal: updateRefundTotal,
+  } = refundPagination;
 
   const canApprove = hasRole('chairperson') || hasRole('admin') || hasRole('secretary') || hasRole('patron');
 
@@ -45,16 +76,28 @@ const CboTreasurerApprovalPanel = () => {
 
     setIsLoading(true);
     try {
-      const [awaiting, all, expenditures, refunds] = await Promise.all([
-        fetchAwaitingApprovalPayments(100),
-        fetchFinancePayments(250),
-        fetchPendingExpenditures(100),
-        fetchPendingRefundRequests(100),
+      const [awaiting, summary, expenditures, refunds] = await Promise.all([
+        fetchAwaitingApprovalPayments(
+          paymentPageSize,
+          (paymentPage - 1) * paymentPageSize,
+        ),
+        fetchFinanceApprovalStats(),
+        fetchPendingExpenditures(
+          expenditurePageSize,
+          (expenditurePage - 1) * expenditurePageSize,
+        ),
+        fetchPendingRefundRequests(
+          refundPageSize,
+          (refundPage - 1) * refundPageSize,
+        ),
       ]);
       setAwaitingPayments(awaiting);
-      setAllPayments(all);
+      setFinanceStats(summary);
       setPendingExpenditures(expenditures);
       setPendingRefunds(refunds);
+      updatePaymentTotal(summary.awaitingCount);
+      updateExpenditureTotal(summary.expenditureCount);
+      updateRefundTotal(summary.refundCount);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load approval queue';
       toast({
@@ -65,32 +108,44 @@ const CboTreasurerApprovalPanel = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [canApprove, toast]);
+  }, [
+    canApprove,
+    expenditurePage,
+    expenditurePageSize,
+    paymentPage,
+    paymentPageSize,
+    refundPage,
+    refundPageSize,
+    toast,
+    updateExpenditureTotal,
+    updatePaymentTotal,
+    updateRefundTotal,
+  ]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
   const stats = useMemo(() => {
-    const completed = allPayments.filter((payment) => payment.status === 'completed');
-    const failed = allPayments.filter((payment) => payment.status === 'failed');
-    const awaiting = allPayments.filter((payment) => payment.status === 'awaiting_approval');
     const expenditureAmount = pendingExpenditures.reduce((sum, item) => sum + item.amount, 0);
     const refundAmount = pendingRefunds.reduce((sum, item) => sum + item.payout_amount, 0);
+    const awaitingAmount = awaitingPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
     return {
-      completedAmount: completed.reduce((sum, payment) => sum + payment.amount, 0),
-      failedCount: failed.length,
-      awaitingAmount: awaiting.reduce((sum, payment) => sum + payment.amount, 0),
-      awaitingCount: awaiting.length,
-      expenditureAmount,
-      expenditureCount: pendingExpenditures.length,
-      refundAmount,
-      refundCount: pendingRefunds.length,
-      totalQueueCount: awaiting.length + pendingExpenditures.length + pendingRefunds.length,
-      totalQueueAmount: awaiting.reduce((sum, payment) => sum + payment.amount, 0) + expenditureAmount + refundAmount,
+      completedAmount: financeStats.completedAmount,
+      failedCount: financeStats.failedCount,
+      awaitingAmount: financeStats.awaitingAmount || awaitingAmount,
+      awaitingCount: financeStats.awaitingCount || awaitingPayments.length,
+      expenditureAmount: financeStats.expenditureAmount || expenditureAmount,
+      expenditureCount: financeStats.expenditureCount || pendingExpenditures.length,
+      refundAmount: financeStats.refundAmount || refundAmount,
+      refundCount: financeStats.refundCount || pendingRefunds.length,
+      totalQueueCount:
+        financeStats.totalQueueCount || awaitingPayments.length + pendingExpenditures.length + pendingRefunds.length,
+      totalQueueAmount:
+        financeStats.totalQueueAmount || awaitingAmount + expenditureAmount + refundAmount,
     };
-  }, [allPayments, pendingExpenditures, pendingRefunds]);
+  }, [awaitingPayments, financeStats, pendingExpenditures, pendingRefunds]);
 
   const handleDecision = async (
     entityType: FinanceEntityType,
@@ -133,6 +188,41 @@ const CboTreasurerApprovalPanel = () => {
       ...previous,
       [itemKey]: value,
     }));
+  };
+
+  const renderPagination = (pagination: UsePaginationStateReturn, label: string) => {
+    if (pagination.totalItems <= pagination.pageSize) return null;
+
+    return (
+      <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-muted-foreground">
+          Showing {(pagination.page - 1) * pagination.pageSize + 1}
+          -{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)}
+          {' '}of {pagination.totalItems} {label}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => pagination.goToPage(pagination.page - 1)}
+            disabled={pagination.page === 1}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm">
+            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => pagination.goToPage(pagination.page + 1)}
+            disabled={pagination.page === pagination.totalPages}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   const renderDecisionButtons = (entityType: FinanceEntityType, entityId: string, label: string) => {
@@ -223,7 +313,7 @@ const CboTreasurerApprovalPanel = () => {
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-lg">Awaiting Finance Approval</CardTitle>
-            <CardDescription>Approve or reject M-Pesa payments, recorded expenditures, and refund requests.</CardDescription>
+            <CardDescription>Approve or reject Pay with M-Pesa transactions, recorded expenditures, and refund requests.</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void loadData()}>
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -256,7 +346,8 @@ const CboTreasurerApprovalPanel = () => {
                 {awaitingPayments.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6">No payments are waiting for approval.</p>
                 ) : (
-                  <Table>
+                  <>
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
@@ -293,7 +384,9 @@ const CboTreasurerApprovalPanel = () => {
                         );
                       })}
                     </TableBody>
-                  </Table>
+                    </Table>
+                    {renderPagination(paymentPagination, 'payments')}
+                  </>
                 )}
               </TabsContent>
 
@@ -301,7 +394,8 @@ const CboTreasurerApprovalPanel = () => {
                 {pendingExpenditures.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6">No expenditures are waiting for approval.</p>
                 ) : (
-                  <Table>
+                  <>
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
@@ -345,7 +439,9 @@ const CboTreasurerApprovalPanel = () => {
                         );
                       })}
                     </TableBody>
-                  </Table>
+                    </Table>
+                    {renderPagination(expenditurePagination, 'expenditures')}
+                  </>
                 )}
               </TabsContent>
 
@@ -353,7 +449,8 @@ const CboTreasurerApprovalPanel = () => {
                 {pendingRefunds.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6">No refund requests are waiting for approval.</p>
                 ) : (
-                  <Table>
+                  <>
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Date</TableHead>
@@ -388,7 +485,9 @@ const CboTreasurerApprovalPanel = () => {
                         );
                       })}
                     </TableBody>
-                  </Table>
+                    </Table>
+                    {renderPagination(refundPagination, 'refund requests')}
+                  </>
                 )}
               </TabsContent>
             </Tabs>

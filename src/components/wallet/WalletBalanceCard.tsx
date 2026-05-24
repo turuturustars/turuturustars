@@ -78,7 +78,7 @@ const WalletBalanceCard = ({
             className="bg-white text-primary hover:bg-white/90"
           >
             <ArrowDownToLine className="mr-2 h-4 w-4" />
-            Top Up via M-Pesa
+            Pay with M-Pesa
           </Button>
           {onRefresh && (
             <Button

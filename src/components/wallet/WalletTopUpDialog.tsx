@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { initiateSTKPush, formatPhoneNumber, queryTransactionStatus } from '@/lib/mpesa';
 import { supabase } from '@/integrations/supabase/client';
 import { CheckCircle2, Clock3, Loader2, RefreshCw, Smartphone, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Props {
   open: boolean;
@@ -24,12 +25,12 @@ const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
 const statusCopy: Record<TopUpStatus, { title: string; detail: string; progress: number }> = {
   idle: {
     title: 'Ready',
-    detail: 'Enter an amount and send the M-Pesa request.',
+    detail: 'Enter an amount and choose Pay with M-Pesa.',
     progress: 0,
   },
   pending: {
-    title: 'Waiting for M-Pesa confirmation',
-    detail: 'Approve the M-Pesa request on your phone. This window will keep checking.',
+    title: 'Waiting for Pay with M-Pesa',
+    detail: 'Approve Pay with M-Pesa on your phone. This window will keep checking.',
     progress: 55,
   },
   checking: {
@@ -49,7 +50,7 @@ const statusCopy: Record<TopUpStatus, { title: string; detail: string; progress:
   },
   timeout: {
     title: 'Still waiting for confirmation',
-    detail: 'The M-Pesa request may have expired or M-Pesa is delayed. You can check again manually.',
+    detail: 'Pay with M-Pesa may have expired or M-Pesa is delayed. You can check again manually.',
     progress: 100,
   },
 };
@@ -60,6 +61,15 @@ const formatKES = (value: number) =>
     currency: 'KES',
     maximumFractionDigits: 0,
   }).format(value);
+
+const validateMpesaPhone = (value: string): string | null => {
+  if (!value.trim()) return 'Enter the M-Pesa number to receive the prompt.';
+  const cleaned = value.replace(/\D/g, '');
+  if (cleaned.length < 10) return 'Phone number must be at least 10 digits.';
+  if (cleaned.length > 13) return 'Phone number is too long.';
+  if (!/^(254|0)?[17]\d{8}$/.test(cleaned)) return 'Use 07XXXXXXXX or 01XXXXXXXX.';
+  return null;
+};
 
 const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
   const { user, profile } = useAuth();
@@ -77,6 +87,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
   const statusInfo = statusCopy[status];
   const isFinal = status === 'completed' || status === 'failed';
   const pollingFinished = isFinal || status === 'timeout';
+  const phoneError = validateMpesaPhone(phone);
 
   const refreshLocalTransaction = useCallback(async (checkoutId: string) => {
     const { data, error } = await supabase
@@ -126,14 +137,14 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
 
       if (currentStatus === 'failed' || currentStatus === 'user_cancelled') {
         setStatus('failed');
-        setStatusDetail(transaction?.result_desc || 'The M-Pesa request was cancelled or failed.');
+        setStatusDetail(transaction?.result_desc || 'Pay with M-Pesa was cancelled or failed.');
         onSuccess?.();
         return;
       }
 
       if (currentStatus === 'request_timeout' || currentStatus === 'timeout') {
         setStatus('timeout');
-        setStatusDetail(transaction?.result_desc || 'The M-Pesa request timed out.');
+        setStatusDetail(transaction?.result_desc || 'Pay with M-Pesa timed out.');
         onSuccess?.();
         return;
       }
@@ -159,7 +170,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
 
       if (attempts > 18) {
         setStatus('timeout');
-        setStatusDetail('We are still waiting for M-Pesa. Use Check status to try again.');
+        setStatusDetail('We are still waiting for Pay with M-Pesa. Use Check status to try again.');
         onSuccess?.();
         return;
       }
@@ -183,8 +194,9 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
       toast({ title: 'Enter a valid amount', description: 'Minimum is KES 10', variant: 'destructive' });
       return;
     }
-    if (!phone) {
-      toast({ title: 'Phone required', description: 'Enter the M-Pesa number to receive the payment request.', variant: 'destructive' });
+    const phoneValidation = validateMpesaPhone(phone);
+    if (phoneValidation) {
+      toast({ title: 'Check phone number', description: phoneValidation, variant: 'destructive' });
       return;
     }
     if (!user?.id) return;
@@ -206,7 +218,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
       setStatus('pending');
       setStatusDetail(null);
       toast({
-        title: 'M-Pesa request sent',
+        title: 'Pay with M-Pesa sent',
         description: 'Check your phone and enter your M-Pesa PIN to complete the top-up.',
       });
       onSuccess?.();
@@ -235,19 +247,19 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
         if (!v) reset();
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="overflow-hidden border-green-100 bg-cyan-50 p-0 sm:max-w-md">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2">
-            <Smartphone className="h-5 w-5 text-primary" />
+            <Smartphone className="h-5 w-5 text-green-600" />
             Top Up Wallet
           </DialogTitle>
-          <DialogDescription>
-            Add funds with M-Pesa. Your wallet updates after confirmation.
+          <DialogDescription className="text-blue-900/75">
+            Add funds with Pay with M-Pesa. Your wallet updates after confirmation.
           </DialogDescription>
         </DialogHeader>
 
         {stage === 'form' && (
-          <div className="space-y-4">
+          <div className="space-y-4 px-6 pb-6 pt-4">
             <div className="space-y-2">
               <Label htmlFor="wallet-topup-amount">Amount</Label>
               <Input
@@ -257,7 +269,9 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
                 placeholder="500"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
               />
+              <p className="text-xs text-muted-foreground">Minimum KES 10. Choose a quick amount or type your own.</p>
               <div className="grid grid-cols-3 gap-2 pt-1 sm:grid-cols-5">
                 {QUICK_AMOUNTS.map((value) => (
                   <Button
@@ -265,6 +279,11 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
                     type="button"
                     variant={numericAmount === value ? 'default' : 'outline'}
                     size="sm"
+                    className={cn(
+                      numericAmount === value
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800'
+                    )}
                     onClick={() => setAmount(String(value))}
                   >
                     {value.toLocaleString()}
@@ -281,19 +300,33 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
                 placeholder="07XX XXX XXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
+                className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
               />
+              {!phoneError && phone.trim() && (
+                <p className="flex items-center gap-1 text-xs text-green-700">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Ready to receive the Pay with M-Pesa prompt
+                </p>
+              )}
+              {phoneError && phone.trim() && (
+                <p className="text-xs text-destructive">{phoneError}</p>
+              )}
             </div>
 
-            <Button onClick={handleSubmit} disabled={loading} className="w-full gap-2">
+            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-xs leading-relaxed text-green-800">
+              Pay with M-Pesa opens on your phone, then your wallet updates automatically after confirmation.
+            </div>
+
+            <Button onClick={handleSubmit} disabled={loading || Boolean(phoneError)} className="h-12 w-full gap-2 bg-green-600 text-white hover:bg-green-700">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
-              {loading ? 'Sending M-Pesa request...' : `Pay with M-Pesa${numericAmount ? ` (${formatKES(numericAmount)})` : ''}`}
+              {loading ? 'Opening Pay with M-Pesa...' : `Pay with M-Pesa${numericAmount ? ` (${formatKES(numericAmount)})` : ''}`}
             </Button>
           </div>
         )}
 
         {stage === 'sent' && (
-          <div className="space-y-5 py-2">
-            <div className="rounded-lg border bg-muted/30 p-4">
+          <div className="space-y-5 px-6 pb-6 pt-4">
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5">
                   {status === 'completed' ? (
@@ -301,7 +334,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
                   ) : status === 'failed' ? (
                     <XCircle className="h-8 w-8 text-destructive" />
                   ) : (
-                    <Clock3 className="h-8 w-8 text-primary" />
+                    <Clock3 className="h-8 w-8 text-green-600" />
                   )}
                 </div>
                 <div className="min-w-0 flex-1 space-y-2">
@@ -340,7 +373,7 @@ const WalletTopUpDialog = ({ open, onOpenChange, onSuccess }: Props) => {
                   Try again
                 </Button>
               )}
-              <Button onClick={() => onOpenChange(false)} className="flex-1">
+              <Button onClick={() => onOpenChange(false)} className="flex-1 bg-green-600 text-white hover:bg-green-700">
                 Done
               </Button>
             </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -50,54 +50,73 @@ const WelfarePage = () => {
   });
   const [beneficiaries, setBeneficiaries] = useState<Array<{id: string; full_name: string}>>([]);
   const pagination = usePaginationState(12);
+  const { page, pageSize, updateTotal } = pagination;
 
   const userRoles = normalizeRoles(roles);
   const canCreateWelfare = hasPermission(userRoles, 'create_welfare');
   const canManageWelfare = hasPermission(userRoles, 'manage_welfare');
 
-  // Paginate cases
-  const paginatedCases = useMemo(() => {
-    const offset = (pagination.page - 1) * pagination.pageSize;
-    return cases.slice(offset, offset + pagination.pageSize);
-  }, [cases, pagination.page, pagination.pageSize]);
-
-  // Update pagination when cases change
-  useEffect(() => {
-    pagination.updateTotal(cases.length);
-  }, [cases.length, pagination]);
-
-  useEffect(() => {
-    fetchWelfareCases();
-    fetchBeneficiaries();
-
-    // Real-time subscription for new welfare cases
-    const channel = supabase
-      .channel('welfare_cases_updates')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'welfare_cases' }, () => {
-        fetchWelfareCases();
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'welfare_cases' }, () => {
-        fetchWelfareCases();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const fetchBeneficiaries = async () => {
+  const fetchBeneficiaries = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name')
-        .order('full_name');
-      
+        .eq('status', 'active')
+        .order('full_name')
+        .limit(100);
+
       setBeneficiaries(data || []);
     } catch (error) {
       console.error('Error fetching beneficiaries:', error);
     }
-  };
+  }, []);
+
+  const fetchWelfareCases = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      setError(null);
+      const offset = (page - 1) * pageSize;
+
+      await retryAsync(
+        async () => {
+          const { data, error: fetchError, count } = await supabase
+            .from('welfare_cases')
+            .select('id, title, description, case_type, target_amount, collected_amount, status, created_at, beneficiary_id, beneficiary:beneficiary_id(full_name)', { count: 'exact' })
+            .order('created_at', { ascending: false })
+            .range(offset, offset + pageSize - 1);
+
+          if (fetchError) throw fetchError;
+          setCases(data || []);
+          updateTotal(count ?? data?.length ?? 0);
+          return data;
+        },
+        {
+          maxRetries: 3,
+          delayMs: 1000,
+          backoffMultiplier: 2,
+          onRetry: (attempt) => {
+            logError(`Retrying fetch welfare cases (attempt ${attempt})`, 'WelfarePage', 'warn');
+          },
+        }
+      );
+    } catch (error) {
+      const errorMsg = getErrorMessage(error);
+      logError(error, 'WelfarePage.fetchWelfareCases');
+      setError(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, pageSize, updateTotal]);
+
+  useEffect(() => {
+    void fetchWelfareCases();
+  }, [fetchWelfareCases]);
+
+  useEffect(() => {
+    if (isDialogOpen && canCreateWelfare) {
+      void fetchBeneficiaries();
+    }
+  }, [canCreateWelfare, fetchBeneficiaries, isDialogOpen]);
 
   const handleSaveWelfareCase = async () => {
     if (!formData.title.trim()) {
@@ -177,15 +196,15 @@ const WelfarePage = () => {
     setIsDeleting(caseId);
     try {
       // Check if there are linked contributions
-      const { data: linkedContributions, error: checkError } = await supabase
+      const { count: linkedContributionsCount, error: checkError } = await supabase
         .from('contributions')
         .select('id', { count: 'exact', head: true })
         .eq('welfare_case_id', caseId);
       
       if (checkError) throw checkError;
       
-      if (linkedContributions && linkedContributions.length > 0) {
-        setError(`Cannot delete this welfare case as it has ${linkedContributions.length} linked contribution(s). Please remove the contributions first.`);
+      if ((linkedContributionsCount ?? 0) > 0) {
+        setError(`Cannot delete this welfare case as it has ${linkedContributionsCount} linked contribution(s). Please remove the contributions first.`);
         return;
       }
       
@@ -206,41 +225,6 @@ const WelfarePage = () => {
     }
   };
 
-  const fetchWelfareCases = async () => {
-    setIsLoading(true);
-    try {
-      setError(null);
-      
-      await retryAsync(
-        async () => {
-          // Fetch ALL welfare cases regardless of status to ensure visibility
-          const { data, error: fetchError } = await supabase
-            .from('welfare_cases')
-            .select('id, title, description, case_type, target_amount, collected_amount, status, created_at, beneficiary_id, beneficiary:beneficiary_id(full_name)')
-            .order('created_at', { ascending: false });
-
-          if (fetchError) throw fetchError;
-          setCases(data || []);
-          return data;
-        },
-        {
-          maxRetries: 3,
-          delayMs: 1000,
-          backoffMultiplier: 2,
-          onRetry: (attempt) => {
-            logError(`Retrying fetch welfare cases (attempt ${attempt})`, 'WelfarePage', 'warn');
-          },
-        }
-      );
-    } catch (error) {
-      const errorMsg = getErrorMessage(error);
-      logError(error, 'WelfarePage.fetchWelfareCases');
-      setError(errorMsg);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const getCaseTypeIcon = (type: string) => {
     switch (type) {
       case 'bereavement':
@@ -253,9 +237,6 @@ const WelfarePage = () => {
         return <DollarSign className="w-5 h-5 text-primary" />;
     }
   };
-
-  const activeCases = cases.filter((c) => c.status === 'active');
-  const closedCases = cases.filter((c) => c.status !== 'active');
 
   const renderEmptyState = () => (
     <Card>
@@ -272,13 +253,13 @@ const WelfarePage = () => {
   const renderCasesList = () => (
     <>
       {/* All Cases with Pagination */}
-      {paginatedCases.length > 0 && (
+      {cases.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">
-            Welfare Cases ({cases.length})
+            Welfare Cases ({pagination.totalItems})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {paginatedCases.map((welfareCase) => (
+            {cases.map((welfareCase) => (
               <Card key={welfareCase.id} className="overflow-hidden">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-4">
@@ -368,7 +349,7 @@ const WelfarePage = () => {
           {/* Pagination Controls */}
           <div className="flex items-center justify-between mt-6 pt-4 border-t">
             <div className="text-sm text-muted-foreground">
-              Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, cases.length)} of {cases.length}
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems}
             </div>
             <div className="flex items-center gap-2">
               <AccessibleButton

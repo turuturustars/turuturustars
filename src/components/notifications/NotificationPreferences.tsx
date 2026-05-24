@@ -23,6 +23,7 @@ import {
   MessageSquare,
   CreditCard,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationPreferences } from '@/hooks/useNotificationPreferences';
 import { cn } from '@/lib/utils';
@@ -54,7 +55,7 @@ interface NotificationType {
   >;
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   bgColor: string;
 }
@@ -63,7 +64,7 @@ interface DeliveryMethod {
   key: keyof Pick<NotificationPreferencesState, 'emailNotifications' | 'whatsappNotifications' | 'soundNotifications' | 'pushNotifications'>;
   title: string;
   description: string;
-  icon: any;
+  icon: LucideIcon;
   canToggle: boolean;
 }
 

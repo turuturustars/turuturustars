@@ -113,12 +113,19 @@ export default function VotingPage() {
       console.error('Error fetching voting motions:', error);
     } else {
       // Map yes_votes/no_votes to votes_for/votes_against for display compatibility
-      const mappedData = (data as any[])?.map(m => ({
+      const mappedData = data?.map((m) => ({
         ...m,
-        votes_for: m.yes_votes,
-        votes_against: m.no_votes
+        id: m.id ?? '',
+        title: m.title ?? '',
+        status: m.status ?? 'pending',
+        created_at: m.created_at ?? new Date().toISOString(),
+        yes_votes: m.yes_votes ?? 0,
+        no_votes: m.no_votes ?? 0,
+        total_votes: m.total_votes ?? 0,
+        votes_for: m.yes_votes ?? 0,
+        votes_against: m.no_votes ?? 0,
       })) || [];
-      setMotions(mappedData as VotingMotion[]);
+      setMotions(mappedData);
     }
     setIsLoading(false);
   };

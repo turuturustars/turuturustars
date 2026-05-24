@@ -40,7 +40,7 @@ export function useRealtimeSubscription(
         .on(
           'postgres_changes',
           {
-            event: event as any,
+            event: event as '*',
             schema,
             table,
             filter,
@@ -101,7 +101,7 @@ export function useRealtimeSubscriptions(
           .on(
             'postgres_changes',
             {
-              event: event as any,
+              event: event as '*',
               schema,
               table,
               filter,

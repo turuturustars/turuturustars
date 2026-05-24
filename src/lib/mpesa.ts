@@ -89,7 +89,7 @@ export async function initiateSTKPush(params: STKPushParams): Promise<STKPushRes
     throw new Error(data.error);
   }
 
-  console.log("M-Pesa payment request response:", data);
+  console.log("Pay with M-Pesa response:", data);
   return data;
 }
 

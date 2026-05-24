@@ -158,7 +158,7 @@ serve(async (req) => {
 
         paymentId = existingPayment?.id ?? null;
       } else {
-        throw new HttpError(500, "Failed to store payment request", insertError);
+        throw new HttpError(500, "Failed to store Pay with M-Pesa prompt", insertError);
       }
     } else {
       paymentId = insertedPayment?.id ?? null;

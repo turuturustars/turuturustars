@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { enqueueBackgroundJob } from '@/lib/backgroundJobs';
 
 export type NotificationType =
   | 'announcement'
@@ -32,6 +33,19 @@ export interface BrowserNotificationOptions {
   onClick?: () => void;
 }
 
+type ExtendedNotificationOptions = NotificationOptions & {
+  actions?: Array<{ action: string; title: string }>;
+  image?: string;
+};
+
+interface NotificationActionEvent extends Event {
+  action: string;
+}
+
+type ActionableNotification = Notification & {
+  onaction?: (event: NotificationActionEvent) => void;
+};
+
 export interface SendBulkNotificationParams {
   userIds: string[];
   title: string;
@@ -47,23 +61,20 @@ export const sendNotification = async (params: SendNotificationParams) => {
   try {
     const { userId, title, message, type, actionUrl } = params;
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: userId,
+    const jobId = await enqueueBackgroundJob({
+      jobType: 'notification_single',
+      payload: {
+        userId,
         title,
         message,
         type,
-        action_url: actionUrl || null,
-        read: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        actionUrl: actionUrl || null,
+      },
+      priority: 4,
+      dedupeKey: null,
+    });
 
-    if (error) throw error;
-    return { success: true, data };
+    return { success: true, queued: true, jobId };
   } catch (error) {
     console.error('Error sending notification:', error);
     throw error;
@@ -77,24 +88,20 @@ export const sendBulkNotifications = async (params: SendBulkNotificationParams) 
   try {
     const { userIds, title, message, type, actionUrl } = params;
 
-    const notificationsData = userIds.map(userId => ({
-      user_id: userId,
-      title,
-      message,
-      type,
-      action_url: actionUrl || null,
-      read: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }));
+    const jobId = await enqueueBackgroundJob({
+      jobType: 'notification_bulk',
+      payload: {
+        userIds,
+        title,
+        message,
+        type,
+        actionUrl: actionUrl || null,
+      },
+      priority: 5,
+      dedupeKey: `notification_bulk:${type}:${title}:${userIds.length}:${Date.now()}`,
+    });
 
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert(notificationsData)
-      .select();
-
-    if (error) throw error;
-    return { success: true, data, count: data?.length || 0 };
+    return { success: true, queued: true, jobId, count: userIds.length };
   } catch (error) {
     console.error('Error sending bulk notifications:', error);
     throw error;
@@ -110,25 +117,18 @@ export const sendAnnouncementNotification = async (
   message: string
 ) => {
   try {
-    // Get all members
-    const { data: members, error: membersError } = await supabase
-      .from('profiles')
-      .select('id');
-
-    if (membersError) throw membersError;
-    if (!members || members.length === 0) return { success: true, count: 0 };
-
-    // Send notification to all members
-    const userIds = members.map(m => m.id);
-    const result = await sendBulkNotifications({
-      userIds,
-      title,
-      message,
-      type: 'announcement',
-      actionUrl: `/dashboard/announcements#${announcementId}`,
+    const jobId = await enqueueBackgroundJob({
+      jobType: 'announcement_notifications',
+      payload: {
+        announcementId,
+        title,
+        message,
+      },
+      priority: 4,
+      dedupeKey: `announcement_notifications:${announcementId}`,
     });
 
-    return result;
+    return { success: true, queued: true, jobId, count: 0 };
   } catch (error) {
     console.error('Error sending announcement notification:', error);
     throw error;
@@ -345,7 +345,7 @@ export const BrowserNotificationService = {
         ? messagePreview.substring(0, 100) + '...' 
         : messagePreview;
 
-      const notificationOptions: any = {
+      const notificationOptions: ExtendedNotificationOptions = {
         body: truncatedMessage,
         icon: '/pwa-192x192.png',
         badge: '/pwa-192x192.png',
@@ -372,15 +372,15 @@ export const BrowserNotificationService = {
         event.preventDefault();
         options?.onClick?.();
         notification.close();
-        (globalThis as any).focus?.();
+        window.focus();
       };
 
-      // Handle action buttons (using 'as any' to avoid TypeScript issues)
-      (notification as any).onaction = (event: any) => {
+      const actionableNotification = notification as ActionableNotification;
+      actionableNotification.onaction = (event) => {
         if (event.action === 'open') {
           options?.onClick?.();
           notification.close();
-          (globalThis as any).focus?.();
+          window.focus();
         } else if (event.action === 'close') {
           notification.close();
         }
@@ -412,7 +412,7 @@ export const BrowserNotificationService = {
     }
 
     try {
-      const notificationOptions: any = {
+      const notificationOptions: ExtendedNotificationOptions = {
         body: options?.body,
         icon: options?.icon || '/pwa-192x192.png',
         badge: options?.badge || '/pwa-192x192.png',
@@ -430,7 +430,7 @@ export const BrowserNotificationService = {
       notification.onclick = () => {
         options?.onClick?.();
         notification.close();
-        (globalThis as any).focus?.();
+        window.focus();
       };
 
       return notification;

@@ -9,16 +9,18 @@ export interface AppError {
   statusCode?: number;
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 export class AppErrorHandler {
   static parseError(error: unknown): AppError {
     // Handle Supabase errors
-    if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
-      const pgError = error as any;
+    if (isRecord(error) && 'status' in error && 'message' in error) {
       return {
-        code: pgError.code || 'SUPABASE_ERROR',
-        message: pgError.message || 'Database operation failed',
-        statusCode: pgError.status,
-        details: pgError,
+        code: typeof error.code === 'string' ? error.code : 'SUPABASE_ERROR',
+        message: typeof error.message === 'string' ? error.message : 'Database operation failed',
+        statusCode: typeof error.status === 'number' ? error.status : undefined,
+        details: error,
       };
     }
 
@@ -53,8 +55,8 @@ export class AppErrorHandler {
   }
 
   static isNetworkError(error: AppError | unknown): boolean {
-    if (error instanceof Object && 'message' in error) {
-      const msg = (error as any).message?.toLowerCase() || '';
+    if (isRecord(error) && typeof error.message === 'string') {
+      const msg = error.message.toLowerCase();
       return msg.includes('network') || msg.includes('offline') || msg.includes('connection');
     }
     return false;

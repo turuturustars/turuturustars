@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowDownLeft, ArrowUpRight, Clock3, Receipt, XCircle } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, CheckCircle2, Clock3, Receipt, XCircle } from 'lucide-react';
 import type { WalletTopUp, WalletTxn } from '@/hooks/useWallet';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
   user_cancelled: 'Cancelled',
   failed: 'Failed',
   unknown: 'Checking',
+  completed: 'Confirmed',
 };
 
 const failedStatuses = new Set(['failed', 'user_cancelled', 'request_timeout']);
@@ -125,23 +126,32 @@ const WalletTransactionList = ({ transactions, topUps = [] }: Props) => {
             {filteredTopUps.map((topUp) => {
               const status = topUp.status || 'pending';
               const failed = failedStatuses.has(status);
+              const completed = status === 'completed';
 
               return (
                 <li key={topUp.id} className="flex items-center gap-3 px-4 py-3 sm:px-6">
                   <div
                     className={cn(
                       'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-                      failed
+                      completed
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : failed
                         ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300'
                         : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                     )}
                   >
-                    {failed ? <XCircle className="h-5 w-5" /> : <Clock3 className="h-5 w-5" />}
+                    {completed ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : failed ? (
+                      <XCircle className="h-5 w-5" />
+                    ) : (
+                      <Clock3 className="h-5 w-5" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="truncate text-sm font-medium">M-Pesa wallet top-up</p>
-                      <Badge variant={failed ? 'destructive' : 'secondary'} className="text-[10px]">
+                      <Badge variant={failed ? 'destructive' : completed ? 'default' : 'secondary'} className="text-[10px]">
                         {STATUS_LABEL[status] || status}
                       </Badge>
                     </div>
@@ -155,11 +165,18 @@ const WalletTransactionList = ({ transactions, topUps = [] }: Props) => {
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">
+                    <p
+                      className={cn(
+                        'text-sm font-semibold tabular-nums',
+                        completed
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-amber-700 dark:text-amber-300'
+                      )}
+                    >
                       + {formatKES(Number(topUp.amount))}
                     </p>
                     <p className="text-[10px] text-muted-foreground tabular-nums">
-                      {failed ? 'Not credited' : 'Awaiting credit'}
+                      {failed ? 'Not credited' : completed ? 'Confirmed by M-Pesa' : 'Checking M-Pesa'}
                     </p>
                   </div>
                 </li>

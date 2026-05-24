@@ -60,7 +60,7 @@ serve(async (req) => {
       } else {
         try {
           await notifyTreasurersOfMoneyEvent(supabase, {
-            title: "C2B M-Pesa payment received",
+            title: "C2B Pay with M-Pesa received",
             amount,
             status: "awaiting_approval",
             source: "mpesa-confirmation",

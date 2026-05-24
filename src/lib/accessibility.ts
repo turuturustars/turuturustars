@@ -298,7 +298,7 @@ export function createFieldAriaProps(options: {
   description?: string;
   disabled?: boolean;
 }) {
-  const ariaProps: Record<string, any> = {
+  const ariaProps: Record<string, string | boolean | undefined> = {
     'aria-label': getFieldAriaLabel(options.fieldName, options.required),
     'aria-required': options.required,
     'aria-disabled': options.disabled,

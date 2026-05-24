@@ -23,17 +23,19 @@ export interface PaymentSummary {
   processingTime?: number;
 }
 
-interface MpesaTransaction {
-  checkout_request_id: string;
-  amount: number;
-  phone_number: string;
-  status: string;
-  mpesa_receipt_number?: string;
-  created_at: string;
-}
+type NumericValue = number | string | null | undefined;
+
+const toNumber = (value: NumericValue): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
 
 /**
- * Hook for monitoring M-Pesa payment metrics
+ * Hook for monitoring Pay with M-Pesa metrics
  */
 export function usePaymentMetrics() {
   const [metrics, setMetrics] = useState<PaymentMetrics>({
@@ -55,56 +57,31 @@ export function usePaymentMetrics() {
       setIsLoading(true);
       setError(null);
 
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error: metricsError } = await supabase.rpc('get_payment_metrics' as never);
+      if (metricsError) throw metricsError;
 
-      // Get today's transactions
-      const { data: todayTx } = await supabase
-        .from('mpesa_transactions')
-        .select('amount, status')
-        .gte('created_at', todayStart);
-
-      // Get weekly transactions
-      const { data: weeklyTx } = await supabase
-        .from('mpesa_transactions')
-        .select('amount, status, created_at')
-        .gte('created_at', weekStart);
-
-      // Calculate metrics
-      const todayData = todayTx || [];
-      const weeklyData = weeklyTx || [];
-
-      const todayCompleted = todayData.filter(t => t.status === 'completed');
-      const todayTotal = todayData.length;
-      const todayAmount = todayCompleted.reduce((sum, t) => sum + (t.amount || 0), 0);
-
-      const weeklyCompleted = weeklyData.filter(t => t.status === 'completed');
-      const weeklyTotal = weeklyData.length;
-      const weeklyAmount = weeklyCompleted.reduce((sum, t) => sum + (t.amount || 0), 0);
-
-      const allAmount = weeklyData.reduce((sum, t) => sum + (t.amount || 0), 0);
-      const allProcessing = weeklyData
-        .filter(t => t.status === 'completed')
-        .map(t => {
-          const created = new Date(t.created_at).getTime();
-          const now = Date.now();
-          return now - created;
-        });
+      const row = data as {
+        todayTotal?: NumericValue;
+        todayCount?: NumericValue;
+        todaySuccessRate?: NumericValue;
+        weeklyTotal?: NumericValue;
+        weeklyCount?: NumericValue;
+        averageAmount?: NumericValue;
+        pendingCount?: NumericValue;
+        failedCount?: NumericValue;
+        averageProcessingTime?: NumericValue;
+      } | null;
 
       setMetrics({
-        todayTotal: todayAmount,
-        todayCount: todayCompleted.length,
-        todaySuccessRate: todayTotal > 0 ? (todayCompleted.length / todayTotal) * 100 : 0,
-        weeklyTotal: weeklyAmount,
-        weeklyCount: weeklyCompleted.length,
-        averageAmount: weeklyTotal > 0 ? allAmount / weeklyTotal : 0,
-        pendingCount: weeklyData.filter(t => t.status === 'pending').length,
-        failedCount: weeklyData.filter(t => t.status === 'failed').length,
-        averageProcessingTime:
-          allProcessing.length > 0
-            ? allProcessing.reduce((a, b) => a + b, 0) / allProcessing.length / 1000
-            : 0,
+        todayTotal: toNumber(row?.todayTotal),
+        todayCount: toNumber(row?.todayCount),
+        todaySuccessRate: toNumber(row?.todaySuccessRate),
+        weeklyTotal: toNumber(row?.weeklyTotal),
+        weeklyCount: toNumber(row?.weeklyCount),
+        averageAmount: toNumber(row?.averageAmount),
+        pendingCount: toNumber(row?.pendingCount),
+        failedCount: toNumber(row?.failedCount),
+        averageProcessingTime: toNumber(row?.averageProcessingTime),
       });
     } catch (err) {
       console.error('Error fetching metrics:', err);
@@ -138,7 +115,7 @@ export function useRecentPayments(limit: number = 10) {
 
       const { data, error: queryError } = await supabase
         .from('mpesa_transactions')
-        .select('*')
+        .select('checkout_request_id, amount, phone_number, status, mpesa_receipt_number, created_at')
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -168,40 +145,6 @@ export function useRecentPayments(limit: number = 10) {
     return () => clearInterval(interval);
   }, [fetchPayments]);
 
-  // Subscribe to real-time updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('mpesa_transactions_changes')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'mpesa_transactions' },
-        (payload) => {
-          const newTx = payload.new as MpesaTransaction | null;
-          if (newTx) {
-            setPayments(prev => {
-              const updated = [
-                {
-                  checkoutRequestId: newTx.checkout_request_id,
-                  amount: newTx.amount,
-                  phone: newTx.phone_number,
-                  status: newTx.status as PaymentSummary['status'],
-                  mpesaReceipt: newTx.mpesa_receipt_number,
-                  createdAt: newTx.created_at,
-                },
-                ...prev,
-              ];
-              return updated.slice(0, limit);
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [limit]);
-
   return { payments, isLoading, error, refresh: fetchPayments };
 }
 
@@ -220,10 +163,11 @@ export function usePaymentIssues(timeWindowHours: number = 24) {
 
       const { data, error } = await supabase
         .from('mpesa_transactions')
-        .select('*')
+        .select('checkout_request_id, amount, phone_number, status, mpesa_receipt_number, created_at')
         .gte('created_at', timeWindow)
         .in('status', ['failed', 'timeout', 'pending'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 

@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { buildSiteUrl } from '@/utils/siteUrl';
 import { resendVerificationEmail } from '@/lib/authService';
 
 interface EmailVerificationProps {
@@ -86,7 +85,7 @@ export const EmailVerification = ({
       if (onResendEmail) {
         await onResendEmail();
       } else {
-        await resendVerificationEmail(email, buildSiteUrl('/auth/confirm'));
+        await resendVerificationEmail(email);
       }
 
       toast({

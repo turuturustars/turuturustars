@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -26,9 +26,11 @@ export interface PrivateMessage {
   id: string;
   conversation_id: string;
   sender_id: string;
+  recipient_id?: string | null;
   content: string;
   read_at: string | null;
   created_at: string;
+  updated_at?: string | null;
   sender_profile?: {
     id: string;
     full_name: string;
@@ -36,13 +38,231 @@ export interface PrivateMessage {
   };
 }
 
-const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000;
+type JsonProfile = {
+  id?: unknown;
+  full_name?: unknown;
+  photo_url?: unknown;
+} | null;
+
+type JsonPresence = {
+  status?: unknown;
+  last_seen?: unknown;
+  is_online?: unknown;
+} | null;
+
+type PrivateMessageRow = {
+  id?: unknown;
+  conversation_id?: unknown;
+  sender_id?: unknown;
+  recipient_id?: unknown;
+  content?: unknown;
+  read_at?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
+  sender_profile?: JsonProfile;
+};
+
+type PrivateConversationSummaryRow = {
+  id?: unknown;
+  participant_one?: unknown;
+  participant_two?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
+  other_participant?: JsonProfile;
+  last_message?: PrivateMessageRow | null;
+  unread_count?: unknown;
+  other_participant_presence?: JsonPresence;
+};
+
+const PRESENCE_HEARTBEAT_MS = 5 * 60 * 1000;
+const CONVERSATION_LIMIT = 50;
+const MESSAGE_LIMIT = 100;
+const REFRESH_DEBOUNCE_MS = 900;
+
+function toNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toStringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function mapProfile(profile: JsonProfile): PrivateMessage['sender_profile'] {
+  const id = toStringValue(profile?.id);
+  if (!id) return undefined;
+
+  return {
+    id,
+    full_name: toStringValue(profile?.full_name) || 'Member',
+    photo_url: typeof profile?.photo_url === 'string' ? profile.photo_url : null,
+  };
+}
+
+function mapMessage(row: PrivateMessageRow | null | undefined): PrivateMessage | undefined {
+  const id = toStringValue(row?.id);
+  const conversationId = toStringValue(row?.conversation_id);
+  const senderId = toStringValue(row?.sender_id);
+  const content = toStringValue(row?.content);
+  const createdAt = toStringValue(row?.created_at);
+
+  if (!id || !conversationId || !senderId || !createdAt) return undefined;
+
+  return {
+    id,
+    conversation_id: conversationId,
+    sender_id: senderId,
+    recipient_id: typeof row?.recipient_id === 'string' ? row.recipient_id : null,
+    content,
+    read_at: typeof row?.read_at === 'string' ? row.read_at : null,
+    created_at: createdAt,
+    updated_at: typeof row?.updated_at === 'string' ? row.updated_at : null,
+    sender_profile: mapProfile(row?.sender_profile ?? null),
+  };
+}
+
+function mapConversation(row: PrivateConversationSummaryRow): PrivateConversation | undefined {
+  const id = toStringValue(row.id);
+  const participantOne = toStringValue(row.participant_one);
+  const participantTwo = toStringValue(row.participant_two);
+  const createdAt = toStringValue(row.created_at);
+  const updatedAt = toStringValue(row.updated_at);
+
+  if (!id || !participantOne || !participantTwo || !createdAt || !updatedAt) return undefined;
+
+  const presenceStatus = row.other_participant_presence?.status === 'online' ? 'online' : 'offline';
+
+  return {
+    id,
+    participant_one: participantOne,
+    participant_two: participantTwo,
+    created_at: createdAt,
+    updated_at: updatedAt,
+    other_participant: mapProfile(row.other_participant ?? null),
+    last_message: mapMessage(row.last_message),
+    unread_count: toNumber(row.unread_count),
+    other_participant_presence: {
+      status: presenceStatus,
+      last_seen:
+        typeof row.other_participant_presence?.last_seen === 'string'
+          ? row.other_participant_presence.last_seen
+          : null,
+      is_online: row.other_participant_presence?.is_online === true,
+    },
+  };
+}
+
+function sortMessages(messages: PrivateMessage[]): PrivateMessage[] {
+  return [...messages].sort((a, b) => {
+    const timeDiff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return timeDiff || a.id.localeCompare(b.id);
+  });
+}
+
+function mergeMessage(existing: PrivateMessage | undefined, incoming: PrivateMessage): PrivateMessage {
+  return {
+    ...existing,
+    ...incoming,
+    sender_profile: incoming.sender_profile ?? existing?.sender_profile,
+  };
+}
 
 export function usePrivateMessages(conversationId?: string) {
   const { user, canInteract } = useAuth();
   const [conversations, setConversations] = useState<PrivateConversation[]>([]);
   const [messages, setMessages] = useState<PrivateMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageVisible, setIsPageVisible] = useState(
+    () => typeof document === 'undefined' || document.visibilityState === 'visible'
+  );
+  const conversationsRef = useRef<PrivateConversation[]>([]);
+  const conversationIdRef = useRef<string | undefined>(conversationId);
+  const refreshTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+
+    const handleVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState === 'visible');
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
+
+  const enrichMessage = useCallback((message: PrivateMessage): PrivateMessage => {
+    if (message.sender_profile) return message;
+
+    const conversation = conversationsRef.current.find((item) => item.id === message.conversation_id);
+    const otherParticipant = conversation?.other_participant;
+    if (otherParticipant && message.sender_id === otherParticipant.id) {
+      return { ...message, sender_profile: otherParticipant };
+    }
+
+    return message;
+  }, []);
+
+  const appendOrUpdateMessage = useCallback((message: PrivateMessage) => {
+    const enriched = enrichMessage(message);
+
+    setMessages((previous) => {
+      const existing = previous.find((item) => item.id === enriched.id);
+      const merged = mergeMessage(existing, enriched);
+      const next = previous.some((item) => item.id === enriched.id)
+        ? previous.map((item) => (item.id === enriched.id ? merged : item))
+        : [...previous, merged];
+
+      return sortMessages(next).slice(-MESSAGE_LIMIT);
+    });
+  }, [enrichMessage]);
+
+  const updateConversationWithMessage = useCallback((message: PrivateMessage, countAsUnread: boolean) => {
+    setConversations((previous) => {
+      const index = previous.findIndex((conversation) => conversation.id === message.conversation_id);
+      if (index === -1) return previous;
+
+      const next = [...previous];
+      const existing = next[index];
+      next[index] = {
+        ...existing,
+        updated_at: message.created_at,
+        last_message: mergeMessage(existing.last_message, enrichMessage(message)),
+        unread_count: countAsUnread ? (existing.unread_count ?? 0) + 1 : existing.unread_count ?? 0,
+      };
+
+      return next.sort(
+        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
+  }, [enrichMessage]);
+
+  const setConversationRead = useCallback((targetConversationId: string) => {
+    setConversations((previous) =>
+      previous.map((conversation) =>
+        conversation.id === targetConversationId
+          ? { ...conversation, unread_count: 0 }
+          : conversation
+      )
+    );
+  }, []);
 
   const fetchConversations = useCallback(async () => {
     if (!user) {
@@ -52,91 +272,22 @@ export function usePrivateMessages(conversationId?: string) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('private_conversations')
-        .select('id, participant_one, participant_two, updated_at, created_at')
-        .or(`participant_one.eq.${user.id},participant_two.eq.${user.id}`)
-        .order('updated_at', { ascending: false });
+      const { data, error } = await supabase.rpc('get_private_conversation_summaries' as never, {
+        p_limit: CONVERSATION_LIMIT,
+        p_offset: 0,
+      } as never);
 
       if (error) {
         console.error('Error fetching conversations:', error);
         return;
       }
 
-      if (data && data.length > 0) {
-        // Get other participant profiles
-        const otherParticipantIds = data.map((c: any) => 
-          c.participant_one === user.id ? c.participant_two : c.participant_one
-        );
-
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, photo_url')
-          .in('id', otherParticipantIds);
-
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-        const { data: statusRows } = await supabase
-          .from('user_status')
-          .select('user_id, status, last_seen')
-          .in('user_id', otherParticipantIds);
-
-        const statusMap = new Map(
-          (statusRows || []).map((row) => [
-            row.user_id,
-            {
-              status: row.status === 'online' ? 'online' : 'offline',
-              last_seen: row.last_seen,
-            },
-          ])
-        );
-
-        // Get last messages and unread counts
-        const conversationsWithData = await Promise.all(
-          data.map(async (conv: any) => {
-            const otherId = conv.participant_one === user.id ? conv.participant_two : conv.participant_one;
-            const rawPresence = statusMap.get(otherId);
-            const lastSeen = rawPresence?.last_seen || null;
-            const isOnline =
-              rawPresence?.status === 'online' &&
-              !!lastSeen &&
-              Date.now() - new Date(lastSeen).getTime() <= PRESENCE_ACTIVE_WINDOW_MS;
-            
-            // Get last message
-            const { data: lastMsgData } = await supabase
-              .from('private_messages')
-              .select('id, sender_id, content, created_at, read_at, conversation_id')
-              .eq('conversation_id', conv.id)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            // Get unread count
-            const { count } = await supabase
-              .from('private_messages')
-              .select('id', { count: 'exact', head: true })
-              .eq('conversation_id', conv.id)
-              .neq('sender_id', user.id)
-              .is('read_at', null);
-
-            return {
-              ...conv,
-              other_participant: profileMap.get(otherId),
-              other_participant_presence: {
-                status: rawPresence?.status || 'offline',
-                last_seen: lastSeen,
-                is_online: isOnline,
-              },
-              last_message: lastMsgData || undefined,
-              unread_count: count || 0,
-            };
-          })
-        );
-
-        setConversations(conversationsWithData);
-      } else {
-        setConversations([]);
-      }
+      const rows = Array.isArray(data) ? data : [];
+      setConversations(
+        rows
+          .map((row) => mapConversation(row as PrivateConversationSummaryRow))
+          .filter((row): row is PrivateConversation => Boolean(row))
+      );
     } catch (err) {
       console.error('Error in fetchConversations:', err);
     } finally {
@@ -144,128 +295,185 @@ export function usePrivateMessages(conversationId?: string) {
     }
   }, [user]);
 
+  const scheduleConversationsRefresh = useCallback(() => {
+    if (refreshTimerRef.current) {
+      window.clearTimeout(refreshTimerRef.current);
+    }
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null;
+      void fetchConversations();
+    }, REFRESH_DEBOUNCE_MS);
+  }, [fetchConversations]);
+
+  const markConversationRead = useCallback(async (targetConversationId: string) => {
+    if (!canInteract) return;
+
+    setConversationRead(targetConversationId);
+
+    const { error } = await supabase.rpc('mark_private_conversation_read' as never, {
+      _conversation_id: targetConversationId,
+    } as never);
+
+    if (error) {
+      console.error('Error marking private messages as read:', error);
+    }
+  }, [canInteract, setConversationRead]);
+
   const fetchMessages = useCallback(async () => {
-    if (!user || !conversationId) return;
+    if (!user || !conversationId) {
+      setMessages([]);
+      return;
+    }
 
     try {
-      const { data, error } = await supabase
-        .from('private_messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+      const { data, error } = await supabase.rpc('get_private_messages' as never, {
+        p_conversation_id: conversationId,
+        p_limit: MESSAGE_LIMIT,
+        p_before: null,
+      } as never);
 
       if (error) {
         console.error('Error fetching messages:', error);
         return;
       }
 
-      if (data && data.length > 0) {
-        const senderIds = [...new Set(data.map((m: any) => m.sender_id))] as string[];
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, full_name, photo_url')
-          .in('id', senderIds);
+      const rows = Array.isArray(data) ? data : [];
+      setMessages(
+        rows
+          .map((row) => mapMessage(row as PrivateMessageRow))
+          .filter((row): row is PrivateMessage => Boolean(row))
+      );
 
-        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-        const messagesWithProfiles: PrivateMessage[] = data.map((msg: any) => ({
-          ...msg,
-          sender_profile: profileMap.get(msg.sender_id),
-        }));
-
-        setMessages(messagesWithProfiles);
-
-        // Mark messages as read
-        if (canInteract) {
-          const { error: markReadError } = await supabase.rpc('mark_private_conversation_read' as never, {
-            _conversation_id: conversationId,
-          } as never);
-
-          if (markReadError) {
-            console.error('Error marking private messages as read:', markReadError);
-          } else {
-            await fetchConversations();
-          }
-        }
-      } else {
-        setMessages([]);
-      }
+      void markConversationRead(conversationId);
     } catch (err) {
       console.error('Error in fetchMessages:', err);
     }
-  }, [user, conversationId, fetchConversations, canInteract]);
+  }, [conversationId, markConversationRead, user]);
 
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
-
-  useEffect(() => {
-    if (conversationId) {
-      void fetchMessages();
-
-      const channel = supabase
-        .channel(`private-messages-${conversationId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'private_messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          () => {
-            void fetchMessages();
-            void fetchConversations();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    if (isPageVisible) {
+      void fetchConversations();
     }
-  }, [conversationId, fetchConversations, fetchMessages]);
+  }, [fetchConversations, isPageVisible]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!conversationId) {
+      setMessages([]);
+      return;
+    }
 
-    const participantOneChannel = supabase
-      .channel(`private-conversations-one-${user.id}`)
+    if (isPageVisible) {
+      void fetchMessages();
+    }
+  }, [conversationId, fetchMessages, isPageVisible]);
+
+  useEffect(() => {
+    if (!user || !conversationId || !isPageVisible) return undefined;
+
+    const channel = supabase
+      .channel(`private-messages-${conversationId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'private_conversations',
-          filter: `participant_one=eq.${user.id}`,
+          table: 'private_messages',
+          filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          void fetchConversations();
+        (payload) => {
+          const message = mapMessage(payload.new as PrivateMessageRow);
+          if (!message) return;
+
+          appendOrUpdateMessage(message);
+          updateConversationWithMessage(message, false);
+
+          if (message.sender_id !== user.id) {
+            void markConversationRead(conversationId);
+          }
         }
       )
-      .subscribe();
-
-    const participantTwoChannel = supabase
-      .channel(`private-conversations-two-${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'private_conversations',
-          filter: `participant_two=eq.${user.id}`,
+          table: 'private_messages',
+          filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          void fetchConversations();
+        (payload) => {
+          const message = mapMessage(payload.new as PrivateMessageRow);
+          if (!message) return;
+
+          appendOrUpdateMessage(message);
+          updateConversationWithMessage(message, false);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'private_messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const deletedId = toStringValue((payload.old as { id?: unknown } | null)?.id);
+          if (deletedId) {
+            setMessages((previous) => previous.filter((message) => message.id !== deletedId));
+          }
+          scheduleConversationsRefresh();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(participantOneChannel);
-      supabase.removeChannel(participantTwoChannel);
+      supabase.removeChannel(channel);
     };
-  }, [user, fetchConversations]);
+  }, [
+    appendOrUpdateMessage,
+    conversationId,
+    isPageVisible,
+    markConversationRead,
+    scheduleConversationsRefresh,
+    updateConversationWithMessage,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (!user || !isPageVisible) return undefined;
+
+    const channel = supabase
+      .channel(`private-inbox-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'private_messages',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const message = mapMessage(payload.new as PrivateMessageRow);
+          if (!message || message.conversation_id === conversationIdRef.current) return;
+
+          const knownConversation = conversationsRef.current.some(
+            (conversation) => conversation.id === message.conversation_id
+          );
+
+          if (knownConversation) {
+            updateConversationWithMessage(message, true);
+          } else {
+            scheduleConversationsRefresh();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isPageVisible, scheduleConversationsRefresh, updateConversationWithMessage, user]);
 
   const updateOwnPresence = useCallback(
     async (status: 'online' | 'offline') => {
@@ -285,103 +493,72 @@ export function usePrivateMessages(conversationId?: string) {
   );
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isPageVisible) return undefined;
 
     void updateOwnPresence('online');
     const heartbeat = window.setInterval(() => {
-      void updateOwnPresence('online');
-    }, 45000);
-
-    const handleBeforeUnload = () => {
-      void updateOwnPresence('offline');
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handleBeforeUnload);
+      if (document.visibilityState === 'visible') {
+        void updateOwnPresence('online');
+      }
+    }, PRESENCE_HEARTBEAT_MS);
 
     return () => {
       window.clearInterval(heartbeat);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handleBeforeUnload);
-      void updateOwnPresence('offline');
     };
-  }, [user, updateOwnPresence]);
+  }, [isPageVisible, updateOwnPresence, user]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) return undefined;
 
-    const statusChannel = supabase
-      .channel(`private-user-status-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'user_status' },
-        () => {
-          void fetchConversations();
-        }
-      )
-      .subscribe();
+    const handleOffline = () => {
+      void updateOwnPresence('offline');
+    };
+
+    window.addEventListener('beforeunload', handleOffline);
+    window.addEventListener('pagehide', handleOffline);
 
     return () => {
-      supabase.removeChannel(statusChannel);
+      window.removeEventListener('beforeunload', handleOffline);
+      window.removeEventListener('pagehide', handleOffline);
+      void updateOwnPresence('offline');
     };
-  }, [user, fetchConversations]);
+  }, [updateOwnPresence, user]);
 
   const startConversation = async (otherUserId: string) => {
     if (!user) throw new Error('Not authenticated');
     if (!canInteract) throw new Error('Your account is currently read-only');
 
-    // Check if conversation already exists
-    const { data: existing } = await supabase
-      .from('private_conversations')
-      .select('id')
-      .or(`and(participant_one.eq.${user.id},participant_two.eq.${otherUserId}),and(participant_one.eq.${otherUserId},participant_two.eq.${user.id})`)
-      .single();
-
-    if (existing) {
-      return existing.id;
-    }
-
-    // Create new conversation
-    const { data, error } = await supabase
-      .from('private_conversations')
-      .insert({
-        participant_one: user.id,
-        participant_two: otherUserId,
-      })
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('start_private_conversation' as never, {
+      p_other_user_id: otherUserId,
+    } as never);
 
     if (error) throw error;
-    
+
+    const nextConversationId = String(data || '');
+    if (!nextConversationId) throw new Error('Could not start conversation');
+
     await fetchConversations();
-    return data.id;
+    return nextConversationId;
   };
 
   const sendPrivateMessage = async (content: string) => {
     if (!user || !conversationId) throw new Error('Not authenticated or no conversation');
     if (!canInteract) throw new Error('Your account is currently read-only');
 
-    const { data, error } = await supabase
-      .from('private_messages')
-      .insert({
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content,
-      })
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('send_private_message' as never, {
+      p_conversation_id: conversationId,
+      p_content: content,
+    } as never);
 
     if (error) throw error;
 
-    // Update conversation timestamp
-    await supabase
-      .from('private_conversations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', conversationId);
+    const row = Array.isArray(data) ? data[0] : data;
+    const message = mapMessage(row as PrivateMessageRow);
+    if (!message) throw new Error('Message was sent but could not be loaded');
 
-    await fetchConversations();
-
-    return data;
+    appendOrUpdateMessage(message);
+    updateConversationWithMessage(message, false);
+    return message;
   };
 
   return {

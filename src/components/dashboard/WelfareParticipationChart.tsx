@@ -12,6 +12,17 @@ interface WelfareData {
   percentage?: number;
 }
 
+interface TooltipPayload {
+  name: string;
+  value: number;
+  payload: WelfareData;
+}
+
+interface LegendPayload {
+  color?: string;
+  value?: string;
+}
+
 const COLORS = [
   'hsl(262, 83%, 58%)', // purple
   'hsl(199, 89%, 48%)', // sky
@@ -75,7 +86,7 @@ const WelfareParticipationChart = () => {
     fetchWelfareData();
   }, [profile?.id]);
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-card border border-border rounded-lg shadow-lg p-3 backdrop-blur-sm">
@@ -92,10 +103,10 @@ const WelfareParticipationChart = () => {
     return null;
   };
 
-  const CustomLegend = ({ payload }: any) => {
+  const CustomLegend = ({ payload = [] }: { payload?: LegendPayload[] }) => {
     return (
       <div className="flex flex-wrap justify-center gap-3 mt-4 px-2">
-        {payload.map((entry: any, index: number) => (
+        {payload.map((entry, index) => (
           <div
             key={`legend-${index}`}
             className="flex items-center gap-2 text-sm hover:opacity-80 transition-opacity"
@@ -104,7 +115,7 @@ const WelfareParticipationChart = () => {
               className="w-3 h-3 rounded-full shadow-sm"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-foreground font-medium">{entry.value}</span>
+            <span className="text-foreground font-medium">{entry.value || ''}</span>
           </div>
         ))}
       </div>

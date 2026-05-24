@@ -83,8 +83,8 @@ export function useNotificationPreferences(userId?: string) {
 
     setIsLoading(true);
     try {
-      const { data, error } = await (supabase
-        .from('notification_preferences' as never) as any)
+      const { data, error } = await supabase
+        .from('notification_preferences')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
@@ -103,8 +103,8 @@ export function useNotificationPreferences(userId?: string) {
       if (!data) {
         // Try to create default preferences
         const insertPayload = { user_id: userId, ...DEFAULT_PREFERENCES };
-        const { data: created, error: insertError } = await (supabase
-          .from('notification_preferences' as never) as any)
+        const { data: created, error: insertError } = await supabase
+          .from('notification_preferences')
           .upsert(insertPayload, { onConflict: 'user_id' })
           .select('*')
           .maybeSingle();
@@ -143,8 +143,8 @@ export function useNotificationPreferences(userId?: string) {
       };
 
       try {
-        const { data, error } = await (supabase
-          .from('notification_preferences' as never) as any)
+        const { data, error } = await supabase
+          .from('notification_preferences')
           .upsert(payload, { onConflict: 'user_id' })
           .select('*')
           .maybeSingle();

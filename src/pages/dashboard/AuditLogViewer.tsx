@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
@@ -33,8 +33,12 @@ import {
   AlertCircle,
   Shield,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
-import { exportAsCSV } from '@/lib/exportUtils';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { useDebounce } from '@/hooks/useDebounce';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 
 // Interface matches actual database schema
 interface AuditLog {
@@ -59,8 +63,10 @@ const AuditLogViewer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [actionTypeFilter, setActionTypeFilter] = useState<string>('all');
-  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
   const [actionTypes, setActionTypes] = useState<string[]>([]);
+  const debouncedSearchTerm = useDebounce(searchTerm.trim(), 300);
+  const pagination = usePaginationState(50);
+  const { page, pageSize, updateTotal } = pagination;
 
   const userRoles = normalizeRoles(roles);
   const auditRoles = [
@@ -75,25 +81,29 @@ const AuditLogViewer = () => {
   ];
   const canViewOperations = userRoles.some((role) => auditRoles.includes(role));
 
-  useEffect(() => {
-    if (canViewOperations) {
-      fetchAuditLogs();
-    } else {
-      setIsLoading(false);
-    }
-  }, [canViewOperations]);
-
-  useEffect(() => {
-    filterLogs();
-  }, [logs, searchTerm, actionTypeFilter]);
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      setIsLoading(true);
+      const offset = (page - 1) * pageSize;
+      let query = supabase
         .from('audit_logs')
-        .select('*')
+        .select(
+          'id, action_type, action_description, performed_by, performed_by_name, performed_by_role, entity_type, entity_id, created_at, metadata, ip_address',
+          { count: 'exact' }
+        )
         .order('created_at', { ascending: false })
-        .limit(500);
+        .range(offset, offset + pageSize - 1);
+
+      if (actionTypeFilter !== 'all') {
+        query = query.eq('action_type', actionTypeFilter);
+      }
+
+      if (debouncedSearchTerm) {
+        const term = debouncedSearchTerm.replace(/[,%]/g, ' ');
+        query = query.or(`action_description.ilike.%${term}%,performed_by_name.ilike.%${term}%,action_type.ilike.%${term}%`);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
 
@@ -113,10 +123,7 @@ const AuditLogViewer = () => {
           ip_address: row.ip_address,
         }));
         setLogs(mappedLogs);
-
-        // Extract unique action types
-        const types = [...new Set(mappedLogs.map((log) => log.action_type))];
-        setActionTypes(types);
+        updateTotal(count ?? mappedLogs.length);
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
@@ -128,49 +135,59 @@ const AuditLogViewer = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [actionTypeFilter, debouncedSearchTerm, page, pageSize, updateTotal, toast]);
 
-  const filterLogs = () => {
-    let results = logs;
+  const fetchActionTypes = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('action_type')
+      .order('action_type')
+      .limit(200);
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      results = results.filter(
-        (log) =>
-          log.action_description.toLowerCase().includes(term) ||
-          log.performed_by.toLowerCase().includes(term) ||
-          log.action_type.toLowerCase().includes(term) ||
-          log.performed_by_name?.toLowerCase().includes(term)
-      );
+    if (!error && data) {
+      setActionTypes([...new Set(data.map((row) => row.action_type).filter(Boolean))]);
     }
+  }, []);
 
-    // Action type filter
-    if (actionTypeFilter !== 'all') {
-      results = results.filter((log) => log.action_type === actionTypeFilter);
+  useEffect(() => {
+    if (canViewOperations) {
+      void fetchAuditLogs();
+    } else {
+      setIsLoading(false);
     }
+  }, [canViewOperations, fetchAuditLogs]);
 
-    setFilteredLogs(results);
-  };
+  useEffect(() => {
+    if (canViewOperations) {
+      void fetchActionTypes();
+    }
+  }, [canViewOperations, fetchActionTypes]);
 
-  const exportLogs = () => {
-    const exportData = filteredLogs.map((log) => ({
-      Date: format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
-      'Action Type': log.action_type,
-      'Description': log.action_description,
-      'Performed By': log.performed_by_name || log.performed_by,
-      'IP Address': log.ip_address || 'N/A',
-    }));
+  const exportLogs = async () => {
+    try {
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'audit_log_export',
+        payload: {
+          actionType: actionTypeFilter === 'all' ? null : actionTypeFilter,
+          search: debouncedSearchTerm || null,
+          format: 'csv',
+          requestedAt: new Date().toISOString(),
+        },
+        priority: 8,
+        dedupeKey: `audit_log_export:${actionTypeFilter}:${debouncedSearchTerm || 'all'}`,
+      });
 
-    exportAsCSV(exportData, {
-      filename: 'audit_logs',
-      includeTimestamp: true,
-    });
-
-    toast({
-      title: 'Success',
-      description: 'Audit logs exported successfully',
-    });
+      toast({
+        title: 'Export queued',
+        description: `Audit log export is processing as job ${shortJobId(jobId)}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : 'Could not queue audit log export',
+        variant: 'destructive',
+      });
+    }
   };
 
   const getActionIcon = (actionType: string) => {
@@ -222,8 +239,8 @@ const AuditLogViewer = () => {
             <CardTitle className="text-sm font-medium">Total Events</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{logs.length}</p>
-            <p className="text-xs text-muted-foreground mt-1">All time</p>
+            <p className="text-2xl font-bold">{pagination.totalItems}</p>
+            <p className="text-xs text-muted-foreground mt-1">Matching filters</p>
           </CardContent>
         </Card>
 
@@ -232,9 +249,9 @@ const AuditLogViewer = () => {
             <CardTitle className="text-sm font-medium">Filtered Results</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{filteredLogs.length}</p>
+            <p className="text-2xl font-bold">{logs.length}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {filteredLogs.length === logs.length ? 'Showing all' : 'Matching filters'}
+              Current page
             </p>
           </CardContent>
         </Card>
@@ -252,12 +269,21 @@ const AuditLogViewer = () => {
               <Input
                 placeholder="Search logs..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  pagination.goToPage(1);
+                }}
                 className="pl-9"
               />
             </div>
 
-            <Select value={actionTypeFilter} onValueChange={setActionTypeFilter}>
+            <Select
+              value={actionTypeFilter}
+              onValueChange={(value) => {
+                setActionTypeFilter(value);
+                pagination.goToPage(1);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="All action types" />
               </SelectTrigger>
@@ -276,9 +302,9 @@ const AuditLogViewer = () => {
 
       {/* Export Button */}
       <div className="flex justify-end">
-        <AccessibleButton onClick={exportLogs} className="gap-2" ariaLabel="Export audit logs as CSV file">
+        <AccessibleButton onClick={() => void exportLogs()} className="gap-2" ariaLabel="Queue audit logs CSV export">
           <Download className="w-4 h-4" />
-          Export Logs
+          Queue Export
         </AccessibleButton>
       </div>
 
@@ -286,7 +312,7 @@ const AuditLogViewer = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">
-            Activity Log ({filteredLogs.length} records)
+            Activity Log ({pagination.totalItems} records)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -294,7 +320,7 @@ const AuditLogViewer = () => {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
-          ) : filteredLogs.length === 0 ? (
+          ) : logs.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
               No logs found matching your filters
@@ -302,7 +328,7 @@ const AuditLogViewer = () => {
           ) : (
             <>
               <div className="space-y-3 lg:hidden">
-                {filteredLogs.map((log) => (
+                {logs.map((log) => (
                   <Card key={log.id} className="border border-border/60">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-start justify-between gap-3">
@@ -347,7 +373,7 @@ const AuditLogViewer = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredLogs.map((log) => (
+                  {logs.map((log) => (
                     <TableRow key={log.id}>
                       <TableCell className="text-sm">
                         {format(new Date(log.created_at), 'MMM dd, yyyy HH:mm:ss')}
@@ -371,6 +397,36 @@ const AuditLogViewer = () => {
                 </Table>
               </div>
             </>
+          )}
+          {logs.length > 0 && (
+            <div className="mt-4 flex items-center justify-between border-t pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {(pagination.page - 1) * pagination.pageSize + 1}-{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)} of {pagination.totalItems}
+              </div>
+              <div className="flex items-center gap-2">
+                <AccessibleButton
+                  variant="outline"
+                  size="sm"
+                  ariaLabel="Previous audit log page"
+                  onClick={() => pagination.goToPage(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </AccessibleButton>
+                <div className="text-sm">
+                  Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+                </div>
+                <AccessibleButton
+                  variant="outline"
+                  size="sm"
+                  ariaLabel="Next audit log page"
+                  onClick={() => pagination.goToPage(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </AccessibleButton>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

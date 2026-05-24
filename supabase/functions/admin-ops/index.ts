@@ -175,9 +175,7 @@ async function ensureNoExistingProfile(
     .from("profiles")
     .select("id, full_name, membership_number")
     .limit(1);
-  const { data, error } = field === "email"
-    ? await query.ilike(field, value)
-    : await query.eq(field, value);
+  const { data, error } = await query.eq(field, value);
 
   if (error) {
     throw new HttpError(500, `Failed to check existing ${label}`, { detail: error.message });
@@ -641,8 +639,7 @@ serve(async (req) => {
             ? body.idNumber
             : "";
       const idNumber = rawIdNumber.replace(/\s+/g, "").trim();
-      const requestedPassword = (body.password as string | undefined)?.trim();
-      const password = requestedPassword || idNumber;
+      const password = idNumber;
       const status = (body.status as string | undefined) || "active";
       const isStudent = Boolean(body.is_student);
       const feePaid = Boolean(body.registration_fee_paid);
@@ -672,14 +669,20 @@ serve(async (req) => {
       await ensureNoExistingProfile(supabase, "email", email, "email address");
 
       // Synthesize an email if none provided so auth.admin.createUser works
-      const effectiveEmail = email || `member-${Date.now()}-${Math.floor(Math.random() * 1000)}@turuturustars.local`;
+      const effectiveEmail = email || `member-${crypto.randomUUID()}@turuturustars.local`;
 
       const { data: created, error: createErr } = await getAuthAdmin(supabase).createUser({
         email: effectiveEmail,
         password,
         email_confirm: true,
         phone,
-        user_metadata: { full_name: fullName, phone, id_number: idNumber, created_by_admin: true },
+        user_metadata: {
+          full_name: fullName,
+          phone,
+          id_number: idNumber,
+          created_by_admin: true,
+          initial_password_source: "national_id",
+        },
       });
 
       if (createErr || !created?.user?.id) {

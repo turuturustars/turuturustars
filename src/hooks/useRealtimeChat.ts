@@ -1,6 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import type { Database } from '@/integrations/supabase/types';
+
+type MessageRow = Database['public']['Tables']['messages']['Row'];
 
 export interface MessageReaction {
   id: string;
@@ -46,8 +49,8 @@ export function useRealtimeChat(roomId = 'global') {
 
   const fetchMessages = useCallback(async () => {
     try {
-      // Use type assertion for tables not in generated types yet
-      const { data, error } = await (supabase.from('messages' as 'announcements') as any)
+      const { data, error } = await supabase
+        .from('messages')
         .select('id, room_id, sender_id, content, created_at')
         .eq('room_id', roomId)
         .order('created_at', { ascending: true })
@@ -60,7 +63,7 @@ export function useRealtimeChat(roomId = 'global') {
       }
 
       if (data && data.length > 0) {
-        const senderIds = [...new Set(data.map((m: any) => m.sender_id))] as string[];
+        const senderIds = [...new Set(data.map((m) => m.sender_id))];
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name, photo_url')
@@ -68,8 +71,9 @@ export function useRealtimeChat(roomId = 'global') {
 
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
         // Fetch reactions for all messages
-        const messageIds = data.map((m: any) => m.id) as string[];
-        const { data: reactions } = await (supabase.from('message_reactions' as 'announcements') as any)
+        const messageIds = data.map((m) => m.id);
+        const { data: reactions } = await supabase
+          .from('message_reactions')
           .select('id, message_id, user_id, emoji, created_at')
           .in('message_id', messageIds);
 
@@ -79,7 +83,7 @@ export function useRealtimeChat(roomId = 'global') {
           reactionsMap.set(r.message_id, [...existing, r]);
         });
 
-        const messagesWithData: ChatMessage[] = data.map((msg: any) => ({
+        const messagesWithData: ChatMessage[] = data.map((msg) => ({
           ...msg,
           sender_profile: profileMap.get(msg.sender_id) || undefined,
           reactions: reactionsMap.get(msg.id) || [],
@@ -98,12 +102,13 @@ export function useRealtimeChat(roomId = 'global') {
 
   const fetchOnlineUsers = useCallback(async () => {
     try {
-      const { data: statusData } = await (supabase.from('user_status' as 'announcements') as any)
+      const { data: statusData } = await supabase
+        .from('user_status')
         .select('user_id')
         .eq('status', 'online');
       
       if (statusData && statusData.length > 0) {
-        const userIds = statusData.map((r: any) => r.user_id);
+        const userIds = statusData.map((r) => r.user_id);
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name, photo_url')
@@ -128,14 +133,15 @@ export function useRealtimeChat(roomId = 'global') {
     if (!user) return;
     
     try {
-      const { data: typingData } = await (supabase.from('typing_indicators' as 'announcements') as any)
+      const { data: typingData } = await supabase
+        .from('typing_indicators')
         .select('user_id')
         .eq('room_id', roomId)
         .eq('is_typing', true)
         .neq('user_id', user.id);
 
       if (typingData && typingData.length > 0) {
-        const userIds = typingData.map((t: any) => t.user_id);
+        const userIds = typingData.map((t) => t.user_id);
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id, full_name')
@@ -156,7 +162,8 @@ export function useRealtimeChat(roomId = 'global') {
     if (!user) return;
     
     try {
-      await (supabase.from('user_status' as 'announcements') as any)
+      await supabase
+        .from('user_status')
         .upsert({
           user_id: user.id,
           status,
@@ -171,7 +178,8 @@ export function useRealtimeChat(roomId = 'global') {
     if (!user) return;
 
     try {
-      await (supabase.from('typing_indicators' as 'announcements') as any)
+      await supabase
+        .from('typing_indicators')
         .upsert({
           user_id: user.id,
           room_id: roomId,
@@ -214,7 +222,7 @@ export function useRealtimeChat(roomId = 'global') {
         async (payload) => {
           if (!mounted) return;
           
-          const newMsg = payload.new as any;
+          const newMsg = payload.new as MessageRow;
           
           const { data: senderProfile } = await supabase
             .from('profiles')
@@ -240,7 +248,7 @@ export function useRealtimeChat(roomId = 'global') {
         { event: 'DELETE', schema: 'public', table: 'messages' },
         (payload) => {
           if (!mounted) return;
-          const id = (payload.old as any)?.id;
+          const id = (payload.old as Partial<MessageRow>)?.id;
           if (id) setMessages((prev) => prev.filter((m) => m.id !== id));
         }
       )
@@ -323,7 +331,8 @@ export function useRealtimeChat(roomId = 'global') {
     // Clear typing indicator when sending
     await setTyping(false);
     
-    const { data, error } = await (supabase.from('messages' as 'announcements') as any)
+    const { data, error } = await supabase
+      .from('messages')
       .insert({
         room_id: roomId,
         sender_id: user.id,
@@ -339,7 +348,8 @@ export function useRealtimeChat(roomId = 'global') {
   const addReaction = async (messageId: string, emoji: string) => {
     if (!user) throw new Error('Not authenticated');
     
-    const { error } = await (supabase.from('message_reactions' as 'announcements') as any)
+    const { error } = await supabase
+      .from('message_reactions')
       .insert({
         message_id: messageId,
         user_id: user.id,
@@ -354,7 +364,8 @@ export function useRealtimeChat(roomId = 'global') {
   const removeReaction = async (messageId: string, emoji: string) => {
     if (!user) throw new Error('Not authenticated');
     
-    const { error } = await (supabase.from('message_reactions' as 'announcements') as any)
+    const { error } = await supabase
+      .from('message_reactions')
       .delete()
       .eq('message_id', messageId)
       .eq('user_id', user.id)

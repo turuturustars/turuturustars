@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -240,12 +241,12 @@ export default function RoleHandoverPage() {
       toast.error('Original and acting user cannot be the same');
       return;
     }
-    const insertData: any = {
+    const insertData: Database['public']['Tables']['role_handovers']['Insert'] = {
       original_user_id: newHandover.original_user_id,
       acting_user_id: newHandover.acting_user_id,
-      role: newHandover.role,
+      role: newHandover.role as Database['public']['Enums']['app_role'],
       start_date: newHandover.start_date,
-      created_by: user?.id
+      created_by: user?.id ?? '',
     };
     if (newHandover.end_date) insertData.end_date = newHandover.end_date;
     if (newHandover.reason) insertData.reason = newHandover.reason;

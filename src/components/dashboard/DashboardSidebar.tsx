@@ -73,17 +73,6 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
     };
 
     fetchRecentAnnouncements();
-
-    const channel = supabase
-      .channel('sidebar-announcements')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, () => {
-        fetchRecentAnnouncements();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const recentAnnouncementCount = useMemo(() => {
@@ -425,7 +414,7 @@ const DashboardSidebar = ({ onClose }: DashboardSidebarProps) => {
       {/* Logout Section - Bottom Fixed */}
       <div className="px-2.5 py-3 lg:px-3 lg:py-3.5 border-t border-border/20 bg-gradient-to-t from-primary/5 via-primary/2 to-transparent">
         <Button
-          onClick={signOut}
+          onClick={() => void signOut()}
           disabled={isLoading}
           className={cn(
             'w-full justify-start gap-3 font-medium transition-all duration-200 h-11 text-sm rounded-xl',

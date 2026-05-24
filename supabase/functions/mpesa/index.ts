@@ -69,7 +69,7 @@ function parseAmount(rawValue: unknown): number {
 function moneyAlertTitle(transactionType: string, statusLabel: string): string {
   if (transactionType === "wallet_topup") return `Wallet top-up ${statusLabel}`;
   if (transactionType === "kitty_contribution") return `Kitty contribution ${statusLabel}`;
-  return `M-Pesa payment ${statusLabel}`;
+  return `Pay with M-Pesa ${statusLabel}`;
 }
 
 async function ensureMemberCanTransact(
@@ -214,23 +214,31 @@ serve(async (req) => {
       throw new Error("No authorization header");
     }
 
-    // Verify user and their role
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error("Unauthorized");
-    }
+    const isServiceRoleRequest = token === SUPABASE_SERVICE_ROLE_KEY;
+    let userId: string | null = null;
+    let hasFinancialRole = isServiceRoleRequest;
 
-    // Check if user has financial role
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-    
-    const hasFinancialRole = roles?.some(r => 
-      ["admin", "treasurer", "chairperson"].includes(r.role)
-    );
+    if (!isServiceRoleRequest) {
+      // Verify user and their role
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError || !user) {
+        throw new Error("Unauthorized");
+      }
+
+      userId = user.id;
+
+      // Check if user has financial role
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+
+      hasFinancialRole = Boolean(roles?.some(r =>
+        ["admin", "treasurer", "chairperson"].includes(r.role)
+      ));
+    }
 
     let payload: Record<string, unknown>;
     try {
@@ -256,8 +264,8 @@ serve(async (req) => {
       throw new Error("Insufficient permissions for financial operations");
     }
 
-    if (action === "stk_push" || action === "query_status") {
-      await ensureMemberCanTransact(supabase, user.id, Boolean(hasFinancialRole));
+    if ((action === "stk_push" || action === "query_status") && userId) {
+      await ensureMemberCanTransact(supabase, userId, Boolean(hasFinancialRole));
     }
 
     const accessToken = await getAccessToken();
@@ -278,8 +286,11 @@ serve(async (req) => {
         const memberId =
           typeof rawMemberId === "string" && rawMemberId.trim().length > 0
             ? rawMemberId.trim()
-            : user.id;
-        if (memberId !== user.id && !hasFinancialRole) {
+            : userId;
+        if (!memberId) {
+          throw new HttpError(401, "A signed-in member is required for STK push");
+        }
+        if (memberId !== userId && !hasFinancialRole) {
           throw new HttpError(403, "You can only initiate payments for your own account");
         }
         const transactionType =
@@ -412,7 +423,7 @@ serve(async (req) => {
           contribution_id: contributionId,
           kitty_id: transactionType === "kitty_contribution" ? kittyId : null,
           status: result.ResponseCode === "0" ? "pending" : "failed",
-          initiated_by: user.id,
+          initiated_by: userId,
         }).select("id").maybeSingle();
 
         if (transactionInsertError) {
@@ -470,7 +481,7 @@ serve(async (req) => {
             });
           }
 
-          if (!transaction || transaction.member_id !== user.id) {
+          if (!transaction || transaction.member_id !== userId) {
             throw new HttpError(403, "You do not have access to this transaction");
           }
         }

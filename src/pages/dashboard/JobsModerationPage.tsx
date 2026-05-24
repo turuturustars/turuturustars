@@ -70,6 +70,18 @@ type ScrapeSourceDraft = {
   priority: string;
 };
 
+type ScrapeFunctionResponse = {
+  ran_at?: string;
+  summary?: {
+    source: string;
+    found: number;
+    sent: number;
+    ingested?: number;
+    skipped_rejected?: number;
+    error?: string;
+  }[];
+};
+
 const defaultSourceDraft: ScrapeSourceDraft = {
   name: '',
   url: '',
@@ -135,7 +147,8 @@ const JobsModerationPage = () => {
 
   const fetchJobs = async () => {
     setLoading(true);
-    const query = (supabase.from('jobs' as never) as any)
+    const query = supabase
+      .from('jobs')
       .select(
         'id,title,organization,location,county,job_type,deadline,posted_at,source_name,source_url,apply_url,excerpt,status,rejected_reason'
       )
@@ -163,12 +176,14 @@ const JobsModerationPage = () => {
   const fetchScrapeControls = async () => {
     setSourcesLoading(true);
 
-    const settingsQuery = (supabase.from('job_scrape_settings' as never) as any)
+    const settingsQuery = supabase
+      .from('job_scrape_settings')
       .select('id,max_per_source,request_delay_ms,job_max_priority,updated_at')
       .eq('id', 1)
       .maybeSingle();
 
-    const sourcesQuery = (supabase.from('job_scrape_sources' as never) as any)
+    const sourcesQuery = supabase
+      .from('job_scrape_sources')
       .select('id,name,url,category,priority,is_active,created_at')
       .order('priority', { ascending: true })
       .order('name', { ascending: true });
@@ -247,7 +262,8 @@ const JobsModerationPage = () => {
 
     setSettingsSaving(true);
 
-    const { data, error } = await (supabase.from('job_scrape_settings' as never) as any)
+    const { data, error } = await supabase
+      .from('job_scrape_settings')
       .upsert(
         {
           id: 1,
@@ -304,7 +320,7 @@ const JobsModerationPage = () => {
     }
 
     setSourceSaving(true);
-    const { error } = await (supabase.from('job_scrape_sources' as never) as any).insert({
+    const { error } = await supabase.from('job_scrape_sources').insert({
       name,
       url,
       category,
@@ -326,7 +342,8 @@ const JobsModerationPage = () => {
   };
 
   const toggleSourceActive = async (source: ScrapeSource) => {
-    const { error } = await (supabase.from('job_scrape_sources' as never) as any)
+    const { error } = await supabase
+      .from('job_scrape_sources')
       .update({ is_active: !source.is_active })
       .eq('id', source.id);
 
@@ -342,7 +359,8 @@ const JobsModerationPage = () => {
     const confirmed = window.confirm(`Delete source "${source.name}"?`);
     if (!confirmed) return;
 
-    const { error } = await (supabase.from('job_scrape_sources' as never) as any)
+    const { error } = await supabase
+      .from('job_scrape_sources')
       .delete()
       .eq('id', source.id);
 
@@ -364,7 +382,7 @@ const JobsModerationPage = () => {
     }
 
     const updates = {
-      status: 'approved',
+      status: 'approved' as const,
       deadline: toDeadlineIso(deadlineValue),
       job_type: draft.job_type ?? job.job_type,
       approved_at: new Date().toISOString(),
@@ -372,7 +390,8 @@ const JobsModerationPage = () => {
       rejected_reason: null,
     };
 
-    const { error } = await (supabase.from('jobs' as never) as any)
+    const { error } = await supabase
+      .from('jobs')
       .update(updates)
       .eq('id', job.id);
 
@@ -389,7 +408,8 @@ const JobsModerationPage = () => {
     const draft = drafts[job.id] || {};
     const reason = (draft.rejected_reason || '').trim();
 
-    const { error } = await (supabase.from('jobs' as never) as any)
+    const { error } = await supabase
+      .from('jobs')
       .update({
         status: 'rejected',
         rejected_reason: reason || 'Not a valid job listing.',
@@ -418,7 +438,8 @@ const JobsModerationPage = () => {
     );
     if (!confirmed) return;
 
-    const { error } = await (supabase.from('jobs' as never) as any)
+    const { error } = await supabase
+      .from('jobs')
       .update({
         status: 'rejected',
         rejected_reason: 'Deleted by admin.',
@@ -456,9 +477,10 @@ const JobsModerationPage = () => {
     }
 
     showSuccess('Scraping finished.', 2500);
+    const payload = data as ScrapeFunctionResponse | null;
     setScrapeSummary({
-      ran_at: (data as any)?.ran_at,
-      summary: (data as any)?.summary ?? [],
+      ran_at: payload?.ran_at ?? new Date().toISOString(),
+      summary: payload?.summary ?? [],
     });
 
     fetchJobs();

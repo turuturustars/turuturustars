@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -11,9 +11,10 @@ import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
+import { usePaginationState } from '@/hooks/usePaginationState';
 import { 
   HandHeart, Loader2, Heart, Users, DollarSign, Plus, Trash2, 
-  TrendingUp, RotateCcw, Eye, EyeOff
+  TrendingUp, RotateCcw, Eye, EyeOff, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -59,6 +60,12 @@ const WelfareManagement = () => {
   const [isContributionDialogOpen, setIsContributionDialogOpen] = useState(false);
   const [showContributionDetails, setShowContributionDetails] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const contributionPagination = usePaginationState(25);
+  const {
+    page: contributionPage,
+    pageSize: contributionPageSize,
+    updateTotal: updateContributionTotal,
+  } = contributionPagination;
 
   const [contributionForm, setContributionForm] = useState({
     amount: '',
@@ -71,26 +78,18 @@ const WelfareManagement = () => {
   const canRefund = hasPermission(userRoles, 'refund_welfare');
   const canRecordPayment = hasPermission(userRoles, 'record_welfare_payment');
 
-  useEffect(() => {
-    fetchWelfareCases();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCase) {
-      fetchContributions(selectedCase.id);
-    }
-  }, [selectedCase]);
-
-  const fetchWelfareCases = async () => {
+  const fetchWelfareCases = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('welfare_cases')
         .select(`
-          *,
+          id, title, description, case_type, target_amount, collected_amount, status, created_at, created_by,
           beneficiary:beneficiary_id (full_name, id)
         `)
-        .order('created_at', { ascending: false });
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
       setCases(data || []);
@@ -100,26 +99,44 @@ const WelfareManagement = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchContributions = async (caseId: string) => {
+  const fetchContributions = useCallback(async (caseId: string) => {
     try {
-      const { data, error } = await supabase
+      const offset = (contributionPage - 1) * contributionPageSize;
+      const { data, error, count } = await supabase
         .from('contributions')
         .select(`
           id, welfare_case_id, amount, member_id, notes, created_at, status,
           member:member_id (full_name)
-        `)
+        `, { count: 'exact' })
         .eq('welfare_case_id', caseId)
         .eq('contribution_type', 'welfare')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + contributionPageSize - 1);
 
       if (error) throw error;
       setContributions((data as unknown as WelfareContribution[]) || []);
+      updateContributionTotal(count ?? data?.length ?? 0);
     } catch (error) {
       console.error('Error fetching contributions:', error);
       toast.error('Failed to load contributions');
     }
+  }, [contributionPage, contributionPageSize, updateContributionTotal]);
+
+  useEffect(() => {
+    void fetchWelfareCases();
+  }, [fetchWelfareCases]);
+
+  useEffect(() => {
+    if (selectedCase) {
+      void fetchContributions(selectedCase.id);
+    }
+  }, [fetchContributions, selectedCase]);
+
+  const selectWelfareCase = (welfareCase: WelfareCase) => {
+    contributionPagination.goToPage(1);
+    setSelectedCase(welfareCase);
   };
 
   const handleAddContribution = async () => {
@@ -263,7 +280,7 @@ const WelfareManagement = () => {
               <Card 
                 key={welfareCase.id}
                 className={`cursor-pointer transition-all ${selectedCase?.id === welfareCase.id ? 'ring-2 ring-primary bg-primary/5' : 'hover:border-primary/50'}`}
-                onClick={() => setSelectedCase(welfareCase)}
+                onClick={() => selectWelfareCase(welfareCase)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-2 mb-2">
@@ -446,7 +463,7 @@ const WelfareManagement = () => {
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Contributions</CardTitle>
-                  <CardDescription>{contributions.length} contributions recorded</CardDescription>
+                  <CardDescription>{contributionPagination.totalItems} contributions recorded</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {contributions.length === 0 ? (
@@ -487,6 +504,36 @@ const WelfareManagement = () => {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {contributionPagination.totalItems > contributionPagination.pageSize && (
+                    <div className="mt-4 flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Showing {(contributionPagination.page - 1) * contributionPagination.pageSize + 1}
+                        -{Math.min(contributionPagination.page * contributionPagination.pageSize, contributionPagination.totalItems)}
+                        {' '}of {contributionPagination.totalItems}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <AccessibleButton
+                          variant="outline"
+                          ariaLabel="Previous welfare contributions page"
+                          onClick={() => contributionPagination.goToPage(contributionPagination.page - 1)}
+                          disabled={contributionPagination.page === 1}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </AccessibleButton>
+                        <span className="text-sm">
+                          Page {contributionPagination.page} of {Math.max(1, contributionPagination.totalPages)}
+                        </span>
+                        <AccessibleButton
+                          variant="outline"
+                          ariaLabel="Next welfare contributions page"
+                          onClick={() => contributionPagination.goToPage(contributionPagination.page + 1)}
+                          disabled={contributionPagination.page === contributionPagination.totalPages}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </AccessibleButton>
+                      </div>
                     </div>
                   )}
                 </CardContent>

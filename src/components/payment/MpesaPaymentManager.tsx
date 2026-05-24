@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +17,12 @@ import {
   Calendar,
   Filter,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { usePaginationState } from '@/hooks/usePaginationState';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 
 interface PaymentStats {
   totalReceived: number;
@@ -61,6 +65,8 @@ const MpesaPaymentManager = () => {
     maxAmount: null,
   });
   const [searchPhone, setSearchPhone] = useState('');
+  const pagination = usePaginationState(50);
+  const { page, pageSize, updateTotal } = pagination;
 
   // Load transactions
   const loadTransactions = useCallback(async () => {
@@ -68,49 +74,44 @@ const MpesaPaymentManager = () => {
     try {
       let query = supabase
         .from('mpesa_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .select('id, checkout_request_id, mpesa_receipt_number, amount, phone_number, status, created_at, member_id, transaction_type', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
 
       // Apply filters
       if (filter.status !== 'all') {
         query = query.eq('status', filter.status);
       }
 
-      const data = await query;
-      if (data.error) throw data.error;
-
-      // Apply client-side filtering
-      let filtered = (data.data || []) as MpesaTransaction[];
-
-      // Date range filter
       const now = new Date();
       const startDate = new Date();
       if (filter.dateRange === 'today') {
         startDate.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', startDate.toISOString());
       } else if (filter.dateRange === 'week') {
         startDate.setDate(now.getDate() - 7);
+        query = query.gte('created_at', startDate.toISOString());
       } else if (filter.dateRange === 'month') {
         startDate.setMonth(now.getMonth() - 1);
+        query = query.gte('created_at', startDate.toISOString());
       }
 
-      filtered = filtered.filter(t => new Date(t.created_at) >= startDate);
-
-      // Amount range filter
       if (filter.minAmount !== null) {
-        filtered = filtered.filter(t => t.amount >= filter.minAmount);
+        query = query.gte('amount', filter.minAmount);
       }
       if (filter.maxAmount !== null) {
-        filtered = filtered.filter(t => t.amount <= filter.maxAmount);
+        query = query.lte('amount', filter.maxAmount);
       }
 
-      // Phone search
       if (searchPhone) {
-        filtered = filtered.filter(t =>
-          t.phone_number.includes(searchPhone.replace(/\D/g, ''))
-        );
+        query = query.ilike('phone_number', `%${searchPhone.replace(/\D/g, '')}%`);
       }
 
-      setTransactions(filtered);
+      const data = await query;
+      if (data.error) throw data.error;
+
+      setTransactions((data.data || []) as MpesaTransaction[]);
+      updateTotal(data.count ?? data.data?.length ?? 0);
     } catch (error) {
       console.error('Error loading transactions:', error);
       toast({
@@ -121,7 +122,11 @@ const MpesaPaymentManager = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filter, searchPhone, toast]);
+  }, [filter, page, pageSize, searchPhone, toast, updateTotal]);
+
+  useEffect(() => {
+    void loadTransactions();
+  }, [loadTransactions]);
 
   // Calculate stats
   const stats = useMemo<PaymentStats>(() => {
@@ -145,26 +150,36 @@ const MpesaPaymentManager = () => {
           : 0,
       averageAmount:
         completed.length > 0 ? Math.round(totalCompleted / completed.length) : 0,
-      totalTransactions: transactions.length,
+        totalTransactions: pagination.totalItems || transactions.length,
       uniqueCustomers: uniquePhones.size,
     };
-  }, [transactions]);
+  }, [pagination.totalItems, transactions]);
 
   // Retry failed payment
   const retryPayment = async (transactionId: string) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('mpesa_transactions')
-        .select('*')
+        .select('id, checkout_request_id')
         .eq('id', transactionId)
         .single();
 
       if (error) throw error;
 
-      // Initiate new payment attempt
+      await enqueueBackgroundJob({
+        jobType: data.checkout_request_id ? 'mpesa_status_recheck' : 'payment_reconciliation',
+        payload: {
+          transactionId,
+          checkoutRequestId: data.checkout_request_id,
+        },
+        priority: 4,
+        dedupeKey: `payment_retry:${transactionId}`,
+        maxAttempts: 8,
+      });
+
       toast({
         title: 'Retry Initiated',
-        description: 'Payment retry has been queued',
+        description: 'Payment retry has been queued for background processing',
       });
 
       // Reload transactions
@@ -180,33 +195,32 @@ const MpesaPaymentManager = () => {
   };
 
   // Export transactions
-  const exportTransactions = () => {
-    const csv = [
-      ['Date', 'Phone', 'Amount', 'Status', 'Receipt', 'Type'].join(','),
-      ...transactions.map(t =>
-        [
-          new Date(t.created_at).toLocaleDateString(),
-          t.phone_number,
-          t.amount,
-          t.status,
-          t.mpesa_receipt_number || 'N/A',
-          t.transaction_type || 'N/A',
-        ].join(',')
-      ),
-    ].join('\n');
+  const exportTransactions = async () => {
+    try {
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'payments_export',
+        payload: {
+          source: 'mpesa_transactions',
+          filter,
+          searchPhone: searchPhone || null,
+          format: 'csv',
+          requestedAt: new Date().toISOString(),
+        },
+        priority: 8,
+        dedupeKey: `payments_export:${filter.status}:${filter.dateRange}:${searchPhone || 'all'}`,
+      });
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = globalThis.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mpesa-transactions-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    globalThis.URL.revokeObjectURL(url);
-
-    toast({
-      title: 'Exported',
-      description: 'Transactions exported to CSV',
-    });
+      toast({
+        title: 'Export queued',
+        description: `Payment export is processing as job ${shortJobId(jobId)}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Export failed',
+        description: error instanceof Error ? error.message : 'Could not queue export',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -325,13 +339,13 @@ const MpesaPaymentManager = () => {
             <div>
               <CardTitle>Transaction History</CardTitle>
               <CardDescription>
-                Complete record of all M-Pesa payments and their status
+                Complete record of all Pay with M-Pesa transactions and their status
               </CardDescription>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={exportTransactions}
+              onClick={() => void exportTransactions()}
               className="gap-2"
             >
               <Download className="w-4 h-4" />
@@ -394,7 +408,7 @@ const MpesaPaymentManager = () => {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={loadTransactions}
+                onClick={() => void loadTransactions()}
               >
                 {isLoading ? (
                   <>
@@ -483,8 +497,33 @@ const MpesaPaymentManager = () => {
             </table>
           </div>
 
-          <div className="text-xs text-muted-foreground">
-            Showing {transactions.length} of {stats.totalTransactions} transactions
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-xs text-muted-foreground">
+              Showing {(pagination.page - 1) * pagination.pageSize + 1}
+              -{Math.min(pagination.page * pagination.pageSize, pagination.totalItems)}
+              {' '}of {pagination.totalItems} transactions
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => pagination.goToPage(pagination.page - 1)}
+                disabled={pagination.page === 1}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm">
+                Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => pagination.goToPage(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

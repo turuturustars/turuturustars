@@ -57,7 +57,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
         webpLink.href = webpSrc;
         webpLink.type = 'image/webp';
         if (sizes) {
-          (webpLink as any).imagesizes = sizes;
+          webpLink.imageSizes = sizes;
         }
         document.head.appendChild(webpLink);
       }
@@ -68,7 +68,7 @@ export const OptimizedImage: React.FC<OptimizedImageProps> = ({
       jpegLink.as = 'image';
       jpegLink.href = src;
       if (sizes) {
-        (jpegLink as any).imagesizes = sizes;
+        jpegLink.imageSizes = sizes;
       }
       document.head.appendChild(jpegLink);
       

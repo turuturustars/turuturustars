@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,8 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Logger, AppErrorHandler } from '@/utils/errorHandler';
 import { Search, Download, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { exportToCSV, exportToJSON } from '@/utils/export';
+import { useDebounce } from '@/hooks/useDebounce';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 
 interface AuditLog {
   id: string;
@@ -24,45 +24,33 @@ interface AuditLog {
   action_description: string;
   performed_by: string | null;
   created_at: string;
-  metadata: any;
+  metadata: unknown;
 }
 
 export function AuditLogViewer() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const debouncedSearchTerm = useDebounce(searchTerm.trim(), 300);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchAuditLogs();
-  }, []);
-
-  useEffect(() => {
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      setFilteredLogs(
-        logs.filter(
-          (log) =>
-            log.action_type.toLowerCase().includes(term) ||
-            log.action_description.toLowerCase().includes(term) ||
-            log.performed_by?.toLowerCase().includes(term)
-        )
-      );
-    } else {
-      setFilteredLogs(logs);
-    }
-  }, [logs, searchTerm]);
-
-  const fetchAuditLogs = async () => {
+  const fetchAuditLogs = useCallback(async () => {
     try {
+      setIsLoading(true);
       setError(null);
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('audit_logs')
-        .select('*')
+        .select('id, action_type, action_description, performed_by, created_at, metadata')
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .limit(100);
+
+      if (debouncedSearchTerm) {
+        const term = debouncedSearchTerm.replace(/[,%]/g, ' ');
+        query = query.or(`action_type.ilike.%${term}%,action_description.ilike.%${term}%`);
+      }
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) throw fetchError;
       setLogs(data || []);
@@ -77,27 +65,36 @@ export function AuditLogViewer() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debouncedSearchTerm, toast]);
 
-  const handleExport = (exportFormat: 'csv' | 'json') => {
-    const dataToExport = filteredLogs.map((log) => ({
-      'Action Type': log.action_type,
-      Description: log.action_description,
-      'Performed By': log.performed_by || 'System',
-      'Date': format(new Date(log.created_at), 'yyyy-MM-dd HH:mm:ss'),
-      Details: JSON.stringify(log.metadata || {}),
-    }));
+  useEffect(() => {
+    void fetchAuditLogs();
+  }, [fetchAuditLogs]);
 
-    if (exportFormat === 'csv') {
-      exportToCSV(dataToExport, ['Action Type', 'Description', 'Performed By', 'Date', 'Details']);
-    } else {
-      exportToJSON(dataToExport, `audit_logs_${new Date().toISOString().split('T')[0]}.json`);
+  const handleExport = async (exportFormat: 'csv' | 'json') => {
+    try {
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'audit_log_export',
+        payload: {
+          search: debouncedSearchTerm || null,
+          format: exportFormat,
+          requestedAt: new Date().toISOString(),
+        },
+        priority: 8,
+        dedupeKey: `audit_log_export:${exportFormat}:${debouncedSearchTerm || 'all'}`,
+      });
+
+      toast({
+        title: 'Export queued',
+        description: `Audit logs ${exportFormat.toUpperCase()} export is processing as job ${shortJobId(jobId)}.`,
+      });
+    } catch (err) {
+      toast({
+        title: 'Export failed',
+        description: AppErrorHandler.getErrorMessage(err),
+        variant: 'destructive',
+      });
     }
-
-    toast({
-      title: 'Success',
-      description: `Audit logs exported as ${exportFormat.toUpperCase()}`,
-    });
   };
 
   const getActionColor = (actionType: string) => {
@@ -125,13 +122,13 @@ export function AuditLogViewer() {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-4">
-          <CardTitle>Audit Logs ({filteredLogs.length})</CardTitle>
+          <CardTitle>Audit Logs ({logs.length})</CardTitle>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleExport('csv')}
-              disabled={filteredLogs.length === 0}
+              onClick={() => void handleExport('csv')}
+              disabled={logs.length === 0}
             >
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -139,8 +136,8 @@ export function AuditLogViewer() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleExport('json')}
-              disabled={filteredLogs.length === 0}
+              onClick={() => void handleExport('json')}
+              disabled={logs.length === 0}
             >
               <Download className="w-4 h-4 mr-2" />
               Export JSON
@@ -177,7 +174,7 @@ export function AuditLogViewer() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLogs.map((log) => (
+              {logs.map((log) => (
                 <TableRow key={log.id}>
                   <TableCell>
                     <Badge className={getActionColor(log.action_type)}>
@@ -198,7 +195,7 @@ export function AuditLogViewer() {
           </Table>
         </div>
 
-        {filteredLogs.length === 0 && (
+        {logs.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             No audit logs found
           </div>

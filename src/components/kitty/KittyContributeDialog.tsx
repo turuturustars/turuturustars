@@ -84,9 +84,9 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
 
       setCheckoutRequestId(response.CheckoutRequestID);
       setStkSent(true);
-      toast.success('M-Pesa request sent. Check your phone.');
+      toast.success('Pay with M-Pesa sent. Check your phone.');
     } catch (error) {
-      toast.error(getErrorMessage(error, 'M-Pesa payment failed'));
+      toast.error(getErrorMessage(error, 'Pay with M-Pesa failed'));
     } finally {
       setBusy(false);
     }
@@ -127,7 +127,7 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
           <HandCoins className="h-4 w-4" /> Contribute
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md border-green-100 bg-cyan-50">
         <DialogHeader>
           <DialogTitle>Contribute to {kitty.title}</DialogTitle>
           <DialogDescription>
@@ -153,7 +153,7 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
               <p className="mt-1 text-sm text-muted-foreground">
                 {transactionComplete
                   ? 'The kitty balance will refresh automatically.'
-                  : 'Enter your M-Pesa PIN on your phone, then wait for the confirmation.'}
+                  : 'Enter your M-Pesa PIN on your phone, then wait for confirmation.'}
               </p>
             </div>
             <div className="rounded-md border bg-muted/30 p-3 text-left text-sm">
@@ -182,9 +182,9 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
           </div>
         ) : (
           <Tabs defaultValue="mpesa">
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="mpesa" className="gap-2">
-                <Smartphone className="h-4 w-4" /> M-Pesa
+            <TabsList className="grid grid-cols-2 bg-white/70">
+              <TabsTrigger value="mpesa" className="gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
+                <Smartphone className="h-4 w-4" /> Pay with M-Pesa
               </TabsTrigger>
               <TabsTrigger value="wallet" className="gap-2">
                 <Wallet className="h-4 w-4" /> Wallet
@@ -201,6 +201,7 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
                 value={amount}
                 onChange={(event) => setAmount(event.target.value)}
                 placeholder="500"
+                className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
               />
               <div className="flex flex-wrap gap-2 pt-1">
                 {quickAmounts.map((quickAmount) => (
@@ -209,6 +210,11 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className={cn(
+                      Number(amount) === quickAmount
+                        ? 'border-green-600 bg-green-600 text-white hover:bg-green-700'
+                        : 'border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800'
+                    )}
                     onClick={() => setAmount(String(quickAmount))}
                   >
                     {formatKes(quickAmount)}
@@ -226,9 +232,10 @@ const KittyContributeDialog = ({ kitty, onContribute }: Props) => {
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
                   placeholder="07XX XXX XXX"
+                  className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500"
                 />
               </div>
-              <Button onClick={payWithMpesa} disabled={busy || !amountIsValid} className="w-full gap-2">
+              <Button onClick={payWithMpesa} disabled={busy || !amountIsValid} className="w-full gap-2 bg-green-600 text-white hover:bg-green-700">
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Smartphone className="h-4 w-4" />}
                 Pay with M-Pesa
               </Button>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AccessibleButton } from '@/components/accessible/AccessibleButton';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,13 @@ interface Member {
   joined_at: string;
 }
 
+interface MemberRegistryStats {
+  total: number;
+  active: number;
+  pending: number;
+  dormant: number;
+}
+
 type MemberStatus = 'active' | 'dormant' | 'pending' | 'suspended';
 
 type FunctionErrorPayload = {
@@ -64,6 +71,24 @@ type FunctionErrorPayload = {
     message?: string;
     response?: { message?: string };
   } | string | null;
+};
+
+type NumericValue = number | string | null | undefined;
+
+type MemberRegistryStatsRow = {
+  total?: NumericValue;
+  active?: NumericValue;
+  pending?: NumericValue;
+  dormant?: NumericValue;
+};
+
+const toNumber = (value: NumericValue): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 };
 
 async function getFunctionErrorMessage(error: unknown): Promise<string> {
@@ -132,6 +157,12 @@ async function getFunctionErrorMessage(error: unknown): Promise<string> {
 
 const MembersPage = () => {
   const [members, setMembers] = useState<Member[]>([]);
+  const [memberStats, setMemberStats] = useState<MemberRegistryStats>({
+    total: 0,
+    active: 0,
+    pending: 0,
+    dormant: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,6 +207,7 @@ const MembersPage = () => {
   const { toast } = useToast();
   const { status, showSuccess } = useStatus();
   const pagination = usePaginationState(15);
+  const { getOffset, pageSize, updateTotal } = pagination;
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const { user, hasRole, isOfficial } = useAuth();
   const canDelete =
@@ -184,43 +216,7 @@ const MembersPage = () => {
   const canManageMembers = isOfficial(); // all officials (including admin) can add/manage
   const officialCanAssist = isOfficial();
 
-  useEffect(() => {
-    fetchMembers();
-  }, []);
-
-  const filteredMembers = useMemo(() => {
-    let filtered = members;
-
-    if (debouncedSearchTerm) {
-      const term = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (m) =>
-          m.full_name.toLowerCase().includes(term) ||
-          m.email?.toLowerCase().includes(term) ||
-          m.phone.includes(term) ||
-          m.id_number?.includes(term) ||
-          m.membership_number?.includes(term)
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((m) => m.status === statusFilter);
-    }
-
-    return filtered;
-  }, [members, debouncedSearchTerm, statusFilter]);
-
-  // Update pagination when filtered members change
-  useEffect(() => {
-    pagination.updateTotal(filteredMembers.length);
-  }, [filteredMembers.length, pagination]);
-
-  const paginatedMembers = useMemo(() => {
-    const offset = pagination.getOffset();
-    return filteredMembers.slice(offset, offset + pagination.pageSize);
-  }, [filteredMembers, pagination]);
-
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     setIsLoading(true);
     try {
       setError(null);
@@ -228,13 +224,44 @@ const MembersPage = () => {
       // Use retry logic for network resilience
       await retryAsync(
         async () => {
-          const { data, error: fetchError } = await supabase
+          const offset = getOffset();
+          let query = supabase
             .from('profiles')
-            .select('id, full_name, email, phone, id_number, membership_number, status, is_student, registration_fee_paid, joined_at')
-            .order('joined_at', { ascending: false });
+            .select('id, full_name, email, phone, id_number, membership_number, status, is_student, registration_fee_paid, joined_at', {
+              count: 'exact',
+            })
+            .order('joined_at', { ascending: false })
+            .range(offset, offset + pageSize - 1);
+
+          const term = debouncedSearchTerm.trim().replace(/[%,()]/g, '');
+          if (term) {
+            const pattern = `%${term}%`;
+            query = query.or(
+              `full_name.ilike.${pattern},email.ilike.${pattern},phone.ilike.${pattern},id_number.ilike.${pattern},membership_number.ilike.${pattern}`
+            );
+          }
+
+          if (statusFilter !== 'all') {
+            query = query.eq('status', statusFilter as MemberStatus);
+          }
+
+          const [{ data, error: fetchError, count }, statsRes] = await Promise.all([
+            query,
+            supabase.rpc('get_member_registry_stats' as never).maybeSingle(),
+          ]);
 
           if (fetchError) throw fetchError;
+          if (statsRes.error) throw statsRes.error;
+
+          const statsRow = statsRes.data as MemberRegistryStatsRow | null;
           setMembers(data || []);
+          setMemberStats({
+            total: toNumber(statsRow?.total),
+            active: toNumber(statsRow?.active),
+            pending: toNumber(statsRow?.pending),
+            dormant: toNumber(statsRow?.dormant),
+          });
+          updateTotal(count ?? data?.length ?? 0);
           return data;
         },
         {
@@ -258,7 +285,11 @@ const MembersPage = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [debouncedSearchTerm, getOffset, pageSize, statusFilter, toast, updateTotal]);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
 
   const handleStatusChange = (memberId: string, newStatus: MemberStatus) => {
     setConfirmDialog({
@@ -473,7 +504,10 @@ const MembersPage = () => {
         fetchMembers();
       }
 
-      toast({ title: 'Member created', description: 'New member profile added successfully' });
+      toast({
+        title: 'Member created',
+        description: 'New member profile added successfully. Their first password is their National ID.',
+      });
       setAddDialog({
         open: false,
         fullName: '',
@@ -520,10 +554,10 @@ const MembersPage = () => {
   };
 
   const stats = {
-    total: members.length,
-    active: members.filter((m) => m.status === 'active').length,
-    pending: members.filter((m) => m.status === 'pending').length,
-    dormant: members.filter((m) => m.status === 'dormant').length,
+    total: memberStats.total,
+    active: memberStats.active,
+    pending: memberStats.pending,
+    dormant: memberStats.dormant,
   };
 
   return (
@@ -603,9 +637,30 @@ const MembersPage = () => {
                 placeholder="Search by name, email, phone, or membership number..."
                 className="pl-9"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  pagination.goToPage(1);
+                }}
               />
             </div>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                pagination.goToPage(1);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="dormant">Dormant</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -613,7 +668,7 @@ const MembersPage = () => {
       {/* Members List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>All Members ({filteredMembers.length})</CardTitle>
+          <CardTitle>All Members ({pagination.totalItems})</CardTitle>
           <AccessibleButton
             variant="outline"
             size="sm"
@@ -644,15 +699,15 @@ const MembersPage = () => {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
-          ) : paginatedMembers.length === 0 ? (
+          ) : members.length === 0 ? (
             <EmptyState
               title="No members found"
-              description={filteredMembers.length === 0 ? 'Try adjusting your filters or search term' : 'Loading...'}
+              description="Try adjusting your filters or search term"
             />
           ) : (
             <>
               <div className="space-y-3 lg:hidden">
-                {paginatedMembers.map((member) => (
+                {members.map((member) => (
                   <Card key={member.id} className="border border-border/60">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center gap-3">
@@ -752,7 +807,7 @@ const MembersPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedMembers.map((member) => (
+                    {members.map((member) => (
                       <TableRow key={member.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -840,7 +895,7 @@ const MembersPage = () => {
               {/* Pagination Controls */}
               <div className="flex items-center justify-between mt-4 pt-4 border-t">
                 <div className="text-sm text-muted-foreground">
-                  Showing {pagination.getOffset() + 1}-{Math.min(pagination.getOffset() + pagination.pageSize, filteredMembers.length)} of {filteredMembers.length}
+                  Showing {pagination.getOffset() + 1}-{Math.min(pagination.getOffset() + pagination.pageSize, pagination.totalItems)} of {pagination.totalItems}
                 </div>
                 <div className="flex items-center gap-2">
                   <AccessibleButton

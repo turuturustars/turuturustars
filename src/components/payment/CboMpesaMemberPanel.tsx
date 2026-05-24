@@ -105,12 +105,12 @@ const CboMpesaMemberPanel = () => {
                 ? `Receipt: ${payment.mpesa_receipt || 'Captured'}`
                 : payment.status === 'awaiting_approval'
                   ? `Receipt captured${payment.mpesa_receipt ? `: ${payment.mpesa_receipt}` : ''}. Awaiting finance approval.`
-                : 'The M-Pesa request did not complete. You can retry.',
+                : 'Pay with M-Pesa did not complete. You can retry.',
             variant: paymentReceived ? 'default' : 'destructive',
           });
         }
       } catch (error) {
-        console.error('M-Pesa payment status polling error', error);
+        console.error('Pay with M-Pesa status polling error', error);
       }
     }, 5000);
 
@@ -153,15 +153,15 @@ const CboMpesaMemberPanel = () => {
       setStkAmount('');
 
       toast({
-        title: 'M-Pesa request sent',
-        description: result.customer_message || 'Approve the M-Pesa request on your phone.',
+        title: 'Pay with M-Pesa sent',
+        description: result.customer_message || 'Approve Pay with M-Pesa on your phone.',
       });
 
       await loadPayments();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to start M-Pesa payment';
+      const message = error instanceof Error ? error.message : 'Failed to start Pay with M-Pesa';
       toast({
-        title: 'M-Pesa payment failed',
+        title: 'Pay with M-Pesa failed',
         description: message,
         variant: 'destructive',
       });
@@ -222,31 +222,31 @@ const CboMpesaMemberPanel = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
+        <Card className="border-green-100 bg-cyan-50/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Smartphone className="w-5 h-5" />
+              <Smartphone className="w-5 h-5 text-green-600" />
               Pay with M-Pesa
             </CardTitle>
-            <CardDescription>Send a payment request to your phone and complete with your M-Pesa PIN.</CardDescription>
+            <CardDescription>Start Pay with M-Pesa on your phone and complete with your M-Pesa PIN.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="stk-phone">Phone Number</Label>
-              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX or 01XXXXXXXX" disabled={!canInteract} />
+              <Input id="stk-phone" value={stkPhone} onChange={(event) => setStkPhone(event.target.value)} placeholder="07XXXXXXXX or 01XXXXXXXX" disabled={!canInteract} className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="stk-amount">Amount (KES)</Label>
-              <Input id="stk-amount" type="number" min={1} value={stkAmount} onChange={(event) => setStkAmount(event.target.value)} placeholder="500" disabled={!canInteract} />
+              <Input id="stk-amount" type="number" min={1} value={stkAmount} onChange={(event) => setStkAmount(event.target.value)} placeholder="500" disabled={!canInteract} className="border-cyan-200 bg-cyan-50/70 focus-visible:border-green-500 focus-visible:ring-green-500" />
             </div>
-            <Button onClick={handleStkPush} disabled={stkLoading || !canInteract} className="w-full">
+            <Button onClick={handleStkPush} disabled={stkLoading || !canInteract} className="w-full bg-green-600 text-white hover:bg-green-700">
               {stkLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Smartphone className="w-4 h-4 mr-2" />}
               Pay with M-Pesa
             </Button>
             {activeCheckoutId && (
-              <div className="rounded-md border p-3 text-sm bg-muted/40">
-                <p className="font-medium">Payment reference: {activeCheckoutId}</p>
-                <p className="text-muted-foreground mt-1">Status: {activeStatus || 'pending'}</p>
+              <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm">
+                <p className="font-medium text-green-950">Payment reference: {activeCheckoutId}</p>
+                <p className="mt-1 text-green-800">Status: {activeStatus || 'pending'}</p>
               </div>
             )}
           </CardContent>

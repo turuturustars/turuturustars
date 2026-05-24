@@ -8,6 +8,12 @@ type WhatsAppQueueRow = {
   phone: string;
   message: string;
   attempts: number;
+  event_type: string;
+  event_id: string | null;
+  priority: string | null;
+  template_name: string | null;
+  template_language: string | null;
+  template_parameters: unknown;
 };
 
 type WhatsAppSessionRow = {
@@ -26,6 +32,8 @@ type ProcessWhatsAppRequest = {
   abandonment_limit?: number;
   include_abandonment?: boolean;
   dry_run?: boolean;
+  retry_failed?: boolean;
+  include_event_types?: string[];
 };
 
 const DEFAULT_LIMIT = 50;
@@ -33,6 +41,18 @@ const MAX_LIMIT = 200;
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_GRAPH_API_VERSION = "v20.0";
 const DEFAULT_ABANDONMENT_MINUTES = 3;
+const OFFICIAL_ROLES = new Set([
+  "admin",
+  "chairperson",
+  "vice_chairman",
+  "secretary",
+  "vice_secretary",
+  "treasurer",
+  "organizing_secretary",
+  "committee_member",
+  "patron",
+  "coordinator",
+]);
 
 function createServiceClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -46,22 +66,42 @@ function createServiceClient() {
   });
 }
 
-function ensureAuthorized(req: Request): void {
+async function ensureAuthorized(supabase: ReturnType<typeof createServiceClient>, req: Request): Promise<void> {
   const expectedSecret = (
     Deno.env.get("WHATSAPP_NOTIFICATIONS_JOB_SECRET") ||
     Deno.env.get("WHATSAPP_NOTIFICATION_SECRET") ||
     ""
   ).trim();
-  if (!expectedSecret) {
-    return;
-  }
-
   const authHeader = req.headers.get("authorization") || "";
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length).trim() : "";
   const customHeader = req.headers.get("x-whatsapp-job-secret")?.trim() || "";
+  const legacyHeader = req.headers.get("x-whatsapp-notification-secret")?.trim() || "";
 
-  if (bearer !== expectedSecret && customHeader !== expectedSecret) {
+  if (expectedSecret && (bearer === expectedSecret || customHeader === expectedSecret || legacyHeader === expectedSecret)) {
+    return;
+  }
+
+  if (!bearer) {
     throw new HttpError(401, "Unauthorized");
+  }
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(bearer);
+  if (authError || !user) {
+    throw new HttpError(401, "Unauthorized");
+  }
+
+  const { data: roles, error: rolesError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  if (rolesError) {
+    throw new HttpError(500, "Failed to verify WhatsApp worker permissions", rolesError);
+  }
+
+  const allowed = (roles || []).some((row: { role?: string }) => OFFICIAL_ROLES.has(String(row.role || "")));
+  if (!allowed) {
+    throw new HttpError(403, "Only officials can run the WhatsApp notification worker");
   }
 }
 
@@ -74,6 +114,10 @@ function parseBody(body: ProcessWhatsAppRequest | null | undefined) {
     : DEFAULT_LIMIT;
   const dryRun = body?.dry_run === true;
   const includeAbandonment = body?.include_abandonment !== false;
+  const retryFailed = body?.retry_failed === true;
+  const includeEventTypes = Array.isArray(body?.include_event_types)
+    ? body.include_event_types.map((item) => String(item)).filter(Boolean).slice(0, 20)
+    : [];
   const maxAttemptsRaw = Number(Deno.env.get("WHATSAPP_NOTIFICATIONS_MAX_ATTEMPTS") || "");
   const maxAttempts = Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw > 0
     ? Math.floor(maxAttemptsRaw)
@@ -83,10 +127,16 @@ function parseBody(body: ProcessWhatsAppRequest | null | undefined) {
     ? abandonmentMinutesRaw
     : DEFAULT_ABANDONMENT_MINUTES;
 
-  return { limit, abandonmentLimit, includeAbandonment, dryRun, maxAttempts, abandonmentMinutes };
+  return { limit, abandonmentLimit, includeAbandonment, dryRun, maxAttempts, abandonmentMinutes, retryFailed, includeEventTypes };
 }
 
-async function sendViaWhatsAppCloud(destination: string, message: string): Promise<{
+type WhatsAppTemplateOptions = {
+  templateName: string;
+  languageCode: string;
+  parameters: string[];
+};
+
+async function sendViaWhatsAppCloud(destination: string, message: string, template?: WhatsAppTemplateOptions | null): Promise<{
   providerMessageId: string | null;
   providerResponse: unknown;
 }> {
@@ -99,6 +149,38 @@ async function sendViaWhatsAppCloud(destination: string, message: string): Promi
   const graphVersion = Deno.env.get("WHATSAPP_GRAPH_API_VERSION")?.trim() || DEFAULT_GRAPH_API_VERSION;
   const destinationNumber = destination.startsWith("+") ? destination.slice(1) : destination;
   const endpoint = `https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`;
+  const body = template
+    ? {
+      messaging_product: "whatsapp",
+      to: destinationNumber,
+      type: "template",
+      template: {
+        name: template.templateName,
+        language: { code: template.languageCode },
+        ...(template.parameters.length
+          ? {
+            components: [
+              {
+                type: "body",
+                parameters: template.parameters.map((text) => ({
+                  type: "text",
+                  text,
+                })),
+              },
+            ],
+          }
+          : {}),
+      },
+    }
+    : {
+      messaging_product: "whatsapp",
+      to: destinationNumber,
+      type: "text",
+      text: {
+        preview_url: false,
+        body: message,
+      },
+    };
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -107,15 +189,7 @@ async function sendViaWhatsAppCloud(destination: string, message: string): Promi
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: destinationNumber,
-      type: "text",
-      text: {
-        preview_url: false,
-        body: message,
-      },
-    }),
+    body: JSON.stringify(body),
   });
 
   const raw = await response.text();
@@ -151,6 +225,45 @@ async function sendViaWhatsAppCloud(destination: string, message: string): Promi
 function isValidWhatsAppDestination(phone: string): boolean {
   const digits = phone.replace(/[^\d+]/g, "").replace(/^\+/, "");
   return /^254[17]\d{8}$/.test(digits);
+}
+
+function queueTemplateParameters(row: WhatsAppQueueRow): string[] {
+  if (Array.isArray(row.template_parameters)) {
+    return row.template_parameters.map((item) => String(item)).filter(Boolean).slice(0, 10);
+  }
+
+  return [row.message].filter(Boolean).slice(0, 1);
+}
+
+function configuredTemplateForEvent(eventType: string): string | null {
+  const normalized = eventType.toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  return (
+    Deno.env.get(`WHATSAPP_${normalized}_TEMPLATE_NAME`)?.trim() ||
+    Deno.env.get("WHATSAPP_NOTIFICATION_TEMPLATE_NAME")?.trim() ||
+    null
+  );
+}
+
+function templateOptionsForRow(row: WhatsAppQueueRow): WhatsAppTemplateOptions | null {
+  const templateName = row.template_name?.trim() || configuredTemplateForEvent(row.event_type);
+  if (!templateName) return null;
+
+  const languageCode =
+    row.template_language?.trim() ||
+    Deno.env.get("WHATSAPP_DEFAULT_LANGUAGE_CODE")?.trim() ||
+    "en";
+
+  return {
+    templateName,
+    languageCode,
+    parameters: queueTemplateParameters(row),
+  };
+}
+
+function retryDelaySeconds(attempts: number): number {
+  const base = Number(Deno.env.get("WHATSAPP_NOTIFICATIONS_RETRY_BASE_SECONDS") || "");
+  const baseSeconds = Number.isFinite(base) && base > 0 ? base : 60;
+  return Math.min(60 * 60, Math.round(baseSeconds * Math.max(1, attempts ** 2)));
 }
 
 function seededIndex(seed: string, count: number): number {
@@ -386,7 +499,7 @@ serve(async (req) => {
     return new Response("ok", {
       headers: {
         ...corsHeaders,
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-whatsapp-job-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-supabase-api-version",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-whatsapp-job-secret, x-whatsapp-notification-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version, x-supabase-api-version",
       },
     });
   }
@@ -396,23 +509,71 @@ serve(async (req) => {
       throw new HttpError(405, "Method not allowed");
     }
 
-    ensureAuthorized(req);
-
     const body = req.method === "POST" ? await readJsonBody<ProcessWhatsAppRequest>(req) : {};
-    const { limit, abandonmentLimit, includeAbandonment, dryRun, maxAttempts, abandonmentMinutes } = parseBody(body);
+    const { limit, abandonmentLimit, includeAbandonment, dryRun, maxAttempts, abandonmentMinutes, retryFailed, includeEventTypes } = parseBody(body);
     const nowIso = new Date().toISOString();
     const supabase = createServiceClient();
+    await ensureAuthorized(supabase, req);
     let queueClaimed = 0;
     let queueSent = 0;
     let queueFailed = 0;
     let queueSkipped = 0;
+    let queueRequeued = 0;
 
-    const { data: pendingRows, error: pendingError } = await supabase
+    if (retryFailed) {
+      let retryQuery = supabase
+        .from("whatsapp_notifications_queue")
+        .select("id")
+        .in("status", ["failed", "skipped"])
+        .order("updated_at", { ascending: true })
+        .limit(limit);
+
+      if (includeEventTypes.length > 0) {
+        retryQuery = retryQuery.in("event_type", includeEventTypes);
+      }
+
+      const { data: retryRows, error: retryLoadError } = await retryQuery;
+      if (retryLoadError) {
+        throw new HttpError(500, "Failed to load failed WhatsApp queue rows", retryLoadError);
+      }
+
+      const retryIds = (retryRows || []).map((row: { id: string }) => row.id);
+      if (retryIds.length > 0) {
+        const { error: retryError } = await supabase
+          .from("whatsapp_notifications_queue")
+          .update({
+            status: "pending",
+            attempts: 0,
+            last_error: null,
+            next_attempt_at: null,
+            last_attempt_at: null,
+            dead_lettered_at: null,
+            processed_at: null,
+            updated_at: nowIso,
+          })
+          .in("id", retryIds);
+
+        if (retryError) {
+          throw new HttpError(500, "Failed to requeue WhatsApp dead-letter rows", retryError);
+        }
+
+        queueRequeued = retryIds.length;
+      }
+    }
+
+    let pendingQuery = supabase
       .from("whatsapp_notifications_queue")
-      .select("id, user_id, phone, message, attempts")
+      .select("id, user_id, phone, message, attempts, event_type, event_id, priority, template_name, template_language, template_parameters")
       .eq("status", "pending")
+      .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
       .order("created_at", { ascending: true })
       .limit(limit);
+
+    if (includeEventTypes.length > 0) {
+      pendingQuery = pendingQuery.in("event_type", includeEventTypes);
+    }
+
+    const { data: pendingRows, error: pendingError } = await pendingQuery;
 
     if (pendingError) {
       throw new HttpError(500, "Failed to load pending WhatsApp queue rows", pendingError);
@@ -425,11 +586,12 @@ serve(async (req) => {
         .from("whatsapp_notifications_queue")
         .update({
           status: "processing",
+          last_attempt_at: nowIso,
           updated_at: nowIso,
         })
         .in("id", pendingIds)
         .eq("status", "pending")
-        .select("id, user_id, phone, message, attempts");
+        .select("id, user_id, phone, message, attempts, event_type, event_id, priority, template_name, template_language, template_parameters");
 
       if (claimError) {
         throw new HttpError(500, "Failed to claim WhatsApp queue rows", claimError);
@@ -449,6 +611,8 @@ serve(async (req) => {
               status: "skipped",
               attempts: nextAttempts,
               last_error: "Invalid normalized WhatsApp destination number",
+              dead_lettered_at: nowIso,
+              last_attempt_at: nowIso,
               processed_at: nowIso,
               updated_at: nowIso,
             })
@@ -462,6 +626,8 @@ serve(async (req) => {
             .from("whatsapp_notifications_queue")
             .update({
               status: "pending",
+              next_attempt_at: null,
+              last_attempt_at: null,
               updated_at: nowIso,
             })
             .eq("id", row.id);
@@ -469,7 +635,8 @@ serve(async (req) => {
         }
 
         try {
-          const result = await sendViaWhatsAppCloud(row.phone, row.message);
+          const template = templateOptionsForRow(row);
+          const result = await sendViaWhatsAppCloud(row.phone, row.message, template);
           queueSent += 1;
 
           const { data: messageRows, error: messageError } = await supabase
@@ -479,11 +646,16 @@ serve(async (req) => {
               direction: "outbound",
               phone: row.phone,
               profile_id: row.user_id,
-              message_type: "text",
+              message_type: template ? "template" : "text",
               body: row.message,
               status: "sent",
               provider_response: result.providerResponse,
-              raw_payload: {},
+              raw_payload: {
+                queue_id: row.id,
+                event_type: row.event_type,
+                event_id: row.event_id,
+                template_name: template?.templateName ?? null,
+              },
             })
             .select("id")
             .limit(1);
@@ -501,6 +673,8 @@ serve(async (req) => {
               provider_response: result.providerResponse,
               whatsapp_message_id: messageRows?.[0]?.id ?? null,
               last_error: null,
+              next_attempt_at: null,
+              dead_lettered_at: null,
               processed_at: nowIso,
               updated_at: nowIso,
             })
@@ -509,6 +683,9 @@ serve(async (req) => {
           queueFailed += 1;
           const errorMessage = error instanceof Error ? error.message : "Unknown WhatsApp send error";
           const terminalFailure = nextAttempts >= maxAttempts;
+          const nextAttemptAt = terminalFailure
+            ? null
+            : new Date(Date.now() + retryDelaySeconds(nextAttempts) * 1000).toISOString();
 
           await supabase
             .from("whatsapp_notifications_queue")
@@ -516,6 +693,8 @@ serve(async (req) => {
               status: terminalFailure ? "failed" : "pending",
               attempts: nextAttempts,
               last_error: errorMessage,
+              next_attempt_at: nextAttemptAt,
+              dead_lettered_at: terminalFailure ? nowIso : null,
               processed_at: terminalFailure ? nowIso : null,
               updated_at: nowIso,
             })
@@ -535,6 +714,7 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       queue: {
+        requeued: queueRequeued,
         claimed: queueClaimed,
         sent: queueSent,
         failed: queueFailed,

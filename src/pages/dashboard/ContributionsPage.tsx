@@ -36,6 +36,7 @@ import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { amountSchema } from '@/lib/validation';
 import { DollarSign, Plus, TrendingUp, Clock, CheckCircle2, Loader2, X, ChevronLeft, ChevronRight, AlertCircle, Smartphone } from 'lucide-react';
+import { ZodError } from 'zod';
 
 interface Contribution {
   id: string;
@@ -153,8 +154,8 @@ const ContributionsPage = () => {
     } else {
       try {
         amountSchema.parse(newContribution.amount);
-      } catch (err: any) {
-        errors.amount = err.errors[0]?.message || 'Invalid amount';
+      } catch (err: unknown) {
+        errors.amount = err instanceof ZodError ? err.errors[0]?.message || 'Invalid amount' : 'Invalid amount';
       }
     }
 
@@ -269,9 +270,9 @@ const ContributionsPage = () => {
             paymentType="welfare"
             onPaymentSuccess={() => fetchContributions()}
             trigger={
-              <Button className="btn-primary gap-2" disabled={!canInteract}>
+              <Button className="gap-2 bg-green-600 text-white hover:bg-green-700" disabled={!canInteract}>
                 <Smartphone className="w-4 h-4" />
-                Contribute via M-Pesa
+                Pay with M-Pesa
               </Button>
             }
           />
@@ -464,7 +465,7 @@ const ContributionsPage = () => {
                             <PayWithMpesa
                               contributionId={contribution.id}
                               defaultAmount={contribution.amount}
-                              trigger={<AccessibleButton size="sm" className="btn-outline w-full" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
+                              trigger={<AccessibleButton size="sm" className="w-full border border-green-200 bg-white text-green-700 hover:bg-green-50 hover:text-green-800" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
                             />
                             <PayWithWalletButton
                               amount={contribution.amount}
@@ -527,7 +528,7 @@ const ContributionsPage = () => {
                             <PayWithMpesa
                               contributionId={contribution.id}
                               defaultAmount={contribution.amount}
-                              trigger={<AccessibleButton size="sm" className="btn-outline" ariaLabel={`Pay KES ${contribution.amount} via M-Pesa for contribution ${contribution.id}`}>M-Pesa</AccessibleButton>}
+                              trigger={<AccessibleButton size="sm" className="border border-green-200 bg-white text-green-700 hover:bg-green-50 hover:text-green-800" ariaLabel={`Pay KES ${contribution.amount} with M-Pesa for contribution ${contribution.id}`}>Pay with M-Pesa</AccessibleButton>}
                             />
                             <PayWithWalletButton
                               amount={contribution.amount}
@@ -664,8 +665,8 @@ const ContributionsPage = () => {
                           contributionId={contribution.id}
                           defaultAmount={contribution.amount}
                           trigger={
-                            <Button size="sm" className="bg-yellow-600 hover:bg-yellow-700">
-                              <DollarSign className="w-4 h-4 mr-2" />
+                            <Button size="sm" className="bg-green-600 text-white hover:bg-green-700">
+                              <Smartphone className="w-4 h-4 mr-2" />
                               Pay with M-Pesa
                             </Button>
                           }

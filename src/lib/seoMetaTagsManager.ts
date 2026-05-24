@@ -19,7 +19,7 @@ interface SEOMetaTags {
   publishDate?: string;
   modifiedDate?: string;
   robots?: string;
-  structuredData?: any;
+  structuredData?: Record<string, unknown>;
   hrefLang?: Array<{ lang: string; url: string }>;
   locale?: string;
 }
@@ -188,7 +188,7 @@ export class SEOMetaTagsManager {
   /**
    * Set structured data (JSON-LD)
    */
-  private setStructuredData(jsonLd: any): void {
+  private setStructuredData(jsonLd: Record<string, unknown>): void {
     // Remove existing structured data script
     const existingScript = document.querySelector('script[data-seo-structured-data]');
     if (existingScript) {

@@ -83,13 +83,16 @@ export const ValidationMessages = {
 /**
  * Validate form data against rules
  */
-export function validateFormData<T extends Record<string, any>>(
+type ValidationResult = boolean | { valid: boolean; [key: string]: unknown };
+
+export function validateFormData<T extends Record<string, unknown>>(
   data: T,
-  rules: Record<keyof T, (value: any) => boolean | { valid: boolean; [key: string]: any }>
-): Record<keyof T, string> {
-  const errors: Record<keyof T, string> = {} as any;
+  rules: Partial<Record<keyof T, (value: T[keyof T]) => ValidationResult>>
+): Partial<Record<keyof T, string>> {
+  const errors: Partial<Record<keyof T, string>> = {};
 
   for (const [field, rule] of Object.entries(rules)) {
+    if (!rule) continue;
     const value = data[field as keyof T];
     const result = rule(value);
     const isValid = typeof result === 'boolean' ? result : result.valid;

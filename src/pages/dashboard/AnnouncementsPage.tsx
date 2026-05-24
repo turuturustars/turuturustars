@@ -10,13 +10,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { hasPermission, normalizeRoles } from '@/lib/rolePermissions';
 import { searchItems } from '@/lib/searchUtils';
-import { exportAsCSV } from '@/lib/exportUtils';
 import { usePaginationState } from '@/hooks/usePaginationState';
 import { getErrorMessage, logError, retryAsync } from '@/lib/errorHandling';
 import { Bell, Megaphone, Loader2, Plus, AlertCircle, Trash2, Edit2, Search, Download, ChevronLeft, ChevronRight, Sparkles, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sendAnnouncementNotification } from '@/lib/notificationService';
 import { useToast } from '@/hooks/use-toast';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 
 interface Announcement {
   id: string;
@@ -230,7 +230,7 @@ const AnnouncementsPage = () => {
     setSuccess(null);
 
     try {
-      const announcementsTable = supabase.from('announcements' as 'announcements') as any;
+      const announcementsTable = supabase.from('announcements');
       
       if (!user?.id) {
         throw new Error('You must be signed in to manage announcements.');
@@ -265,20 +265,18 @@ const AnnouncementsPage = () => {
 
         if (error) throw error;
 
-        // Broadcast notifications for new announcements (non-blocking)
+        // Broadcast notifications for new announcements without blocking the author.
         if (createdAnnouncement?.id) {
-          try {
-            await sendAnnouncementNotification(
-              createdAnnouncement.id,
-              createdAnnouncement.title,
-              createdAnnouncement.content
-            );
-          } catch (notifyError) {
+          void sendAnnouncementNotification(
+            createdAnnouncement.id,
+            createdAnnouncement.title,
+            createdAnnouncement.content
+          ).catch((notifyError) => {
             logError(notifyError, 'AnnouncementsPage.sendAnnouncementNotification', 'warn');
-          }
+          });
         }
 
-        setSuccess('Announcement created successfully!');
+        setSuccess('Announcement created successfully! Notifications are being queued.');
       }
 
       setFormData({ title: '', content: '', priority: 'normal' });
@@ -334,7 +332,7 @@ const AnnouncementsPage = () => {
 
     setIsDeleting(announcementId);
     try {
-      const announcementsTable = supabase.from('announcements' as 'announcements') as any;
+      const announcementsTable = supabase.from('announcements');
       const { error } = await announcementsTable
         .delete()
         .eq('id', announcementId);
@@ -554,13 +552,22 @@ const AnnouncementsPage = () => {
                     variant="outline"
                     ariaLabel="Export announcements as CSV"
                     onClick={() => {
-                      const exportData = filteredAnnouncements.map((a) => ({
-                        'Title': a.title,
-                        'Priority': a.priority,
-                        'Date': new Date(a.published_at || a.created_at).toLocaleDateString(),
-                        'Creator': a.created_by_profile?.full_name || 'Unknown',
-                      }));
-                      exportAsCSV(exportData, { filename: 'announcements' });
+                      void enqueueBackgroundJob({
+                        jobType: 'announcement_export',
+                        payload: {
+                          search: searchTerm.trim() || null,
+                          priority: priorityFilter === 'all' ? null : priorityFilter,
+                          sortBy,
+                          format: 'csv',
+                          requestedAt: new Date().toISOString(),
+                        },
+                        priority: 8,
+                        dedupeKey: `announcement_export:${priorityFilter}:${searchTerm.trim() || 'all'}:${sortBy}`,
+                      }).then((jobId) => {
+                        setSuccess(`Announcement export queued. Job ${shortJobId(jobId)}`);
+                      }).catch((exportError) => {
+                        setError(exportError instanceof Error ? exportError.message : 'Failed to queue export');
+                      });
                     }}
                     className="gap-2"
                   >

@@ -89,7 +89,7 @@ export const usePageMeta = (metadata: PageMetaData) => {
 /**
  * Helper function to generate structured data for SEO
  */
-export const generateStructuredData = (type: string, data: Record<string, any>) => {
+export const generateStructuredData = (type: string, data: Record<string, unknown>) => {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': type,

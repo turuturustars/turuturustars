@@ -12,6 +12,7 @@ import {
 import { AccessibleStatus, useStatus } from '@/components/accessible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 import {
   Users,
   DollarSign,
@@ -51,6 +52,83 @@ interface ReportData {
   };
 }
 
+type NumericValue = number | string | null | undefined;
+
+interface ReportSummaryRpc {
+  members?: {
+    total?: NumericValue;
+    active?: NumericValue;
+    pending?: NumericValue;
+    dormant?: NumericValue;
+    students?: NumericValue;
+    newThisMonth?: NumericValue;
+  };
+  contributions?: {
+    total?: NumericValue;
+    paid?: NumericValue;
+    pending?: NumericValue;
+    missed?: NumericValue;
+    totalAmount?: NumericValue;
+    paidAmount?: NumericValue;
+    byType?: Record<string, { count?: NumericValue; amount?: NumericValue }>;
+  };
+  welfare?: {
+    totalCases?: NumericValue;
+    activeCases?: NumericValue;
+    closedCases?: NumericValue;
+    targetAmount?: NumericValue;
+    collectedAmount?: NumericValue;
+  };
+}
+
+const toNumber = (value: NumericValue): number => {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const mapReportSummary = (summary: ReportSummaryRpc | null): ReportData => {
+  const byType = Object.fromEntries(
+    Object.entries(summary?.contributions?.byType || {}).map(([type, item]) => [
+      type,
+      {
+        count: toNumber(item?.count),
+        amount: toNumber(item?.amount),
+      },
+    ])
+  );
+
+  return {
+    members: {
+      total: toNumber(summary?.members?.total),
+      active: toNumber(summary?.members?.active),
+      pending: toNumber(summary?.members?.pending),
+      dormant: toNumber(summary?.members?.dormant),
+      students: toNumber(summary?.members?.students),
+      newThisMonth: toNumber(summary?.members?.newThisMonth),
+    },
+    contributions: {
+      total: toNumber(summary?.contributions?.total),
+      paid: toNumber(summary?.contributions?.paid),
+      pending: toNumber(summary?.contributions?.pending),
+      missed: toNumber(summary?.contributions?.missed),
+      totalAmount: toNumber(summary?.contributions?.totalAmount),
+      paidAmount: toNumber(summary?.contributions?.paidAmount),
+      byType,
+    },
+    welfare: {
+      totalCases: toNumber(summary?.welfare?.totalCases),
+      activeCases: toNumber(summary?.welfare?.activeCases),
+      closedCases: toNumber(summary?.welfare?.closedCases),
+      targetAmount: toNumber(summary?.welfare?.targetAmount),
+      collectedAmount: toNumber(summary?.welfare?.collectedAmount),
+    },
+  };
+};
+
 const ReportsPage = () => {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,77 +160,15 @@ const ReportsPage = () => {
     setIsLoading(true);
     try {
       const dateRange = getDateRange();
-      
-      let membersQuery = supabase.from('profiles').select('id, full_name, joined_at, status, is_student');
-      let contributionsQuery = supabase.from('contributions').select('id, member_id, amount, contribution_type, created_at, status');
-      let welfareQuery = supabase.from('welfare_cases').select('id, title, case_type, target_amount, collected_amount, status, created_at');
 
-      if (dateRange) {
-        membersQuery = membersQuery
-          .gte('joined_at', dateRange.start.toISOString())
-          .lte('joined_at', dateRange.end.toISOString());
-        contributionsQuery = contributionsQuery
-          .gte('created_at', dateRange.start.toISOString())
-          .lte('created_at', dateRange.end.toISOString());
-        welfareQuery = welfareQuery
-          .gte('created_at', dateRange.start.toISOString())
-          .lte('created_at', dateRange.end.toISOString());
-      }
+      const { data, error } = await supabase.rpc('get_reports_summary' as never, {
+        p_start: dateRange?.start.toISOString() ?? null,
+        p_end: dateRange?.end.toISOString() ?? null,
+      } as never);
 
-      const [membersRes, contributionsRes, welfareRes, allMembersRes] = await Promise.all([
-        membersQuery,
-        contributionsQuery,
-        welfareQuery,
-        supabase.from('profiles').select('id, full_name, status, is_student'), // Get all members for total count
-      ]);
+      if (error) throw error;
 
-      if (membersRes.error) throw membersRes.error;
-      if (contributionsRes.error) throw contributionsRes.error;
-      if (welfareRes.error) throw welfareRes.error;
-
-      const members = dateRange ? membersRes.data || [] : allMembersRes.data || [];
-      const allMembers = allMembersRes.data || [];
-      const contributions = contributionsRes.data || [];
-      const welfare = welfareRes.data || [];
-
-      // Calculate contribution types
-      const byType: Record<string, { count: number; amount: number }> = {};
-      contributions.forEach((c) => {
-        if (!byType[c.contribution_type]) {
-          byType[c.contribution_type] = { count: 0, amount: 0 };
-        }
-        byType[c.contribution_type].count++;
-        byType[c.contribution_type].amount += c.amount;
-      });
-
-      setReportData({
-        members: {
-          total: allMembers.length,
-          active: allMembers.filter((m) => m.status === 'active').length,
-          pending: allMembers.filter((m) => m.status === 'pending').length,
-          dormant: allMembers.filter((m) => m.status === 'dormant').length,
-          students: allMembers.filter((m) => m.is_student).length,
-          newThisMonth: members.length,
-        },
-        contributions: {
-          total: contributions.length,
-          paid: contributions.filter((c) => c.status === 'paid').length,
-          pending: contributions.filter((c) => c.status === 'pending').length,
-          missed: contributions.filter((c) => c.status === 'missed').length,
-          totalAmount: contributions.reduce((sum, c) => sum + c.amount, 0),
-          paidAmount: contributions
-            .filter((c) => c.status === 'paid')
-            .reduce((sum, c) => sum + c.amount, 0),
-          byType,
-        },
-        welfare: {
-          totalCases: welfare.length,
-          activeCases: welfare.filter((w) => w.status === 'active').length,
-          closedCases: welfare.filter((w) => w.status === 'closed').length,
-          targetAmount: welfare.reduce((sum, w) => sum + (w.target_amount || 0), 0),
-          collectedAmount: welfare.reduce((sum, w) => sum + (w.collected_amount || 0), 0),
-        },
-      });
+      setReportData(mapReportSummary(data as ReportSummaryRpc | null));
     } catch (error) {
       console.error('Error fetching report data:', error);
       toast({
@@ -165,47 +181,26 @@ const ReportsPage = () => {
     }
   };
 
-  const exportReport = (type: string) => {
+  const exportReport = async (type: string) => {
     if (!reportData) return;
 
-    let content = '';
     const date = format(new Date(), 'yyyy-MM-dd');
+    const dateRange = getDateRange();
+    const jobId = await enqueueBackgroundJob({
+      jobType: 'report_export',
+      payload: {
+        reportType: type,
+        format: 'txt',
+        period: reportPeriod,
+        start: dateRange?.start.toISOString() ?? null,
+        end: dateRange?.end.toISOString() ?? null,
+        requestedAt: new Date().toISOString(),
+      },
+      priority: 7,
+      dedupeKey: `report_export:${type}:${reportPeriod}:${date}`,
+    });
 
-    if (type === 'members') {
-      content = `Turuturu Stars CBO - Members Report (${date})\n\n`;
-      content += `Total Members: ${reportData.members.total}\n`;
-      content += `Active Members: ${reportData.members.active}\n`;
-      content += `Pending Approval: ${reportData.members.pending}\n`;
-      content += `Dormant Members: ${reportData.members.dormant}\n`;
-      content += `Student Members: ${reportData.members.students}\n`;
-      content += `New This Period: ${reportData.members.newThisMonth}\n`;
-    } else if (type === 'contributions') {
-      content = `Turuturu Stars CBO - Contributions Report (${date})\n\n`;
-      content += `Total Contributions: ${reportData.contributions.total}\n`;
-      content += `Verified Payments: ${reportData.contributions.paid}\n`;
-      content += `Pending Verification: ${reportData.contributions.pending}\n`;
-      content += `Missed Payments: ${reportData.contributions.missed}\n`;
-      content += `Total Amount: KSh ${reportData.contributions.totalAmount.toLocaleString()}\n`;
-      content += `Amount Collected: KSh ${reportData.contributions.paidAmount.toLocaleString()}\n\n`;
-      content += `By Type:\n`;
-      Object.entries(reportData.contributions.byType).forEach(([type, data]) => {
-        content += `  ${type}: ${data.count} contributions, KSh ${data.amount.toLocaleString()}\n`;
-      });
-    } else if (type === 'welfare') {
-      content = `Turuturu Stars CBO - Welfare Report (${date})\n\n`;
-      content += `Total Cases: ${reportData.welfare.totalCases}\n`;
-      content += `Active Cases: ${reportData.welfare.activeCases}\n`;
-      content += `Closed Cases: ${reportData.welfare.closedCases}\n`;
-      content += `Target Amount: KSh ${reportData.welfare.targetAmount.toLocaleString()}\n`;
-      content += `Collected Amount: KSh ${reportData.welfare.collectedAmount.toLocaleString()}\n`;
-    }
-
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = globalThis.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `turuturu-${type}-report-${date}.txt`;
-    a.click();
+    showSuccess(`${type} report queued. Job ${shortJobId(jobId)}`, 2500);
   };
 
   if (isLoading) {
@@ -308,10 +303,7 @@ const ReportsPage = () => {
                 <Users className="w-5 h-5" />
                 Members Report
               </CardTitle>
-              <AccessibleButton variant="outline" ariaLabel="Export members report as text file" onClick={() => {
-                exportReport('members');
-                showSuccess('Members report exported successfully', 2000);
-              }}>
+              <AccessibleButton variant="outline" ariaLabel="Queue members report export" onClick={() => void exportReport('members')}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </AccessibleButton>
@@ -420,10 +412,7 @@ const ReportsPage = () => {
                 <DollarSign className="w-5 h-5" />
                 Contributions Report
               </CardTitle>
-              <AccessibleButton variant="outline" ariaLabel="Export contributions report as text file" onClick={() => {
-                exportReport('contributions');
-                showSuccess('Contributions report exported successfully', 2000);
-              }}>
+              <AccessibleButton variant="outline" ariaLabel="Queue contributions report export" onClick={() => void exportReport('contributions')}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </AccessibleButton>
@@ -494,10 +483,7 @@ const ReportsPage = () => {
                 <HandHeart className="w-5 h-5" />
                 Welfare Report
               </CardTitle>
-              <AccessibleButton variant="outline" ariaLabel="Export welfare report as text file" onClick={() => {
-                exportReport('welfare');
-                showSuccess('Welfare report exported successfully', 2000);
-              }}>
+              <AccessibleButton variant="outline" ariaLabel="Queue welfare report export" onClick={() => void exportReport('welfare')}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </AccessibleButton>

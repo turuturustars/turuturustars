@@ -1,10 +1,7 @@
 export function generateRequestId(): string {
   try {
-    // modern browsers and node 18+ support crypto.randomUUID
-    // @ts-ignore
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      // @ts-ignore
-      return crypto.randomUUID();
+    if (typeof globalThis.crypto?.randomUUID === 'function') {
+      return globalThis.crypto.randomUUID();
     }
   } catch (e) {
     // ignore

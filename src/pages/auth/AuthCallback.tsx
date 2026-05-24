@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { buildSiteUrl } from '@/utils/siteUrl';
 import { ensureProfileForUser, isProfileComplete } from '@/features/auth/authApi';
+import { startNewSessionPolicy } from '@/utils/sessionPolicy';
 
 /**
  * AuthCallback - Handles OAuth and email verification callbacks
@@ -41,6 +42,8 @@ const AuthCallback = () => {
           navigate('/auth', { replace: true });
           return;
         }
+
+        startNewSessionPolicy(session.user.id);
 
         // Ensure profile exists and then route based on completion
         const profile = await ensureProfileForUser(session.user);

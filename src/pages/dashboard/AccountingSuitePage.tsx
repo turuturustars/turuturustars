@@ -60,6 +60,7 @@ import {
   recordExpenditure,
 } from '@/lib/mpesaContributionsApi';
 import { cn } from '@/lib/utils';
+import { enqueueBackgroundJob, shortJobId } from '@/lib/backgroundJobs';
 
 type PeriodFilter = 'month' | 'quarter' | 'year' | 'all';
 
@@ -117,6 +118,36 @@ type WalletRow = {
   id: string;
   balance: number;
   status: string;
+};
+
+type AccountingSummary = {
+  contributionIncome?: unknown;
+  directPaymentIncome?: unknown;
+  kittyIncome?: unknown;
+  income?: unknown;
+  operatingExpenses?: unknown;
+  refundExpense?: unknown;
+  kittyOutflows?: unknown;
+  totalExpenses?: unknown;
+  surplus?: unknown;
+  cashAndBank?: unknown;
+  receivables?: unknown;
+  mpesaClearing?: unknown;
+  memberWalletLiability?: unknown;
+  payables?: unknown;
+  refundPayables?: unknown;
+  totalAssets?: unknown;
+  totalLiabilities?: unknown;
+  fundBalance?: unknown;
+  paidContributionCount?: unknown;
+  completedPaymentCount?: unknown;
+  awaitingPaymentCount?: unknown;
+  pendingExpenditureCount?: unknown;
+  totalExpenditureCount?: unknown;
+  unclassifiedExpenseCount?: unknown;
+  missingReferenceCount?: unknown;
+  expensesByCategory?: Array<{ name?: unknown; value?: unknown }>;
+  monthlyTrend?: Array<{ key?: unknown; month?: unknown; income?: unknown; expenses?: unknown }>;
 };
 
 type SupabaseErrorLike = { message?: string } | null;
@@ -207,6 +238,7 @@ const fundOptions = [
 ];
 
 const pieColors = ['#16a34a', '#2563eb', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#64748b'];
+const RECENT_ACCOUNTING_LIMIT = 100;
 
 function toNumber(value: unknown): number {
   const parsed = Number(value);
@@ -287,6 +319,7 @@ const AccountingSuitePage = () => {
   const [kittyDisbursements, setKittyDisbursements] = useState<KittyDisbursementRow[]>([]);
   const [wallets, setWallets] = useState<WalletRow[]>([]);
   const [accounts, setAccounts] = useState<AccountingAccount[]>(defaultAccounts);
+  const [accountingSummary, setAccountingSummary] = useState<AccountingSummary | null>(null);
   const [expenseForm, setExpenseForm] = useState<ExpenseFormState>(() => defaultExpenseForm());
 
   const loadAccountingData = useCallback(async () => {
@@ -302,42 +335,44 @@ const AccountingSuitePage = () => {
         kittyDisbursementsRes,
         walletsRes,
         accountsRes,
+        summaryRes,
       ] = await Promise.all([
         supabase
           .from('contributions')
           .select('id, amount, contribution_type, status, created_at, paid_at, due_date, reference_number')
           .order('created_at', { ascending: false })
-          .limit(1000),
+          .limit(RECENT_ACCOUNTING_LIMIT),
         db
           .from<PaymentRow>('payments')
           .select('id, amount, method, status, created_at, verified_at, mpesa_receipt')
           .order('created_at', { ascending: false })
-          .limit(1000),
-        fetchExpenditures(1000),
+          .limit(RECENT_ACCOUNTING_LIMIT),
+        fetchExpenditures(RECENT_ACCOUNTING_LIMIT),
         db
           .from<RefundRow>('refund_requests')
           .select('id, contribution_type, requested_amount, payout_amount, status, created_at, resolved_at')
           .order('created_at', { ascending: false })
-          .limit(500),
+          .limit(RECENT_ACCOUNTING_LIMIT),
         supabase
           .from('kitties')
           .select('id, title, category, balance, total_contributed, total_disbursed, status, created_at')
           .order('created_at', { ascending: false })
-          .limit(500),
+          .limit(RECENT_ACCOUNTING_LIMIT),
         db
           .from<KittyDisbursementRow>('kitty_disbursements')
           .select('id, amount, purpose, recipient, created_at')
           .order('created_at', { ascending: false })
-          .limit(500),
+          .limit(RECENT_ACCOUNTING_LIMIT),
         db
           .from<WalletRow>('wallets')
           .select('id, balance, status')
-          .limit(1000),
+          .limit(RECENT_ACCOUNTING_LIMIT),
         db
           .from<AccountingAccount>('accounting_accounts')
           .select('id, code, name, account_type, system_key, is_active')
           .eq('is_active', true)
           .order('code', { ascending: true }),
+        supabase.rpc('get_accounting_suite_summary' as never, { p_period: period } as never),
       ]);
 
       if (contributionsRes.error) throw contributionsRes.error;
@@ -346,6 +381,9 @@ const AccountingSuitePage = () => {
       if (kittiesRes.error) throw kittiesRes.error;
       if (kittyDisbursementsRes.error) throw kittyDisbursementsRes.error;
       if (walletsRes.error) throw walletsRes.error;
+      if (summaryRes.error) {
+        console.error('Accounting summary RPC failed:', summaryRes.error);
+      }
 
       setContributions((contributionsRes.data || []).map((row) => ({ ...row, amount: toNumber(row.amount) })));
       setPayments((paymentsRes.data || []).map((row) => ({ ...row, amount: toNumber(row.amount) })));
@@ -367,6 +405,7 @@ const AccountingSuitePage = () => {
       if (!accountsRes.error && accountsRes.data?.length) {
         setAccounts(accountsRes.data as AccountingAccount[]);
       }
+      setAccountingSummary(summaryRes.error ? null : (summaryRes.data as AccountingSummary | null));
     } catch (error) {
       const message = getErrorMessage(error, 'Failed to load accounting data');
       toast({
@@ -377,7 +416,7 @@ const AccountingSuitePage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [period, toast]);
 
   useEffect(() => {
     void loadAccountingData();
@@ -395,30 +434,52 @@ const AccountingSuitePage = () => {
     const approvedRefunds = refunds.filter((row) => row.status === 'approved');
     const periodKittyDisbursements = kittyDisbursements.filter((row) => inPeriod(row.created_at, period));
 
-    const contributionIncome = paidContributions.reduce((sum, row) => sum + row.amount, 0);
-    const directPaymentIncome = completedPayments.reduce((sum, row) => sum + row.amount, 0);
-    const kittyIncome = kitties.reduce((sum, row) => sum + row.total_contributed, 0);
-    const income = contributionIncome + directPaymentIncome + kittyIncome;
-    const operatingExpenses = approvedExpenditures.reduce((sum, row) => sum + row.amount, 0);
-    const refundExpense = paidRefunds.reduce((sum, row) => sum + row.payout_amount, 0);
-    const kittyOutflows = periodKittyDisbursements.reduce((sum, row) => sum + row.amount, 0);
-    const totalExpenses = operatingExpenses + refundExpense + kittyOutflows;
-    const surplus = income - totalExpenses;
-
-    const receivables = pendingContributions.reduce((sum, row) => sum + row.amount, 0);
-    const mpesaClearing = awaitingPayments.reduce((sum, row) => sum + row.amount, 0);
-    const memberWalletLiability = wallets
-      .filter((row) => row.status !== 'closed')
-      .reduce((sum, row) => sum + row.balance, 0);
-    const payables = pendingExpenditures.reduce((sum, row) => sum + row.amount, 0);
-    const refundPayables = approvedRefunds.reduce((sum, row) => sum + row.payout_amount, 0);
-    const cashAndBank = income - totalExpenses;
-    const totalAssets = cashAndBank + receivables + mpesaClearing;
-    const totalLiabilities = memberWalletLiability + payables + refundPayables;
-    const fundBalance = totalAssets - totalLiabilities;
-
     const unclassifiedExpenses = expenditures.filter((row) => !row.account_code || row.category.toLowerCase().includes('other'));
     const missingReferences = expenditures.filter((row) => !row.reference_number && row.status !== 'rejected');
+    const summaryNumber = (key: keyof AccountingSummary, fallback: number) =>
+      accountingSummary ? toNumber(accountingSummary[key]) : fallback;
+
+    const localContributionIncome = paidContributions.reduce((sum, row) => sum + row.amount, 0);
+    const localDirectPaymentIncome = completedPayments.reduce((sum, row) => sum + row.amount, 0);
+    const localKittyIncome = kitties.reduce((sum, row) => sum + row.total_contributed, 0);
+    const localOperatingExpenses = approvedExpenditures.reduce((sum, row) => sum + row.amount, 0);
+    const localRefundExpense = paidRefunds.reduce((sum, row) => sum + row.payout_amount, 0);
+    const localKittyOutflows = periodKittyDisbursements.reduce((sum, row) => sum + row.amount, 0);
+    const localIncome = localContributionIncome + localDirectPaymentIncome + localKittyIncome;
+    const localTotalExpenses = localOperatingExpenses + localRefundExpense + localKittyOutflows;
+    const localReceivables = pendingContributions.reduce((sum, row) => sum + row.amount, 0);
+    const localMpesaClearing = awaitingPayments.reduce((sum, row) => sum + row.amount, 0);
+    const localMemberWalletLiability = wallets
+      .filter((row) => row.status !== 'closed')
+      .reduce((sum, row) => sum + row.balance, 0);
+    const localPayables = pendingExpenditures.reduce((sum, row) => sum + row.amount, 0);
+    const localRefundPayables = approvedRefunds.reduce((sum, row) => sum + row.payout_amount, 0);
+
+    const contributionIncome = summaryNumber('contributionIncome', localContributionIncome);
+    const directPaymentIncome = summaryNumber('directPaymentIncome', localDirectPaymentIncome);
+    const kittyIncome = summaryNumber('kittyIncome', localKittyIncome);
+    const income = summaryNumber('income', localIncome);
+    const operatingExpenses = summaryNumber('operatingExpenses', localOperatingExpenses);
+    const refundExpense = summaryNumber('refundExpense', localRefundExpense);
+    const kittyOutflows = summaryNumber('kittyOutflows', localKittyOutflows);
+    const totalExpenses = summaryNumber('totalExpenses', localTotalExpenses);
+    const surplus = summaryNumber('surplus', income - totalExpenses);
+    const receivables = summaryNumber('receivables', localReceivables);
+    const mpesaClearing = summaryNumber('mpesaClearing', localMpesaClearing);
+    const memberWalletLiability = summaryNumber('memberWalletLiability', localMemberWalletLiability);
+    const payables = summaryNumber('payables', localPayables);
+    const refundPayables = summaryNumber('refundPayables', localRefundPayables);
+    const cashAndBank = summaryNumber('cashAndBank', income - totalExpenses);
+    const totalAssets = summaryNumber('totalAssets', cashAndBank + receivables + mpesaClearing);
+    const totalLiabilities = summaryNumber('totalLiabilities', memberWalletLiability + payables + refundPayables);
+    const fundBalance = summaryNumber('fundBalance', totalAssets - totalLiabilities);
+    const paidContributionCount = summaryNumber('paidContributionCount', paidContributions.length);
+    const completedPaymentCount = summaryNumber('completedPaymentCount', completedPayments.length);
+    const awaitingPaymentCount = summaryNumber('awaitingPaymentCount', awaitingPayments.length);
+    const pendingExpenditureCount = summaryNumber('pendingExpenditureCount', pendingExpenditures.length);
+    const totalExpenditureCount = summaryNumber('totalExpenditureCount', expenditures.length);
+    const unclassifiedExpenseCount = summaryNumber('unclassifiedExpenseCount', unclassifiedExpenses.length);
+    const missingReferenceCount = summaryNumber('missingReferenceCount', missingReferences.length);
 
     const incomeByType = [
       { name: 'Paid Contributions', value: contributionIncome },
@@ -426,11 +487,18 @@ const AccountingSuitePage = () => {
       { name: 'Kitty Contributions', value: kittyIncome },
     ].filter((item) => item.value > 0);
 
-    const expensesByCategory = groupByLabel(
+    const localExpensesByCategory = groupByLabel(
       approvedExpenditures,
       (row) => row.category,
       (row) => row.amount,
     );
+    const summaryExpensesByCategory = (accountingSummary?.expensesByCategory || [])
+      .map((row) => ({
+        name: String(row.name || 'Unclassified'),
+        value: toNumber(row.value),
+      }))
+      .filter((row) => row.value > 0);
+    const expensesByCategory = summaryExpensesByCategory.length > 0 ? summaryExpensesByCategory : localExpensesByCategory;
 
     const lastSixMonths = Array.from({ length: 6 }, (_, index) => {
       const date = startOfMonth(subMonths(new Date(), 5 - index));
@@ -455,6 +523,15 @@ const AccountingSuitePage = () => {
     approvedExpenditures.forEach((row) => addToMonth(getRowDate(row), 'expenses', row.amount));
     paidRefunds.forEach((row) => addToMonth(getRowDate(row), 'expenses', row.payout_amount));
     periodKittyDisbursements.forEach((row) => addToMonth(row.created_at, 'expenses', row.amount));
+    const summaryMonthlyTrend = (accountingSummary?.monthlyTrend || [])
+      .map((row) => ({
+        key: String(row.key || ''),
+        month: String(row.month || ''),
+        income: toNumber(row.income),
+        expenses: toNumber(row.expenses),
+      }))
+      .filter((row) => row.key && row.month);
+    const monthlyTrend = summaryMonthlyTrend.length > 0 ? summaryMonthlyTrend : lastSixMonths;
 
     const baseTrialBalanceRows = [
       { code: '1000', account: 'Cash and Bank', debit: Math.max(cashAndBank, 0), credit: Math.max(-cashAndBank, 0) },
@@ -491,6 +568,13 @@ const AccountingSuitePage = () => {
       paidRefunds,
       approvedRefunds,
       periodKittyDisbursements,
+      paidContributionCount,
+      completedPaymentCount,
+      awaitingPaymentCount,
+      pendingExpenditureCount,
+      totalExpenditureCount,
+      unclassifiedExpenseCount,
+      missingReferenceCount,
       income,
       contributionIncome,
       directPaymentIncome,
@@ -513,14 +597,14 @@ const AccountingSuitePage = () => {
       missingReferences,
       incomeByType,
       expensesByCategory,
-      monthlyTrend: lastSixMonths,
+      monthlyTrend,
       trialBalanceRows,
       trialBalanceDebitTotal,
       trialBalanceCreditTotal,
       trialBalanceDifference: trialBalanceDebitTotal - trialBalanceCreditTotal,
       balanceDifference: totalAssets - (totalLiabilities + fundBalance),
     };
-  }, [contributions, expenditures, kittyDisbursements, kitties, payments, period, refunds, wallets]);
+  }, [accountingSummary, contributions, expenditures, kittyDisbursements, kitties, payments, period, refunds, wallets]);
 
   const expenseAccounts = accounts.filter((account) => account.account_type === 'expense');
 
@@ -585,31 +669,30 @@ const AccountingSuitePage = () => {
     }
   };
 
-  const exportSnapshot = () => {
-    const rows = [
-      ['Report', 'Line item', 'Amount'],
-      ['Balance Sheet', 'Cash and Bank', analytics.cashAndBank],
-      ['Balance Sheet', 'Contribution Receivables', analytics.receivables],
-      ['Balance Sheet', 'M-Pesa Clearing', analytics.mpesaClearing],
-      ['Balance Sheet', 'Total Assets', analytics.totalAssets],
-      ['Balance Sheet', 'Member Wallet Liability', analytics.memberWalletLiability],
-      ['Balance Sheet', 'Accounts Payable', analytics.payables],
-      ['Balance Sheet', 'Refunds Payable', analytics.refundPayables],
-      ['Balance Sheet', 'Total Liabilities', analytics.totalLiabilities],
-      ['Balance Sheet', 'Fund Balance', analytics.fundBalance],
-      ['Income & Expenditure', 'Total Income', analytics.income],
-      ['Income & Expenditure', 'Total Expenditure', analytics.totalExpenses],
-      ['Income & Expenditure', 'Surplus / Deficit', analytics.surplus],
-    ];
+  const exportSnapshot = async () => {
+    try {
+      const jobId = await enqueueBackgroundJob({
+        jobType: 'accounting_export',
+        payload: {
+          period,
+          format: 'csv',
+          requestedAt: new Date().toISOString(),
+        },
+        priority: 8,
+        dedupeKey: `accounting_export:${period}:${format(new Date(), 'yyyy-MM-dd')}`,
+      });
 
-    const csv = rows.map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = globalThis.URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `accounting-suite-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    anchor.click();
-    globalThis.URL.revokeObjectURL(url);
+      toast({
+        title: 'Accounting export queued',
+        description: `The finance snapshot is processing as job ${shortJobId(jobId)}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Export failed',
+        description: getErrorMessage(error, 'Could not queue accounting export'),
+        variant: 'destructive',
+      });
+    }
   };
 
   if (isLoading) {
@@ -651,7 +734,7 @@ const AccountingSuitePage = () => {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button variant="outline" onClick={exportSnapshot}>
+          <Button variant="outline" onClick={() => void exportSnapshot()}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
@@ -669,7 +752,7 @@ const AccountingSuitePage = () => {
         <MetricCard
           title="Income"
           value={formatKES(analytics.income)}
-          caption={`${analytics.paidContributions.length + analytics.completedPayments.length} paid income records`}
+          caption={`${analytics.paidContributionCount + analytics.completedPaymentCount} paid income records`}
           icon={TrendingUp}
           tone="blue"
         />
@@ -683,7 +766,7 @@ const AccountingSuitePage = () => {
         <MetricCard
           title="Surplus / Deficit"
           value={formatKES(analytics.surplus)}
-          caption={`${analytics.unclassifiedExpenses.length} expenses need classification`}
+          caption={`${analytics.unclassifiedExpenseCount} expenses need classification`}
           icon={Scale}
           tone={analytics.surplus >= 0 ? 'emerald' : 'red'}
         />
@@ -761,19 +844,19 @@ const AccountingSuitePage = () => {
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <InsightCard
               title="Approval Queue"
-              value={`${analytics.pendingExpenditures.length + analytics.awaitingPayments.length}`}
+              value={`${analytics.pendingExpenditureCount + analytics.awaitingPaymentCount}`}
               caption={`${formatKES(analytics.payables + analytics.mpesaClearing)} waiting for finance action`}
               icon={BookOpenCheck}
             />
             <InsightCard
               title="Classification Quality"
-              value={`${Math.max(0, expenditures.length - analytics.unclassifiedExpenses.length)}/${expenditures.length}`}
+              value={`${Math.max(0, analytics.totalExpenditureCount - analytics.unclassifiedExpenseCount)}/${analytics.totalExpenditureCount}`}
               caption="Expenses with clear account/category mapping"
               icon={Calculator}
             />
             <InsightCard
               title="Reference Control"
-              value={`${analytics.missingReferences.length}`}
+              value={`${analytics.missingReferenceCount}`}
               caption="Expense records without payment reference"
               icon={ReceiptText}
             />
