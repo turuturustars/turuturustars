@@ -495,6 +495,7 @@ const DEFAULT_AI_KNOWLEDGE_FETCH_LIMIT = 80;
 const DEFAULT_AI_KNOWLEDGE_CONTEXT_LIMIT = 12;
 const DEFAULT_AI_DIRECT_KNOWLEDGE_SCORE = 6;
 const DEFAULT_AI_CONVERSATION_TURNS = 8;
+const DEFAULT_HUMAN_SUPPORT_PHONE = "0700471113";
 const PROFILE_SELECT =
   "id, full_name, phone, email, membership_number, status, registration_fee_paid, id_number, location, occupation, employment_status, education_level, interests, additional_notes, registration_progress, registration_completed_at";
 const REGISTRATION_REQUEST_SELECT =
@@ -1077,6 +1078,52 @@ function siteUrl(path: string): string {
   return `${configuredSiteUrl()}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function humanSupportPhone(): string {
+  return Deno.env.get("WHATSAPP_HUMAN_SUPPORT_PHONE")?.trim() || DEFAULT_HUMAN_SUPPORT_PHONE;
+}
+
+function humanSupportWhatsappPhone(): string {
+  const raw = humanSupportPhone();
+  const normalized = normalizePhoneForWhatsapp(raw);
+  if (normalized) return normalized;
+  const digits = raw.replace(/\D/g, "");
+  return digits || DEFAULT_HUMAN_SUPPORT_PHONE.replace(/\D/g, "");
+}
+
+function humanSupportWhatsappUrl(message?: string): string {
+  const phone = humanSupportWhatsappPhone();
+  const cleanMessage = clampPlainWhatsAppText(message || "", 900).trim();
+  if (!cleanMessage) return `https://wa.me/${phone}`;
+  return `https://wa.me/${phone}?text=${encodeURIComponent(cleanMessage)}`;
+}
+
+function humanSupportAccessLink(
+  profile: Profile,
+  inboundText: string,
+  contextSummary: string | null,
+  language: "auto" | "en" | "sw",
+): WhatsAppAccessLink {
+  const name = memberGreetingName(profile);
+  const message = language === "sw"
+    ? [
+      `Habari admin, mimi ni ${name}. Nahitaji msaada kwenye Turuturu Stars WhatsApp.`,
+      contextSummary ? `Nilikwama hapa: ${contextSummary}` : null,
+      inboundText ? `Ujumbe wangu: ${clampPlainWhatsAppText(inboundText, 240)}` : null,
+    ].filter(Boolean).join("\n")
+    : [
+      `Hi admin, I am ${name}. I need help with Turuturu Stars WhatsApp.`,
+      contextSummary ? `I was stuck here: ${contextSummary}` : null,
+      inboundText ? `My message: ${clampPlainWhatsAppText(inboundText, 240)}` : null,
+    ].filter(Boolean).join("\n");
+
+  return {
+    label: language === "sw" ? "human support" : "human support",
+    url: humanSupportWhatsappUrl(message),
+    intent: "query_support",
+    displayText: language === "sw" ? "Message admin" : "Message admin",
+  };
+}
+
 function accessLinkForIntent(intent: IntentName, roles: string[]): AccessLinkConfig | null {
   const isOfficialMember = isOfficial(roles);
 
@@ -1281,6 +1328,42 @@ function withRequestedAccessLink(
   };
 }
 
+function withHumanSupportAccessLink(
+  execution: ExecutionResult,
+  profile: Profile,
+  inboundText: string,
+  contextSummary: string | null,
+  language: "auto" | "en" | "sw",
+): ExecutionResult {
+  if (execution.actionStatus !== "completed" && execution.actionStatus !== "needs_clarification") return execution;
+  if (whatsappInteractiveForReply(execution.reply)) return execution;
+
+  const accessLink = humanSupportAccessLink(profile, inboundText, contextSummary, language);
+  const prompt = language === "sw"
+    ? [
+      `Nimemjulisha human support (${humanSupportPhone()}) na nimeweka context ya mahali chat ilikwama.`,
+      "Bonyeza button hapa chini ku-chat na admin moja kwa moja. Unaweza pia kuendelea hapa au kuandika MENU.",
+    ].join("\n")
+    : [
+      `I have notified human support (${humanSupportPhone()}) and captured where this chat got stuck.`,
+      "Tap the button below to message admin directly. You can also continue here or type MENU.",
+    ].join("\n");
+
+  return {
+    ...execution,
+    reply: `${execution.reply}\n\n${prompt}`,
+    accessLink,
+    result: {
+      ...execution.result,
+      human_support: {
+        phone: humanSupportPhone(),
+        context: contextSummary,
+        access_link: accessLink,
+      },
+    },
+  };
+}
+
 function normalizePhoneForStorage(phone: string): string {
   try {
     return normalizeKenyanPhone(phone);
@@ -1429,8 +1512,14 @@ function normalizeInteractiveReplyId(id: string): string | null {
   if (menuMatch) return menuMatch[1].toLowerCase() === "back" ? "0" : menuMatch[1].toLowerCase();
   const ratingMatch = trimmed.match(/^rating:([1-5]):([a-z_ -]+)$/i);
   if (ratingMatch) return `rating:${ratingMatch[1]}:${ratingMatch[2].trim().toLowerCase().replace(/[\s-]+/g, "_")}`;
-  const quickMatch = trimmed.match(/^quick:(menu|wallet|receipts|support)$/i);
-  if (quickMatch) return quickMatch[1].toLowerCase();
+  const quickMatch = trimmed.match(/^quick:(menu|wallet|contribution|contributions|welfare|kitty|kitties|communication|profile|more_services|receipts|support|rate)$/i);
+  if (quickMatch) {
+    const value = quickMatch[1].toLowerCase();
+    if (value === "contribution") return "contributions";
+    if (value === "kitties") return "kitty";
+    if (value === "more_services") return "more services";
+    return value;
+  }
   const keywordMatch = trimmed.match(/^keyword:(jobs|voting|refunds|discipline|membership)$/i);
   if (keywordMatch) return keywordMatch[1].toLowerCase();
   if (/^\d{1,2}$/.test(trimmed)) return trimmed;
@@ -3515,7 +3604,7 @@ function fallbackInterpretMessage(text: string): ParsedIntent {
     return { ...base, intent: "query_membership", confidence: 0.8 };
   }
 
-  if (/(support|contact|helpdesk|customer care|admin contact|official contact|msaada|mawasiliano|nisaidie)/i.test(lower)) {
+  if (/(support|contact|helpdesk|customer care|admin contact|official contact|human|person|agent|talk to someone|talk to admin|stuck|kwama|nimekwama|blocked|cannot continue|can'?t continue|msaada|mawasiliano|nisaidie|binadamu)/i.test(lower)) {
     return { ...base, intent: "query_support", confidence: 0.74 };
   }
 
@@ -9401,14 +9490,14 @@ function supportReply(language: "auto" | "en" | "sw", profile: Profile): string 
     return [
       `Niko hapa kukusaidia, ${memberGreetingName(profile)}.`,
       "Unaweza kuuliza kuhusu contributions, wallet, membership, kitties, welfare, meetings, voting, jobs, refunds, notifications, au profile.",
-      "Kwa jambo linalohitaji official, tuma maelezo mafupi hapa na admin/official anaweza kufuatilia kupitia dashboard.",
+      `Kwa jambo linalohitaji mtu, human support ni ${humanSupportPhone()}.`,
     ].join("\n");
   }
 
   return [
     `I am here to help, ${memberGreetingName(profile)}.`,
     "You can ask about contributions, wallet, membership, kitties, welfare, meetings, voting, jobs, refunds, notifications, or your profile.",
-    "For something that needs an official, send the short details here so an admin/official can follow up from the dashboard.",
+    `For anything that needs a person, human support is ${humanSupportPhone()}.`,
   ].join("\n");
 }
 
@@ -10043,6 +10132,7 @@ async function notifyOfficialsOfWhatsappEscalation(
   inboundText: string,
   reason: string,
   parsed?: ParsedIntent | null,
+  contextSummary?: string | null,
 ): Promise<void> {
   const { data, error } = await supabase
     .from("user_roles")
@@ -10066,7 +10156,10 @@ async function notifyOfficialsOfWhatsappEscalation(
   const message = [
     reason,
     `Member: ${profile.full_name} (${profile.membership_number || profile.phone || profile.id})`,
+    `Phone: ${displayPhone(profile.phone || "")}`,
     reference ? `Reference: ${reference}` : null,
+    contextSummary ? `Where stuck: ${contextSummary}` : null,
+    parsed ? `Intent: ${parsed.intent} (${parsed.confidence})` : null,
     `Message: ${clampPlainWhatsAppText(inboundText, 500)}`,
   ].filter(Boolean).join("\n");
   const now = new Date().toISOString();
@@ -10084,6 +10177,102 @@ async function notifyOfficialsOfWhatsappEscalation(
   if (insertError) {
     console.warn("Failed to create WhatsApp escalation notifications", insertError);
   }
+}
+
+function supportContextSummary(
+  session: WhatsappSession | null | undefined,
+  parsed: ParsedIntent | null | undefined,
+  language: "auto" | "en" | "sw",
+): string {
+  const state = session?.state || null;
+  const parts = [
+    session ? conversationContextLabel(state, language) : null,
+    state?.menu?.section ? `menu=${state.menu.section}` : null,
+    state?.menu?.action ? `action=${state.menu.action}` : null,
+    state?.pending_intent?.intent ? `pending=${state.pending_intent.intent}` : null,
+    state?.asked_for?.length ? `asked_for=${state.asked_for.join(",")}` : null,
+    session?.last_intent ? `last_intent=${session.last_intent}` : null,
+    parsed ? `intent=${parsed.intent}; confidence=${parsed.confidence}` : null,
+  ].filter(Boolean);
+  return parts.join(" | ") || "No saved session context";
+}
+
+function memberWhatsappChatUrl(phone: string): string | null {
+  const normalized = normalizePhoneForWhatsapp(phone);
+  const digits = normalized || phone.replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : null;
+}
+
+async function notifyHumanSupportByWhatsApp(
+  message: InboundMessage,
+  profile: Profile,
+  inboundText: string,
+  reason: string,
+  contextSummary: string,
+  parsed?: ParsedIntent | null,
+): Promise<void> {
+  const supportPhone = humanSupportWhatsappPhone();
+  const memberChatUrl = memberWhatsappChatUrl(message.from || profile.phone);
+  const body = [
+    "Turuturu Stars WhatsApp support escalation",
+    reason,
+    `Member: ${profile.full_name} (${profile.membership_number || profile.id})`,
+    `Phone: ${displayPhone(profile.phone || message.from)}`,
+    parsed ? `Intent: ${parsed.intent} (${parsed.confidence})` : null,
+    `Where stuck: ${contextSummary}`,
+    `Message: ${clampPlainWhatsAppText(inboundText, 700)}`,
+  ].filter(Boolean).join("\n");
+
+  const accessLink = memberChatUrl
+    ? {
+      label: "member chat",
+      url: memberChatUrl,
+      intent: "query_support" as IntentName,
+      displayText: "Message member",
+    }
+    : undefined;
+
+  const result = await sendWhatsAppText(supportPhone, body, message.phoneNumberId, accessLink);
+  if (result.status !== "sent") {
+    console.warn("Human support WhatsApp notification was not sent", {
+      status: result.status,
+      supportPhone,
+      providerResponse: result.providerResponse,
+    });
+  }
+}
+
+async function escalateWhatsappHumanSupport(
+  supabase: SupabaseClient,
+  message: InboundMessage,
+  profile: Profile,
+  session: WhatsappSession | null | undefined,
+  inboundText: string,
+  reason: string,
+  parsed?: ParsedIntent | null,
+  language: "auto" | "en" | "sw" = "auto",
+): Promise<string> {
+  const contextSummary = supportContextSummary(session, parsed, language === "auto" ? detectLanguage(inboundText) : language);
+  const results = await Promise.allSettled([
+    notifyOfficialsOfWhatsappEscalation(supabase, profile, inboundText, reason, parsed, contextSummary),
+    notifyHumanSupportByWhatsApp(message, profile, inboundText, reason, contextSummary, parsed),
+  ]);
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      console.warn("WhatsApp human support escalation step failed", result.reason);
+    }
+  }
+
+  return contextSummary;
+}
+
+function shouldEscalateToHumanSupport(parsed: ParsedIntent, execution: ExecutionResult): boolean {
+  if (parsed.intent === "query_support") {
+    const menu = cleanString(execution.result?.menu);
+    return menu !== "more_services";
+  }
+  return parsed.intent === "unknown" && execution.actionStatus === "needs_clarification";
 }
 
 async function logAdminAction(
@@ -12237,6 +12426,64 @@ function ratingFallbackBody(language: "auto" | "en" | "sw"): string {
     : `Rate this chat: ${labels}.`;
 }
 
+function nextBestActionButton(intent: IntentName, language: "auto" | "en" | "sw"): WhatsAppInteractiveButton {
+  const sw = language === "sw";
+  if (intent === "query_wallet" || intent === "top_up_wallet") return { id: "quick:wallet", title: "Wallet" };
+  if (intent === "query_contributions" || intent === "record_contribution" || intent === "verify_contribution" || intent === "query_receipts" || intent === "query_refunds") {
+    return { id: "quick:contributions", title: sw ? "Michango" : "Contributions" };
+  }
+  if (intent === "query_welfare" || intent === "contribute_welfare" || intent === "create_welfare_case") return { id: "quick:welfare", title: "Welfare" };
+  if (intent === "query_kitties" || intent === "contribute_kitty") return { id: "quick:kitty", title: "Kitty" };
+  if (intent === "query_announcements" || intent === "query_meetings" || intent === "query_notifications" || intent === "create_announcement") {
+    return { id: "quick:communication", title: sw ? "Mawasiliano" : "Communication" };
+  }
+  if (intent === "query_profile" || intent === "update_profile" || intent === "query_membership") return { id: "quick:profile", title: "Profile" };
+  if (intent === "query_jobs" || intent === "query_voting" || intent === "query_discipline") return { id: "quick:more_services", title: "More" };
+  return { id: "quick:menu", title: "Menu" };
+}
+
+function nextStepButtonsForLink(accessLink: WhatsAppAccessLink, language: "auto" | "en" | "sw"): WhatsAppInteractiveButton[] {
+  const candidates = accessLink.intent === "query_support"
+    ? [
+      { id: "quick:menu", title: "Menu" },
+      { id: "quick:wallet", title: "Wallet" },
+      { id: "quick:rate", title: "Rate chat" },
+    ]
+    : [
+      nextBestActionButton(accessLink.intent, language),
+      { id: "quick:support", title: "Human support" },
+      { id: "quick:rate", title: "Rate chat" },
+    ];
+
+  const seen = new Set<string>();
+  return candidates.filter((button) => {
+    if (seen.has(button.id)) return false;
+    seen.add(button.id);
+    return true;
+  }).slice(0, 3);
+}
+
+function nextStepsInteractive(to: string, language: "auto" | "en" | "sw", accessLink: WhatsAppAccessLink): WhatsAppPreparedReply {
+  const sw = language === "sw";
+  const buttons = nextStepButtonsForLink(accessLink, language);
+  const interactive: WhatsAppInteractiveContent = {
+    kind: "button",
+    body: sw
+      ? "Unahitaji hatua nyingine? Chagua hapa, au andika request yako kawaida."
+      : "Need another step? Choose one here, or type your request normally.",
+    footer: sw ? "MENU hufungua list yote." : "MENU opens the full list.",
+    buttons,
+  };
+  const fallbackChoices = buttons.map((button) => button.title).join(", ");
+  return {
+    messageType: "interactive",
+    fallbackBody: sw
+      ? `Hatua nyingine: ${fallbackChoices}. Unaweza pia kuandika MENU.`
+      : `Next steps: ${fallbackChoices}. You can also type MENU.`,
+    payload: whatsappPayloadForInteractive(to, interactive),
+  };
+}
+
 function whatsappInteractiveForReply(body: string): WhatsAppInteractiveContent | null {
   const quickAction = quickActionInteractive(body);
   if (quickAction) return quickAction;
@@ -12517,10 +12764,11 @@ async function sendWhatsAppText(
   };
 }
 
-async function sendWhatsAppRatingPrompt(
+async function sendPreparedWhatsAppPrompt(
   to: string,
   phoneNumberId: string | null,
-  language: "auto" | "en" | "sw",
+  prepared: WhatsAppPreparedReply,
+  label: string,
 ): Promise<{
   status: string;
   providerResponse: unknown;
@@ -12529,7 +12777,6 @@ async function sendWhatsAppRatingPrompt(
   body: string;
 }> {
   const provider = resolveWhatsAppProvider(phoneNumberId);
-  const prepared = ratingInteractive(to, language);
 
   if (!provider) {
     return {
@@ -12544,8 +12791,8 @@ async function sendWhatsAppRatingPrompt(
   let response = await postWhatsAppPayload(provider, prepared.payload);
   let delivered = prepared;
 
-  if (!response.ok) {
-    console.warn("WhatsApp rating interactive send failed; falling back to text", response.status, response.payload);
+  if (!response.ok && prepared.messageType === "interactive") {
+    console.warn(`${label} interactive send failed; falling back to text`, response.status, response.payload);
     delivered = {
       messageType: "text",
       fallbackBody: prepared.fallbackBody,
@@ -12555,7 +12802,7 @@ async function sendWhatsAppRatingPrompt(
   }
 
   if (!response.ok) {
-    console.error("WhatsApp rating prompt send failed", response.status, response.payload);
+    console.error(`${label} send failed`, response.status, response.payload);
     return {
       status: "send_failed",
       providerResponse: response.payload,
@@ -12574,6 +12821,35 @@ async function sendWhatsAppRatingPrompt(
     messageType: delivered.messageType,
     body: delivered.fallbackBody,
   };
+}
+
+async function sendWhatsAppRatingPrompt(
+  to: string,
+  phoneNumberId: string | null,
+  language: "auto" | "en" | "sw",
+): Promise<{
+  status: string;
+  providerResponse: unknown;
+  providerMessageId: string | null;
+  messageType: WhatsAppOutboundMessageType;
+  body: string;
+}> {
+  return sendPreparedWhatsAppPrompt(to, phoneNumberId, ratingInteractive(to, language), "WhatsApp rating prompt");
+}
+
+async function sendWhatsAppNextStepsPrompt(
+  to: string,
+  phoneNumberId: string | null,
+  language: "auto" | "en" | "sw",
+  accessLink: WhatsAppAccessLink,
+): Promise<{
+  status: string;
+  providerResponse: unknown;
+  providerMessageId: string | null;
+  messageType: WhatsAppOutboundMessageType;
+  body: string;
+}> {
+  return sendPreparedWhatsAppPrompt(to, phoneNumberId, nextStepsInteractive(to, language, accessLink), "WhatsApp next-step prompt");
 }
 
 async function postWhatsAppPayload(
@@ -12648,6 +12924,21 @@ async function sendAndLogReply(
       ratingResult.providerResponse,
       ratingResult.providerMessageId,
       ratingResult.messageType,
+    );
+  }
+
+  if (accessLink && !includeRatingPrompt && sendResult.status === "sent") {
+    const nextLanguage = detectLanguage(message.text || finalBody);
+    const nextResult = await sendWhatsAppNextStepsPrompt(message.phone, message.phoneNumberId, nextLanguage, accessLink);
+    await logOutboundMessage(
+      supabase,
+      message.phone,
+      profile,
+      nextResult.body,
+      nextResult.status,
+      nextResult.providerResponse,
+      nextResult.providerMessageId,
+      nextResult.messageType,
     );
   }
 
@@ -12922,13 +13213,31 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     };
     await updateConversationSummary(supabase, message.phone, paymentSession, profile, paymentRoles, message.text, parsed, execution);
     if (isSmartReceiptIssueText(message.text)) {
-      await notifyOfficialsOfWhatsappEscalation(
+      const supportContext = await escalateWhatsappHumanSupport(
         supabase,
+        message,
         profile,
+        paymentSession,
         message.text,
         "Member reports a missing receipt or unresolved WhatsApp payment concern.",
         parsed,
+        initialLanguage,
       );
+      const supportExecution = withHumanSupportAccessLink(
+        {
+          actionStatus: "needs_clarification",
+          reply: initialLanguage === "sw"
+            ? "Nimepeleka hii issue kwa human support pia."
+            : "I have also sent this issue to human support.",
+          result: { payment_issue_support_follow_up: true },
+          nextState: paymentSession.state ?? {},
+        },
+        profile,
+        message.text,
+        supportContext,
+        initialLanguage,
+      );
+      await sendAndLogReply(supabase, message, profile, supportExecution.reply, false, supportExecution.accessLink);
     }
     return;
   }
@@ -13105,7 +13414,23 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, menuHandled.parsed);
     try {
       const menuLanguage = menuHandled.parsed.language === "auto" ? detectLanguage(message.text) : menuHandled.parsed.language;
-      const execution = withRequestedAccessLink(menuHandled.execution, menuHandled.parsed.intent, roles, menuLanguage);
+      const supportContext = shouldEscalateToHumanSupport(menuHandled.parsed, menuHandled.execution)
+        ? await escalateWhatsappHumanSupport(
+          supabase,
+          message,
+          profile,
+          session,
+          message.text,
+          menuHandled.parsed.intent === "query_support"
+            ? "Member requested human WhatsApp support from the menu."
+            : "The WhatsApp assistant could not resolve this menu response and asked for clarification.",
+          menuHandled.parsed,
+          menuLanguage,
+        )
+        : null;
+      const execution = supportContext
+        ? withHumanSupportAccessLink(menuHandled.execution, profile, message.text, supportContext, menuLanguage)
+        : withRequestedAccessLink(menuHandled.execution, menuHandled.parsed.intent, roles, menuLanguage);
       const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, false, execution.accessLink);
       await completeAction(supabase, actionId, execution, outboundMessageId);
       await updateSessionState(supabase, message.phone, menuHandled.execution.nextState ?? {}, menuHandled.lastIntent);
@@ -13141,20 +13466,27 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
   try {
     const rawExecution = await executeIntent(supabase, parsed, profile, roles, context, message.text);
     const language = parsed.language === "auto" ? detectLanguage(message.text) : parsed.language;
-    const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, language);
+    const supportContext = shouldEscalateToHumanSupport(parsed, rawExecution)
+      ? await escalateWhatsappHumanSupport(
+        supabase,
+        message,
+        profile,
+        session,
+        message.text,
+        parsed.intent === "query_support"
+          ? "Member requested human WhatsApp support."
+          : "The WhatsApp assistant could not resolve this member message and asked for clarification.",
+        parsed,
+        language,
+      )
+      : null;
+    const execution = supportContext
+      ? withHumanSupportAccessLink(rawExecution, profile, message.text, supportContext, language)
+      : withRequestedAccessLink(rawExecution, parsed.intent, roles, language);
     const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, false, execution.accessLink);
     await completeAction(supabase, actionId, execution, outboundMessageId);
     await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
-    if (parsed.intent === "unknown" && execution.actionStatus === "needs_clarification") {
-      await notifyOfficialsOfWhatsappEscalation(
-        supabase,
-        profile,
-        message.text,
-        "The WhatsApp assistant could not resolve this member message and asked for clarification.",
-        parsed,
-      );
-    }
   } catch (error) {
     const language = parsed.language === "auto" ? detectLanguage(message.text) : parsed.language;
     const reply = language === "sw"
@@ -13174,13 +13506,31 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
       outboundMessageId,
     );
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, failureExecution);
-    await notifyOfficialsOfWhatsappEscalation(
+    const supportContext = await escalateWhatsappHumanSupport(
       supabase,
+      message,
       profile,
+      session,
       message.text,
       "WhatsApp assistant hit an error while handling this member message.",
       parsed,
+      language,
     );
+    const supportExecution = withHumanSupportAccessLink(
+      {
+        actionStatus: "needs_clarification",
+        reply: language === "sw"
+          ? "Hii inaonekana inahitaji human support sasa."
+          : "This looks like it needs human support now.",
+        result: { error_support_follow_up: true },
+        nextState: session.state ?? {},
+      },
+      profile,
+      message.text,
+      supportContext,
+      language,
+    );
+    await sendAndLogReply(supabase, message, profile, supportExecution.reply, false, supportExecution.accessLink);
     console.error("WhatsApp message handling failed", error);
   }
 }

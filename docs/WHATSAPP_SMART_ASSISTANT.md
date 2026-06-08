@@ -16,6 +16,8 @@ It can:
 - Show a WhatsApp typing indicator/read receipt while preparing replies.
 - Offer WhatsApp interactive list/button menus with numbered text fallback while still accepting normal conversation.
 - Open focused service menus for wallet, contributions, welfare, kitties, communication, profile/membership, more services, and role-aware official tools.
+- Keep members moving after CTA links with WhatsApp next-step buttons for the likely service, human support, and rating.
+- Escalate stuck or human-support requests to officials, send the admin WhatsApp alert, and give the member a `Message admin` CTA.
 - Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
 - Start wallet top-ups by M-Pesa STK push using the main `wallets` and `wallet_transactions` ledger.
 - Let members list active kitties and contribute to a kitty by M-Pesa or from their wallet.
@@ -38,6 +40,7 @@ supabase secrets set WHATSAPP_VERIFY_TOKEN="long-random-token"
 supabase secrets set WHATSAPP_ACCESS_TOKEN="meta-cloud-api-token"
 supabase secrets set WHATSAPP_PHONE_NUMBER_ID="meta-phone-number-id"
 supabase secrets set WHATSAPP_SITE_URL="https://turuturustars.co.ke"
+supabase secrets set WHATSAPP_HUMAN_SUPPORT_PHONE="0700471113"
 supabase secrets set WHATSAPP_REGISTRATION_OTP_PEPPER="long-random-otp-pepper"
 supabase secrets set WHATSAPP_REGISTRATION_DEFAULT_STATUS="pending"
 supabase secrets set WHATSAPP_NOTIFICATIONS_JOB_SECRET="long-random-job-secret"
@@ -87,7 +90,9 @@ Intent extraction also receives the rolling session summary, so it can remember 
 
 Do not commit AI keys or paste production keys into docs or code. Store them only as Supabase Edge Function secrets, and rotate any key that has been shared in chat or logs.
 
-Member and official replies also attach a WhatsApp CTA button when the answer has a matching dashboard or public page. For example, a wallet reply says `Tap the button below to open your wallet.` and shows a `Click here` button instead of exposing the full URL. If Meta rejects the interactive button, the function falls back to plain text with the URL so the member still has a usable path. Set `WHATSAPP_SITE_URL` if the production domain changes.
+Member and official replies also attach a WhatsApp CTA button when the answer has a matching dashboard or public page. For example, a wallet reply says `Tap the button below to open your wallet.` and shows a `Click here` button instead of exposing the full URL. After CTA replies, the bot sends a small WhatsApp button prompt so the member can open the likely next menu, ask for human support, or rate the chat instead of feeling stuck at the link. If Meta rejects the interactive button, the function falls back to plain text with the URL so the member still has a usable path. Set `WHATSAPP_SITE_URL` if the production domain changes.
+
+Human support defaults to `0700471113` and can be changed with `WHATSAPP_HUMAN_SUPPORT_PHONE`. When a member asks for a person, taps support, reports an unresolved receipt/payment issue, or the assistant cannot resolve a message, the function creates official dashboard notifications, sends a WhatsApp alert to the support number with the member, message, intent, and saved session context, and gives the member a `Message admin` CTA that opens WhatsApp directly.
 
 ## Meta Webhook
 
