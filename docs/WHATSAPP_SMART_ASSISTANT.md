@@ -138,7 +138,7 @@ Announcement publishing is unified through the database helper `enqueue_announce
 
 Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, then either provide an email or reply `SKIP` / `NO EMAIL`. Email is optional, and users may send profile details directly at the email step. If an email is provided, the bot verifies it by OTP when possible, but registration can continue without blocking on email delivery. Once full name, National ID, and location are complete, the bot creates an auth/profile member account with the National ID as the default password. By default the new member is `pending`, so member-priority services stay locked until an admin approves the account.
 
-After registered-member replies, the assistant sends a compact WhatsApp `Rate chat` picker instead of appending rating text into the reply body. Members can tap a rating option, or type a rating label such as `excellent`, `good`, `okay`, `poor`, or `bad`. The rating is saved and the bot sends a short thank-you without starting a new command.
+The assistant sends the compact WhatsApp `Rate chat` picker only when the member closes the conversation, such as `thanks`, `bye`, or `nothing else`, or when the member explicitly asks to rate/give feedback. It does not attach ratings after normal replies. Members can tap a rating option, or type a rating label such as `excellent`, `good`, `okay`, `poor`, or `bad`. The rating is saved and the bot sends a short thank-you without starting a new command.
 
 ## Conversation Pauses
 

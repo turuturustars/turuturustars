@@ -1840,6 +1840,17 @@ function isConversationCloseText(text: string): boolean {
     /^(?:i\s+want\s+to\s+)?(?:leave it at that|that'?s all|that is all)(?:\s+(?:thanks|thank you|bye|goodbye|good bye))?$/i.test(normalized);
 }
 
+function isConversationRatingRequestText(text: string): boolean {
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/g, "")
+    .replace(/\s+/g, " ");
+
+  return /^(?:rate|rating|feedback|review|rate chat|rate this chat|give feedback|send feedback|how do i rate|naweza rate|nataka kurate)$/i
+    .test(normalized);
+}
+
 function isSmartPaymentDoneText(text: string): boolean {
   return /^(?:done|finished|complete|completed|paid|nimemaliza|nimelipa|nimekamilisha)$/i.test(text.trim());
 }
@@ -12055,7 +12066,7 @@ async function sendAndLogReply(
   message: InboundMessage,
   profile: Profile | null,
   body: string,
-  includeRatingPrompt = profile !== null,
+  includeRatingPrompt = false,
   accessLink?: WhatsAppAccessLink,
 ): Promise<string | null> {
   const plainBody = plainWhatsAppText(body);
@@ -12087,6 +12098,27 @@ async function sendAndLogReply(
     );
   }
 
+  await markSessionOutbound(supabase, message.phone);
+  return outboundMessageId;
+}
+
+async function sendAndLogRatingPrompt(
+  supabase: SupabaseClient,
+  message: InboundMessage,
+  profile: Profile,
+  language: "auto" | "en" | "sw",
+): Promise<string | null> {
+  const ratingResult = await sendWhatsAppRatingPrompt(message.phone, message.phoneNumberId, language);
+  const outboundMessageId = await logOutboundMessage(
+    supabase,
+    message.phone,
+    profile,
+    ratingResult.body,
+    ratingResult.status,
+    ratingResult.providerResponse,
+    ratingResult.providerMessageId,
+    ratingResult.messageType,
+  );
   await markSessionOutbound(supabase, message.phone);
   return outboundMessageId;
 }
@@ -12362,7 +12394,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, parsed);
     const rawExecution = await executeIntent(supabase, parsed, profile, roles, { contributions: [], wallet: null }, message.text);
     const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, initialLanguage);
-    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, false, execution.accessLink);
     await completeAction(supabase, actionId, execution, outboundMessageId);
     await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
@@ -12392,8 +12424,14 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
       message,
       profile,
       conversationClosedReply(profile, initialLanguage),
-      false,
+      true,
     );
+    return;
+  }
+
+  if (isConversationRatingRequestText(message.text)) {
+    await upsertSession(supabase, message.phone, profile);
+    await sendAndLogRatingPrompt(supabase, message, profile, initialLanguage);
     return;
   }
 
@@ -12515,7 +12553,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     try {
       const menuLanguage = menuHandled.parsed.language === "auto" ? detectLanguage(message.text) : menuHandled.parsed.language;
       const execution = withRequestedAccessLink(menuHandled.execution, menuHandled.parsed.intent, roles, menuLanguage);
-      const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
+      const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, false, execution.accessLink);
       await completeAction(supabase, actionId, execution, outboundMessageId);
       await updateSessionState(supabase, message.phone, menuHandled.execution.nextState ?? {}, menuHandled.lastIntent);
       await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, menuHandled.parsed, execution);
@@ -12551,7 +12589,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     const rawExecution = await executeIntent(supabase, parsed, profile, roles, context, message.text);
     const language = parsed.language === "auto" ? detectLanguage(message.text) : parsed.language;
     const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, language);
-    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, false, execution.accessLink);
     await completeAction(supabase, actionId, execution, outboundMessageId);
     await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
