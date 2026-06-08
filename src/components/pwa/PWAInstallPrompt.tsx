@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 import { Button } from "@/components/ui/button";
-import { Download, MonitorSmartphone, Pin, RefreshCw, WifiOff, X } from "lucide-react";
+import { MonitorSmartphone, RefreshCw, WifiOff, X } from "lucide-react";
 
 const INSTALL_DISMISS_KEY = "pwa_install_prompt_dismissed_at";
 const DISMISS_DURATION_MS = 1000 * 60 * 60 * 24 * 3;
+const INSTALL_PROMPT_VISIBLE_MS = 5000;
 
 const isStandaloneMode = () =>
   window.matchMedia("(display-mode: standalone)").matches ||
   (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 export const PWAInstallPrompt = () => {
-  const [showInstallInfo, setShowInstallInfo] = useState(false);
   const [isInstalled, setIsInstalled] = useState<boolean>(() => isStandaloneMode());
   const [isDismissed, setIsDismissed] = useState(false);
 
@@ -37,15 +37,13 @@ export const PWAInstallPrompt = () => {
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
-      // Let the browser show its native install banner/icon. The custom card
-      // below stays as a gentle fallback with platform-specific steps.
+      // Let the browser show its native install banner/icon. The custom toast
+      // below stays as a gentle fallback without blocking the page.
       if (event.defaultPrevented) return;
-      setShowInstallInfo(false);
     };
 
     const onInstalled = () => {
       setIsInstalled(true);
-      setShowInstallInfo(false);
     };
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -61,10 +59,9 @@ export const PWAInstallPrompt = () => {
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = /android/.test(ua);
-    const isWindows = /windows/.test(ua);
     const isDesktop = !isIOS && !isAndroid;
 
-    return { isIOS, isAndroid, isWindows, isDesktop };
+    return { isIOS, isAndroid, isDesktop };
   }, []);
 
   const canShowManualInstall = !isInstalled && (deviceFlags.isIOS || deviceFlags.isAndroid || deviceFlags.isDesktop);
@@ -80,9 +77,12 @@ export const PWAInstallPrompt = () => {
     }
   };
 
-  const handleInstall = async () => {
-    setShowInstallInfo((open) => !open);
-  };
+  useEffect(() => {
+    if (!showInstallPrompt) return;
+
+    const timeoutId = window.setTimeout(dismissInstallPrompt, INSTALL_PROMPT_VISIBLE_MS);
+    return () => window.clearTimeout(timeoutId);
+  }, [showInstallPrompt]);
 
   return (
     <>
@@ -127,69 +127,28 @@ export const PWAInstallPrompt = () => {
       )}
 
       {showInstallPrompt && (
-        <div className="fixed inset-x-3 bottom-3 z-[110] mx-auto max-w-md rounded-lg border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:inset-x-4 sm:bottom-4 sm:p-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-md bg-blue-50 p-2 text-blue-700">
-              <MonitorSmartphone className="h-5 w-5" />
+        <div
+          className="fixed bottom-3 right-3 z-[110] w-[min(18rem,calc(100vw-1.5rem))] animate-in fade-in slide-in-from-bottom-2 duration-200 rounded-md border border-slate-200 bg-white/95 p-2.5 shadow-lg backdrop-blur sm:bottom-4 sm:right-4"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="rounded-md bg-blue-50 p-1.5 text-blue-700">
+              <MonitorSmartphone className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">Install Turuturu Stars App</p>
-              <p className="text-xs text-slate-600">
-                Faster launch, full-screen app, and home screen or taskbar access across Android, iPhone, and desktop.
-              </p>
+              <p className="truncate text-xs font-semibold text-slate-900">Install Turuturu Stars App</p>
+              <p className="truncate text-[11px] text-slate-600">Quick app access from your home screen.</p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={dismissInstallPrompt}>
+            <button
+              type="button"
+              className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              onClick={dismissInstallPrompt}
+              aria-label="Close install prompt"
+            >
               <X className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
-
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button size="sm" className="h-9 w-full rounded-md sm:w-auto" onClick={handleInstall}>
-              <Download className="h-4 w-4" />
-              Show install steps
-            </Button>
-            {deviceFlags.isWindows && (
-              <span className="inline-flex w-full items-center justify-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-700 sm:w-auto">
-                <Pin className="h-3.5 w-3.5" />
-                Pin to taskbar supported
-              </span>
-            )}
-          </div>
-
-          {showInstallInfo && (
-            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-              {deviceFlags.isIOS && (
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>Tap browser Share menu.</li>
-                  <li>Select Add to Home Screen.</li>
-                  <li>Tap Add to install the app icon.</li>
-                </ol>
-              )}
-
-              {deviceFlags.isAndroid && (
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>Open browser menu.</li>
-                  <li>Select Install app or Add to Home screen.</li>
-                  <li>Confirm install to place the app icon.</li>
-                </ol>
-              )}
-
-              {deviceFlags.isWindows && (
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>In Edge or Chrome, open browser menu then Apps then Install this site as an app.</li>
-                  <li>Launch the installed app from Start menu.</li>
-                  <li>Right-click its icon and choose Pin to taskbar.</li>
-                </ol>
-              )}
-
-              {deviceFlags.isDesktop && !deviceFlags.isWindows && (
-                <ol className="list-decimal space-y-1 pl-4">
-                  <li>In Chrome or Edge, open browser menu then Apps then Install this site as an app.</li>
-                  <li>Launch it from Applications or Dock after install.</li>
-                </ol>
-              )}
-            </div>
-          )}
         </div>
       )}
     </>
