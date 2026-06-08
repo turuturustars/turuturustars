@@ -304,6 +304,7 @@ type ExecutionResult = {
   actionStatus: "completed" | "needs_clarification" | "failed" | "blocked";
   reply: string;
   result: Record<string, unknown>;
+  accessLink?: WhatsAppAccessLink;
   contributionId?: string | null;
   expenditureId?: string | null;
   welfareCaseId?: string | null;
@@ -315,6 +316,13 @@ type AccessLinkConfig = {
   label: string;
   swLabel: string;
   path: string;
+};
+
+type WhatsAppAccessLink = {
+  label: string;
+  url: string;
+  intent: IntentName;
+  displayText: string;
 };
 
 type FinanceContext = {
@@ -1248,18 +1256,23 @@ function withRequestedAccessLink(
 
   const label = language === "sw" ? link.swLabel : link.label;
   const prompt = language === "sw"
-    ? `Bonyeza hapa kufungua ${label}: ${url}`
-    : `Press here to access ${label}: ${url}`;
+    ? `Bonyeza button hapa chini kufungua ${label}.`
+    : `Tap the button below to open ${label}.`;
+  const accessLink: WhatsAppAccessLink = {
+    label,
+    url,
+    intent,
+    displayText: language === "sw" ? "Fungua hapa" : "Click here",
+  };
 
   return {
     ...execution,
     reply: `${execution.reply}\n\n${prompt}`,
+    accessLink,
     result: {
       ...execution.result,
       access_link: {
-        label,
-        url,
-        intent,
+        ...accessLink,
       },
     },
   };
@@ -1388,13 +1401,32 @@ function extractText(message: Record<string, unknown>): string {
 
   const buttonReply = interactive?.button_reply as Record<string, unknown> | undefined;
   const listReply = interactive?.list_reply as Record<string, unknown> | undefined;
-  if (typeof buttonReply?.title === "string") return buttonReply.title.trim();
-  if (typeof buttonReply?.id === "string") return buttonReply.id.trim();
-  if (typeof listReply?.title === "string") return listReply.title.trim();
-  if (typeof listReply?.description === "string") return listReply.description.trim();
-  if (typeof listReply?.id === "string") return listReply.id.trim();
+  const buttonReplyText = extractInteractiveReplyText(buttonReply);
+  if (buttonReplyText) return buttonReplyText;
+  const listReplyText = extractInteractiveReplyText(listReply);
+  if (listReplyText) return listReplyText;
 
   return "";
+}
+
+function extractInteractiveReplyText(reply: Record<string, unknown> | undefined): string {
+  const id = cleanString(reply?.id);
+  const title = cleanString(reply?.title);
+  const description = cleanString(reply?.description);
+  if (id) {
+    const normalizedId = normalizeInteractiveReplyId(id);
+    if (normalizedId) return normalizedId;
+  }
+  return title || description || id || "";
+}
+
+function normalizeInteractiveReplyId(id: string): string | null {
+  const trimmed = id.trim();
+  const menuMatch = trimmed.match(/^menu:(?:main|wallet|contribution|welfare|kitty|official|select):(\d{1,2}|back|cancel)$/i);
+  if (menuMatch) return menuMatch[1].toLowerCase() === "back" ? "0" : menuMatch[1].toLowerCase();
+  if (/^\d{1,2}$/.test(trimmed)) return trimmed;
+  if (/^(menu|main|home|back|cancel|exit|0)$/i.test(trimmed)) return trimmed;
+  return null;
 }
 
 function extractInboundMessages(payload: Record<string, unknown>): InboundMessage[] {
@@ -11332,6 +11364,333 @@ async function logInboundMessage(
   return { id: String((data as Record<string, unknown>).id), duplicate: false };
 }
 
+type WhatsAppOutboundMessageType = "text" | "interactive";
+
+type WhatsAppInteractiveButton = {
+  id: string;
+  title: string;
+};
+
+type WhatsAppInteractiveRow = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
+type WhatsAppInteractiveSection = {
+  title: string;
+  rows: WhatsAppInteractiveRow[];
+};
+
+type WhatsAppInteractiveContent =
+  | {
+    kind: "button";
+    body: string;
+    footer?: string;
+    buttons: WhatsAppInteractiveButton[];
+  }
+  | {
+    kind: "list";
+    header?: string;
+    body: string;
+    footer?: string;
+    button: string;
+    sections: WhatsAppInteractiveSection[];
+  }
+  | {
+    kind: "cta_url";
+    body: string;
+    footer?: string;
+    displayText: string;
+    url: string;
+  };
+
+type WhatsAppPreparedReply = {
+  messageType: WhatsAppOutboundMessageType;
+  fallbackBody: string;
+  payload: Record<string, unknown>;
+};
+
+const WHATSAPP_LIST_ROW_LIMIT = 10;
+
+function whatsappGraphApiVersion(): string {
+  return Deno.env.get("WHATSAPP_GRAPH_API_VERSION")?.trim() || "v21.0";
+}
+
+function resolveWhatsAppProvider(phoneNumberId: string | null): {
+  accessToken: string;
+  phoneNumberId: string;
+  apiVersion: string;
+} | null {
+  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")?.trim();
+  const configuredPhoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")?.trim();
+  const resolvedPhoneNumberId = phoneNumberId && phoneNumberId !== "simulation"
+    ? phoneNumberId
+    : configuredPhoneNumberId;
+
+  if (!accessToken || !resolvedPhoneNumberId) return null;
+  return {
+    accessToken,
+    phoneNumberId: resolvedPhoneNumberId,
+    apiVersion: whatsappGraphApiVersion(),
+  };
+}
+
+function fitWhatsAppText(value: string, max: number): string {
+  const cleaned = plainWhatsAppText(value).replace(/\s+/g, " ").trim();
+  if (cleaned.length <= max) return cleaned;
+  if (max <= 3) return cleaned.slice(0, max);
+  return `${cleaned.slice(0, max - 3).trim()}...`;
+}
+
+function parseMenuRows(body: string): WhatsAppInteractiveRow[] {
+  const rows: WhatsAppInteractiveRow[] = [];
+  for (const line of body.split(/\n+/)) {
+    const match = line.trim().match(/^(\d{1,2})\.\s+(.+)$/);
+    if (!match) continue;
+
+    const id = match[1];
+    if (id === "0") continue;
+
+    const rawLabel = match[2].trim();
+    const [rawTitle, ...descriptionParts] = rawLabel.split(/\s+-\s+|:\s+/);
+    const description = descriptionParts.join(" - ").trim();
+    rows.push({
+      id,
+      title: fitWhatsAppText(rawTitle || rawLabel, 24),
+      ...(description ? { description: fitWhatsAppText(description, 72) } : {}),
+    });
+  }
+  return rows;
+}
+
+function compactMainMenuRows(rows: WhatsAppInteractiveRow[]): WhatsAppInteractiveRow[] {
+  if (rows.length <= WHATSAPP_LIST_ROW_LIMIT) return rows;
+  const hasOfficialTools = rows.some((row) => row.id === "12");
+  const priority = hasOfficialTools
+    ? new Set(["1", "2", "3", "4", "5", "6", "7", "8", "11", "12"])
+    : new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "11"]);
+  const compact = rows.filter((row) => priority.has(row.id));
+  return compact.slice(0, WHATSAPP_LIST_ROW_LIMIT);
+}
+
+function interactiveBody(body: string, fallback: string): string {
+  const lines = body
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) =>
+      line &&
+      !/^\d{1,2}\.\s+/.test(line) &&
+      !/^(0\.|Tip:|Treasurer:|Chair\/Admin\/Secretary:|Examples:|Reply 0|Rate this chat:)/i.test(line)
+    );
+  return fitWhatsAppText(lines.slice(0, 4).join("\n") || fallback, 1024);
+}
+
+function isMainMenuReply(body: string): boolean {
+  return /Turuturu Stars member self-service/i.test(body) && /\n1\.\s+Wallet/i.test(body);
+}
+
+function isMenuChoiceReply(body: string): boolean {
+  return /^(Wallet menu|Contribution menu|Kitty menu|Welfare menu|Official tools)\b/i.test(body.trim());
+}
+
+function isDynamicSelectionReply(body: string): boolean {
+  return /^Step 2:\s+.+\n1\.\s+/i.test(body.trim()) && /Reply with the (welfare case|kitty) number|Reply na number ya (welfare case|kitty)/i.test(body);
+}
+
+function buttonInteractiveFromRows(body: string, rows: WhatsAppInteractiveRow[]): WhatsAppInteractiveContent | null {
+  if (rows.length < 1 || rows.length > 3) return null;
+  const sw = detectLanguage(body) === "sw";
+  return {
+    kind: "button",
+    body: interactiveBody(body, sw ? "Chagua hatua inayofuata." : "Choose the next step."),
+    footer: sw ? "Reply 0 kurudi." : "Reply 0 to go back.",
+    buttons: rows.map((row) => ({
+      id: `menu:main:${row.id}`,
+      title: fitWhatsAppText(row.title, 20),
+    })),
+  };
+}
+
+function listInteractiveFromRows(
+  body: string,
+  rows: WhatsAppInteractiveRow[],
+  options: { sectionTitle: string; header?: string; button?: string; mainMenu?: boolean } = { sectionTitle: "Options" },
+): WhatsAppInteractiveContent | null {
+  if (rows.length < 1) return null;
+  const sw = detectLanguage(body) === "sw";
+  const selectedRows = options.mainMenu ? compactMainMenuRows(rows) : rows.slice(0, WHATSAPP_LIST_ROW_LIMIT);
+  return {
+    kind: "list",
+    header: fitWhatsAppText(options.header || "Turuturu Stars", 60),
+    body: interactiveBody(
+      body,
+      sw
+        ? "Chagua option hapa WhatsApp, au andika swali lako kawaida."
+        : "Choose an option in WhatsApp, or type your request normally.",
+    ),
+    footer: sw ? "Unaweza kuandika MENU wakati wowote." : "You can type MENU anytime.",
+    button: fitWhatsAppText(options.button || (sw ? "Chagua huduma" : "Choose service"), 20),
+    sections: [
+      {
+        title: fitWhatsAppText(options.sectionTitle, 24),
+        rows: selectedRows.map((row) => ({
+          ...row,
+          id: `menu:${options.mainMenu ? "main" : "select"}:${row.id}`,
+        })),
+      },
+    ],
+  };
+}
+
+function whatsappInteractiveForReply(body: string): WhatsAppInteractiveContent | null {
+  const rows = parseMenuRows(body);
+  if (!rows.length) return null;
+
+  if (isMainMenuReply(body)) {
+    return listInteractiveFromRows(body, rows, {
+      sectionTitle: "Member services",
+      header: "Turuturu Stars",
+      button: "Open menu",
+      mainMenu: true,
+    });
+  }
+
+  if (isDynamicSelectionReply(body)) {
+    return listInteractiveFromRows(body, rows, {
+      sectionTitle: /kitty/i.test(body) ? "Active kitties" : "Welfare cases",
+      header: /kitty/i.test(body) ? "Choose kitty" : "Choose welfare",
+      button: "Choose",
+    });
+  }
+
+  if (isMenuChoiceReply(body)) {
+    return buttonInteractiveFromRows(body, rows) || listInteractiveFromRows(body, rows, {
+      sectionTitle: "Options",
+      header: body.trim().split(/\n/)[0] || "Menu",
+      button: "Choose",
+    });
+  }
+
+  return null;
+}
+
+function whatsappPayloadForInteractive(to: string, interactive: WhatsAppInteractiveContent): Record<string, unknown> {
+  if (interactive.kind === "cta_url") {
+    return {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: { text: fitWhatsAppText(interactive.body, 1024) },
+        ...(interactive.footer ? { footer: { text: fitWhatsAppText(interactive.footer, 60) } } : {}),
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: fitWhatsAppText(interactive.displayText, 20),
+            url: interactive.url,
+          },
+        },
+      },
+    };
+  }
+
+  if (interactive.kind === "button") {
+    return {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: { text: interactive.body },
+        ...(interactive.footer ? { footer: { text: fitWhatsAppText(interactive.footer, 60) } } : {}),
+        action: {
+          buttons: interactive.buttons.slice(0, 3).map((button) => ({
+            type: "reply",
+            reply: {
+              id: button.id,
+              title: fitWhatsAppText(button.title, 20),
+            },
+          })),
+        },
+      },
+    };
+  }
+
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "interactive",
+    interactive: {
+      type: "list",
+      ...(interactive.header ? { header: { type: "text", text: fitWhatsAppText(interactive.header, 60) } } : {}),
+      body: { text: interactive.body },
+      ...(interactive.footer ? { footer: { text: fitWhatsAppText(interactive.footer, 60) } } : {}),
+      action: {
+        button: fitWhatsAppText(interactive.button, 20),
+        sections: interactive.sections.map((section) => ({
+          title: fitWhatsAppText(section.title, 24),
+          rows: section.rows.slice(0, WHATSAPP_LIST_ROW_LIMIT).map((row) => ({
+            id: row.id,
+            title: fitWhatsAppText(row.title, 24),
+            ...(row.description ? { description: fitWhatsAppText(row.description, 72) } : {}),
+          })),
+        })),
+      },
+    },
+  };
+}
+
+function whatsappPayloadForText(to: string, body: string): Record<string, unknown> {
+  const hasUrl = /https?:\/\//i.test(body);
+  return {
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    to,
+    type: "text",
+    text: {
+      preview_url: hasUrl,
+      body: clampPlainWhatsAppText(body, 3900),
+    },
+  };
+}
+
+function prepareWhatsAppReply(to: string, body: string, accessLink?: WhatsAppAccessLink): WhatsAppPreparedReply {
+  const fallbackBody = clampPlainWhatsAppText(body, 3900);
+  if (accessLink) {
+    return {
+      messageType: "interactive",
+      fallbackBody,
+      payload: whatsappPayloadForInteractive(to, {
+        kind: "cta_url",
+        body: fallbackBody,
+        footer: "Turuturu Stars portal",
+        displayText: accessLink.displayText,
+        url: accessLink.url,
+      }),
+    };
+  }
+
+  const interactive = whatsappInteractiveForReply(fallbackBody);
+  if (interactive) {
+    return {
+      messageType: "interactive",
+      fallbackBody,
+      payload: whatsappPayloadForInteractive(to, interactive),
+    };
+  }
+
+  return {
+    messageType: "text",
+    fallbackBody,
+    payload: whatsappPayloadForText(to, fallbackBody),
+  };
+}
+
 async function logOutboundMessage(
   supabase: SupabaseClient,
   phone: string,
@@ -11340,6 +11699,7 @@ async function logOutboundMessage(
   status: string,
   providerResponse: unknown,
   providerMessageId: string | null,
+  messageType: WhatsAppOutboundMessageType = "text",
 ): Promise<string | null> {
   const { data, error } = await supabase
     .from("whatsapp_messages")
@@ -11350,7 +11710,7 @@ async function logOutboundMessage(
       phone,
       profile_id: profile?.id || null,
       member_id: profile?.id || null,
-      message_type: "text",
+      message_type: messageType,
       body,
       text_body: body,
       status,
@@ -11403,47 +11763,96 @@ async function sendWhatsAppText(
   to: string,
   body: string,
   phoneNumberId: string | null,
-): Promise<{ status: string; providerResponse: unknown; providerMessageId: string | null }> {
-  const accessToken = Deno.env.get("WHATSAPP_ACCESS_TOKEN")?.trim();
-  const resolvedPhoneNumberId = phoneNumberId || Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")?.trim();
+  accessLink?: WhatsAppAccessLink,
+): Promise<{
+  status: string;
+  providerResponse: unknown;
+  providerMessageId: string | null;
+  messageType: WhatsAppOutboundMessageType;
+}> {
+  const provider = resolveWhatsAppProvider(phoneNumberId);
 
-  if (!accessToken || !resolvedPhoneNumberId) {
+  if (!provider) {
     return {
       status: "skipped_missing_provider_config",
       providerResponse: { skipped: true, reason: "Missing WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID" },
       providerMessageId: null,
+      messageType: "text",
     };
   }
 
-  const apiVersion = Deno.env.get("WHATSAPP_GRAPH_API_VERSION")?.trim() || "v20.0";
-  const hasUrl = /https?:\/\//i.test(body);
-  const response = await fetch(`https://graph.facebook.com/${apiVersion}/${resolvedPhoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      recipient_type: "individual",
-      to,
-      type: "text",
-      text: {
-        preview_url: hasUrl,
-        body: clampPlainWhatsAppText(body, 3900),
-      },
-    }),
-  });
+  let prepared = prepareWhatsAppReply(to, body, accessLink);
+  let response = await postWhatsAppPayload(provider, prepared.payload);
 
-  const payload = await response.json().catch(() => null) as Record<string, unknown> | null;
-  if (!response.ok) {
-    console.error("WhatsApp send failed", response.status, payload);
-    return { status: "send_failed", providerResponse: payload, providerMessageId: null };
+  if (!response.ok && prepared.messageType === "interactive") {
+    console.warn("WhatsApp interactive send failed; falling back to text", response.status, response.payload);
+    const textFallbackBody = accessLink
+      ? `${prepared.fallbackBody}\n\n${accessLink.displayText}: ${accessLink.url}`
+      : prepared.fallbackBody;
+    prepared = {
+      messageType: "text",
+      fallbackBody: textFallbackBody,
+      payload: whatsappPayloadForText(to, textFallbackBody),
+    };
+    response = await postWhatsAppPayload(provider, prepared.payload);
   }
 
-  const messages = payload?.messages as Array<Record<string, unknown>> | undefined;
+  if (!response.ok) {
+    console.error("WhatsApp send failed", response.status, response.payload);
+    return {
+      status: "send_failed",
+      providerResponse: response.payload,
+      providerMessageId: null,
+      messageType: prepared.messageType,
+    };
+  }
+
+  const messages = response.payload?.messages as Array<Record<string, unknown>> | undefined;
   const providerMessageId = cleanString(messages?.[0]?.id);
-  return { status: "sent", providerResponse: payload, providerMessageId };
+  return {
+    status: "sent",
+    providerResponse: response.payload,
+    providerMessageId,
+    messageType: prepared.messageType,
+  };
+}
+
+async function postWhatsAppPayload(
+  provider: { accessToken: string; phoneNumberId: string; apiVersion: string },
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; status: number; payload: Record<string, unknown> | null }> {
+  const response = await fetch(`https://graph.facebook.com/${provider.apiVersion}/${provider.phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${provider.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responsePayload = await response.json().catch(() => null) as Record<string, unknown> | null;
+  return { ok: response.ok, status: response.status, payload: responsePayload };
+}
+
+async function showWhatsAppTypingIndicator(message: InboundMessage): Promise<void> {
+  if (Deno.env.get("WHATSAPP_ENABLE_TYPING_INDICATOR")?.trim().toLowerCase() === "false") return;
+  if (!message.providerMessageId || message.providerMessageId.startsWith("sim-")) return;
+
+  const provider = resolveWhatsAppProvider(message.phoneNumberId);
+  if (!provider) return;
+
+  const response = await postWhatsAppPayload(provider, {
+    messaging_product: "whatsapp",
+    status: "read",
+    message_id: message.providerMessageId,
+    typing_indicator: {
+      type: "text",
+    },
+  });
+
+  if (!response.ok) {
+    console.warn("WhatsApp typing indicator failed", response.status, response.payload);
+  }
 }
 
 async function sendAndLogReply(
@@ -11452,10 +11861,11 @@ async function sendAndLogReply(
   profile: Profile | null,
   body: string,
   includeRatingPrompt = profile !== null,
+  accessLink?: WhatsAppAccessLink,
 ): Promise<string | null> {
   const plainBody = plainWhatsAppText(body);
   const finalBody = clampPlainWhatsAppText(includeRatingPrompt ? appendRatingPrompt(plainBody) : plainBody, 3900);
-  const sendResult = await sendWhatsAppText(message.phone, finalBody, message.phoneNumberId);
+  const sendResult = await sendWhatsAppText(message.phone, finalBody, message.phoneNumberId, accessLink);
   const outboundMessageId = await logOutboundMessage(
     supabase,
     message.phone,
@@ -11464,6 +11874,7 @@ async function sendAndLogReply(
     sendResult.status,
     sendResult.providerResponse,
     sendResult.providerMessageId,
+    sendResult.messageType,
   );
   await markSessionOutbound(supabase, message.phone);
   return outboundMessageId;
@@ -11588,6 +11999,9 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
   const profile = await findRegisteredProfile(supabase, message.from);
   const inboundLog = await logInboundMessage(supabase, message, profile);
   if (inboundLog.duplicate) return;
+  await showWhatsAppTypingIndicator(message).catch((error) => {
+    console.warn("WhatsApp typing indicator unavailable", error);
+  });
 
   if (!profile) {
     try {
@@ -11736,7 +12150,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     const actionId = await recordAction(supabase, profile, message.phone, inboundLog.id, message.text, parsed);
     const rawExecution = await executeIntent(supabase, parsed, profile, roles, { contributions: [], wallet: null }, message.text);
     const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, initialLanguage);
-    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
     await completeAction(supabase, actionId, execution, outboundMessageId);
     await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);
@@ -11889,7 +12303,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     try {
       const menuLanguage = menuHandled.parsed.language === "auto" ? detectLanguage(message.text) : menuHandled.parsed.language;
       const execution = withRequestedAccessLink(menuHandled.execution, menuHandled.parsed.intent, roles, menuLanguage);
-      const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+      const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
       await completeAction(supabase, actionId, execution, outboundMessageId);
       await updateSessionState(supabase, message.phone, menuHandled.execution.nextState ?? {}, menuHandled.lastIntent);
       await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, menuHandled.parsed, execution);
@@ -11925,7 +12339,7 @@ async function handleInboundMessage(supabase: SupabaseClient, message: InboundMe
     const rawExecution = await executeIntent(supabase, parsed, profile, roles, context, message.text);
     const language = parsed.language === "auto" ? detectLanguage(message.text) : parsed.language;
     const execution = withRequestedAccessLink(rawExecution, parsed.intent, roles, language);
-    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply);
+    const outboundMessageId = await sendAndLogReply(supabase, message, profile, execution.reply, true, execution.accessLink);
     await completeAction(supabase, actionId, execution, outboundMessageId);
     await updateSessionState(supabase, message.phone, execution.nextState ?? {}, parsed.intent);
     await updateConversationSummary(supabase, message.phone, session, profile, roles, message.text, parsed, execution);

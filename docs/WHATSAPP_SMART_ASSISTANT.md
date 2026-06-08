@@ -13,7 +13,8 @@ It can:
   confirm the WhatsApp number, optionally collect email, verify email by OTP when available, collect required profile details, and create the member account.
 - Understand natural English, Kiswahili, and mixed Kenyan phrasing.
 - Store a rolling `whatsapp_sessions.conversation_summary` for continuity, including preferred language, unresolved issue, recent payment/reference concern, registration stage, and role capabilities.
-- Offer an M-Pesa-style numbered menu while still accepting normal conversation.
+- Show a WhatsApp typing indicator/read receipt while preparing replies.
+- Offer WhatsApp interactive list/button menus with numbered text fallback while still accepting normal conversation.
 - Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
 - Start wallet top-ups by M-Pesa STK push using the main `wallets` and `wallet_transactions` ledger.
 - Let members list active kitties and contribute to a kitty by M-Pesa or from their wallet.
@@ -43,6 +44,8 @@ supabase secrets set BREVO_API_KEY="brevo-api-key" BREVO_SENDER_EMAIL="support@t
 ```
 
 Keep `WHATSAPP_REGISTRATION_DEFAULT_STATUS` as `pending` for production. Setting it to `active` makes WhatsApp-created accounts usable immediately after registration.
+
+The assistant uses Meta Cloud API interactive messages for menus when possible. If Meta rejects an interactive payload, it automatically retries the same reply as plain text. Typing indicators are enabled by default; set `WHATSAPP_ENABLE_TYPING_INDICATOR="false"` to disable them for troubleshooting.
 
 Recommended:
 
@@ -83,7 +86,7 @@ Intent extraction also receives the rolling session summary, so it can remember 
 
 Do not commit AI keys or paste production keys into docs or code. Store them only as Supabase Edge Function secrets, and rotate any key that has been shared in chat or logs.
 
-Member and official replies also append a clickable access link when the answer has a matching dashboard or public page. For example, a wallet reply ends with `Press here to access your wallet: https://turuturustars.co.ke/dashboard/finance/wallet`. Set `WHATSAPP_SITE_URL` if the production domain changes.
+Member and official replies also attach a WhatsApp CTA button when the answer has a matching dashboard or public page. For example, a wallet reply says `Tap the button below to open your wallet.` and shows a `Click here` button instead of exposing the full URL. If Meta rejects the interactive button, the function falls back to plain text with the URL so the member still has a usable path. Set `WHATSAPP_SITE_URL` if the production domain changes.
 
 ## Meta Webhook
 
