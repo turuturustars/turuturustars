@@ -15,6 +15,7 @@ It can:
 - Store a rolling `whatsapp_sessions.conversation_summary` for continuity, including preferred language, unresolved issue, recent payment/reference concern, registration stage, and role capabilities.
 - Show a WhatsApp typing indicator/read receipt while preparing replies.
 - Offer WhatsApp interactive list/button menus with numbered text fallback while still accepting normal conversation.
+- Open focused service menus for wallet, contributions, welfare, kitties, communication, profile/membership, more services, and role-aware official tools.
 - Answer member queries about profile status, contributions, wallet balance, receipts, notifications, jobs, announcements, meetings, kitties, refunds, voting status, and welfare cases.
 - Start wallet top-ups by M-Pesa STK push using the main `wallets` and `wallet_transactions` ledger.
 - Let members list active kitties and contribute to a kitty by M-Pesa or from their wallet.
@@ -45,7 +46,7 @@ supabase secrets set BREVO_API_KEY="brevo-api-key" BREVO_SENDER_EMAIL="support@t
 
 Keep `WHATSAPP_REGISTRATION_DEFAULT_STATUS` as `pending` for production. Setting it to `active` makes WhatsApp-created accounts usable immediately after registration.
 
-The assistant uses Meta Cloud API interactive messages for menus, quick actions, and rating prompts when possible. If Meta rejects an interactive payload, it automatically retries the same reply as plain text. Typing indicators are enabled by default; set `WHATSAPP_ENABLE_TYPING_INDICATOR="false"` to disable them for troubleshooting.
+The assistant uses Meta Cloud API interactive messages for menus, quick actions, and rating prompts when possible. Main `MENU` opens focused service hubs, and typed shortcuts such as `wallet`, `contributions`, `welfare`, `kitty`, `communication`, `profile`, `more services`, and `official tools` open the matching submenu directly. If Meta rejects an interactive payload, it automatically retries the same reply as plain text. Typing indicators are enabled by default; set `WHATSAPP_ENABLE_TYPING_INDICATOR="false"` to disable them for troubleshooting.
 
 Recommended:
 

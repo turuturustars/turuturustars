@@ -182,6 +182,9 @@ type MenuSection =
   | "welfare_select"
   | "welfare_amount"
   | "official"
+  | "communication"
+  | "profile"
+  | "more_services"
   | "kitty"
   | "kitty_select"
   | "kitty_amount";
@@ -1422,7 +1425,7 @@ function extractInteractiveReplyText(reply: Record<string, unknown> | undefined)
 
 function normalizeInteractiveReplyId(id: string): string | null {
   const trimmed = id.trim();
-  const menuMatch = trimmed.match(/^menu:(?:main|wallet|contribution|welfare|kitty|official|select):(\d{1,2}|back|cancel)$/i);
+  const menuMatch = trimmed.match(/^menu:(?:main|wallet|contribution|welfare|kitty|official|communication|profile|more_services|select):(\d{1,2}|back|cancel)$/i);
   if (menuMatch) return menuMatch[1].toLowerCase() === "back" ? "0" : menuMatch[1].toLowerCase();
   const ratingMatch = trimmed.match(/^rating:([1-5]):([a-z_ -]+)$/i);
   if (ratingMatch) return `rating:${ratingMatch[1]}:${ratingMatch[2].trim().toLowerCase().replace(/[\s-]+/g, "_")}`;
@@ -6266,6 +6269,19 @@ function exactMenuRequest(text: string): boolean {
   return /^(menu|munu|menyu|main menu|home|help|start|msaada)$/i.test(text.trim());
 }
 
+function directMenuRequestSection(text: string): MenuSection | null {
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, " ");
+  if (/^(wallet|wallet menu|mkoba)$/i.test(normalized)) return "wallet";
+  if (/^(contribution|contributions|contribution menu|michango|mchango)$/i.test(normalized)) return "contribution";
+  if (/^(welfare|welfare menu|welfare cases|kesi)$/i.test(normalized)) return "welfare";
+  if (/^(kitty|kitties|kitty menu|fundraisers?|harambee)$/i.test(normalized)) return "kitty";
+  if (/^(communication|communication menu|updates|notices|mawasiliano|matangazo)$/i.test(normalized)) return "communication";
+  if (/^(profile|profile menu|membership|membership menu|account|akaunti)$/i.test(normalized)) return "profile";
+  if (/^(more|more services|more services menu|other services)$/i.test(normalized)) return "more_services";
+  if (/^(official|official tools|admin|admin menu|official menu)$/i.test(normalized)) return "official";
+  return null;
+}
+
 function isBackCommand(text: string): boolean {
   return /^(0|00|back|go back|main|main menu|home|nyuma|rudi)$/i.test(text.trim());
 }
@@ -6292,16 +6308,13 @@ function mainMenuReply(profile: Profile, roles: string[], language: "auto" | "en
       "Step 3: Kwa malipo, utakubali ombi la M-Pesa likifika kwa simu yako.",
       "",
       "1. Wallet - salio, top-up, wallet history",
-      "2. Contributions - deni, paid records, PAY",
-      "3. Receipts - malipo yaliyothibitishwa",
-      "4. Welfare cases - cases active na targets",
-      "5. Kitties - view/contribute by M-Pesa or wallet",
-      "6. Meetings - mkutano ujao",
-      "7. Announcements - matangazo mapya",
-      "8. Profile & membership - status, fee, update details",
-      "9. Notifications - unread alerts/reminders",
-      "10. More services - jobs, voting, refunds, discipline",
-      "11. Support - ask for help or official follow-up",
+      "2. Contributions - summary, pay, receipts",
+      "3. Welfare - cases, contribute, records",
+      "4. Kitties - view, contribute, records",
+      "5. Communication - announcements, meetings, notifications",
+      "6. Profile & membership - status, fee, update details",
+      "7. More services - jobs, voting, refunds, discipline",
+      "8. Support - ask for help or official follow-up",
     ]
     : [
       `Hi ${name}. This is your Turuturu Stars member self-service.`,
@@ -6310,22 +6323,19 @@ function mainMenuReply(profile: Profile, roles: string[], language: "auto" | "en
       "Step 3: For payments, approve the Pay with M-Pesa prompt when it appears on your phone.",
       "",
       "1. Wallet - balance, top-up, wallet history",
-      "2. Contributions - what you owe, paid records, PAY",
-      "3. Receipts - confirmed payments",
-      "4. Welfare cases - active cases and targets",
-      "5. Kitties - view/contribute by M-Pesa or wallet",
-      "6. Meetings - next meeting",
-      "7. Announcements - latest notices",
-      "8. Profile & membership - status, fee, update details",
-      "9. Notifications - unread alerts/reminders",
-      "10. More services - jobs, voting, refunds, discipline",
-      "11. Support - ask for help or official follow-up",
+      "2. Contributions - summary, pay, receipts",
+      "3. Welfare - cases, contribute, records",
+      "4. Kitties - view, contribute, records",
+      "5. Communication - announcements, meetings, notifications",
+      "6. Profile & membership - status, fee, update details",
+      "7. More services - jobs, voting, refunds, discipline",
+      "8. Support - ask for help or official follow-up",
     ];
 
   if (official) {
     lines.push(language === "sw"
-      ? "12. Official tools - approvals, announcements, payment verification"
-      : "12. Official tools - approvals, announcements, payment verification");
+      ? "9. Official tools - approvals, announcements, payment verification"
+      : "9. Official tools - approvals, announcements, payment verification");
     lines.push(language === "sw"
       ? `Roles zako: ${roles.map(roleDisplayName).join(", ")}. Reply MY ROLE kuthibitisha.`
       : `Your roles: ${roles.map(roleDisplayName).join(", ")}. Reply MY ROLE to confirm.`);
@@ -6353,26 +6363,96 @@ function mainMenuReply(profile: Profile, roles: string[], language: "auto" | "en
 function moreServicesReply(language: "auto" | "en" | "sw"): string {
   const lines = language === "sw"
     ? [
-      "More member services:",
-      "JOBS - job opportunities zilizo wazi",
-      "VOTING - motions na voting status",
-      "REFUNDS - refund request status",
-      "DISCIPLINE - fines or discipline records",
-      "MEMBERSHIP - membership fee/registration status",
+      "More services menu",
+      "Choose the next step:",
+      "1. Jobs - open opportunities",
+      "2. Voting - motions and voting status",
+      "3. Refunds - refund request status",
+      "4. Discipline/fines - records and unpaid fines",
+      "5. Membership status - fee, registration, benefits",
       "",
-      "Reply na keyword moja hapo juu, au uliza kawaida. Reply MENU kurudi main menu.",
+      "Reply na keyword moja, uliza kawaida, au reply 0 kurudi main menu.",
     ]
     : [
-      "More member services:",
-      "JOBS - open job opportunities",
-      "VOTING - motions and voting status",
-      "REFUNDS - refund request status",
-      "DISCIPLINE - fines or discipline records",
-      "MEMBERSHIP - membership fee/registration status",
+      "More services menu",
+      "Choose the next step:",
+      "1. Jobs - open opportunities",
+      "2. Voting - motions and voting status",
+      "3. Refunds - refund request status",
+      "4. Discipline/fines - records and unpaid fines",
+      "5. Membership status - fee, registration, benefits",
       "",
-      "Reply with one keyword above, or ask naturally. Reply MENU to return to the main menu.",
+      "Reply with one keyword, ask naturally, or reply 0 to return to the main menu.",
     ];
 
+  return lines.join("\n");
+}
+
+function communicationMenuReply(roles: string[], language: "auto" | "en" | "sw"): string {
+  const lines = language === "sw"
+    ? [
+      "Communication menu",
+      "Choose the next step:",
+      "1. Latest announcements",
+      "2. Upcoming meetings",
+      "3. Unread notifications",
+      "4. Support or official follow-up",
+    ]
+    : [
+      "Communication menu",
+      "Choose the next step:",
+      "1. Latest announcements",
+      "2. Upcoming meetings",
+      "3. Unread notifications",
+      "4. Support or official follow-up",
+    ];
+
+  if (isOfficial(roles)) {
+    lines.push(language === "sw"
+      ? "5. Announcement delivery status"
+      : "5. Announcement delivery status");
+  }
+  if (canCreateAnnouncement(roles)) {
+    lines.push(language === "sw"
+      ? "6. Publish announcement"
+      : "6. Publish announcement");
+  }
+
+  lines.push("");
+  lines.push(language === "sw" ? "Reply 0 kurudi main menu." : "Reply 0 to return to the main menu.");
+  return lines.join("\n");
+}
+
+function profileMenuReply(profile: Profile, roles: string[], language: "auto" | "en" | "sw"): string {
+  const memberNo = profile.membership_number || (language === "sw" ? "haijapewa bado" : "not assigned");
+  const roleText = roles.length ? roles.map(roleDisplayName).join(", ") : "member";
+  const lines = language === "sw"
+    ? [
+      "Profile & membership menu",
+      `Membership No: ${memberNo}`,
+      `Roles: ${roleText}`,
+      "Choose the next step:",
+      "1. View profile and account status",
+      "2. Membership fee and registration status",
+      "3. Update profile details",
+      "4. Member benefits",
+      "5. My roles",
+      "",
+      "Reply 0 kurudi main menu.",
+    ]
+    : [
+      "Profile & membership menu",
+      `Membership No: ${memberNo}`,
+      `Roles: ${roleText}`,
+      "Choose the next step:",
+      "1. View profile and account status",
+      "2. Membership fee and registration status",
+      "3. Update profile details",
+      "4. Member benefits",
+      "5. My roles",
+      "",
+      "Reply 0 to return to the main menu.",
+    ];
   return lines.join("\n");
 }
 
@@ -6388,6 +6468,7 @@ function walletMenuReply(context: FinanceContext, language: "auto" | "en" | "sw"
       "1. Check wallet balance",
       "2. Top up wallet with M-Pesa",
       "3. Recent wallet transactions",
+      "4. Payment receipts",
       "",
       "Tip: unaweza pia kuandika 'top up wallet 500'.",
       "0. Back to main menu",
@@ -6399,6 +6480,7 @@ function walletMenuReply(context: FinanceContext, language: "auto" | "en" | "sw"
       "1. Check balance",
       "2. Top up wallet with M-Pesa",
       "3. Recent wallet transactions",
+      "4. Payment receipts",
       "",
       "Tip: you can also type 'top up wallet 500'.",
       "0. Back to main menu",
@@ -6406,14 +6488,17 @@ function walletMenuReply(context: FinanceContext, language: "auto" | "en" | "sw"
   return lines.join("\n");
 }
 
-function contributionOptionsReply(language: "auto" | "en" | "sw"): string {
+function contributionOptionsReply(language: "auto" | "en" | "sw", roles: string[] = []): string {
   const lines = language === "sw"
     ? [
       "Contribution menu",
       "Choose the next step:",
-      "1. Contribute now with M-Pesa",
-      "2. Contribute later",
+      "1. Contribution summary",
+      "2. Pay contribution now with M-Pesa",
       "3. Record a contribution already made",
+      "4. Receipts - confirmed payments",
+      "5. Pending contribution records",
+      "6. Membership fee/status",
       "",
       "Uki-record payment tayari imelipwa, tuma amount, purpose, na M-Pesa/bank reference au paste message kamili.",
       "0. Back to main menu",
@@ -6421,13 +6506,25 @@ function contributionOptionsReply(language: "auto" | "en" | "sw"): string {
     : [
       "Contribution menu",
       "Choose the next step:",
-      "1. Contribute now with M-Pesa",
-      "2. Contribute later",
+      "1. Contribution summary",
+      "2. Pay contribution now with M-Pesa",
       "3. Record a contribution already made",
+      "4. Receipts - confirmed payments",
+      "5. Pending contribution records",
+      "6. Membership fee/status",
       "",
       "When recording a payment already made, send the amount, purpose, and M-Pesa/bank reference or paste the full payment message.",
       "0. Back to main menu",
     ];
+
+  if (canVerifyContribution(roles)) {
+    lines.splice(lines.length - 2, 0, language === "sw"
+      ? "7. Pending manual payments to verify"
+      : "7. Pending manual payments to verify");
+    lines.splice(lines.length - 2, 0, language === "sw"
+      ? "8. Verify payment by reference"
+      : "8. Verify payment by reference");
+  }
   return lines.join("\n");
 }
 
@@ -6439,6 +6536,8 @@ function kittyMenuReply(language: "auto" | "en" | "sw"): string {
       "1. View active kitties/fundraisers",
       "2. Contribute to kitty with M-Pesa",
       "3. Contribute to kitty from wallet",
+      "4. My kitty contribution records",
+      "5. Wallet balance",
       "",
       "Tip: unaweza pia kuandika 'contribute 500 to school kitty'.",
       "0. Back to main menu",
@@ -6449,6 +6548,8 @@ function kittyMenuReply(language: "auto" | "en" | "sw"): string {
       "1. View active kitties/fundraisers",
       "2. Contribute to kitty with M-Pesa",
       "3. Contribute to kitty from wallet",
+      "4. My kitty contribution records",
+      "5. Wallet balance",
       "",
       "Tip: you can also type 'contribute 500 to school kitty'.",
       "0. Back to main menu",
@@ -6456,14 +6557,16 @@ function kittyMenuReply(language: "auto" | "en" | "sw"): string {
   return lines.join("\n");
 }
 
-function welfareMenuReply(language: "auto" | "en" | "sw"): string {
+function welfareMenuReply(language: "auto" | "en" | "sw", roles: string[] = []): string {
   const lines = language === "sw"
     ? [
       "Welfare menu",
       "Choose the next step:",
       "1. View active welfare cases",
-      "2. Contribute to welfare with M-Pesa",
-      "3. Contribute to welfare from wallet",
+      "2. My welfare contribution records",
+      "3. Contribute to welfare with M-Pesa",
+      "4. Contribute to welfare from wallet",
+      "5. Wallet balance",
       "",
       "Tip: unaweza pia kuandika 'changia 500 kwa Kangethe welfare'.",
       "0. Back to main menu",
@@ -6472,12 +6575,23 @@ function welfareMenuReply(language: "auto" | "en" | "sw"): string {
       "Welfare menu",
       "Choose the next step:",
       "1. View active welfare cases",
-      "2. Contribute to welfare with M-Pesa",
-      "3. Contribute to welfare from wallet",
+      "2. My welfare contribution records",
+      "3. Contribute to welfare with M-Pesa",
+      "4. Contribute to welfare from wallet",
+      "5. Wallet balance",
       "",
       "Tip: you can also type 'contribute 500 for Kangethe welfare'.",
       "0. Back to main menu",
     ];
+
+  if (isOfficial(roles)) {
+    lines.splice(lines.length - 2, 0, language === "sw"
+      ? "6. Add welfare case"
+      : "6. Add welfare case");
+    lines.splice(lines.length - 2, 0, language === "sw"
+      ? "7. Welfare management"
+      : "7. Welfare management");
+  }
   return lines.join("\n");
 }
 
@@ -6496,6 +6610,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "6. My role",
       "7. Add fine/discipline record",
       "8. Add member",
+      "9. Add welfare case",
       "",
       "0. Back to main menu",
     ]
@@ -6511,6 +6626,7 @@ function officialMenuReply(roles: string[], language: "auto" | "en" | "sw"): str
       "6. My role",
       "7. Add fine/discipline record",
       "8. Add member",
+      "9. Add welfare case",
       "",
       "0. Back to main menu",
     ];
@@ -7522,6 +7638,78 @@ async function handleNumberedMenu(
     };
   }
 
+  const directSection = directMenuRequestSection(text);
+  if (directSection) {
+    if (directSection === "wallet") {
+      return {
+        parsed: menuIntent("query_wallet", language),
+        execution: { actionStatus: "completed", reply: walletMenuReply(context, language), result: { menu: "wallet" }, nextState: sessionWithMenu(menuState("wallet")) },
+        lastIntent: "menu_wallet",
+      };
+    }
+    if (directSection === "contribution") {
+      return {
+        parsed: menuIntent("query_contributions", language),
+        execution: {
+          actionStatus: "completed",
+          reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language, roles)}`,
+          result: { menu: "contributions" },
+          nextState: sessionWithMenu(menuState("contribution")),
+        },
+        lastIntent: "query_contributions",
+      };
+    }
+    if (directSection === "welfare") {
+      return {
+        parsed: menuIntent("query_welfare", language),
+        execution: { actionStatus: "completed", reply: welfareMenuReply(language, roles), result: { menu: "welfare" }, nextState: sessionWithMenu(menuState("welfare")) },
+        lastIntent: "query_welfare",
+      };
+    }
+    if (directSection === "kitty") {
+      return {
+        parsed: menuIntent("query_kitties", language),
+        execution: { actionStatus: "completed", reply: kittyMenuReply(language), result: { menu: "kitty" }, nextState: sessionWithMenu(menuState("kitty")) },
+        lastIntent: "menu_kitty",
+      };
+    }
+    if (directSection === "communication") {
+      return {
+        parsed: menuIntent("query_announcements", language),
+        execution: { actionStatus: "completed", reply: communicationMenuReply(roles, language), result: { menu: "communication" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "communication",
+      };
+    }
+    if (directSection === "profile") {
+      return {
+        parsed: menuIntent("query_profile", language),
+        execution: { actionStatus: "completed", reply: profileMenuReply(profile, roles, language), result: { menu: "profile" }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "profile",
+      };
+    }
+    if (directSection === "more_services") {
+      return {
+        parsed: menuIntent("query_support", language),
+        execution: { actionStatus: "completed", reply: moreServicesReply(language), result: { menu: "more_services" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "more_services",
+      };
+    }
+    if (directSection === "official") {
+      return {
+        parsed: menuIntent("query_approvals", language),
+        execution: {
+          actionStatus: isOfficial(roles) ? "completed" : "blocked",
+          reply: isOfficial(roles)
+            ? officialMenuReply(roles, language)
+            : (language === "sw" ? "Official tools zinahitaji role ya official/admin." : "Official tools require an official/admin role."),
+          result: { menu: "official", roles },
+          nextState: sessionWithMenu(menuState(isOfficial(roles) ? "official" : "main")),
+        },
+        lastIntent: "query_approvals",
+      };
+    }
+  }
+
   if (isCloseMenuCommand(text) && current) {
     return {
       parsed: menuIntent("help", language),
@@ -7864,10 +8052,29 @@ async function handleNumberedMenu(
         lastIntent: "query_wallet",
       };
     }
+    if (number === 4) {
+      return {
+        parsed: menuIntent("query_receipts", language),
+        execution: { actionStatus: "completed", reply: await receiptsReply(supabase, profile, language), result: { menu: "wallet_receipts" }, nextState: sessionWithMenu(menuState("wallet")) },
+        lastIntent: "query_receipts",
+      };
+    }
   }
 
   if (section === "contribution") {
     if (number === 1) {
+      return {
+        parsed: menuIntent("query_contributions", language),
+        execution: {
+          actionStatus: "completed",
+          reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language, roles)}`,
+          result: { menu: "contribution_summary" },
+          nextState: sessionWithMenu(menuState("contribution")),
+        },
+        lastIntent: "query_contributions",
+      };
+    }
+    if (number === 2) {
       return {
         parsed: menuIntent("record_contribution", language),
         execution: {
@@ -7875,20 +8082,6 @@ async function handleNumberedMenu(
           reply: language === "sw" ? "Step 2: Unataka kuchangia KSh ngapi sasa? Mfano: 500" : "Step 2: How much do you want to contribute now? Example: 500",
           result: { missing: ["amount"], menu: "contribution_now" },
           nextState: sessionWithMenu(menuState("contribution_now_amount")),
-        },
-        lastIntent: "record_contribution",
-      };
-    }
-    if (number === 2) {
-      return {
-        parsed: menuIntent("record_contribution", language),
-        execution: {
-          actionStatus: "completed",
-          reply: language === "sw"
-            ? "Sawa, hakuna payment imeanzishwa. Ukiwa ready, reply CONTRIBUTION 500 au MENU."
-            : "Okay, no payment has been started. When ready, reply CONTRIBUTION 500 or MENU.",
-          result: { contribution_later: true },
-          nextState: {},
         },
         lastIntent: "record_contribution",
       };
@@ -7909,6 +8102,58 @@ async function handleNumberedMenu(
           },
         },
         lastIntent: "record_contribution",
+      };
+    }
+    if (number === 4) {
+      return {
+        parsed: menuIntent("query_receipts", language),
+        execution: { actionStatus: "completed", reply: await receiptsReply(supabase, profile, language), result: { menu: "contribution_receipts" }, nextState: sessionWithMenu(menuState("contribution")) },
+        lastIntent: "query_receipts",
+      };
+    }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_contributions", language),
+        execution: { actionStatus: "completed", reply: contributionRecordsByStatusReply(context, "pending", language), result: { menu: "pending_contributions" }, nextState: sessionWithMenu(menuState("contribution")) },
+        lastIntent: "query_contributions",
+      };
+    }
+    if (number === 6) {
+      return {
+        parsed: menuIntent("query_membership", language),
+        execution: { actionStatus: "completed", reply: membershipReply(profile, context, language), result: { menu: "membership_status" }, nextState: sessionWithMenu(menuState("contribution")) },
+        lastIntent: "query_membership",
+      };
+    }
+    if (number === 7 && canVerifyContribution(roles)) {
+      return {
+        parsed: menuIntent("verify_contribution", language),
+        execution: {
+          actionStatus: "completed",
+          reply: await listPendingContributionVerifications(supabase, language),
+          result: { menu: "pending_payments" },
+          nextState: sessionWithMenu(menuState("contribution")),
+        },
+        lastIntent: "pending_payments",
+      };
+    }
+    if (number === 8 && canVerifyContribution(roles)) {
+      return {
+        parsed: menuIntent("verify_contribution", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma reference ya payment kuthibitisha. Mfano: VERIFY QJD123ABC."
+            : "Send the payment reference to verify. Example: VERIFY QJD123ABC.",
+          result: { missing: ["reference_number"], menu: "verify_payment" },
+          nextState: {
+            pending_intent: { intent: "verify_contribution", confidence: 0.85, language },
+            asked_for: ["reference_number"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("contribution"),
+          },
+        },
+        lastIntent: "verify_contribution",
       };
     }
   }
@@ -7936,9 +8181,16 @@ async function handleNumberedMenu(
     }
     if (number === 4) {
       return {
-        parsed: menuIntent("query_welfare", language),
-        execution: { actionStatus: "completed", reply: welfareMenuReply(language), result: { menu: "welfare" }, nextState: sessionWithMenu(menuState("welfare")) },
-        lastIntent: "query_welfare",
+        parsed: menuIntent("query_kitties", language),
+        execution: { actionStatus: "completed", reply: await kittyContributionRecordsReply(supabase, profile, language), result: { menu: "kitty_records" }, nextState: sessionWithMenu(menuState("kitty")) },
+        lastIntent: "query_kitties",
+      };
+    }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_wallet", language),
+        execution: { actionStatus: "completed", reply: walletReply(context, language), result: { menu: "kitty_wallet_balance" }, nextState: sessionWithMenu(menuState("kitty")) },
+        lastIntent: "query_wallet",
       };
     }
   }
@@ -7951,17 +8203,67 @@ async function handleNumberedMenu(
         lastIntent: "query_welfare",
       };
     }
-    if (number === 2 || number === 3) {
-      const chooser = await welfareSelectionReply(supabase, number === 3 ? "welfare_wallet" : "welfare_mpesa", language);
+    if (number === 2) {
+      return {
+        parsed: menuIntent("query_welfare", language),
+        execution: {
+          actionStatus: "completed",
+          reply: typedContributionRecordsReply(context, /^welfare$/i, "welfare", language),
+          result: { menu: "welfare_contribution_records" },
+          nextState: sessionWithMenu(menuState("welfare")),
+        },
+        lastIntent: "query_welfare",
+      };
+    }
+    if (number === 3 || number === 4) {
+      const chooser = await welfareSelectionReply(supabase, number === 4 ? "welfare_wallet" : "welfare_mpesa", language);
       return {
         parsed: menuIntent("contribute_welfare", language),
         execution: {
           actionStatus: chooser.count > 0 ? "needs_clarification" : "completed",
           reply: chooser.reply,
-          result: { menu: "welfare_select", payment_method: number === 3 ? "wallet" : "mpesa" },
+          result: { menu: "welfare_select", payment_method: number === 4 ? "wallet" : "mpesa" },
           nextState: chooser.state,
         },
         lastIntent: "contribute_welfare",
+      };
+    }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_wallet", language),
+        execution: { actionStatus: "completed", reply: walletReply(context, language), result: { menu: "welfare_wallet_balance" }, nextState: sessionWithMenu(menuState("welfare")) },
+        lastIntent: "query_wallet",
+      };
+    }
+    if (number === 6 && isOfficial(roles)) {
+      return {
+        parsed: menuIntent("create_welfare_case", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma welfare case kwa format hii: ADD WELFARE CASE medical for Mary target 20000."
+            : "Send the welfare case like this: ADD WELFARE CASE medical for Mary target 20000.",
+          result: { missing: ["title"], menu: "add_welfare_case" },
+          nextState: {
+            pending_intent: { intent: "create_welfare_case", confidence: 0.85, language },
+            asked_for: ["title"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("welfare"),
+          },
+        },
+        lastIntent: "create_welfare_case",
+      };
+    }
+    if (number === 7 && isOfficial(roles)) {
+      return {
+        parsed: menuIntent("query_welfare", language),
+        execution: {
+          actionStatus: "completed",
+          reply: await welfareReply(supabase, language),
+          result: { menu: "welfare_management" },
+          nextState: sessionWithMenu(menuState("welfare")),
+        },
+        lastIntent: "query_welfare",
       };
     }
   }
@@ -8092,6 +8394,173 @@ async function handleNumberedMenu(
         lastIntent: "create_member",
       };
     }
+    if (number === 9) {
+      return {
+        parsed: menuIntent("create_welfare_case", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma welfare case kwa format hii: ADD WELFARE CASE medical for Mary target 20000."
+            : "Send the welfare case like this: ADD WELFARE CASE medical for Mary target 20000.",
+          result: { missing: ["title"], menu: "add_welfare_case" },
+          nextState: {
+            pending_intent: { intent: "create_welfare_case", confidence: 0.85, language },
+            asked_for: ["title"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("official"),
+          },
+        },
+        lastIntent: "create_welfare_case",
+      };
+    }
+  }
+
+  if (section === "communication") {
+    if (number === 1) {
+      return {
+        parsed: menuIntent("query_announcements", language),
+        execution: { actionStatus: "completed", reply: await announcementsReply(supabase, language), result: { menu: "announcements" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "query_announcements",
+      };
+    }
+    if (number === 2) {
+      return {
+        parsed: menuIntent("query_meetings", language),
+        execution: { actionStatus: "completed", reply: await meetingsReply(supabase, language), result: { menu: "meetings" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "query_meetings",
+      };
+    }
+    if (number === 3) {
+      return {
+        parsed: menuIntent("query_notifications", language),
+        execution: { actionStatus: "completed", reply: await notificationsReply(supabase, profile, language), result: { menu: "notifications" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "query_notifications",
+      };
+    }
+    if (number === 4) {
+      return {
+        parsed: menuIntent("query_support", language),
+        execution: { actionStatus: "completed", reply: supportReply(language, profile), result: { menu: "communication_support" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "query_support",
+      };
+    }
+    if (number === 5 && isOfficial(roles)) {
+      return {
+        parsed: { ...menuIntent("query_announcements", language), category: "delivery_status" },
+        execution: {
+          actionStatus: "completed",
+          reply: await latestAnnouncementDeliveryReply(supabase, language),
+          result: { menu: "announcement_delivery" },
+          nextState: sessionWithMenu(menuState("communication")),
+        },
+        lastIntent: "query_announcements",
+      };
+    }
+    if (number === 6 && canCreateAnnouncement(roles)) {
+      return {
+        parsed: menuIntent("create_announcement", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: language === "sw"
+            ? "Tuma title/topic ya tangazo au draft message. Nitaitengeneza vizuri, nikuonyeshe preview, kisha utasema SEND ku-publish."
+            : "Send the announcement title/topic or draft message. I will polish it, show you a preview, then you can reply SEND to publish.",
+          result: { menu: "create_announcement" },
+          nextState: {
+            pending_intent: { intent: "create_announcement", confidence: 0.8, language },
+            asked_for: ["title", "content"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("communication"),
+          },
+        },
+        lastIntent: "create_announcement",
+      };
+    }
+  }
+
+  if (section === "profile") {
+    if (number === 1) {
+      return {
+        parsed: menuIntent("query_profile", language),
+        execution: { actionStatus: "completed", reply: profileReply(profile, roles, language), result: { menu: "profile_status" }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "query_profile",
+      };
+    }
+    if (number === 2) {
+      return {
+        parsed: menuIntent("query_membership", language),
+        execution: { actionStatus: "completed", reply: membershipReply(profile, context, language), result: { menu: "membership_status" }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "query_membership",
+      };
+    }
+    if (number === 3) {
+      return {
+        parsed: menuIntent("update_profile", language),
+        execution: {
+          actionStatus: "needs_clarification",
+          reply: profileUpdateClarificationReply(language),
+          result: { menu: "update_profile" },
+          nextState: {
+            pending_intent: { intent: "update_profile", confidence: 0.85, language },
+            asked_for: ["profile_updates"],
+            updated_at: new Date().toISOString(),
+            menu: menuState("profile"),
+          },
+        },
+        lastIntent: "update_profile",
+      };
+    }
+    if (number === 4) {
+      return {
+        parsed: menuIntent("query_membership", language),
+        execution: { actionStatus: "completed", reply: memberBenefitsReply(language), result: { menu: "member_benefits" }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "query_membership",
+      };
+    }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_profile", language),
+        execution: { actionStatus: "completed", reply: profileReply(profile, roles, language), result: { menu: "my_roles", roles }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "query_profile",
+      };
+    }
+  }
+
+  if (section === "more_services") {
+    if (number === 1) {
+      return {
+        parsed: menuIntent("query_jobs", language),
+        execution: { actionStatus: "completed", reply: await jobsReply(supabase, language), result: { menu: "jobs" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "query_jobs",
+      };
+    }
+    if (number === 2) {
+      return {
+        parsed: menuIntent("query_voting", language),
+        execution: { actionStatus: "completed", reply: await votingReply(supabase, profile, language), result: { menu: "voting" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "query_voting",
+      };
+    }
+    if (number === 3) {
+      return {
+        parsed: menuIntent("query_refunds", language),
+        execution: { actionStatus: "completed", reply: await refundsReply(supabase, profile, language), result: { menu: "refunds" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "query_refunds",
+      };
+    }
+    if (number === 4) {
+      return {
+        parsed: menuIntent("query_discipline", language),
+        execution: { actionStatus: "completed", reply: await disciplineReply(supabase, profile, language), result: { menu: "discipline" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "query_discipline",
+      };
+    }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_membership", language),
+        execution: { actionStatus: "completed", reply: membershipReply(profile, context, language), result: { menu: "membership_status" }, nextState: sessionWithMenu(menuState("more_services")) },
+        lastIntent: "query_membership",
+      };
+    }
   }
 
   if (section === "main") {
@@ -8107,7 +8576,7 @@ async function handleNumberedMenu(
         parsed: menuIntent("query_contributions", language),
         execution: {
           actionStatus: "completed",
-          reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language)}`,
+          reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language, roles)}`,
           result: { menu: "contributions" },
           nextState: sessionWithMenu(menuState("contribution")),
         },
@@ -8116,68 +8585,47 @@ async function handleNumberedMenu(
     }
     if (number === 3) {
       return {
-        parsed: menuIntent("query_receipts", language),
-        execution: { actionStatus: "completed", reply: await receiptsReply(supabase, profile, language), result: { menu: "receipts" }, nextState: sessionWithMenu(menuState("main")) },
-        lastIntent: "query_receipts",
-      };
-    }
-    if (number === 4) {
-      return {
         parsed: menuIntent("query_welfare", language),
-        execution: { actionStatus: "completed", reply: welfareMenuReply(language), result: { menu: "welfare" }, nextState: sessionWithMenu(menuState("welfare")) },
+        execution: { actionStatus: "completed", reply: welfareMenuReply(language, roles), result: { menu: "welfare" }, nextState: sessionWithMenu(menuState("welfare")) },
         lastIntent: "query_welfare",
       };
     }
-    if (number === 5) {
+    if (number === 4) {
       return {
         parsed: menuIntent("query_kitties", language),
         execution: { actionStatus: "completed", reply: kittyMenuReply(language), result: { menu: "kitty" }, nextState: sessionWithMenu(menuState("kitty")) },
         lastIntent: "menu_kitty",
       };
     }
+    if (number === 5) {
+      return {
+        parsed: menuIntent("query_announcements", language),
+        execution: { actionStatus: "completed", reply: communicationMenuReply(roles, language), result: { menu: "communication" }, nextState: sessionWithMenu(menuState("communication")) },
+        lastIntent: "communication",
+      };
+    }
     if (number === 6) {
       return {
-        parsed: menuIntent("query_meetings", language),
-        execution: { actionStatus: "completed", reply: await meetingsReply(supabase, language), result: { menu: "meetings" }, nextState: sessionWithMenu(menuState("main")) },
-        lastIntent: "query_meetings",
+        parsed: menuIntent("query_profile", language),
+        execution: { actionStatus: "completed", reply: profileMenuReply(profile, roles, language), result: { menu: "profile" }, nextState: sessionWithMenu(menuState("profile")) },
+        lastIntent: "profile",
       };
     }
     if (number === 7) {
       return {
-        parsed: menuIntent("query_announcements", language),
-        execution: { actionStatus: "completed", reply: await announcementsReply(supabase, language), result: { menu: "announcements" }, nextState: sessionWithMenu(menuState("main")) },
-        lastIntent: "query_announcements",
-      };
-    }
-    if (number === 8) {
-      return {
-        parsed: menuIntent("query_profile", language),
-        execution: { actionStatus: "completed", reply: profileReply(profile, roles, language), result: { menu: "profile" }, nextState: sessionWithMenu(menuState("main")) },
-        lastIntent: "query_profile",
-      };
-    }
-    if (number === 9) {
-      return {
-        parsed: menuIntent("query_notifications", language),
-        execution: { actionStatus: "completed", reply: await notificationsReply(supabase, profile, language), result: { menu: "notifications" }, nextState: sessionWithMenu(menuState("main")) },
-        lastIntent: "query_notifications",
-      };
-    }
-    if (number === 10) {
-      return {
         parsed: menuIntent("query_support", language),
-        execution: { actionStatus: "completed", reply: moreServicesReply(language), result: { menu: "more_services" }, nextState: sessionWithMenu(menuState("main")) },
+        execution: { actionStatus: "completed", reply: moreServicesReply(language), result: { menu: "more_services" }, nextState: sessionWithMenu(menuState("more_services")) },
         lastIntent: "more_services",
       };
     }
-    if (number === 11) {
+    if (number === 8) {
       return {
         parsed: menuIntent("query_support", language),
         execution: { actionStatus: "completed", reply: supportReply(language, profile), result: { menu: "support" }, nextState: sessionWithMenu(menuState("main")) },
         lastIntent: "query_support",
       };
     }
-    if (number === 12 && isOfficial(roles)) {
+    if (number === 9 && isOfficial(roles)) {
       return {
         parsed: menuIntent("query_approvals", language),
         execution: { actionStatus: "completed", reply: officialMenuReply(roles, language), result: { menu: "official" }, nextState: sessionWithMenu(menuState("official")) },
@@ -8197,17 +8645,34 @@ async function handleNumberedMenu(
         current?.section === "wallet"
           ? walletMenuReply(context, language)
           : current?.section === "contribution"
-            ? contributionOptionsReply(language)
+            ? contributionOptionsReply(language, roles)
           : current?.section === "welfare"
-            ? welfareMenuReply(language)
+            ? welfareMenuReply(language, roles)
             : current?.section === "official"
               ? officialMenuReply(roles, language)
           : current?.section === "kitty"
             ? kittyMenuReply(language)
+            : current?.section === "communication"
+              ? communicationMenuReply(roles, language)
+            : current?.section === "profile"
+              ? profileMenuReply(profile, roles, language)
+            : current?.section === "more_services"
+              ? moreServicesReply(language)
             : mainMenuReply(profile, roles, language),
       ].join("\n\n"),
       result: { invalid_menu_selection: number, current_menu: current?.section || "main" },
-      nextState: sessionWithMenu(menuState(current?.section === "wallet" || current?.section === "contribution" || current?.section === "welfare" || current?.section === "kitty" || current?.section === "official" ? current.section : "main")),
+      nextState: sessionWithMenu(menuState(
+        current?.section === "wallet" ||
+          current?.section === "contribution" ||
+          current?.section === "welfare" ||
+          current?.section === "kitty" ||
+          current?.section === "official" ||
+          current?.section === "communication" ||
+          current?.section === "profile" ||
+          current?.section === "more_services"
+          ? current.section
+          : "main",
+      )),
     },
     lastIntent: "menu",
   };
@@ -8317,6 +8782,91 @@ async function receiptsReply(supabase: SupabaseClient, profile: Profile, languag
   for (const row of rows) {
     const ref = row.reference_number ? `, ref ${row.reference_number}` : "";
     lines.push(`- ${row.contribution_type}: ${formatMoney(Number(row.amount || 0))} on ${shortDate(String(row.paid_at || row.created_at || ""))}${ref}`);
+  }
+  return lines.join("\n");
+}
+
+function contributionRecordsByStatusReply(
+  context: FinanceContext,
+  status: string,
+  language: "auto" | "en" | "sw",
+): string {
+  const rows = context.contributions.filter((row) => row.status === status).slice(0, 8);
+  if (rows.length === 0) {
+    return language === "sw"
+      ? `Sijaona contribution records zenye status ${status}.`
+      : `I do not see contribution records with status ${status}.`;
+  }
+
+  const total = rows.reduce((sum, row) => sum + row.amount, 0);
+  const lines = language === "sw"
+    ? [`${status[0].toUpperCase()}${status.slice(1)} contributions: ${formatMoney(total)}`]
+    : [`${status[0].toUpperCase()}${status.slice(1)} contributions: ${formatMoney(total)}`];
+
+  for (const row of rows) {
+    const ref = row.reference_number ? `, ref ${row.reference_number}` : "";
+    lines.push(`- ${row.contribution_type}: ${formatMoney(row.amount)} (${shortDate(row.paid_at || row.created_at)}${ref})`);
+  }
+  return lines.join("\n");
+}
+
+function typedContributionRecordsReply(
+  context: FinanceContext,
+  matcher: RegExp,
+  label: string,
+  language: "auto" | "en" | "sw",
+): string {
+  const rows = context.contributions.filter((row) => matcher.test(row.contribution_type)).slice(0, 8);
+  if (rows.length === 0) {
+    return language === "sw"
+      ? `Sijaona ${label} contribution records kwa account yako.`
+      : `I do not see ${label} contribution records on your account.`;
+  }
+
+  const totalPaid = rows
+    .filter((row) => row.status === "paid")
+    .reduce((sum, row) => sum + row.amount, 0);
+  const totalPending = rows
+    .filter((row) => row.status === "pending")
+    .reduce((sum, row) => sum + row.amount, 0);
+  const lines = [
+    `${label[0].toUpperCase()}${label.slice(1)} records: paid ${formatMoney(totalPaid)}, pending ${formatMoney(totalPending)}`,
+  ];
+
+  for (const row of rows.slice(0, 5)) {
+    const ref = row.reference_number ? `, ref ${row.reference_number}` : "";
+    lines.push(`- ${formatMoney(row.amount)} (${row.status || "unknown"}, ${shortDate(row.paid_at || row.created_at)}${ref})`);
+  }
+  return lines.join("\n");
+}
+
+async function kittyContributionRecordsReply(
+  supabase: SupabaseClient,
+  profile: Profile,
+  language: "auto" | "en" | "sw",
+): Promise<string> {
+  const { data, error } = await supabase
+    .from("kitty_contributions")
+    .select("amount, source, status, reference, created_at, kitties(title)")
+    .eq("member_id", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(8);
+
+  if (error) throw new HttpError(500, "Failed to load kitty contribution records", error);
+  const rows = (data || []) as Array<Record<string, unknown>>;
+  if (rows.length === 0) {
+    return language === "sw"
+      ? "Sijaona kitty contribution records kwa account yako."
+      : "I do not see kitty contribution records on your account.";
+  }
+
+  const total = rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const lines = [language === "sw" ? `Kitty contributions zako: ${formatMoney(total)}` : `Your kitty contributions: ${formatMoney(total)}`];
+  for (const row of rows) {
+    const kitty = row.kitties as Record<string, unknown> | null;
+    const title = cleanString(kitty?.title) || "Kitty";
+    const ref = row.reference ? `, ref ${row.reference}` : "";
+    lines.push(`- ${title}: ${formatMoney(Number(row.amount || 0))} via ${row.source || "unknown"} (${row.status || "completed"}, ${shortDate(String(row.created_at || ""))}${ref})`);
   }
   return lines.join("\n");
 }
@@ -10651,9 +11201,9 @@ async function executeIntent(
   if (intent.intent === "query_contributions") {
     return {
       actionStatus: "completed",
-      reply: contributionSummaryReply(profile, context, language),
+      reply: `${contributionSummaryReply(profile, context, language)}\n\n${contributionOptionsReply(language, roles)}`,
       result: { records: context.contributions.length },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("contribution")),
     };
   }
 
@@ -10753,9 +11303,9 @@ async function executeIntent(
   if (intent.intent === "query_wallet") {
     return {
       actionStatus: "completed",
-      reply: walletReply(context, language),
+      reply: `${walletReply(context, language)}\n\n${walletMenuReply(context, language)}`,
       result: { wallet: context.wallet },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("wallet")),
     };
   }
 
@@ -10763,17 +11313,17 @@ async function executeIntent(
     if (intent.category === "delivery_status" || isAnnouncementDeliveryQuestion(inboundText)) {
       return {
         actionStatus: "completed",
-        reply: await latestAnnouncementDeliveryReply(supabase, language),
+        reply: `${await latestAnnouncementDeliveryReply(supabase, language)}\n\n${communicationMenuReply(roles, language)}`,
         result: { source: "whatsapp_notifications_queue", category: "announcement_delivery" },
-        nextState: {},
+        nextState: sessionWithMenu(menuState("communication")),
       };
     }
 
     return {
       actionStatus: "completed",
-      reply: await announcementsReply(supabase, language),
+      reply: `${await announcementsReply(supabase, language)}\n\n${communicationMenuReply(roles, language)}`,
       result: { source: "announcements" },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("communication")),
     };
   }
 
@@ -10784,16 +11334,16 @@ async function executeIntent(
   if (intent.intent === "query_meetings") {
     return {
       actionStatus: "completed",
-      reply: await meetingsReply(supabase, language),
+      reply: `${await meetingsReply(supabase, language)}\n\n${communicationMenuReply(roles, language)}`,
       result: { source: "meetings" },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("communication")),
     };
   }
 
   if (intent.intent === "query_welfare") {
     return {
       actionStatus: "completed",
-      reply: `${await welfareReply(supabase, language)}\n\n${welfareMenuReply(language)}`,
+      reply: `${await welfareReply(supabase, language)}\n\n${welfareMenuReply(language, roles)}`,
       result: { source: "welfare_cases" },
       nextState: sessionWithMenu(menuState("welfare")),
     };
@@ -10802,7 +11352,7 @@ async function executeIntent(
   if (intent.intent === "query_kitties") {
     return {
       actionStatus: "completed",
-      reply: await kittiesReply(supabase, language),
+      reply: `${await kittiesReply(supabase, language)}\n\n${kittyMenuReply(language)}`,
       result: { source: "kitties" },
       nextState: sessionWithMenu(menuState("kitty")),
     };
@@ -10820,9 +11370,9 @@ async function executeIntent(
   if (intent.intent === "query_notifications") {
     return {
       actionStatus: "completed",
-      reply: await notificationsReply(supabase, profile, language),
+      reply: `${await notificationsReply(supabase, profile, language)}\n\n${communicationMenuReply(roles, language)}`,
       result: { source: "notifications", read: false },
-      nextState: {},
+      nextState: sessionWithMenu(menuState("communication")),
     };
   }
 
@@ -11151,7 +11701,7 @@ async function executeIntent(
           ? (language === "sw"
             ? "Unaweza ku-record payment iliyofanyika, lakini nahitaji amount, purpose, na M-Pesa/bank reference au message kamili. Mfano: PAID 500 welfare REF QJD123ABC."
             : "You can record a payment already made, but I need the amount, purpose, and M-Pesa/bank reference or full message. Example: PAID 500 welfare REF QJD123ABC.")
-          : contributionOptionsReply(language),
+          : contributionOptionsReply(language, roles),
         result: isManualPaymentRecordContext(inboundText, intent)
           ? { missing: ["amount", "reference_number", "purpose"] }
           : { menu: "contribution_options" },
@@ -11538,7 +12088,7 @@ function isMainMenuReply(body: string): boolean {
 }
 
 function isMenuChoiceReply(body: string): boolean {
-  return /\b(Wallet menu|Contribution menu|Kitty menu|Welfare menu|Official tools)\b/i.test(body.trim());
+  return /\b(Wallet menu|Contribution menu|Kitty menu|Welfare menu|Communication menu|Profile & membership menu|More services menu|Official tools)\b/i.test(body.trim());
 }
 
 function menuSectionFromReply(body: string): string {
@@ -11546,6 +12096,9 @@ function menuSectionFromReply(body: string): string {
   if (/\bContribution menu\b/i.test(body)) return "contribution";
   if (/\bKitty menu\b/i.test(body)) return "kitty";
   if (/\bWelfare menu\b/i.test(body)) return "welfare";
+  if (/\bCommunication menu\b/i.test(body)) return "communication";
+  if (/\bProfile & membership menu\b/i.test(body)) return "profile";
+  if (/\bMore services menu\b/i.test(body)) return "more_services";
   if (/\bOfficial tools\b/i.test(body)) return "official";
   return "main";
 }
