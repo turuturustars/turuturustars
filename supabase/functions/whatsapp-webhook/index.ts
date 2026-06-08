@@ -482,7 +482,6 @@ const CONVERSATION_RATINGS: ConversationRating[] = [
   { emoji: "🙁", score: 2, label: "poor" },
   { emoji: "😡", score: 1, label: "bad" },
 ];
-const RATING_PROMPT = `\n\nRate this chat: ${CONVERSATION_RATINGS.map((rating) => rating.emoji).join(" ")}`;
 const REGISTRATION_OTP_LENGTH = 6;
 const REGISTRATION_OTP_TTL_SECONDS = 10 * 60;
 const REGISTRATION_OTP_RESEND_SECONDS = 60;
@@ -1250,6 +1249,7 @@ function withRequestedAccessLink(
 
   const link = accessLinkForIntent(intent, roles);
   if (!link) return execution;
+  if (whatsappInteractiveForReply(execution.reply)) return execution;
 
   const url = siteUrl(link.path);
   if (execution.reply.includes(url)) return execution;
@@ -1424,6 +1424,12 @@ function normalizeInteractiveReplyId(id: string): string | null {
   const trimmed = id.trim();
   const menuMatch = trimmed.match(/^menu:(?:main|wallet|contribution|welfare|kitty|official|select):(\d{1,2}|back|cancel)$/i);
   if (menuMatch) return menuMatch[1].toLowerCase() === "back" ? "0" : menuMatch[1].toLowerCase();
+  const ratingMatch = trimmed.match(/^rating:([1-5]):([a-z_ -]+)$/i);
+  if (ratingMatch) return `rating:${ratingMatch[1]}:${ratingMatch[2].trim().toLowerCase().replace(/[\s-]+/g, "_")}`;
+  const quickMatch = trimmed.match(/^quick:(menu|wallet|receipts|support)$/i);
+  if (quickMatch) return quickMatch[1].toLowerCase();
+  const keywordMatch = trimmed.match(/^keyword:(jobs|voting|refunds|discipline|membership)$/i);
+  if (keywordMatch) return keywordMatch[1].toLowerCase();
   if (/^\d{1,2}$/.test(trimmed)) return trimmed;
   if (/^(menu|main|home|back|cancel|exit|0)$/i.test(trimmed)) return trimmed;
   return null;
@@ -5865,14 +5871,32 @@ function welcomeBackReply(
   return variants[seededIndex(seed, variants.length)];
 }
 
-function appendRatingPrompt(body: string): string {
-  if (body.includes("Rate this chat:")) return body;
-  return `${body}${RATING_PROMPT}`;
+function ratingPromptReply(language: "auto" | "en" | "sw"): string {
+  return language === "sw" ? "Rate chat hii." : "Rate this chat.";
+}
+
+function isRatingPromptBody(body: string | null | undefined): boolean {
+  const normalized = plainWhatsAppText(body || "").trim().toLowerCase();
+  return normalized === "rate this chat." ||
+    normalized === "rate chat hii." ||
+    normalized.startsWith("rate this chat:") ||
+    normalized.startsWith("rate chat hii:");
 }
 
 function detectConversationRating(text: string): ConversationRating | null {
   const normalized = text.trim();
   if (!normalized) return null;
+
+  const interactiveMatch = normalized.match(/^rating:([1-5]):([a-z_ -]+)$/i);
+  if (interactiveMatch) {
+    const score = Number(interactiveMatch[1]);
+    const label = interactiveMatch[2].trim().toLowerCase().replace(/[\s-]+/g, "_");
+    return CONVERSATION_RATINGS.find((rating) => rating.score === score || rating.label === label) || null;
+  }
+
+  const lower = normalized.toLowerCase().replace(/[\s-]+/g, "_");
+  const labelMatch = CONVERSATION_RATINGS.find((rating) => lower === rating.label);
+  if (labelMatch) return labelMatch;
 
   for (const rating of CONVERSATION_RATINGS) {
     if (normalized === rating.emoji) return rating;
@@ -11468,8 +11492,8 @@ function compactMainMenuRows(rows: WhatsAppInteractiveRow[]): WhatsAppInteractiv
   if (rows.length <= WHATSAPP_LIST_ROW_LIMIT) return rows;
   const hasOfficialTools = rows.some((row) => row.id === "12");
   const priority = hasOfficialTools
-    ? new Set(["1", "2", "3", "4", "5", "6", "7", "8", "11", "12"])
-    : new Set(["1", "2", "3", "4", "5", "6", "7", "8", "9", "11"]);
+    ? new Set(["1", "2", "3", "4", "5", "6", "7", "8", "10", "12"])
+    : new Set(["1", "2", "3", "4", "5", "6", "7", "8", "10", "11"]);
   const compact = rows.filter((row) => priority.has(row.id));
   return compact.slice(0, WHATSAPP_LIST_ROW_LIMIT);
 }
@@ -11481,9 +11505,21 @@ function interactiveBody(body: string, fallback: string): string {
     .filter((line) =>
       line &&
       !/^\d{1,2}\.\s+/.test(line) &&
-      !/^(0\.|Tip:|Treasurer:|Chair\/Admin\/Secretary:|Examples:|Reply 0|Rate this chat:)/i.test(line)
+      !/^(0\.|Tip:|Treasurer:|Chair\/Admin\/Secretary:|Examples:|Reply 0|Rate this chat:|Tap the button below|Bonyeza button hapa chini)/i.test(line)
     );
   return fitWhatsAppText(lines.slice(0, 4).join("\n") || fallback, 1024);
+}
+
+function mainMenuInteractiveBody(body: string): string {
+  const sw = detectLanguage(body) === "sw";
+  const greeting = body.trim().split(/\n/)[0]?.replace(/This is your Turuturu Stars member self-service\.?/i, "").trim();
+  const prefix = greeting && greeting.length <= 80 ? `${greeting} ` : "";
+  return fitWhatsAppText(
+    sw
+      ? `${prefix}Chagua huduma hapa WhatsApp, au andika request yako kawaida.`
+      : `${prefix}Choose a service in WhatsApp, or type your request normally.`,
+    1024,
+  );
 }
 
 function isMainMenuReply(body: string): boolean {
@@ -11491,7 +11527,16 @@ function isMainMenuReply(body: string): boolean {
 }
 
 function isMenuChoiceReply(body: string): boolean {
-  return /^(Wallet menu|Contribution menu|Kitty menu|Welfare menu|Official tools)\b/i.test(body.trim());
+  return /\b(Wallet menu|Contribution menu|Kitty menu|Welfare menu|Official tools)\b/i.test(body.trim());
+}
+
+function menuSectionFromReply(body: string): string {
+  if (/\bWallet menu\b/i.test(body)) return "wallet";
+  if (/\bContribution menu\b/i.test(body)) return "contribution";
+  if (/\bKitty menu\b/i.test(body)) return "kitty";
+  if (/\bWelfare menu\b/i.test(body)) return "welfare";
+  if (/\bOfficial tools\b/i.test(body)) return "official";
+  return "main";
 }
 
 function isDynamicSelectionReply(body: string): boolean {
@@ -11501,12 +11546,13 @@ function isDynamicSelectionReply(body: string): boolean {
 function buttonInteractiveFromRows(body: string, rows: WhatsAppInteractiveRow[]): WhatsAppInteractiveContent | null {
   if (rows.length < 1 || rows.length > 3) return null;
   const sw = detectLanguage(body) === "sw";
+  const section = menuSectionFromReply(body);
   return {
     kind: "button",
     body: interactiveBody(body, sw ? "Chagua hatua inayofuata." : "Choose the next step."),
     footer: sw ? "Reply 0 kurudi." : "Reply 0 to go back.",
     buttons: rows.map((row) => ({
-      id: `menu:main:${row.id}`,
+      id: `menu:${section || "main"}:${row.id}`,
       title: fitWhatsAppText(row.title, 20),
     })),
   };
@@ -11523,12 +11569,14 @@ function listInteractiveFromRows(
   return {
     kind: "list",
     header: fitWhatsAppText(options.header || "Turuturu Stars", 60),
-    body: interactiveBody(
-      body,
-      sw
-        ? "Chagua option hapa WhatsApp, au andika swali lako kawaida."
-        : "Choose an option in WhatsApp, or type your request normally.",
-    ),
+    body: options.mainMenu
+      ? mainMenuInteractiveBody(body)
+      : interactiveBody(
+        body,
+        sw
+          ? "Chagua option hapa WhatsApp, au andika swali lako kawaida."
+          : "Choose an option in WhatsApp, or type your request normally.",
+      ),
     footer: sw ? "Unaweza kuandika MENU wakati wowote." : "You can type MENU anytime.",
     button: fitWhatsAppText(options.button || (sw ? "Chagua huduma" : "Choose service"), 20),
     sections: [
@@ -11543,7 +11591,95 @@ function listInteractiveFromRows(
   };
 }
 
+function moreServicesInteractive(body: string): WhatsAppInteractiveContent | null {
+  if (!/^More member services:/i.test(body.trim())) return null;
+  const sw = detectLanguage(body) === "sw";
+  return {
+    kind: "list",
+    header: "Turuturu Stars",
+    body: sw
+      ? "Chagua huduma zaidi hapa WhatsApp, au andika keyword moja kwa moja."
+      : "Choose another service in WhatsApp, or type a keyword directly.",
+    footer: sw ? "MENU kurudi main menu." : "MENU returns to the main menu.",
+    button: sw ? "Huduma zaidi" : "More services",
+    sections: [
+      {
+        title: "More services",
+        rows: [
+          { id: "keyword:jobs", title: "Jobs", description: sw ? "Nafasi za kazi" : "Open opportunities" },
+          { id: "keyword:voting", title: "Voting", description: sw ? "Motions na voting status" : "Motions and voting status" },
+          { id: "keyword:refunds", title: "Refunds", description: sw ? "Status ya refund" : "Refund request status" },
+          { id: "keyword:discipline", title: "Discipline", description: sw ? "Fines na discipline records" : "Fines and discipline records" },
+          { id: "keyword:membership", title: "Membership", description: sw ? "Status ya membership" : "Membership and registration status" },
+        ],
+      },
+    ],
+  };
+}
+
+function quickActionInteractive(body: string): WhatsAppInteractiveContent | null {
+  const sw = detectLanguage(body) === "sw";
+  const normalized = body.trim();
+  const isGreeting = /^(Hi|Mambo)\s+.+\b(I am here|Niko hapa)\./i.test(normalized) &&
+    /Reply MENU (only|tu)/i.test(normalized);
+  if (!isGreeting) return null;
+
+  return {
+    kind: "button",
+    body: interactiveBody(
+      body,
+      sw ? "Niko hapa. Chagua hatua au andika request yako." : "I am here. Choose a step or type your request.",
+    ),
+    footer: sw ? "Unaweza pia kuandika kawaida." : "You can also type normally.",
+    buttons: [
+      { id: "quick:menu", title: sw ? "Menu" : "Menu" },
+      { id: "quick:wallet", title: "Wallet" },
+      { id: "quick:support", title: sw ? "Support" : "Support" },
+    ],
+  };
+}
+
+function ratingInteractive(to: string, language: "auto" | "en" | "sw"): WhatsAppPreparedReply {
+  const sw = language === "sw";
+  const body = ratingPromptReply(language);
+  const interactive: WhatsAppInteractiveContent = {
+    kind: "list",
+    header: "Turuturu Stars",
+    body,
+    footer: sw ? "Chagua rating moja." : "Choose one rating.",
+    button: sw ? "Rate chat" : "Rate chat",
+    sections: [
+      {
+        title: sw ? "Rating yako" : "Your rating",
+        rows: CONVERSATION_RATINGS.map((rating) => ({
+          id: `rating:${rating.score}:${rating.label}`,
+          title: fitWhatsAppText(rating.label[0].toUpperCase() + rating.label.slice(1), 24),
+          description: `${rating.score}/5`,
+        })),
+      },
+    ],
+  };
+  return {
+    messageType: "interactive",
+    fallbackBody: ratingFallbackBody(language),
+    payload: whatsappPayloadForInteractive(to, interactive),
+  };
+}
+
+function ratingFallbackBody(language: "auto" | "en" | "sw"): string {
+  const labels = CONVERSATION_RATINGS.map((rating) => rating.label).join(", ");
+  return language === "sw"
+    ? `Rate chat hii: ${labels}.`
+    : `Rate this chat: ${labels}.`;
+}
+
 function whatsappInteractiveForReply(body: string): WhatsAppInteractiveContent | null {
+  const quickAction = quickActionInteractive(body);
+  if (quickAction) return quickAction;
+
+  const moreServices = moreServicesInteractive(body);
+  if (moreServices) return moreServices;
+
   const rows = parseMenuRows(body);
   if (!rows.length) return null;
 
@@ -11661,6 +11797,15 @@ function whatsappPayloadForText(to: string, body: string): Record<string, unknow
 
 function prepareWhatsAppReply(to: string, body: string, accessLink?: WhatsAppAccessLink): WhatsAppPreparedReply {
   const fallbackBody = clampPlainWhatsAppText(body, 3900);
+  const interactive = whatsappInteractiveForReply(fallbackBody);
+  if (interactive) {
+    return {
+      messageType: "interactive",
+      fallbackBody,
+      payload: whatsappPayloadForInteractive(to, interactive),
+    };
+  }
+
   if (accessLink) {
     return {
       messageType: "interactive",
@@ -11672,15 +11817,6 @@ function prepareWhatsAppReply(to: string, body: string, accessLink?: WhatsAppAcc
         displayText: accessLink.displayText,
         url: accessLink.url,
       }),
-    };
-  }
-
-  const interactive = whatsappInteractiveForReply(fallbackBody);
-  if (interactive) {
-    return {
-      messageType: "interactive",
-      fallbackBody,
-      payload: whatsappPayloadForInteractive(to, interactive),
     };
   }
 
@@ -11817,6 +11953,65 @@ async function sendWhatsAppText(
   };
 }
 
+async function sendWhatsAppRatingPrompt(
+  to: string,
+  phoneNumberId: string | null,
+  language: "auto" | "en" | "sw",
+): Promise<{
+  status: string;
+  providerResponse: unknown;
+  providerMessageId: string | null;
+  messageType: WhatsAppOutboundMessageType;
+  body: string;
+}> {
+  const provider = resolveWhatsAppProvider(phoneNumberId);
+  const prepared = ratingInteractive(to, language);
+
+  if (!provider) {
+    return {
+      status: "skipped_missing_provider_config",
+      providerResponse: { skipped: true, reason: "Missing WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID" },
+      providerMessageId: null,
+      messageType: "text",
+      body: prepared.fallbackBody,
+    };
+  }
+
+  let response = await postWhatsAppPayload(provider, prepared.payload);
+  let delivered = prepared;
+
+  if (!response.ok) {
+    console.warn("WhatsApp rating interactive send failed; falling back to text", response.status, response.payload);
+    delivered = {
+      messageType: "text",
+      fallbackBody: prepared.fallbackBody,
+      payload: whatsappPayloadForText(to, prepared.fallbackBody),
+    };
+    response = await postWhatsAppPayload(provider, delivered.payload);
+  }
+
+  if (!response.ok) {
+    console.error("WhatsApp rating prompt send failed", response.status, response.payload);
+    return {
+      status: "send_failed",
+      providerResponse: response.payload,
+      providerMessageId: null,
+      messageType: delivered.messageType,
+      body: delivered.fallbackBody,
+    };
+  }
+
+  const messages = response.payload?.messages as Array<Record<string, unknown>> | undefined;
+  const providerMessageId = cleanString(messages?.[0]?.id);
+  return {
+    status: "sent",
+    providerResponse: response.payload,
+    providerMessageId,
+    messageType: delivered.messageType,
+    body: delivered.fallbackBody,
+  };
+}
+
 async function postWhatsAppPayload(
   provider: { accessToken: string; phoneNumberId: string; apiVersion: string },
   payload: Record<string, unknown>,
@@ -11864,7 +12059,7 @@ async function sendAndLogReply(
   accessLink?: WhatsAppAccessLink,
 ): Promise<string | null> {
   const plainBody = plainWhatsAppText(body);
-  const finalBody = clampPlainWhatsAppText(includeRatingPrompt ? appendRatingPrompt(plainBody) : plainBody, 3900);
+  const finalBody = clampPlainWhatsAppText(plainBody, 3900);
   const sendResult = await sendWhatsAppText(message.phone, finalBody, message.phoneNumberId, accessLink);
   const outboundMessageId = await logOutboundMessage(
     supabase,
@@ -11876,6 +12071,22 @@ async function sendAndLogReply(
     sendResult.providerMessageId,
     sendResult.messageType,
   );
+
+  if (includeRatingPrompt) {
+    const ratingLanguage = detectLanguage(message.text || finalBody);
+    const ratingResult = await sendWhatsAppRatingPrompt(message.phone, message.phoneNumberId, ratingLanguage);
+    await logOutboundMessage(
+      supabase,
+      message.phone,
+      profile,
+      ratingResult.body,
+      ratingResult.status,
+      ratingResult.providerResponse,
+      ratingResult.providerMessageId,
+      ratingResult.messageType,
+    );
+  }
+
   await markSessionOutbound(supabase, message.phone);
   return outboundMessageId;
 }
@@ -11945,19 +12156,20 @@ async function recordConversationRating(
 ): Promise<void> {
   const { data: ratedMessage, error: ratedMessageError } = await supabase
     .from("whatsapp_messages")
-    .select("id")
+    .select("id, body")
     .eq("phone", message.phone)
     .eq("profile_id", profile.id)
     .eq("direction", "outbound")
     .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(5);
 
-  if (ratedMessageError && ratedMessageError.code !== "PGRST116") {
+  if (ratedMessageError) {
     throw new HttpError(500, "Failed to find latest WhatsApp assistant reply for rating", ratedMessageError);
   }
 
-  const ratedMessageId = ratedMessage ? String((ratedMessage as Record<string, unknown>).id) : null;
+  const ratedMessageRow = ((ratedMessage || []) as Array<Record<string, unknown>>)
+    .find((row) => !isRatingPromptBody(cleanString(row.body)));
+  const ratedMessageId = ratedMessageRow ? String(ratedMessageRow.id) : null;
   let ratedActionId: string | null = null;
 
   if (ratedMessageId) {

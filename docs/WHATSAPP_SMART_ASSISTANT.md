@@ -8,7 +8,7 @@ It can:
 - Accept WhatsApp Cloud API inbound messages.
 - Match the sender phone number against `profiles.phone`.
 - Greet registered members by name when the number is recognized.
-- Ask registered members to rate the chat with emoji choices `😍 😊 😐 🙁 😡` and store those ratings.
+- Ask registered members to rate the chat with a WhatsApp rating picker and store those ratings.
 - Guide unknown numbers through a registration-interest flow:
   confirm the WhatsApp number, optionally collect email, verify email by OTP when available, collect required profile details, and create the member account.
 - Understand natural English, Kiswahili, and mixed Kenyan phrasing.
@@ -45,7 +45,7 @@ supabase secrets set BREVO_API_KEY="brevo-api-key" BREVO_SENDER_EMAIL="support@t
 
 Keep `WHATSAPP_REGISTRATION_DEFAULT_STATUS` as `pending` for production. Setting it to `active` makes WhatsApp-created accounts usable immediately after registration.
 
-The assistant uses Meta Cloud API interactive messages for menus when possible. If Meta rejects an interactive payload, it automatically retries the same reply as plain text. Typing indicators are enabled by default; set `WHATSAPP_ENABLE_TYPING_INDICATOR="false"` to disable them for troubleshooting.
+The assistant uses Meta Cloud API interactive messages for menus, quick actions, and rating prompts when possible. If Meta rejects an interactive payload, it automatically retries the same reply as plain text. Typing indicators are enabled by default; set `WHATSAPP_ENABLE_TYPING_INDICATOR="false"` to disable them for troubleshooting.
 
 Recommended:
 
@@ -138,13 +138,7 @@ Announcement publishing is unified through the database helper `enqueue_announce
 
 Unknown numbers are not allowed into member-priority actions. They are prompted to reply `REGISTER`, confirm the number they are messaging from, then either provide an email or reply `SKIP` / `NO EMAIL`. Email is optional, and users may send profile details directly at the email step. If an email is provided, the bot verifies it by OTP when possible, but registration can continue without blocking on email delivery. Once full name, National ID, and location are complete, the bot creates an auth/profile member account with the National ID as the default password. By default the new member is `pending`, so member-priority services stay locked until an admin approves the account.
 
-After registered-member replies, the assistant appends:
-
-```text
-Rate this chat: 😍 😊 😐 🙁 😡
-```
-
-When the member replies with one of those emojis, the rating is saved and the bot sends a short thank-you without starting a new command.
+After registered-member replies, the assistant sends a compact WhatsApp `Rate chat` picker instead of appending rating text into the reply body. Members can tap a rating option, or type a rating label such as `excellent`, `good`, `okay`, `poor`, or `bad`. The rating is saved and the bot sends a short thank-you without starting a new command.
 
 ## Conversation Pauses
 
